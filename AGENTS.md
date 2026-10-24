@@ -145,8 +145,9 @@ einen separaten Celery-Worker, Redis, PostgreSQL **ohne pgvector** und
 Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO,
 pgvector und die vollständige Aufnahme-/Clip-/Review-Pipeline aus der
 Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend ist als separater
-Demo-/Live-Kamera-Client vorhanden; die neue Audio-Job-API ist dort noch nicht
-angebunden. Umgesetzt sind zwei getrennte
+Demo-/Live-Kamera-Client vorhanden; der Aufnahme-Pfad nutzt die Audio-Job-API
+mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
+jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
 Analyse-Pipelines mit S3-Persistenz für kombinierte Jobs, beide mit `t_ms` ab Aufnahmestart im
 gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als
 Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription

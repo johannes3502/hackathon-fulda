@@ -119,3 +119,17 @@ Infrastrukturauftrags. Der lokale Stack bleibt gestartet.
 - Während der Arbeit eingegangene Frontend-Teamänderungen aus `origin/main`
   konfliktfrei in den Arbeitsbranch integriert. Deren Live-Kamera-/SSE-Protokoll
   bleibt separat; die Audio-Job-API ist noch nicht in die neue Oberfläche eingebunden.
+
+## Merge-Vorbereitung der Audio-PR (24.10.2026)
+
+Neue Teamänderung auf `main` verband die Kamera mit dem alten synchronen
+`/speech/analyze`. Vor dem Merge angepasst: vollständige Aufnahme weiter erst
+nach Stop hochladen, `transcribe=false` beibehalten, 202/Job-ID prüfen und
+Status bis completed/failed abfragen. Abbruch beendet Polling; Fehler lassen
+das lokale Video verfügbar. Zeitbudget des Pollings: elf Minuten, keine Aussage
+zur Modelllatenz. ASR bleibt separat über die API verfügbar. Damit ist die
+oben dokumentierte fehlende Audio-UI-Anbindung für die lokale Signalanalyse behoben.
+
+Prüfung vor PR/Merge: 33 Backend-Tests (echtes Silero-Modell), 26 Frontend-Tests,
+sechs Browser-Tests mit synthetischer Kamera auf Desktop/schmalem Viewport,
+TypeScript, ESLint, Produktionsbuild und API-Aktualitätscheck bestanden.

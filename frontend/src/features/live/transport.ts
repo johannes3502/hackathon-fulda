@@ -4,7 +4,7 @@ import type {
   VideoChunkMeta,
   VideoTransport,
 } from "./contracts";
-import { analysisResult, request } from "./analysis";
+import { analysisResult, request, waitForAudioJob } from "./analysis";
 
 export class AnalysisTransport implements VideoTransport {
   private controller = new AbortController();
@@ -28,11 +28,19 @@ export class AnalysisTransport implements VideoTransport {
       recording,
       recording.type.includes("mp4") ? "take.mp4" : "take.webm",
     );
-    const result = analysisResult(
-      await request(this.endpoint, "/speech/analyze", this.controller.signal, {
+    // Preserve this UI's local signal-analysis mode; paid ASR is opt-in via API.
+    body.append("transcribe", "false");
+    const accepted = await request(
+      this.endpoint,
+      "/speech/analyze",
+      this.controller.signal,
+      {
         method: "POST",
         body,
-      }),
+      },
+    );
+    const result = analysisResult(
+      await waitForAudioJob(this.endpoint, accepted, this.controller.signal),
       "speech",
       durationMs,
     );
