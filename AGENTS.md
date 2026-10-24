@@ -10,7 +10,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 |---|---|---|
 | 1 | Posture / Gesture / Eye Tracking | Pose-, Gesten- und Blick-Landmarks aus der Kamera; Regeln darauf erzeugen Events (z. B. „Haltung auffällig“) |
 | 2 | Transkription + Fact-Check | Transkript mit Wort-Timestamps; Abgleich der Aussagen per RAG mit vorab hochgeladenen Quellen (PDF, PPTX, …); Web-Fetch-Agent als Zweitquelle |
-| 3 | Sprechmerkmale | Tempo, Pausen, Zögern, Füllwörter, Lautstärke (zu leise/laut) |
+| 3 | Sprechmerkmale | Tempo, Pausen, Zögern, Füllwörter, Lautstärke (zu leise/laut), Tonhöhenvariation (monoton); live Hinweise während des Vortrags |
 | 4 | Timestamp-Review | Events auf einer Timeline; Klick springt zur Stelle und spielt den Clip des Events ab |
 | 5 | Frage-Simulator | Agent stellt nach der Präsentation Fragen, abgeleitet aus Transkript, Quellen und Fact-Check-Funden |
 
@@ -45,7 +45,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 - **Transkription:** Stufe A (zuerst): Audio nach dem Stoppen hochladen, Wort-Timestamps zurück. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg → Anbieter mit Füllwort-Option prüfen (z. B. Deepgram, AssemblyAI) oder `faster-whisper`/CrisperWhisper als lokale Alternative. Wort-Timestamps und Füllwort-Unterstützung des gewählten Modells vor der Entscheidung gegen die aktuelle Doku prüfen.
 - **Embeddings:** mehrsprachiges Modell (Inhalte sind deutsch), z. B. Voyage, OpenAI oder lokal bge-m3 / multilingual-e5. Bei wenigen kleinen Dokumenten reicht auch Long-Context ohne Vektoren.
 - **Fact-Check und Frage-Agent:** ein LLM-Anbieter für beides. Für den Web-Fetch-Agent Anbieter-Tool für Suche/Abruf nutzen, kein eigenes Scraping.
-- **Stimme:** Lautstärke per RMS im Browser, relativ zu einer Kalibrierung (ca. 3 s normales Sprechen). Keine Tonhöhen-Analyse.
+- **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
 - **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
@@ -56,7 +56,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 ```
 Browser (Next.js, TS)
  ├─ Kamera → MediaPipe (Pose/Face/Hand) → Regeln → Events + Landmarks      [live, lokal]
- ├─ Mikro  → AudioWorklet → Pegel/Lautstärke                               [live, lokal]
+ ├─ Mikro  → AudioWorklet → Pegel, F0, Silbenrate → Regeln → Events + Live-Hinweis [live, lokal]
  └─ MediaRecorder → komplette Aufnahme ──(Presigned URL)──► MinIO
                                                      │
  Quellen-Upload (PDF/PPTX) ──────────────────────────┤
@@ -86,7 +86,7 @@ Event {
   session_id, id,
   t_ms          // relativ zum Aufnahmestart
   duration_ms,
-  type          // posture | gesture | gaze | filler | pause | pace | volume | fact | question
+  type          // posture | gesture | gaze | filler | pause | pace | volume | pitch | fact | question
   severity      // info | hint | warning
   source        // browser | asr | speech | factcheck | agent
   clip_key?, snapshot_key?   // Objektspeicher
@@ -97,6 +97,7 @@ Event {
 ### Regeln
 
 - **Gemeinsame Zeitachse:** Alle Events tragen `t_ms` relativ zum Aufnahmestart. Der Landmark-Takt wird an `MediaRecorder.onstart` verankert (`performance.now()`), das Review nutzt nur `video.currentTime`.
+- **Live-Feedback:** Browser-Regeln (Pose und Stimme) zeigen während der Aufnahme einen dezenten Hinweis (z. B. „Tempo hoch“, „Stimme monoton“, „zu leise“), ohne Score und ohne Note. Damit er nicht ablenkt: Mindestdauer der Abweichung, Cooldown pro Hinweis-Typ, höchstens ein Hinweis gleichzeitig, abschaltbar. Jeder Hinweis erzeugt zugleich ein Event für die Timeline. Schwellenwerte sind Konfiguration relativ zur Baseline und als „Heuristik“ gekennzeichnet.
 - **Pose-Events:** Regeln auf Landmark-Winkeln, kalibriert gegen eine Baseline (erste Sekunden neutrale Haltung), mit Mindestdauer gegen Flackern. Schwellenwerte sind Konfiguration und im UI als „Heuristik“ gekennzeichnet. Kamera-Framing: Oberkörper muss sichtbar sein, sonst Hinweis statt Auswertung.
 - **Clips statt Vollvideo:** Das Backend schneidet pro Event ein Fenster (ca. 5 s vor/nach, mit Re-Encode für präzise Schnitte) plus Snapshot-Frame und löscht die Originalaufnahme. Aufnahme vorher remuxen, weil `MediaRecorder`-WebM nicht seekbar ist.
 - **Fact-Check:** (1) LLM extrahiert prüfbare Aussagen mit Timestamp aus dem Transkript, (2) Top-k-Chunks pro Aussage aus pgvector, (3) LLM urteilt mit wörtlichem Zitat, (4) Code prüft per String-Match, dass das Zitat im Chunk steht. Drei Ergebnisse: *stützt*, *widerspricht*, *in den Quellen nicht gefunden*. Letzteres ist nicht „falsch“. Web-Fetch kommt erst danach als Zweitquelle.
