@@ -89,6 +89,11 @@ export function SessionSetupForm() {
               <Play size={17} /> {pending ? "Opening demo…" : "Try sample demo"}
             </Button>
             <Button asChild variant="outline">
+              <Link href="/gestures">
+                See gestures in 22 seconds <ArrowRight size={17} />
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/live">
                 Open camera studio <ArrowRight size={17} />
               </Link>

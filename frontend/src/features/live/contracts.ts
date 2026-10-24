@@ -1,10 +1,19 @@
-import type { components } from "../../../../api/schema";
+import type { PoseEvent } from "../pose/evaluation";
 import type { QuestionAnswer, QuestionResult } from "../questions/api";
-
+import type { components } from "../../../../api/schema";
 export type Word = components["schemas"]["Word"];
 export type FactCheckResult = components["schemas"]["FactCheckResult"];
-export type FeedbackKind = "positive" | "suggestion" | "attention";
+export type TranscriptWord = components["schemas"]["Word"];
+export type LiveTranscript = {
+  words: TranscriptWord[];
+  provider: string | null;
+  synthetic: boolean;
+  notices: string[];
+};
+export type FeedbackKind =
+  "positive" | "suggestion" | "attention" | "observation";
 export type LiveFeedback = {
+  evidence?: PoseEvent;
   id: string;
   category: string;
   kind: FeedbackKind;
@@ -23,9 +32,8 @@ export type LiveMetric = {
 export type LiveConfig = {
   title: string;
   targetMs: number;
-  mode: "demo" | "backend";
+  mode: "local" | "backend";
   endpoint: string;
-  /** Backend mode: send audio to the configured ASR for word timestamps. */
   transcribe?: boolean;
 };
 export type VideoChunkMeta = {
@@ -39,8 +47,8 @@ export type VideoChunkMeta = {
 export type LiveMessage =
   | { type: "feedback"; sessionId: string; feedback: LiveFeedback }
   | { type: "metrics"; sessionId: string; atMs: number; metrics: LiveMetric[] }
-  | { type: "transcript"; sessionId: string; words: Word[] }
-  | { type: "error"; sessionId: string; message: string };
+  | { type: "error"; sessionId: string; message: string }
+  | { type: "transcript"; sessionId: string; transcript: LiveTranscript };
 export type LiveProgress = {
   phase: "connecting" | "recording" | "finishing";
   elapsedMs: number;
@@ -48,10 +56,15 @@ export type LiveProgress = {
   bytesSent: number;
   feedback: LiveFeedback[];
   metrics: LiveMetric[];
-  words?: Word[];
   notice: string | null;
 };
 export type LiveRecording = {
+  words?: Word[];
+  factCheck?: FactCheckResult;
+  questions?: QuestionResult;
+  answers?: Record<string, QuestionAnswer>;
+  transcript?: LiveTranscript;
+  poseEvents?: PoseEvent[];
   poseLog?: Blob;
   id: string;
   config: LiveConfig;
@@ -66,13 +79,6 @@ export type LiveRecording = {
   bytesSent: number;
   completion: "complete" | "interrupted";
   notice: string | null;
-  /** Word timestamps from ASR or an imported transcript; input of the fact-check. */
-  words?: Word[];
-  factCheck?: FactCheckResult;
-  /** Question simulator; follow-ups are inserted into `questions.questions`. */
-  questions?: QuestionResult;
-  /** Typed answers and their source comparison, keyed by question id. */
-  answers?: Record<string, QuestionAnswer>;
 };
 export interface VideoTransport {
   connect(

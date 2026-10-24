@@ -19,10 +19,6 @@ export function LiveAnalysis({ sessionId }: { sessionId: string }) {
         durationMs: recording.durationMs,
         videoUrl: recording.videoUrl,
         demo: false,
-        notice:
-          recording.config.mode === "demo"
-            ? "Echte Aufnahme mit vorgegebenen Demo-Markern. Diese Markierungen sind keine erkannten Stärken oder Schwächen. Es sind keine Performance-Werte hinterlegt."
-            : undefined,
         performance: [],
         moments: recording.feedback.map((item) => {
           const factIndex = /^fact-(\d+)$/.exec(item.id);

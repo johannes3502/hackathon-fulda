@@ -33,13 +33,13 @@ export function FactCheckPanel({
   recording: LiveRecording;
   onSelect: (feedback: LiveFeedback) => void;
 }) {
-  const { save } = useLiveSessions();
+  const { update } = useLiveSessions();
   const endpoint = recording.config.endpoint;
   const [settings, setSettings] = useState<FactCheckSettings | null>(null);
   // Same browser collection as the /sources page; never rendered on the server.
   const [collection] = useState(collectionId);
   const [readySources, setReadySources] = useState<number | null>(null);
-  const [useWeb, setUseWeb] = useState(true);
+  const [useWeb, setUseWeb] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -88,14 +88,23 @@ export function FactCheckPanel({
         active.signal,
       );
       if (active.signal.aborted) return;
-      save({
-        ...recording,
-        factCheck: checked,
-        feedback: [
-          ...recording.feedback.filter((f) => !f.id.startsWith("fact-")),
-          ...factFeedback(checked, recording.durationMs),
-        ].sort((a, b) => a.startMs - b.startMs),
-      });
+      update(recording.id, (current) =>
+        current.words !== words
+          ? current
+          : {
+              ...current,
+              factCheck: checked,
+              questions: undefined,
+              answers: undefined,
+              feedback: [
+                ...current.feedback.filter(
+                  (f) =>
+                    !f.id.startsWith("fact-") && !f.id.startsWith("question-"),
+                ),
+                ...factFeedback(checked, recording.durationMs),
+              ].sort((a, b) => a.startMs - b.startMs),
+            },
+      );
       setNotice(
         checked.claims.length
           ? `${checked.claims.length} ${checked.claims.length === 1 ? "statement" : "statements"} checked and added to your feedback moments.`
@@ -140,7 +149,9 @@ export function FactCheckPanel({
           <dt>Your sources</dt>
           <dd>
             {readySources === null ? "Unavailable" : `${readySources} ready`} ·{" "}
-            <Link href="/sources">Manage sources</Link>
+            <Link href="/sources" target="_blank" rel="noopener noreferrer">
+              Manage sources (new tab)
+            </Link>
           </dd>
         </div>
       </dl>
@@ -158,8 +169,8 @@ export function FactCheckPanel({
       )}
       {settings && !settings.available && (
         <p className="status-warning" role="status">
-          The fact-check model is not configured on the backend (LLM_BASE_URL,
-          LLM_MODEL).
+          The model is unavailable. Start the local model, then refresh its
+          status.
         </p>
       )}
       {settings?.available && (
@@ -174,6 +185,25 @@ export function FactCheckPanel({
       )}
       <Button onClick={() => void check()} disabled={!canRun}>
         {busy ? "Checking statements…" : result ? "Check again" : "Check facts"}
+      </Button>
+      <Button
+        variant="ghost"
+        disabled={busy}
+        onClick={() => {
+          const signal = AbortSignal.timeout(15000);
+          void factCheckSettings(endpoint, signal)
+            .then(setSettings)
+            .catch(() => setNotice("Model status is unavailable."));
+          void listSources(endpoint, collection)
+            .then((sources) =>
+              setReadySources(
+                sources.filter((s) => s.status === "ready").length,
+              ),
+            )
+            .catch(() => setNotice("Sources are unavailable."));
+        }}
+      >
+        Refresh status
       </Button>
       <p role="status" className="field-hint">
         {notice}

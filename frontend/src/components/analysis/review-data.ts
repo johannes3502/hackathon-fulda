@@ -83,7 +83,10 @@ export function feedbackToMoment(
     tMs: item.startMs,
     durationMs: Math.max(0, item.endMs - item.startMs),
     criterion: categories[item.category.toLowerCase()] ?? null,
-    kind: item.kind === "suggestion" ? "note" : item.kind,
+    kind:
+      item.kind === "suggestion" || item.kind === "observation"
+        ? "note"
+        : item.kind,
     title: item.title,
     detail: claim?.explanation || item.detail,
     action: item.action,

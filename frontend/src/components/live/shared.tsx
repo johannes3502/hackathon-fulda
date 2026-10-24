@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, FlaskConical, Radio } from "lucide-react";
+import { ArrowLeft, ArrowRight, Radio } from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import type { LiveConfig, LiveFeedback } from "@/features/live/contracts";
@@ -8,8 +8,10 @@ import { time } from "@/lib/utils";
 export function LiveBadge({ mode }: { mode: LiveConfig["mode"] }) {
   return (
     <span className={`demo-badge ${mode === "backend" ? "backend-badge" : ""}`}>
-      {mode === "demo" ? <FlaskConical size={13} /> : <Radio size={13} />}
-      {mode === "demo" ? "Scripted demo feedback" : "Backend feedback"}
+      <Radio size={13} />
+      {mode === "local"
+        ? "Local gesture feedback"
+        : "Local gestures + backend audio"}
     </span>
   );
 }
@@ -85,11 +87,13 @@ export function FeedbackMoment({
     >
       <div className="finding-top">
         <span className={`feedback-kind ${feedback.kind}`}>
-          {feedback.kind === "positive"
-            ? "Keep"
-            : feedback.kind === "attention"
-              ? "Check"
-              : "Try"}{" "}
+          {feedback.kind === "observation"
+            ? "Observed"
+            : feedback.kind === "positive"
+              ? "Keep"
+              : feedback.kind === "attention"
+                ? "Check"
+                : "Try"}{" "}
           · {feedback.category}
         </span>
         <span className="timestamp">

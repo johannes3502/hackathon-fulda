@@ -30,6 +30,8 @@ import { apiEndpoint, request } from "@/features/live/analysis";
 import type { LiveConfig, LiveProgress } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
+import { poseFeedback } from "@/features/pose/feedback";
+import { GestureGuide } from "./GestureGuide";
 import { PoseDownload } from "./PoseDownload";
 import { PoseDebug } from "./PoseDebug";
 import { PoseOverlay } from "./PoseOverlay";
@@ -59,8 +61,8 @@ export function LiveStudio() {
   const pose = usePoseCapture(videoRef, cameraStatus === "active");
   const [title, setTitle] = useState("My pitch rehearsal");
   const [targetMs, setTargetMs] = useState(180000);
-  const [mode, setMode] = useState<LiveConfig["mode"]>("demo");
-  const [transcribe, setTranscribe] = useState(false);
+  const [mode, setMode] = useState<LiveConfig["mode"]>("local");
+  const [transcribe, setTranscribe] = useState(true);
   const [endpoint, setEndpoint] = useState(
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
   );
@@ -68,6 +70,7 @@ export function LiveStudio() {
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [largeView, setLargeView] = useState(true);
+  const [showCues, setShowCues] = useState(true);
   const [poseDebug, setPoseDebug] = useState(false);
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
@@ -143,10 +146,28 @@ export function LiveStudio() {
         setProgress(next);
       },
       (recording) => {
-        save({ ...recording, poseLog: pose.recordingBlob() });
+        const poseEvents = pose
+          .recordingEvents()
+          .filter((event) => event.t_ms < recording.durationMs)
+          .map((event) => ({
+            ...event,
+            duration_ms: Math.min(
+              event.duration_ms,
+              recording.durationMs - event.t_ms,
+            ),
+          }));
+        save({
+          ...recording,
+          poseLog: pose.recordingBlob(),
+          poseEvents,
+          feedback: [
+            ...recording.feedback,
+            ...poseEvents.map(poseFeedback),
+          ].sort((a, b) => a.startMs - b.startMs),
+        });
         router.push(`/live/${recording.id}/review`);
       },
-      pose.beginRecording,
+      (timestamp) => pose.beginRecording(timestamp, recorder.id),
     );
     owner.current = recorder;
     try {
@@ -168,7 +189,20 @@ export function LiveStudio() {
     stopCamera();
     setProgress(null);
   };
-  const latest = progress?.feedback.at(-1);
+  const evaluation =
+    cameraStatus === "active" && pose.state?.phase === "running"
+      ? pose.state.evaluation
+      : null;
+  const feedback = progress
+    ? [
+        ...progress.feedback,
+        ...(pose.state?.evaluation?.events ?? []).map(poseFeedback),
+      ].sort((a, b) => a.startMs - b.startMs)
+    : [];
+  const latest =
+    showCues && pose.state?.phase === "running" && evaluation?.cue
+      ? poseFeedback(evaluation.cue)
+      : null;
   return (
     <AppShell experience="live">
       <div
@@ -206,6 +240,22 @@ export function LiveStudio() {
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <div className="live-control-bar">
+              <fieldset className="live-analysis-choice" disabled={!!progress}>
+                <div className="field">
+                  <label htmlFor="live-source">Speech analysis</label>
+                  <NativeSelect
+                    id="live-source"
+                    value={mode}
+                    onChange={(e) => {
+                      stopCamera();
+                      setMode(e.target.value as LiveConfig["mode"]);
+                    }}
+                  >
+                    <option value="local">Off · gestures only</option>
+                    <option value="backend">On · local speech analysis</option>
+                  </NativeSelect>
+                </div>
+              </fieldset>
               {!progress ? (
                 cameraStatus === "active" && (
                   <>
@@ -269,7 +319,7 @@ export function LiveStudio() {
                         : "Preview only"}
                 </span>
                 <span className="stage-demo">
-                  {mode === "demo" ? (
+                  {mode === "local" ? (
                     <>
                       <MicOff size={14} /> No audio
                     </>
@@ -314,19 +364,13 @@ export function LiveStudio() {
                 </span>
               )}
               {cameraStatus === "active" &&
-                pose.state?.phase === "running" &&
-                pose.state.armsCrossed && (
-                  <span className="live-pose-cue" role="status">
-                    Arms crossed. Try an open stance.
-                    <small>Heuristic</small>
-                  </span>
-                )}
-              {cameraStatus === "active" &&
                 poseDebug &&
                 pose.state?.phase === "running" && (
                   <PoseDebug
                     sample={pose.state.latest}
-                    active={pose.state.armsCrossed}
+                    active={evaluation?.cue?.payload.rule === "arms_crossed"}
+                    evaluation={evaluation}
+                    timing={pose.state.timing}
                   />
                 )}
               {cameraStatus !== "active" && (
@@ -362,8 +406,8 @@ export function LiveStudio() {
                     : "Camera stays local until Start"}
                 </span>
                 <span>
-                  {mode === "demo"
-                    ? "Scripted feedback · local landmarks"
+                  {mode === "local"
+                    ? "Local gesture observations"
                     : progress?.phase === "recording"
                       ? "Audio analysis after stopping"
                       : "Backend mode"}
@@ -373,16 +417,16 @@ export function LiveStudio() {
             <p className="camera-message" role="status">
               {progress
                 ? (progress.notice ??
-                  (mode === "demo"
-                    ? "Demo feedback is scripted. No video is uploaded. Pose landmarks and logging stay local."
-                    : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis${transcribe ? " and transcription" : ""}.`))
+                  (mode === "local"
+                    ? "Video and gesture observations stay in this browser. Start each take with 3 seconds in a neutral position."
+                    : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis.`))
                 : cameraCopy[cameraStatus]}
               {mode === "backend" && !progress && (
                 <span className="recording-consent">
                   By starting, you agree to send your video and microphone audio
                   to <strong>{endpoint}</strong> after stopping.
                   {transcribe &&
-                    " Audio is also sent to the configured speech recognition provider (default: Deepgram, EU endpoint)."}{" "}
+                    " Whisper transcribes locally; no audio is sent to a cloud provider."}{" "}
                   The original is removed after processing; analysis results
                   remain stored.
                 </span>
@@ -417,22 +461,6 @@ export function LiveStudio() {
                     </div>
                   </div>
                 </details>
-                <div className="field">
-                  <label htmlFor="live-source">Feedback source</label>
-                  <NativeSelect
-                    id="live-source"
-                    value={mode}
-                    onChange={(e) => {
-                      stopCamera();
-                      setMode(e.target.value as LiveConfig["mode"]);
-                    }}
-                  >
-                    <option value="demo">Local demo · scripted markers</option>
-                    <option value="backend">
-                      Backend · audio analysis after recording
-                    </option>
-                  </NativeSelect>
-                </div>
                 {mode === "backend" && (
                   <div className="field">
                     <details className="connection-settings">
@@ -456,16 +484,32 @@ export function LiveStudio() {
                         checked={transcribe}
                         onChange={(e) => setTranscribe(e.target.checked)}
                       />
-                      Transcribe speech for word analysis and fact-check
+                      Create a transcript with local Whisper
                     </label>
                     <p className="field-hint">
                       {transcribe
-                        ? "The backend sends the audio to its configured speech recognition provider (default: Deepgram, EU endpoint). The transcript is needed for the fact-check in the review."
+                        ? "Whisper transcribes on the backend. Review the transcript before checking claims against your sources."
                         : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
                     </p>
                   </div>
                 )}
               </fieldset>
+            </details>
+            <details className="live-settings gesture-settings">
+              <summary>Gesture guide and calibration</summary>
+              <GestureGuide evaluation={evaluation ?? null} />
+              <Button
+                variant="outline"
+                disabled={
+                  cameraStatus !== "active" ||
+                  pose.state?.phase !== "running" ||
+                  !!progress
+                }
+                onClick={pose.recalibrate}
+              >
+                Recalibrate neutral position
+              </Button>
+              <Link href="/gestures">Try synthetic walkthrough</Link>
             </details>
             <details
               className="live-settings studio-diagnostics"
@@ -486,8 +530,8 @@ export function LiveStudio() {
                 data is uploaded or used to score your presentation.
               </p>
               <p className="field-hint">
-                Head angles and frontal-eye visibility are uncalibrated
-                heuristics, not gaze tracking. Missing measurements stay empty.
+                Gesture and posture observations are prototype heuristics. Eye
+                contact, emotion and presentation quality are not measured.
               </p>
               <div className="live-control-bar">
                 {pose.state?.phase === "error" && (
@@ -519,7 +563,7 @@ export function LiveStudio() {
               <div className="stream-summary">
                 <span>
                   {progress?.chunksSent ?? 0} recording parts{" "}
-                  {mode === "demo"
+                  {mode === "local"
                     ? "handled locally"
                     : "uploaded after stopping"}
                 </span>
@@ -533,25 +577,32 @@ export function LiveStudio() {
               review. Download it before refreshing or leaving this workspace.
             </p>
           </div>
-          {progress && (
+          {(cameraStatus === "active" || progress) && (
             <aside className="coaching-column">
               <section className="cue-panel">
                 <div className="panel-title-row">
                   <h2>
-                    <Eye size={18} />{" "}
-                    {mode === "demo" ? "Live feedback" : "Audio feedback"}
+                    <Eye size={18} /> Live gesture feedback
                   </h2>
-                  <span>{mode === "demo" ? "Scripted" : "From backend"}</span>
+                  <span>Heuristic</span>
                 </div>
                 <div aria-live="polite" aria-atomic="true">
                   <p className="cue-message">
-                    {latest?.title ?? "One useful moment at a time."}
+                    {!showCues
+                      ? "Live hints hidden"
+                      : (latest?.title ??
+                        (pose.state?.phase === "error"
+                          ? "Landmarks unavailable"
+                          : evaluation?.phase === "ready"
+                            ? "Ready for your next gesture"
+                            : "Find your neutral position"))}
                   </p>
                   <p className="live-cue-detail">
-                    {latest?.action ??
-                      (mode === "demo"
-                        ? "Start a recording to try example feedback markers and video replay."
-                        : `Audio heuristics appear after you finish. Pose logging is separate from feedback. ${transcribe ? "Transcript-based feedback follows the audio analysis." : "Transcription is off."}`)}
+                    {!showCues
+                      ? "Observations still appear in your review."
+                      : (latest?.action ??
+                        evaluation?.message ??
+                        "Enable your camera, then keep shoulders, hips and hands visible. Recording is optional for preview.")}
                   </p>
                 </div>
                 {latest && (
@@ -560,40 +611,43 @@ export function LiveStudio() {
                     {time(latest.endMs)}
                   </span>
                 )}
+                <label className="loop-control">
+                  <input
+                    type="checkbox"
+                    checked={showCues}
+                    onChange={(e) => setShowCues(e.target.checked)}
+                  />{" "}
+                  Show live hints
+                </label>
               </section>
-              {progress && (
-                <section className="panel live-events">
-                  <div className="panel-title-row">
-                    <h2>Session observations</h2>
-                    <span className="badge">
-                      {progress?.feedback.length ?? 0}
+              <section className="panel live-events">
+                <div className="panel-title-row">
+                  <h2>Session observations</h2>
+                  <span className="badge">{feedback.length}</span>
+                </div>
+                {feedback.length ? (
+                  <div className="event-feed">
+                    {feedback.toReversed().map((item) => (
+                      <div key={item.id}>
+                        <span className={`feedback-kind ${item.kind}`}>
+                          {item.category} · {time(item.startMs)}
+                        </span>
+                        <strong>{item.title}</strong>
+                        <p>{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="live-empty">
+                    <CheckCircle2 size={24} />
+                    <p>No observations yet.</p>
+                    <span>
+                      Start a take to save observations for replay. No
+                      observations does not imply a perfect performance.
                     </span>
                   </div>
-                  {progress?.feedback.length ? (
-                    <div className="event-feed">
-                      {progress.feedback.toReversed().map((item) => (
-                        <div key={item.id}>
-                          <span className={`feedback-kind ${item.kind}`}>
-                            {item.category} · {time(item.startMs)}
-                          </span>
-                          <strong>{item.title}</strong>
-                          <p>{item.detail}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="live-empty">
-                      <CheckCircle2 size={24} />
-                      <p>No observations yet.</p>
-                      <span>
-                        {mode === "demo"
-                          ? "Three scripted markers arrive in the first 10 seconds."
-                          : "No feedback does not imply a perfect performance."}
-                      </span>
-                    </div>
-                  )}
-                </section>
-              )}
+                )}
+              </section>
               {!!progress?.metrics.length && (
                 <section className="panel live-events">
                   <h2>Backend metrics</h2>
@@ -610,6 +664,17 @@ export function LiveStudio() {
                   </dl>
                 </section>
               )}
+              <div className="stream-summary">
+                <span>
+                  {progress?.chunksSent ?? 0} recording parts{" "}
+                  {mode === "local"
+                    ? "handled locally"
+                    : "uploaded after stopping"}
+                </span>
+                <span>
+                  {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
+                </span>
+              </div>
             </aside>
           )}
         </div>

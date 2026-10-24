@@ -50,6 +50,58 @@ async function syntheticCamera(page: Page) {
     };
   });
 }
+// Controlled landmarks exercise the real evaluator, recording and UI, not model accuracy.
+async function syntheticPose(page: Page) {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        if (String(url).includes("/pose/worker.js"))
+          (window as unknown as { poseWorker: Worker }).poseWorker = this;
+      }
+    };
+  });
+  await page.route("**/pose/worker.js", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: `let origin = null, kind = 'raised';
+      onmessage = ({data}) => {
+        if (data.type === 'init') postMessage({type:'ready'});
+        if (data.type === 'test-start') { origin = data.timestamp; kind = data.kind ?? 'raised'; }
+        if (data.type === 'test-kind') kind = data.kind;
+        if (data.type === 'frame') {
+          const points = Array.from({length:33}, () => ({x:.5,y:.2,z:0,visibility:.99,presence:.99}));
+          const set = (i,x,y) => Object.assign(points[i],{x,y});
+          set(11,.38,.38); set(12,.62,.38); set(13,.34,.55); set(14,.66,.55);
+          set(15,.34,.72); set(16,.66,.72); set(23,.41,.82); set(24,.59,.82);
+          if (origin !== null && data.timestamp - origin >= 4000) {
+            if (kind === 'raised') { set(14,.73,.35); set(16,.72,.12); }
+            if (kind === 'shift') for (const point of points) point.x += .12;
+            if (kind === 'crossed') { set(15,.59,.49); set(16,.41,.49); }
+          }
+          for(let i=25;i<33;i++) points[i].visibility=.1;
+          postMessage({type:'sample',timestamp:data.timestamp,width:data.frame.width,height:data.frame.height,points});
+          data.frame.close();
+        }
+      };`,
+    }),
+  );
+}
+async function startPoseSequence(page: Page, kind = "raised") {
+  await expect(
+    page.getByRole("button", { name: "Finish & review" }),
+  ).toBeVisible();
+  await page.evaluate(
+    (kind) =>
+      (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
+        type: "test-start",
+        timestamp: performance.now(),
+        kind,
+      }),
+    kind,
+  );
+}
 async function noOverflow(page: Page) {
   expect(
     await page.evaluate(
@@ -67,10 +119,48 @@ async function enable(page: Page) {
     page.getByRole("button", { name: "Turn camera off" }),
   ).toBeVisible();
 }
+test("speech analysis is visible above the camera and in large view", async ({
+  page,
+}, info) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  await page.route("http://localhost:8000/health/**", (route) =>
+    route.fulfill({ json: { status: "ok" } }),
+  );
+  await enable(page);
+  const speech = page.getByLabel("Speech analysis", { exact: true });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(speech).toBeInViewport();
+  await page.getByRole("button", { name: "Large view", exact: true }).click();
+  await expect(speech).toBeInViewport();
+  await speech.selectOption("backend");
+  await expect(
+    page.getByRole("button", { name: "Enable camera" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Enable camera" }).click();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as unknown as { mediaConstraints: MediaStreamConstraints })
+          .mediaConstraints.audio,
+    ),
+  ).toBeTruthy();
+  await expect(
+    page.getByRole("button", { name: "Start recording" }),
+  ).toBeEnabled();
+  await noOverflow(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: info.outputPath("speech-analysis-visible.png"),
+    fullPage: true,
+  });
+});
+
 test("large view scales feedback and preserves an active recording", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
+  await syntheticPose(page);
   await enable(page);
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
@@ -92,7 +182,8 @@ test("large view scales feedback and preserves an active recording", async ({
   if (info.project.name === "desktop") {
     expect((await video.boundingBox())!.width).toBeGreaterThan(originalWidth);
   }
-  await expect(cue).toHaveText("Review this gesture moment", {
+  await startPoseSequence(page);
+  await expect(cue).toHaveText("Hand above shoulder", {
     timeout: 12000,
   });
   await noOverflow(page);
@@ -142,11 +233,13 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await syntheticCamera(page);
+  await syntheticPose(page);
   await enable(page);
   await page.getByRole("button", { name: "Start recording" }).click();
-  await expect(
-    page.getByText("Review this gesture moment").first(),
-  ).toBeVisible({ timeout: 12000 });
+  await startPoseSequence(page);
+  await expect(page.getByText("Hand above shoulder").first()).toBeVisible({
+    timeout: 12000,
+  });
   await noOverflow(page);
   await page.screenshot({
     path: `test-results/live-studio-${info.project.name}.png`,
@@ -184,11 +277,30 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("link", { name: "Download video" }).click();
   expect((await downloadPromise).suggestedFilename()).toMatch(/\.webm$/);
+  const evidenceDownload = page.waitForEvent("download");
+  await page
+    .getByRole("link", { name: "Download gesture evidence JSON" })
+    .click();
+  const evidenceStream = await (await evidenceDownload).createReadStream();
+  const evidenceChunks: Buffer[] = [];
+  for await (const chunk of evidenceStream!) evidenceChunks.push(chunk);
+  const evidence = JSON.parse(Buffer.concat(evidenceChunks).toString());
+  expect(evidence).toHaveLength(1);
+  expect(evidence[0].session_id).toBe(page.url().split("/").at(-2));
+  expect(evidence[0].payload).toMatchObject({
+    rule: "hand_raised",
+    heuristic: true,
+    rule_version: "pose-rules-v3",
+  });
+  expect(evidence[0].t_ms).toBeGreaterThanOrEqual(4000);
+  expect(
+    evidence[0].payload.confirmed_at_ms - evidence[0].t_ms,
+  ).toBeGreaterThanOrEqual(800);
   await page.getByRole("link", { name: "Rewatch feedback sections" }).click();
   await page.getByLabel("Filter by category").selectOption("Gestures");
   await expect(page.locator(".moment-browser-list button")).toHaveCount(1);
   await expect(page.locator(".replay-detail h2")).toHaveText(
-    "Review this gesture moment",
+    "Hand above shoulder",
   );
   await expect
     .poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime))
@@ -200,18 +312,34 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   await expect
     .poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime))
     .toBeLessThan(4);
-  // The last section reaches the file's end; MediaRecorder's clock can be slightly longer than the encoded video.
-  await video.evaluate((el: HTMLVideoElement) => {
-    el.playbackRate = 4;
-  });
-  await expect
-    .poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime))
-    .toBeGreaterThan(4);
-  await expect
-    .poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime), {
-      timeout: 5000,
-    })
-    .toBeLessThan(4);
+  // Observe a real loop instead of polling a short, accelerated section at
+  // intervals that can repeatedly miss its latter half.
+  const loop = await video.evaluate(
+    (el: HTMLVideoElement) =>
+      new Promise<{ from: number; to: number; paused: boolean }>(
+        (resolve, reject) => {
+          let previous = el.currentTime;
+          const timeout = setTimeout(() => {
+            el.removeEventListener("timeupdate", observe);
+            reject(new Error("Recorded feedback section did not loop"));
+          }, 6000);
+          function observe() {
+            const current = el.currentTime;
+            if (previous - current > 0.5) {
+              clearTimeout(timeout);
+              el.removeEventListener("timeupdate", observe);
+              resolve({ from: previous, to: current, paused: el.paused });
+            }
+            previous = current;
+          }
+          el.addEventListener("timeupdate", observe);
+          el.playbackRate = 4;
+        },
+      ),
+  );
+  expect(loop.from).toBeGreaterThan(loop.to + 0.5);
+  expect(loop.to).toBeCloseTo(Math.max(0, evidence[0].t_ms / 1000 - 2), 0);
+  expect(loop.paused).toBe(false);
   await video.evaluate((el: HTMLVideoElement) => {
     el.playbackRate = 1;
   });
@@ -239,14 +367,13 @@ async function backend(page: Page, transcribe = false) {
     .getByRole("button", { name: "Standard view", exact: true })
     .click();
   await page.getByText("Recording options", { exact: true }).click();
-  await page.getByLabel("Feedback source").selectOption("backend");
+  await page.getByLabel("Speech analysis").selectOption("backend");
   await expect(
     page.getByText("analysis results remain stored", { exact: false }),
   ).toBeVisible();
-  if (transcribe)
-    await page
-      .getByLabel("Transcribe speech for word analysis and fact-check")
-      .check();
+  await page
+    .getByLabel("Create a transcript with local Whisper")
+    .setChecked(transcribe);
   await page.getByRole("button", { name: "Enable camera" }).click();
   await page.getByRole("button", { name: "Start recording" }).click();
   await expect(
@@ -326,6 +453,9 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
   await expect(page).toHaveURL(/\/review$/);
   expect(uploads).toBe(1);
   await expect(page.getByText("Audio: pause count")).toBeVisible();
+  await page
+    .getByText("Import or replace word timestamps", { exact: true })
+    .click();
   await page.getByLabel("Word timestamps (JSON)").setInputFiles({
     name: "words.json",
     mimeType: "application/json",
@@ -566,16 +696,124 @@ test("pose model failure preserves camera recording controls", async ({
   ).toBeEnabled();
 });
 
+test("sideways motion and crossed arms reach review while live hints can be muted", async ({
+  page,
+}, info) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  await enable(page);
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await startPoseSequence(page, "shift");
+  await expect(page.locator(".cue-message")).toHaveText(
+    "Sideways position change",
+    { timeout: 12000 },
+  );
+  await page.getByRole("button", { name: "Pose debug" }).click();
+  await expect(page.getByLabel("Pose debug readout")).toContainText(
+    "Sideways shift: 0.50",
+  );
+  await page.getByLabel("Show live hints").uncheck();
+  await expect(page.locator(".cue-message")).toHaveText("Live hints hidden");
+  await page.evaluate(() =>
+    (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
+      type: "test-kind",
+      kind: "crossed",
+    }),
+  );
+  await expect(page.locator(".event-feed")).toContainText(
+    "Arms crossed in front of torso",
+    { timeout: 7000 },
+  );
+  await expect(page.locator(".cue-message")).toHaveText("Live hints hidden");
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("pose-debug.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(
+    page.getByLabel("Feedback timeline").getByRole("button"),
+  ).toHaveCount(2);
+  await page.getByRole("link", { name: "Rewatch feedback sections" }).click();
+  await page.getByLabel("Filter by category").selectOption("Gestures");
+  await expect(page.locator(".replay-detail h2")).toHaveText(
+    "Arms crossed in front of torso",
+  );
+});
+
 test("transcribed take is fact-checked against sources and links back to the video", async ({
   page,
 }, info) => {
   const jobId = "12345678-1234-1234-1234-123456789abc";
   const factJob = "87654321-4321-4321-4321-cba987654321";
+  const questionJob = "77654321-4321-4321-4321-cba987654321";
+  const answerJob = "67654321-4321-4321-4321-cba987654321";
+  const question = {
+    id: "q1",
+    kind: "contradiction",
+    question: "Wie viele Studierende sind es laut Quelle?",
+    reason: "Die Zahlen weichen ab.",
+    t_ms: 200,
+    duration_ms: 900,
+    transcript: "Wir haben 9000 Studierende.",
+    claim: "9000 Studierende",
+    evidence: null,
+    query: "Studierende",
+  };
+  await page.route("http://localhost:8000/questions", (route) =>
+    route.fulfill({ status: 202, json: { job_id: questionJob } }),
+  );
+  await page.route(
+    `http://localhost:8000/questions/jobs/${questionJob}`,
+    (route) =>
+      route.fulfill({
+        json: {
+          job_id: questionJob,
+          status: "completed",
+          result: {
+            questions: [question],
+            events: [],
+            notices: [],
+            model: "synthetic-model",
+            sources_used: true,
+          },
+        },
+      }),
+  );
+  await page.route("http://localhost:8000/questions/answers", async (route) => {
+    expect(route.request().postDataJSON().answer).toBe("9500 Studierende.");
+    await route.fulfill({ status: 202, json: { job_id: answerJob } });
+  });
+  await page.route(
+    `http://localhost:8000/questions/answers/${answerJob}`,
+    (route) =>
+      route.fulfill({
+        json: {
+          job_id: answerJob,
+          status: "completed",
+          result: {
+            verdict: "supports",
+            explanation: "Die korrigierte Zahl steht in der Quelle.",
+            evidence: {
+              kind: "upload",
+              label: "Synthetische Folie 2",
+              quote: "9500 Studierende",
+              passage: "9500 Studierende",
+            },
+            checked: ["upload"],
+            follow_up: null,
+            model: "synthetic-model",
+            notes: [],
+          },
+        },
+      }),
+  );
   const words = [
     { word: "Wir", start_ms: 200, end_ms: 400 },
     { word: "haben", start_ms: 450, end_ms: 700 },
     { word: "9000", start_ms: 750, end_ms: 1000 },
-    { word: "Studierende.", start_ms: 1050, end_ms: 1400 },
+    { word: "Studierende.", start_ms: 1050, end_ms: 1150 },
   ];
   await page.route("http://localhost:8000/speech/analyze", async (route) => {
     expect(route.request().postData()).toContain(
@@ -595,6 +833,9 @@ test("transcribed take is fact-checked against sources and links back to the vid
           audio: { summary: { pause_count: 0 } },
           events: [],
           words,
+          asr_provider: "whisper",
+          synthetic_demo: false,
+          notices: [],
           transcription: { summary: { word_count: 4 }, events: [] },
         },
       },
@@ -696,7 +937,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
   await expect(page.locator(".fact-claim blockquote")).toContainText(
     "“rund 9.500 Studierende in acht Fachbereichen”folien.pdf, Page 2",
   );
-  expect(request).toMatchObject({ words, use_web: true });
+  expect(request).toMatchObject({ words, use_web: false });
   expect(request!.collection_id).toMatch(/^[0-9a-f-]{36}$/);
   await page.locator(".fact-claim-head button").click();
   await expect(page.locator(".selected-feedback")).toContainText(
@@ -711,4 +952,24 @@ test("transcribed take is fact-checked against sources and links back to the vid
   await expect(
     page.getByText("Source says otherwise", { exact: false }).first(),
   ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Stats & playback", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Start question round" }).click();
+  await expect(
+    page.getByText(question.question, { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Your answer", { exact: true })
+    .fill("9500 Studierende.");
+  await page
+    .getByRole("button", { name: "Compare with sources", exact: true })
+    .click();
+  await expect(
+    page.getByText("Your answer matches the source", { exact: true }),
+  ).toBeVisible();
+  await noOverflow(page);
+  await page
+    .locator(".questions")
+    .screenshot({ path: info.outputPath("local-question-answer.png") });
 });

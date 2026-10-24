@@ -4,14 +4,17 @@ from app.transcription.analysis import analyze_words
 from app.transcription.config import WordConfig
 from app.transcription.models import WordAnalysis, Word
 from app.transcription.pipeline import run_transcription_pipeline
-from app.transcription.transcriber import JsonTranscriber, Transcriber
+from app.transcription.text import transcript_text
+from app.transcription.transcriber import JsonTranscriber, Transcriber, WhisperTranscriber
 
 __all__ = [
     "JsonTranscriber",
     "Transcriber",
+    "WhisperTranscriber",
     "Word",
     "WordAnalysis",
     "WordConfig",
     "analyze_words",
     "run_transcription_pipeline",
+    "transcript_text",
 ]

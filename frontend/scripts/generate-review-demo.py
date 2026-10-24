@@ -52,4 +52,3 @@ proc.stdin.close()
 log=proc.stderr.read().decode(errors='replace');code=proc.wait()
 if code:raise RuntimeError(log)
 print('Created synthetic 90-second MP4:',(out/'presentation.mp4').stat().st_size,'bytes')
-

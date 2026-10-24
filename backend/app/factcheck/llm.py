@@ -12,6 +12,8 @@ from typing import Protocol
 from urllib.parse import urlsplit
 
 import httpx
+from pydantic import BaseModel
+from app.factcheck.local import LocalOllamaChat
 
 
 class LLMError(RuntimeError):
@@ -24,6 +26,14 @@ class ChatModel(Protocol):
     def complete_json(self, system: str, user: str) -> dict:
         """Return the model's answer parsed as one JSON object."""
         ...
+
+
+def structured_json(llm: ChatModel, system: str, user: str, output: type[BaseModel]) -> dict:
+    """Native local inference constrains the JSON grammar; other adapters retain their contract."""
+    if isinstance(llm, LocalOllamaChat):
+        raw = llm.complete_json(system, user, schema=output.model_json_schema())
+        return output.model_validate(raw).model_dump()
+    return llm.complete_json(system, user)
 
 
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
@@ -81,6 +91,10 @@ class OpenAICompatibleChat:
 def llm_settings() -> dict[str, str] | None:
     """Base URL and model if configured; None disables the fact-check."""
     base_url, model = os.getenv("LLM_BASE_URL", "").strip(), os.getenv("LLM_MODEL", "").strip()
+    if not base_url and not model:
+        coach = LocalOllamaChat()
+        return {"base_url": coach.endpoint, "model": coach.model,
+                "host": urlsplit(coach.endpoint).hostname or "localhost", "provider": "ollama"}
     if not base_url or not model:
         return None
     return {"base_url": base_url, "model": model, "host": urlsplit(base_url).hostname or base_url}
@@ -90,6 +104,8 @@ def configured_llm() -> ChatModel:
     settings = llm_settings()
     if settings is None:
         raise ValueError("Set LLM_BASE_URL and LLM_MODEL for the fact-check")
+    if settings.get("provider") == "ollama":
+        return LocalOllamaChat()
     temperature = os.getenv("LLM_TEMPERATURE", "").strip()
     return OpenAICompatibleChat(
         settings["base_url"], settings["model"], os.getenv("LLM_API_KEY", ""),

@@ -4,9 +4,11 @@ import { connections, visiblePosePoints } from "@/features/pose/overlay";
 export function PoseOverlay({
   sample,
   largeView,
+  label = "Live pose landmarks",
 }: {
   sample: PoseSample;
   largeView: boolean;
+  label?: string;
 }) {
   const points = visiblePosePoints(sample);
   const { width, height } = sample.image;
@@ -16,7 +18,7 @@ export function PoseOverlay({
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio={largeView ? "xMidYMid meet" : "xMidYMid slice"}
       role="img"
-      aria-label="Live pose landmarks"
+      aria-label={label}
     >
       {connections.map(([from, to]) => {
         const a = points[from],

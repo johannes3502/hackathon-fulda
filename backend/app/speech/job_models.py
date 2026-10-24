@@ -18,6 +18,7 @@ class AnalysisOptions(BaseModel):
 class RecordingAnalysis(BaseModel):
     audio: AudioAnalysis
     words: list[Word]
+    text: str
     transcription: WordAnalysis | None
     events: list[Event]
     asr_provider: str | None

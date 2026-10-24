@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { clipRange, upsertFeedback } from "./protocol";
-import { DemoVideoTransport } from "./transport";
+import { LocalVideoTransport } from "./transport";
 import type { LiveFeedback } from "./contracts";
 
 const feedback: LiveFeedback = {
@@ -33,18 +33,15 @@ describe("live feedback", () => {
     expect(clipRange(earlier, 7000)).toEqual({ start: 0, end: 4.5 });
     expect(clipRange(feedback, 6500)).toEqual({ start: 2, end: 6.5 });
   });
-  it("emits each scripted marker once, on the real chunk timeline", async () => {
-    const transport = new DemoVideoTransport();
+  it("local transport never invents feedback from elapsed recording time", async () => {
+    const transport: import("./contracts").VideoTransport =
+      new LocalVideoTransport();
     const receive = vi.fn();
     await transport.connect(session, receive);
-    await transport.send(new Blob(), { ...meta, endMs: 2400 });
-    expect(receive).not.toHaveBeenCalled();
     await transport.send(new Blob(), meta);
-    await transport.send(new Blob(), meta);
-    expect(receive).toHaveBeenCalledTimes(2);
-    expect(receive.mock.calls[1][0].feedback.endMs).toBe(6000);
+    await transport.send(new Blob(), { ...meta, endMs: 60000 });
+    await transport.finish(60000, new Blob());
     transport.close();
-    await transport.send(new Blob(), { ...meta, endMs: 11000 });
-    expect(receive).toHaveBeenCalledTimes(2);
+    expect(receive).not.toHaveBeenCalled();
   });
 });

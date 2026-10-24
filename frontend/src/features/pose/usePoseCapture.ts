@@ -36,16 +36,18 @@ export function usePoseCapture(
         "Camera stopped. Your captured samples are ready to download.",
       );
   }, [enabled, start]);
-  function beginRecording(timestamp: number) {
+  function beginRecording(timestamp: number, sessionId?: string) {
     recording.current = false;
     if (
       owner.current &&
       (state?.phase === "running" || state?.phase === "loading")
     ) {
       recording.current = true;
-      owner.current.beginRecording(timestamp);
+      owner.current.beginRecording(timestamp, sessionId);
       setState((previous) =>
-        previous ? { ...previous, count: 0, latest: null } : previous,
+        previous
+          ? { ...previous, count: 0, latest: null, evaluation: null }
+          : previous,
       );
       setDownload(undefined);
     }
@@ -55,6 +57,9 @@ export function usePoseCapture(
     download,
     start,
     beginRecording,
+    recalibrate: () => owner.current?.recalibrate(),
+    recordingEvents: () =>
+      recording.current ? (owner.current?.events ?? []) : [],
     stop: () => owner.current?.stop(),
     recordingBlob: () =>
       recording.current ? owner.current?.log.blob() : undefined,

@@ -2,8 +2,11 @@
 
 **Status:** Thema fix (24.10.2026).
 **Grundlage:** Erste Feature-Beschreibungen des Teams. Es gibt noch kein
-Fein-Konzept, keine Scores und keine Schwellenwerte. Das lokale technische
-Grundgerüst ist inzwischen festgelegt (Abschnitt 3, Technik).
+vollständiges Fein-Konzept. Gesten-/Haltungsbeobachtungen sind inzwischen
+als explizite Prototyp-Heuristiken umgesetzt (keine Scores):
+[Recherche und Auswertung](04-gesture-evaluation.md),
+[Jury-Ablauf und offene Abnahme](05-jury-demo.md). Das lokale technische
+Grundgerüst ist festgelegt (Abschnitt 3, Technik).
 
 > **Regel:** Keine zusätzlichen Features erfinden. Alles, was unten nicht steht,
 > ist offen und muss entschieden werden.
@@ -38,42 +41,31 @@ Produktentscheidung.
 
 ## 3. Offen — muss das Team entscheiden
 
-### UI-Entwurf Stats-Karte (Nutzerwunsch 24.10.2026)
-
-Ergänzender Nutzerwunsch: Review mit Video, denselben Kriterien und einer
-Performance-Zeitkurve nach dem Vorbild einer Schachanalyse. Anklickbare gute und
-schwächere Momente sowie fachliche Anmerkungen springen zum Video-Timestamp.
-Die Vorschau `/review-preview` zeigt synthetische Scores und Quellen mit einem
-generierten Beispielvideo. `/live/[sessionId]/analysis` nutzt vorhandene Events
-und echte Aufnahmen, lässt nicht berechnete Performance-Werte aber ausdrücklich
-offen. Die vier Kriterien filtern die Momente; die Kurve bleibt der Gesamtverlauf.
-
-Auf der Startseite: vereinfachte Spielerkarte mit Gesamt-Kreisdiagramm und
-Gestik/Fachwissen/Flow/Struktur, jeweils 1–100 %. Für diesen ausdrücklich
-angefragten Designentwurf werden synthetische, als Demo markierte Werte gezeigt.
-„Quersumme“ wird als gleich gewichteter arithmetischer Durchschnitt interpretiert
-(auf ganze Prozent gerundet). Die Ableitung der vier Werte aus realen Analysen
-ist weiterhin offen; die Karte behauptet keine gemessene persönliche Bewertung.
-
 ### Zielgruppe und Setting
 - Wer präsentiert damit: Studierende, Schule, Ausbildung, Beruf?
 - Übungsraum oder echter Vortrag?
 - Einzelperson oder mit Feedback durch Lehrkraft?
 
 ### Analyse
-- Welche Metriken pro Feature, welche Schwellenwerte, welche Scores?
+- Gesten: sichtbare Geometrie relativ zur Neutralstellung, Mindestdauer,
+  Hysterese und Cooldown sind als Prototyp-Heuristiken umgesetzt; keine Scores.
+  Systematische Genauigkeits-/Geräteprüfung bleibt offen.
 - Was läuft live, was erst nach der Präsentation?
 - Wie werden Fehlalarme und Unsicherheit angezeigt?
 - Eye Tracking: Webcam-basiert oder zusätzliche Hardware?
 
 ### Fact-Checking
-- Welche Dateiformate können hochgeladen werden?
+- Quellen-Ingest ist für PDF, PPTX, DOCX, TXT und Markdown umgesetzt.
+  Lokale Jina-Embeddings und pgvector/Volltextsuche liefern zitierbare Passagen;
+  darauf läuft ein lokaler Ollama-Quellenvergleich mit Wort-Timestamps und
+  codegeprüften Zitaten. Höchstens sechs ausgewählte Aussagen, fünf Passagen je
+  Aussage; keine vollständige Wahrheitsprüfung. [Wie und warum](06-local-coaching.md).
 - Welche Web-Quellen darf der Agent abrufen?
 - Wie wird eine Quelle als glaubwürdig markiert?
-- Was passiert, wenn keine Quelle gefunden wird?
+- Fehlende Evidenz wird als „in den Quellen nicht gefunden“ gezeigt, nicht als falsch.
 
 ### Frage-Simulator
-- Umgesetzt (24.10.2026, Nutzerauftrag): bis zu 5 Fragen pro Runde, zuerst zu
+- Umgesetzt (24.10.2026, Nutzerauftrag): bis zu 3 Fragen pro Runde, zuerst zu
   Widersprüchen und nicht belegten Aussagen aus dem Fact-Check, dann zu
   Quelleninhalten, die im Vortrag fehlen, dann zu unklaren Stellen.
 - Antworten getippt oder gesprochen; Abgleich mit den Quellen (stützt /
@@ -83,7 +75,7 @@ ist weiterhin offen; die Karte behauptet keine gemessene persönliche Bewertung.
   Rollen, „Curious student“ (naiv, duzt, fragt nach Begriffen und Beispielen)
   und „Professor / tutor“ (präzise, siezt, fragt nach Belegen). Fragen und
   Reaktionen liest der Browser vor (`speechSynthesis`); die gesprochene
-  Antwort wird per Deepgram transkribiert und gegen die hochgeladenen
+  Antwort wird per konfiguriertem Transcriber (standardmäßig lokales Whisper) transkribiert und gegen die hochgeladenen
   Vorlesungsunterlagen geprüft. Die Rolle ändert nur den Stil, nicht die
   Quellenbindung.
 - Offen: automatisches Antwortende per Stille-Erkennung (aktuell Button
@@ -93,7 +85,8 @@ ist weiterhin offen; die Karte behauptet keine gemessene persönliche Bewertung.
 - Lokales Grundgerüst: PostgreSQL und S3-Dateispeicher mit persistenten
   Docker-Volumes, ausschließlich für synthetische Entwicklungsdaten.
   Expliziter Audio-Upload unter `/speech/analyze`, keine automatische Aufzeichnung.
-  Celery verarbeitet Silero-VAD/RMS/YIN sowie optional Deepgram-ASR (EU, deutsch).
+  Celery verarbeitet Silero-VAD/RMS/YIN sowie standardmäßig lokales
+  faster-whisper (deutsch); Deepgram-ASR (EU) bleibt optional.
   Originale werden nach terminaler Verarbeitung gelöscht; Ergebnisse verbleiben
   in S3. Stalled Jobs und Speicherfehler benötigen noch eine Cleanup-Regel.
   Der Smoke-Test entfernt seine synthetischen Audiodaten wieder.
@@ -105,17 +98,18 @@ ist weiterhin offen; die Karte behauptet keine gemessene persönliche Bewertung.
 - Keine echten personenbezogenen Daten in der Demo.
 
 ### Technik
-- Lokaler Stack (24.10.2026): FastAPI, MediaPipe, PostgreSQL,
+- Lokaler Stack (24.10.2026): FastAPI, MediaPipe, PostgreSQL mit pgvector,
   MediaRecorder im Browser und SeaweedFS als S3-Dateispeicher;
   FFmpeg im Backend. Celery führt lange Arbeiten in einem separaten Worker
   aus, Redis dient als Queue und temporärer Ergebnisspeicher. Die
-  Post-Transkription nutzt Deepgram Nova-3 hinter einem austauschbaren Interface.
-  Deutsche Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und Speicherverhalten:
-  `backend/README.md`.
+  Post-Transkription nutzt standardmäßig lokales faster-whisper hinter einem
+  austauschbaren Interface; Deepgram Nova-3 (EU) ist optional. Deutsche
+  Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und
+  Speicherverhalten: `backend/README.md`.
 - Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
-- Fact-Check umgesetzt mit OpenAI-kompatibler Schnittstelle; konkreter Anbieter,
-  Modell und Hosting bleiben offen. Web-Zweitquelle: Wikipedia-API (Standard)
-  oder Tavily. Der Frage-Simulator nutzt dasselbe Modell.
+- Nutzerentscheidung: lokale Vorführung reicht; öffentliches Hosting ist
+  derzeit nicht nötig. Nutzer bevorzugt freie/lokale Modelle statt OpenAI API:
+  Qwen3.5 4B Q4_K_M läuft nativ über Ollama, Whisper `small` im Worker.
 - Latenz, Ausfall-Fallback, Kosten.
 - Browser- und Geräte-Support (Laptop und Smartphone).
 
@@ -150,3 +144,6 @@ einbauen**:
 | 24.10.2026 | Voice-Agent mit zwei Rollen | Nutzerauftrag: nach dem Vortrag mit einem Agenten sprechen, der Fragen stellt und Antworten gegen die Vorlesungsunterlagen prüft; Rollen „dummer Schüler“ (umgesetzt als neugieriger Erstsemester) und Professor/Tutor. |
 | 24.10.2026 | Frage-Simulator umgesetzt | Nutzerauftrag: Feature 5 vollständig einbauen; Fragen aus Fact-Check-Funden und Quellen, getippte Antworten gegen Quellen geprüft, ohne Bewertung. |
 | 24.10.2026 | Fact-Check mit RAG und Web-Zweitquelle | Nutzerauftrag: hochgeladene Quellen (z. B. Vorlesungsfolien) zuerst, Web nur als Fallback; LLM über OpenAI-kompatible API, Anbieter offen. Transkription im Live-Studio als Opt-in. |
+| 24.10.2026 | Echte lokale Gesten-/Haltungsbeobachtungen, synthetischer Jury-Rundgang und Evidenz-Export | Nutzerauftrag: Gesten recherchieren, nachvollziehbar auswerten und für die Jury vorführbar machen. Keine Blickkontakt-/Qualitätsbewertung. |
+| 24.10.2026 | Lokale Whisper-Transkription als Standard | Nutzerauftrag: Speech-to-Text mit einem lokalen Modell statt Cloud-Zwang; Deepgram bleibt optional. |
+| 24.10.2026 | Lokaler Quellenvergleich und echte Text-Fragerunde im Web-Review | Nutzer präferiert freie/lokale Alternative zur zunächst gewählten OpenAI API. Keine API-Schlüssel; Zitate werden vor Anzeige geprüft. |

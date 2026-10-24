@@ -127,10 +127,14 @@ export function QuestionSimulator({
         active.signal,
       );
       if (active.signal.aborted) return;
-      update(recording.id, (current) => ({
-        ...withQuestions(current, generated),
-        answers: {},
-      }));
+      update(recording.id, (current) =>
+        current.words !== words
+          ? current
+          : {
+              ...withQuestions(current, generated),
+              answers: {},
+            },
+      );
       setNotice(
         generated.questions.length
           ? `${generated.questions.length} ${generated.questions.length === 1 ? "question" : "questions"} ready. Questions about a passage were added to your feedback moments.`
@@ -150,7 +154,14 @@ export function QuestionSimulator({
 
   function answered(question: Question, answer: string, review: AnswerReview) {
     update(recording.id, (current) => {
-      if (!current.questions) return current;
+      if (
+        !current.questions ||
+        current.words !== recording.words ||
+        !current.questions.questions.some(
+          (q) => q.id === question.id && q.question === question.question,
+        )
+      )
+        return current;
       const questions = review.follow_up
         ? withFollowUp(
             current.questions.questions,
@@ -209,7 +220,9 @@ export function QuestionSimulator({
           <dt>Your sources</dt>
           <dd>
             {readySources === null ? "Unavailable" : `${readySources} ready`} ·{" "}
-            <Link href="/sources">Manage sources</Link>
+            <Link href="/sources" target="_blank" rel="noopener noreferrer">
+              Manage sources (new tab)
+            </Link>
           </dd>
         </div>
       </dl>

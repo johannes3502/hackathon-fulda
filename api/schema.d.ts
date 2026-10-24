@@ -283,8 +283,8 @@ export interface paths {
          * Analyze
          * @description Store in S3 and enqueue analysis. Poll status_url for the result.
          *
-         *     German filler preservation is unverified. Originals are deleted after
-         *     terminal processing. Demo recordings must be synthetic.
+         *     Whisper runs locally; German filler preservation is model-dependent.
+         *     Originals are deleted after terminal processing. Demo recordings must be synthetic.
          */
         post: operations["analyze_speech_analyze_post"];
         delete?: never;
@@ -485,13 +485,19 @@ export interface components {
              */
             config?: string | null;
             /**
+             * Local Only
+             * @description Require local Whisper; reject hosted or synthetic ASR before storing the recording
+             * @default false
+             */
+            local_only: boolean;
+            /**
              * Recording
              * @description Synthetic audio/video recording (WebM, MP4, WAV, ...)
              */
             recording: string;
             /**
              * Transcribe
-             * @description Send audio to configured ASR (default: Deepgram EU). false = local signal analysis only
+             * @description Run configured ASR (default: local Whisper). false = local signal analysis only
              * @default true
              */
             transcribe: boolean;
@@ -612,7 +618,7 @@ export interface components {
         FactCheckConfig: {
             /**
              * Max Claims
-             * @default 12
+             * @default 6
              */
             max_claims: number;
             /**
@@ -768,7 +774,7 @@ export interface components {
         QuestionConfig: {
             /**
              * Max Questions
-             * @default 5
+             * @default 3
              */
             max_questions: number;
             /**
@@ -863,6 +869,8 @@ export interface components {
              * @default false
              */
             synthetic_demo: boolean;
+            /** Text */
+            text: string;
             transcription: components["schemas"]["WordAnalysis"] | null;
             /** Words */
             words: components["schemas"]["Word"][];

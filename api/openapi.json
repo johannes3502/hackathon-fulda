@@ -454,6 +454,12 @@
             "description": "AudioConfig JSON; first 3000 ms are calibration",
             "title": "Config"
           },
+          "local_only": {
+            "default": false,
+            "description": "Require local Whisper; reject hosted or synthetic ASR before storing the recording",
+            "title": "Local Only",
+            "type": "boolean"
+          },
           "recording": {
             "contentMediaType": "application/octet-stream",
             "description": "Synthetic audio/video recording (WebM, MP4, WAV, ...)",
@@ -462,7 +468,7 @@
           },
           "transcribe": {
             "default": true,
-            "description": "Send audio to configured ASR (default: Deepgram EU). false = local signal analysis only",
+            "description": "Run configured ASR (default: local Whisper). false = local signal analysis only",
             "title": "Transcribe",
             "type": "boolean"
           }
@@ -736,7 +742,7 @@
         "description": "Prototype limits, not tuned. Returned with every result.",
         "properties": {
           "max_claims": {
-            "default": 12,
+            "default": 6,
             "maximum": 30.0,
             "minimum": 1.0,
             "title": "Max Claims",
@@ -1105,7 +1111,7 @@
         "description": "Prototype limits, not tuned. Returned with every result.",
         "properties": {
           "max_questions": {
-            "default": 5,
+            "default": 3,
             "maximum": 10.0,
             "minimum": 1.0,
             "title": "Max Questions",
@@ -1327,6 +1333,10 @@
             "title": "Synthetic Demo",
             "type": "boolean"
           },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
           "transcription": {
             "anyOf": [
               {
@@ -1348,6 +1358,7 @@
         "required": [
           "audio",
           "words",
+          "text",
           "transcription",
           "events",
           "asr_provider"
@@ -2308,7 +2319,7 @@
     },
     "/speech/analyze": {
       "post": {
-        "description": "Store in S3 and enqueue analysis. Poll status_url for the result.\n\nGerman filler preservation is unverified. Originals are deleted after\nterminal processing. Demo recordings must be synthetic.",
+        "description": "Store in S3 and enqueue analysis. Poll status_url for the result.\n\nWhisper runs locally; German filler preservation is model-dependent.\nOriginals are deleted after terminal processing. Demo recordings must be synthetic.",
         "operationId": "analyze_speech_analyze_post",
         "requestBody": {
           "content": {

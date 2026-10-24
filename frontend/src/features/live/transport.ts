@@ -1,12 +1,7 @@
-import type {
-  LiveConfig,
-  LiveMessage,
-  VideoChunkMeta,
-  VideoTransport,
-} from "./contracts";
+import type { LiveConfig, LiveMessage, VideoTransport } from "./contracts";
 import {
   analysisResult,
-  parseWords,
+  parseTranscript,
   request,
   waitForAudioJob,
 } from "./analysis";
@@ -36,8 +31,8 @@ export class AnalysisTransport implements VideoTransport {
       recording,
       recording.type.includes("mp4") ? "take.mp4" : "take.webm",
     );
-    // Paid ASR only when the user opted in before recording.
-    body.append("transcribe", this.transcribe ? "true" : "false");
+    body.append("transcribe", String(this.transcribe));
+    body.append("local_only", "true");
     const accepted = await request(
       this.endpoint,
       "/speech/analyze",
@@ -47,36 +42,35 @@ export class AnalysisTransport implements VideoTransport {
         body,
       },
     );
-    const job = await waitForAudioJob(
+    const raw = await waitForAudioJob(
       this.endpoint,
       accepted,
       this.controller.signal,
     );
-    const result = analysisResult(job, "speech", durationMs);
-    const words =
-      this.transcribe && Array.isArray(job.words) && job.words.length
-        ? parseWords(job.words, Number.MAX_SAFE_INTEGER)
-        : [];
-    const wordMetrics =
-      words.length &&
-      job.transcription &&
-      typeof job.transcription === "object" &&
-      "summary" in job.transcription
-        ? analysisResult(
-            { summary: job.transcription.summary, events: [] },
-            "words",
-            durationMs,
-          ).metrics
-        : [];
+    const result = analysisResult(raw, "speech", durationMs);
+    if (this.transcribe) {
+      const transcript = parseTranscript(raw, durationMs);
+      this.receive?.({
+        type: "transcript",
+        sessionId: this.sessionId,
+        transcript,
+      });
+      if (raw.transcription && typeof raw.transcription === "object") {
+        const wordMetrics = analysisResult(
+          { ...raw.transcription, events: [] },
+          "words",
+          durationMs,
+        );
+        result.metrics.push(...wordMetrics.metrics);
+      }
+    }
     for (const feedback of result.feedback)
       this.receive?.({ type: "feedback", sessionId: this.sessionId, feedback });
-    if (words.length)
-      this.receive?.({ type: "transcript", sessionId: this.sessionId, words });
     this.receive?.({
       type: "metrics",
       sessionId: this.sessionId,
       atMs: durationMs,
-      metrics: [...result.metrics, ...wordMetrics],
+      metrics: result.metrics,
     });
   }
   close() {
@@ -85,76 +79,15 @@ export class AnalysisTransport implements VideoTransport {
   }
 }
 
-export class DemoVideoTransport implements VideoTransport {
-  private receive: ((message: LiveMessage) => void) | undefined;
-  private sessionId = "";
-  private next = 0;
-  async connect(
-    session: { sessionId: string },
-    receive: (message: LiveMessage) => void,
-  ) {
-    this.sessionId = session.sessionId;
-    this.receive = receive;
-  }
-  async send(_chunk: Blob, meta: VideoChunkMeta) {
-    const examples = [
-      {
-        at: 2500,
-        category: "Framing",
-        kind: "positive" as const,
-        title: "Your opening moment",
-        detail:
-          "This demo marker shows how a positive backend observation appears beside your video.",
-        action: "Replay the opening and decide what you want to keep.",
-      },
-      {
-        at: 6000,
-        category: "Gestures",
-        kind: "suggestion" as const,
-        title: "Review this gesture moment",
-        detail:
-          "This is a scripted gesture marker, not a detected issue in your recording.",
-        action:
-          "Check whether your hands supported your explanation at this moment.",
-      },
-      {
-        at: 10000,
-        category: "Posture",
-        kind: "attention" as const,
-        title: "A moment to check your stance",
-        detail:
-          "This demo marker illustrates a posture alert. No posture analysis has run.",
-        action: "Watch the surrounding seconds and make your own assessment.",
-      },
-    ];
-    while (
-      this.next < examples.length &&
-      meta.endMs >= examples[this.next].at
-    ) {
-      const item = examples[this.next++];
-      this.receive?.({
-        type: "feedback",
-        sessionId: this.sessionId,
-        feedback: {
-          id: `demo-${this.next}`,
-          startMs: Math.max(0, item.at - 2000),
-          endMs: item.at,
-          category: item.category,
-          kind: item.kind,
-          title: item.title,
-          detail: item.detail,
-          action: item.action,
-        },
-      });
-    }
-  }
+// Local recordings receive only actual browser observations. No scripted markers.
+export class LocalVideoTransport implements VideoTransport {
+  async connect() {}
+  async send() {}
   async finish() {}
-  close() {
-    this.receive = undefined;
-  }
+  close() {}
 }
 export function createVideoTransport(config: LiveConfig): VideoTransport {
-  return config.mode === "demo"
-    ? new DemoVideoTransport()
-    : new AnalysisTransport(config.endpoint, !!config.transcribe);
+  return config.mode === "local"
+    ? new LocalVideoTransport()
+    : new AnalysisTransport(config.endpoint, config.transcribe);
 }

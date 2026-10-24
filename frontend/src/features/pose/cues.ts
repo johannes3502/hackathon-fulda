@@ -8,6 +8,7 @@ export const CROSS_ARMS = {
   maxWristHeight: 0.2,
   maxElbowDeg: 120,
   holdMs: 2000,
+  // Legacy native cue release behavior; web PoseEvaluator ends on missing data.
   releaseMs: 500,
   // Crossed wrists are often hidden under the other arm, so a missing
   // measurement ends an episode later than a clear "not crossed".
@@ -53,6 +54,7 @@ export const armsCrossed = (sample: PoseSample | null) =>
   crossArmsCheck(sample).crossed;
 
 /**
+ * Native-app compatibility adapter. Web uses PoseEvaluator for canonical events.
  * Turns per-sample results into one hint per episode: active once arms stay
  * crossed for holdMs, inactive after they are released, then a cooldown.
  */

@@ -94,3 +94,58 @@ it("resumes a browser-paused preview so a live camera does not silently stop sam
   await Promise.resolve();
   capture.dispose();
 });
+
+it("ignores in-flight preview results after the recorder anchor, even with a full log", () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("Worker", FakeWorker);
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  const update = vi.fn();
+  const capture = new PoseCapture({} as HTMLVideoElement, update);
+  capture.start();
+  capture.beginRecording(1000, "take-2");
+  vi.spyOn(capture.log, "full", "get").mockReturnValue(true);
+  FakeWorker.latest.onmessage?.({
+    data: {
+      type: "sample",
+      width: 640,
+      height: 360,
+      timestamp: 999,
+      points: [],
+    },
+  });
+  expect(update).toHaveBeenCalledTimes(1);
+  expect(capture.events).toEqual([]);
+  capture.dispose();
+});
+
+it("fails a stalled inference, clears current landmarks and releases its frame watchdog", async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("Worker", FakeWorker);
+  vi.stubGlobal("requestAnimationFrame", vi.fn());
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  vi.stubGlobal(
+    "createImageBitmap",
+    vi.fn(async () => ({ close: vi.fn() })),
+  );
+  const update = vi.fn();
+  const video = {
+    paused: false,
+    ended: false,
+    readyState: 2,
+    currentTime: 1,
+    srcObject: { getVideoTracks: () => [{ readyState: "live" }] },
+  } as unknown as HTMLVideoElement;
+  const capture = new PoseCapture(video, update);
+  capture.start();
+  FakeWorker.latest.onmessage?.({ data: { type: "ready" } });
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(update).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      phase: "error",
+      latest: null,
+      message: expect.stringContaining("stalled"),
+    }),
+  );
+  expect(FakeWorker.latest.terminate).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+});

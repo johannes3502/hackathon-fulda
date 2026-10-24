@@ -19,7 +19,8 @@ import httpx
 import psycopg
 
 from app.events import Event, merge_timeline
-from app.factcheck.llm import ChatModel, LLMError
+from app.factcheck.llm import ChatModel, LLMError, structured_json
+from app.factcheck.drafts import ExtractedClaims, Judgment
 from app.factcheck.models import (
     ClaimResult, Evidence, EvidenceKind, FactCheckConfig, FactCheckRequest, FactCheckResult,
 )
@@ -79,8 +80,8 @@ def extract_claims(llm: ChatModel, items: list[Sentence], limit: int) -> list[Cl
         if len(claims) >= limit:
             break
         transcript = "\n".join(f"[{s.number}] ({clock(s.start_ms)}) {s.text}" for s in batch)
-        answer = llm.complete_json(EXTRACT_PROMPT.replace("{limit}", str(limit - len(claims))),
-                                   f"Transkript (Satznummer, Zeit, Satz):\n{transcript}")
+        answer = structured_json(llm, EXTRACT_PROMPT.replace("{limit}", str(limit - len(claims))),
+                                   f"Transkript (Satznummer, Zeit, Satz):\n{transcript}", ExtractedClaims)
         raw = answer.get("claims")
         if not isinstance(raw, list):
             raise LLMError("Model answer has no claims list")
@@ -136,17 +137,17 @@ def verified_evidence(quote: object, preferred: object, passages: list[Passage],
 def judge(llm: ChatModel, claim: Claim, passages: list[Passage], config: FactCheckConfig) -> tuple[str, str, Evidence | None, list[str]]:
     """Return verdict, explanation, verified evidence and notes."""
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1))
-    answer = llm.complete_json(JUDGE_PROMPT, f"Behauptung: {claim.text}\n\nAuszüge:\n{context}")
+    answer = structured_json(llm, JUDGE_PROMPT, f"Behauptung: {claim.text}\n\nAuszüge:\n{context}", Judgment)
     verdict = answer.get("verdict")
     explanation = answer.get("explanation") if isinstance(answer.get("explanation"), str) else ""
     if verdict not in ("supports", "contradicts", "not_found"):
-        return "not_found", "", None, ["Modellantwort ohne gültiges Urteil verworfen."]
+        return "unchecked", "", None, ["Modellantwort ohne gültiges Urteil verworfen."]
     if verdict == "not_found":
         return "not_found", explanation.strip(), None, []
     evidence = verified_evidence(answer.get("quote"), answer.get("passage"), passages, config.min_quote_chars)
     if evidence is not None:
         return verdict, explanation.strip(), evidence, []
-    return "not_found", "", None, ["Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen."]
+    return "unchecked", "", None, ["Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen."]
 
 
 def check_claim(claim: Claim, request: FactCheckRequest, llm: ChatModel, searcher: WebSearcher | None,
@@ -174,6 +175,8 @@ def check_claim(claim: Claim, request: FactCheckRequest, llm: ChatModel, searche
             result.notes.append("Websuche fehlgeschlagen." if kind == "web" else "Prüfung gegen die Quellen fehlgeschlagen.")
             continue
         result.notes.extend(notes)
+        if verdict == "unchecked":
+            failures += 1
         result.explanation = explanation or result.explanation
         if evidence is not None:
             result.verdict, result.evidence = verdict, evidence

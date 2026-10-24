@@ -38,7 +38,7 @@ flowchart TB
         WORDS["Wort-Analyse<br/>Füller, Pausen, Tempo"]
         INGEST["RAG-Ingest<br/>Extrakt, Chunk, Embed"]
         EMB["Lokale Embeddings<br/>jina-embeddings-v2-base-de<br/>FastEmbed/ONNX"]
-        FACT["Fact-Check<br/>Aussagen extrahieren, RAG zuerst,<br/>Web als Zweitquelle, Zitat-Check"]
+        FACT["Fact-Check<br/>Aussagen extrahieren, RAG zuerst,<br/>Web optional (Standard aus), Zitat-Check"]
         QUEST["Frage-Simulator / Voice-Agent<br/>Rolle: Student oder Professor/Tutor,<br/>Fragen aus Funden + Quellen,<br/>gesprochene Antwort -> ASR,<br/>Antwort-Abgleich mit Zitat-Check"]
     end
 
@@ -48,12 +48,13 @@ flowchart TB
         S3[("SeaweedFS<br/>S3-kompatibel<br/>Port 8333")]
     end
 
-    EXT["Deepgram ASR<br/>nova-3, deutsch<br/>EU-Endpunkt (extern)"]
-    LLM["LLM, OpenAI-kompatibel<br/>/chat/completions<br/>Anbieter offen (extern oder lokal)"]
+    EXT["ASR lokal: faster-whisper small<br/>CPU/int8, Deutsch<br/>Deepgram nur explizit optional"]
+    LLM["LLM lokal: Ollama auf dem Host<br/>Qwen3.5 4B Q4_K_M<br/>JSON-Schema, kein Cloud-Fallback"]
     WEBS["Websuche (Zweitquelle)<br/>Wikipedia-API oder Tavily"]
 
     WEB -- "Kamera/Mikro" --> MP_W
     WEB -- "Aufnahme" --> MR
+    MP_W --> RULES["PoseEvaluator: Neutralstellung, Geometrie, Mindestdauer<br/>posture/gesture-Events; lokale Evidenz"]
     MOB -- "Kamera" --> MP_M
 
     WEB -- "fetch: /speech, /sources,<br/>/transcription, /factcheck,<br/>/questions, /health" --> MAIN
@@ -123,7 +124,7 @@ flowchart LR
     WK --> PG
     WK --> ST
     WK --> RD
-    WK -. "LLM_BASE_URL<br/>(Host: host.docker.internal)" .-> LLM(["LLM, OpenAI-kompatibel"])
+    WK -. "OLLAMA_URL<br/>(Host: host.docker.internal)" .-> LLM(["Ollama lokal; kompatibler Adapter optional"])
     WK -. "WEB_SEARCH_PROVIDER" .-> WS(["Wikipedia / Tavily"])
 ```
 
@@ -137,12 +138,12 @@ sequenceDiagram
     participant S3 as SeaweedFS (S3)
     participant R as Redis
     participant W as Celery Worker
-    participant DG as Deepgram (optional)
+    participant ASR as Whisper lokal (optional)
 
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     U->>FE: Stop
-    FE->>BE: POST /speech/analyze (recording, transcribe = Opt-in im Studio)
+    FE->>BE: POST /speech/analyze (recording, transcribe = Checkbox, standardmäßig an; local_only=true)
     BE->>S3: Original speichern
     BE->>R: Task analyze_speech einreihen
     BE-->>FE: 202 {job_id, status_url}
@@ -152,8 +153,8 @@ sequenceDiagram
     W->>W: FFmpeg -> 16kHz mono, Frames 40ms/10ms
     W->>W: RMS-Pegel, YIN-Pitch, Silero VAD, Silben-Peaks
     opt transcribe=true
-        W->>DG: POST /v1/listen (nova-3, de)
-        DG-->>W: Wort-Timestamps
+        W->>ASR: faster-whisper small (de, word_timestamps=true)
+        ASR-->>W: Text und Wort-Timestamps
         W->>W: Füller, Pausen, Tempo (Wort-Analyse)
     end
     W->>W: merge_timeline (Events deduplizieren)
@@ -183,7 +184,7 @@ flowchart TB
     PGDB --> RET
     RET --> HITS["Top-k SourceHits<br/>mit Zitat-Ort: page/slide/<br/>paragraph/line"]
     FCQ["Fact-Check je Aussage<br/>(app/factcheck/pipeline.py)"] -- "Suchanfrage" --> RET
-    HITS --> JUDGE["LLM-Urteil mit wörtlichem Zitat<br/>quote_in_text-Prüfung<br/>stützt / widerspricht / nicht gefunden"]
+    HITS --> JUDGE["LLM-Urteil mit wörtlichem Zitat<br/>quote_in_text-Prüfung<br/>stützt / widerspricht / nicht gefunden<br/>ungültiges Zitat: unchecked"]
     JUDGE -. "nicht belegt" .-> WEBQ["Websuche als Zweitquelle<br/>(Wikipedia / Tavily)"]
     JUDGE --> EVT["fact-Events auf der Timeline"]
     HITS --> QA["Frage-Simulator<br/>(app/questions/pipeline.py)<br/>Lücken-Fragen + Antwort-Abgleich"]
@@ -201,7 +202,7 @@ sequenceDiagram
     participant S3 as SeaweedFS (S3)
     participant W as Celery Worker (fact_check)
     participant PG as Postgres + pgvector
-    participant L as LLM (OpenAI-kompatibel)
+    participant L as Ollama lokal (JSON-Schema)
     participant WS as Wikipedia / Tavily
 
     FE->>BE: GET /factcheck/settings (Modell, LLM-Host, Web-Anbieter)
@@ -245,8 +246,8 @@ sequenceDiagram
     participant S3 as SeaweedFS (S3)
     participant W as Celery Worker
     participant PG as Postgres + pgvector
-    participant L as LLM (OpenAI-kompatibel)
-    participant A as ASR (Deepgram EU)
+    participant L as Ollama lokal (JSON-Schema)
+    participant A as ASR (lokales Whisper, Deepgram optional)
 
     U->>FE: Rolle wählen, Start question round
     FE->>BE: POST /questions (Wörter, Fact-Check-Funde, collection_id, persona)
@@ -296,6 +297,8 @@ flowchart TD
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
     LIVE --> SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]
     SRC -->|"Weiter zur Aufnahme"| LIVE
+    LIVE --> WALK["/gestures: synthetischer 22-s-Rundgang<br/>gleiche Regeln, keine Genauigkeitsvalidierung"]
+    WALK --> LIVE
 
     PRAC --> STATE{"Phasen"}
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]
@@ -312,7 +315,7 @@ flowchart TD
     SRC -->|"collection_id aus localStorage"| UPLOAD["POST /sources<br/>POST /sources/search"]
 
     subgraph Transport["VideoTransport (wahlweise)"]
-        DEMO["DemoVideoTransport<br/>skriptete Marker"]
+        DEMO["LocalVideoTransport<br/>kein Upload; echte Pose-Events"]
         ANA["AnalysisTransport<br/>Backend-Upload + Polling"]
     end
     LIVE --> Transport

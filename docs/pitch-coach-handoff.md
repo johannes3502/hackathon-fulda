@@ -3,7 +3,7 @@
 ## Camera and audio review
 
 The `/live` workspace uses HTTP endpoints through the same-origin `/api` proxy
-in Compose. `frontend/src/features/live/transport.ts` implements the local demo
+in Compose. `frontend/src/features/live/transport.ts` implements the local capture transport
 and `AnalysisTransport`; `contracts.ts` defines their shared interface.
 
 | Backend endpoint | Frontend use |
@@ -26,7 +26,7 @@ around a selected marker. Download before refresh or leaving `/live`. The
 backend stores queued uploads and results in S3 and deletes originals after
 terminal processing; there are no event clips or persistent session history yet.
 
-Pose capture runs locally in a MediaPipe worker and exports JSONL without
+Pose capture and calibrated gesture observations run locally in a MediaPipe worker/browser and export JSONL/evidence JSON without
 sending landmarks to the backend. Preview and recording logs use separate time
 anchors; a take resets the preview log. The recording log remains downloadable
 in review. [Data points and heuristics](../frontend/DATA_POINTS.md).
@@ -51,8 +51,11 @@ the sample controls and validate external input before dispatching events.
   without attributing it to a new user recording. Storage failure leaves the
   in-memory sample usable.
 
-The arms-crossed pose cue and source ingest/retrieval are implemented.
-Fact-check, generated judge questions and answer evaluation still use sample data. Session persistence, presigned uploads
+Real local gesture/posture rules now feed live hints, evidence export and review
+markers (`features/pose/evaluation.ts`). The separate `/gestures` walkthrough
+runs these rules on explicitly synthetic landmarks. Eye contact is not inferred.
+Source upload and hybrid retrieval are implemented at `/sources`. Fact-check,
+judge questions and answer evaluation still use sample data. Session persistence, presigned uploads
 and event-clip retrieval are also pending. Keep these boundaries visible when
 connecting new services; no fabricated scores or model results.
 

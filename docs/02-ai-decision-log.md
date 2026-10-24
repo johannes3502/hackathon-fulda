@@ -22,6 +22,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 14 | ML-Audioanalyse mit Hintergrundjobs | Codex: Silero VAD v6.2 als gepinntes ONNX-Modell (SHA-256 geprüft), RMS/YIN beibehalten, 3-s-Kalibrierung; Deepgram Nova-3 (de, EU) hinter `Transcriber`; asynchroner Upload/Status und kombinierte Timeline, S3-Ergebnisse und Löschung der Originale | VAD nur an synthetischer Sprache/Rauschen geprüft; keine Genauigkeitsbehauptung. Deepgram-HTTP-Vertrag mit Mock geprüft, kein echter Anbieteraufruf ohne Schlüssel. Deutsche Füllworterhaltung laut Detaildokumentation nicht zugesichert; kein `filler_words=true`. Englische Feature-Unterstützung nicht auf Deutsch übertragen. JSON-Demo explizit markiert; kein stilles Ersetzen fehlgeschlagener ASR durch erfundene Wörter. S3-Ausfälle/abgebrochene Jobs können Cleanup verzögern; kein allgemeiner Retention-Job. Prozessabbruch zwischen bezahltem ASR-Aufruf und Speicherung kann diesen Aufruf wiederholen | Nutzer bestätigt vorgeschlagenes Vorgehen und eigenen Arbeitsbranch; Entscheidung für ersten austauschbaren ASR-Adapter innerhalb dieses Auftrags | `backend/tests/test_ml_audio.py`, `backend/tests/fixtures/`, `backend/scripts/smoke_audio.py`; Quellen und Prüfumfang unten |
 | 15 | README und Altbestand aufräumen | Haupt-README auf 17 Zeilen gekürzt; alten Frontend-Plan, doppelte Produktnotiz und überholte Video-WebSocket-Dokumentation entfernt; ungenutzte Validatoren und Handshake-Typen gestrichen | Referenzen vor dem Löschen geprüft; aktuelle HTTP-Upload-/Job-Grenze im Handoff dokumentiert, API-Tooling-Anleitung zentralisiert. Zwei Tests entfernten ausschließlich die gelöschten WebSocket-Helfer; Replay- und HTTP-Tests bleiben aktiv | Ausdrücklicher Nutzerauftrag für Vereinfachung und Cleanup | Compose-Start, Typecheck, Lint, 25 Frontend-Tests, Backend-Smoke-Test und lokale Markdown-Links bestanden |
 | 16 | Quellen-Upload und RAG-Retrieval (Feature 2, Vorbereitung für Fact-Check und Frage-Agent) | Claude Code: `app/sources/` mit Extraktion (PDF pro Seite, PPTX pro Folie inkl. Notizen/Tabellen, DOCX, TXT/MD), Chunking mit Seiten-/Folienangabe, lokalem Embedding-Modell hinter `Embedder`-Interface, pgvector + deutscher Volltextsuche mit Reciprocal Rank Fusion, Celery-Ingest, REST-API und Frontend-Seite `/sources`; Postgres-Image auf `pgvector/pgvector:0.8.6-pg18-trixie` umgestellt | Embedding-Anbieter war offen; lokales Modell gewählt, damit keine Dokumente an Dritte gehen (≈0,6 GB RAM pro Prozess). Erste Keyword-Suche zerlegte „260.000“ anders als PostgreSQL und fand die Zahl nicht; korrigiert, indem PostgreSQL die Suchanfrage selbst tokenisiert. Gemessener CPU-Durchsatz des Modells auf einem 12-Kern-Linux-Laptop nur ≈3 Abschnitte/s (1 MB Text ≈ 6 min); Test auf Mac M5 Pro steht aus, schnellere Alternativen gemessen (MiniLM-L12 ≈12/s, potion-multilingual ≈800/s). Next-Proxy puffert Uploads standardmäßig nur bis 10 MB; `proxyClientMaxBodySize` auf 100 MB gesetzt (betraf auch Aufnahmen). Kein OCR. Suche liefert immer Top-k, auch wenn nichts passt. Retrieval-Qualität nur mit synthetischen Mini-Dokumenten geprüft, keine Genauigkeitsaussage | Nutzerauftrag (Quellen hochladen, später für Fact-Check/Fragerunde nutzen); Modell-, Chunking- und Ranking-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_sources.py` (inkl. DB-Roundtrip gegen pgvector), `backend/scripts/smoke_sources.py` im Compose-Stack bestanden; Frontend-Unit-Tests, Typecheck, Lint; Browser-Check Desktop/375 px ohne Konsolenfehler |
+| 17 | Lokale Whisper-Transkription als Standard | Codex: faster-whisper hinter dem bestehenden `Transcriber`-Protokoll, lokales Modell im Image, Deepgram nur noch optional; `RecordingAnalysis.text` und regeneriertes API-Schema | Modellqualität, deutsche Füllwörter und Wortgrenzen nicht bewertet. Docker-Build mit Modelldownload nicht geprüft. PyAV 15.1.0 nötig, da 19.0.2 den faster-whisper-Dekoder bricht. Kein Cloud-Zwang, aber auch kein Nachweis besserer Erkennung | Nutzerauftrag: Speech-to-Text mit lokalem Modell, Review vor Push | Nach dem Merge mit main: 46 Backend-Tests bestanden, zwei übersprungen; echter `tiny`-Lauf über `run_analysis` mit synthetischer deutscher Sprache; API-Aktualitätscheck bestanden; Details unten |
 | 17 | Fact-Check (Feature 2) mit RAG zuerst und Web als Zweitquelle | Claude Code: `app/factcheck/` mit OpenAI-kompatiblem Chat-Client (httpx, keine neue Abhängigkeit), Aussagen-Extraktion über nummerierte Sätze (Timestamps aus den Wort-Timestamps, nicht vom Modell), Hybrid-Retrieval je Aussage in der Quellen-Collection, LLM-Urteil mit wörtlichem Zitat, Zitat-Prüfung per `quote_in_text`, danach Websuche (Wikipedia-API ohne Schlüssel oder Tavily) nur für nicht belegte Aussagen; Celery-Task `fact_check`, `POST /factcheck`, Status-Polling, `fact`-Events; Frontend: Transkription im Live-Studio als Opt-in, Fact-Check-Panel in der Review mit Sprung zur Videostelle | Nutzer legte nur „OpenAI-kompatibel“ fest; URL und Modell bleiben Teamentscheidung, daher Konfiguration über `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` und `/factcheck` antwortet ohne Konfiguration mit 503. `temperature` wird standardmäßig nicht gesendet, weil manche Modelle nur den Standardwert akzeptieren; JSON-Modus abschaltbar. Ein vom Modell erfundenes Zitat wird verworfen (Ergebnis „nicht gefunden“ statt Scheinbeleg); technische Fehler heißen „unchecked“, nicht „falsch“. Wikipedia lehnte den ersten User-Agent mit HTTP 403 ab (Wikimedia-Policy verlangt Kontaktangabe); Repo-URL ergänzt. Websuche mit unpräziser Suchanfrage liefert themenfremde Artikel; das Urteil hängt dann am Modell. Qualität von Extraktion und Urteil mit echtem Modell nicht gemessen; Transkript-Sätze gehen an den LLM-Anbieter, Suchanfragen an Wikipedia/Tavily (im UI vor dem Start benannt) | Nutzerauftrag (Fact-Check mit RAG über hochgeladene Quellen wie Vorlesungsfolien, Web-Fallback, eigener Branch, danach nach main); Prompt-, Grenzwert- und Wikipedia-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_factcheck.py` (10 Tests), Backend-Suite 51 bestanden; Frontend: Typecheck, Lint, 49 Unit-Tests, 18 Playwright-Tests Desktop/375 px; End-to-End im isolierten Compose-Stack, siehe unten |
 
 ## Prüfprotokoll (24.10.2026)
@@ -179,6 +180,164 @@ TypeScript, ESLint, Produktionsbuild und API-Aktualitätscheck bestanden.
   JS-/WASM-Runtime und Modell über HTTP erreichbar, Modell-Prüfsumme stimmt
   mit dem eingecheckten Asset überein.
 
+## Gesten und Jury-Pfad (24.10.2026)
+
+Auftrag: Gestenerkennung recherchieren, implementieren, leicht demonstrierbar
+machen und das Wie/Warum der Auswertung dokumentieren.
+
+- Geprüfte Primärquellen und Alternativen: `docs/04-gesture-evaluation.md`.
+  Codex entschied für die vorhandene Pose-Landmark-Kette statt eines zusätzlichen
+  Fingerklassifikators, da grobe Bewegungen die gewählten Beobachtungen tragen.
+- Korrektur: Die bisherigen zeitgesteuerten Marker auf echten Kameraaufnahmen
+  wurden entfernt. Der lokale Modus erzeugt nur aus tatsächlich gelieferten
+  Landmarks abgeleitete Beobachtungen. Synthetische Demonstration bleibt ein
+  eigener, sichtbarer Pfad, ohne Kamera und ohne behauptete Modellgenauigkeit.
+- Technische Parameter sind als `pose-rules-v1` offengelegt. Keine wissenschaftlich
+  validierten Grenzwerte, keine Scores; Prüfung am echten Demo-Gerät bleibt offen.
+- Unsicherheit: Fehlende Pose pausiert Auswertung; fehlende Hände sperren nur
+  Gesten. Kalibrierung, Mindestdauer, Hysterese und Cooldown verhindern definierte
+  Arten von Flackern. Eye Contact wird aus diesen Punkten nicht abgeleitet.
+- Zeitbezug: Rohdaten und Events beginnen bei `MediaRecorder.onstart` neu.
+  Review nutzt die lokale Aufnahme und zeigt die Regel-Evidenz am Event.
+- Menschliche Entscheidungen noch nötig: Prüfung auf Veranstaltungsgerät,
+  belastbare Evaluationsdaten, Quellen-/Frage-Anbieter. Nutzer hat lokale
+  Vorführung bestätigt; öffentliches Hosting ist keine Abnahmevoraussetzung. Details und
+  ehrliche Demo-Abgrenzung: `docs/05-jury-demo.md`.
+
+### Team-Integration und Rückmeldung zur Seitwärtsbewegung
+
+- Neu eingetroffenes `main` integriert: lokale Quellen-/RAG-Pipeline,
+  Architekturdiagramme und Handgelenk-Kreuzungsgeometrie mit Debug-Readout.
+  Die Kreuzungsgeometrie bleibt erhalten; ihre separate Hinweis-Zustandsmaschine
+  wurde in die gemeinsame Event-Auswertung überführt. Ein Hinweis gleichzeitig,
+  neue Baseline/Zeitachse pro Aufnahme und exportierbare Evidenz gelten nun auch
+  dort. Fehlende Handgelenke werden nicht überbrückt.
+- Nutzer-Test: Hand hoch und Hände zusammen funktionierten. „Seitwärts“ fehlte,
+  weil der Nutzer den gesamten Körper versetzte; die erste Regel maß nur den
+  Torso-Winkel. `pose-rules-v2` ergänzt deshalb einen separaten horizontalen
+  Positionsvergleich zur Baseline. Der Winkel-Schwellwert wurde nicht einfach
+  gesenkt. Live-Debug zeigt beide Messwerte, Anleitung und Beispiel wurden
+  korrigiert. Der Nutzer bestätigte danach auch die Positionsregel.
+- Rückmeldung zur Verzögerung: Die Positionsregel wartete bewusst 1,5 s.
+  `pose-rules-v3` verkürzt diese Mindestdauer auf 0,8 s; Schwelle und Hysterese
+  bleiben gleich. Debug ergänzt gemessene Frame-/Inferenzzeit und Abtastrate.
+  Safari als Ursache ist nicht belegt; die Messung trennt Verarbeitungszeit
+  von der absichtlichen Bestätigungsdauer. Die neue Geschwindigkeit braucht
+  noch subjektive Rückmeldung am Gerät.
+- Der Nutzer hat lokale Vorführung ausdrücklich als ausreichend bestätigt.
+  Die offene öffentliche Hosting-Frage entfällt für diese Abnahme.
+- Beim Neubau der integrierten Backend-Abhängigkeiten lief ein PyPI-Download in
+  den Standard-Timeout. Der Build verwendet nun 120 s Download-Timeout und fünf
+  Retries; keine Paketversionen wurden zur Umgehung geändert.
+- Spätere Team-Änderungen integrieren native Quellen-/Practice-Flows, ein
+  gemeinsames Overlay und den Loading-Screen. Der native Pfad importiert noch
+  `CrossArmsCue`; deshalb bleibt dieser Adapter samt Tests für die App erhalten.
+  Die Web-Auswertung nutzt ausschließlich `PoseEvaluator`. Die Migration der
+  Browser-Hinweise darf die parallele native Arbeit nicht brechen.
+### Lokale Prüfung nach Integration
+
+- 63 Frontend-Tests und 18 Mobile-Tests bestanden; ESLint in beiden Workspaces
+  sowie TypeScript in beiden Workspaces bestanden. Die native App wurde hier nicht auf einem
+  physischen Gerät neu qualifiziert.
+- 36 Browser-Tests auf Desktop und 375-px-Viewport bestanden: synthetischer
+  Jury-Rundgang, echte Regel-Engine mit kontrollierten Landmarks, lokale
+  Aufnahme/Replay/Loop/Export, Ausfälle sowie Sources-/Sample-Pfade. Das echte
+  MediaPipe-Modell wurde auf synthetischen Kameraframes geladen. Kein Nachweis
+  für Kamera-Erkennungsqualität oder physisches Safari/iOS.
+- Frontend-Produktionsbuild bestanden. Der Loop-Test beobachtet jetzt den
+  tatsächlichen Zeitsprung beim Wiederholen; langsames Polling hatte den kurzen
+  Abschnitt bei vierfacher Wiedergabe wiederholt verpasst.
+- 43 Backend-Tests im Compose-Image bestanden, einschließlich echtem Silero-
+  Modell und synthetischem pgvector-Datenbanktest. Keine externen ASR-/LLM-
+  Anbieteraufrufe als Nachweis verwendet.
+- Compose-Smoke bestätigt API/FFmpeg/MediaPipe, PostgreSQL, S3-Zugriff und
+  Cleanup sowie getrennte Celery-Verarbeitung bei weiter antwortender API.
+  Quellen-Smoke: synthetisches PPTX hochgeladen, lokal eingebettet, gesucht und
+  wieder gelöscht. Alle sechs Compose-Dienste sind gesund.
+- Hand hoch, Hände zusammen und seitlicher Versatz wurden vom Nutzer mit der
+  echten Kamera bestätigt. Daraus folgt keine gemessene Erkennungsquote.
+  Die auf 0,8 s verkürzte Positionsregel ist automatisiert geprüft; eine neue
+  Rückmeldung zur empfundenen Geschwindigkeit und ein Safari-Vergleich fehlen.
+## Lokale Whisper-Transkription als Standard (24.10.2026)
+
+- Nutzerauftrag: Speech-to-Text mit einem lokalen Modell statt Cloud-Zwang.
+  `faster-whisper` 1.2.1 läuft im bestehenden Celery-Worker auf CPU und liefert
+  Wort-Timestamps; `WhisperTranscriber` implementiert weiterhin das vorhandene
+  `Transcriber`-Protokoll. Deepgram bleibt als optionaler Adapter erhalten,
+  JSON nur als explizit gewählte synthetische Demo.
+- Modell: [faster-whisper](https://github.com/SYSTRAN/faster-whisper),
+  [CTranslate2](https://github.com/OpenNMT/CTranslate2),
+  [Systran/faster-whisper-small](https://huggingface.co/Systran/faster-whisper-small)
+  (MIT). Das Image lädt das Modell beim Build nach `/app/models/whisper`; zur
+  Laufzeit wird nicht nachgeladen. `WHISPER_MODEL` ist ein Build-Argument,
+  `WHISPER_MODEL_PATH` zeigt auf die eingebetteten Dateien.
+- Ergebnis enthält zusätzlich `RecordingAnalysis.text`; die Wortliste bleibt
+  für Timestamps und Events maßgeblich. Das OpenAPI-/TypeScript-Schema wurde
+  regeneriert.
+- PyAV ist auf 15.1.0 begrenzt: Mit 19.0.2 bricht der Dekoder mit
+  `TypeError: open() got an unexpected keyword argument 'metadata_errors'` ab.
+- Verifiziert nativ mit Python 3.13 und ffmpeg 7.1.5; nach dem Merge mit
+  `origin/main` erneut 46 Backend-Tests bestanden, zwei übersprungen (Silero-
+  Modell und DB-Roundtrip ohne lokale Instanzen). Ein echter `tiny`-Lauf über
+  `run_analysis` mit `tests/fixtures/speech-de.wav`, inklusive Text und
+  Wort-Timestamps, war bestanden. Standardmodell `small` wurde nicht qualitativ
+  bewertet.
+- Nicht verifiziert: Docker-Build mit Modell-Download (Docker in dieser VM nicht
+  verfügbar), deutsche Füllwortqualität, menschliche Stimmen, GPU/`cuda`,
+  Latenz und Speicherbedarf des `small`-Modells pro Worker. Keine Aussage zur
+  Erkennungsgenauigkeit.
+
+## Lokale Alternative statt OpenAI API: Zwischenstand (24.10.2026)
+
+- Der Nutzer wählte zunächst OpenAI API, fragte dann ausdrücklich nach einer
+  freien/lokalen Alternative. Umsetzung ohne API-Key: native Ollama-Inferenz
+  mit Qwen3.5 4B Q4_K_M; Teamarbeit zu lokalem Whisper aus
+  `feat/local-whisper-asr` integriert. Kein OpenAI-Aufruf durchgeführt.
+- Auf M2 Pro/32 GB getestet. Der generische Ollama-Tag lud MLX und scheiterte
+  bei JSON-Schema-Ausgabe mit HTTP 501. Expliziter GGUF-Tag funktioniert;
+  `OLLAMA_NO_CLOUD=1`, Loopback-Server und kein automatischer Anbieterwechsel.
+- Web-Review verbindet Whisper-Wörter, Zeitmarker, Quellenvergleich und
+  Textantworten. Modellzitate werden gegen die tatsächlich gefundenen Chunks
+  geprüft; ungültige Zitate unterdrücken Urteil und davon abgeleitete Rückfrage.
+  Neue Jobs laufen in Celery, Redis enthält nur IDs, Inputs/Ergebnisse liegen
+  in S3 und können im Review gelöscht werden. Kein automatischer TTL.
+- Reale lokale Prüfung: drei erfundene Aussagen korrekt als gestützt,
+  widersprochen und nicht gefunden eingeordnet (18,3 s); Korrekturantwort mit
+  gültigem Zitat (5,1 s). Quellen und Coaching-Jobs anschließend gelöscht.
+  Whisper `small` lieferte den Text der 6,845-s-eSpeak-Fixture mit 13 Wörtern.
+  Dies ist Integrations-, keine allgemeine Qualitäts-/Füllwortvalidierung.
+- Vor weiterer Main-Integration: 61 Backend- und 67 Frontend-Tests bestanden;
+  Typecheck/ESLint sowie sechs gezielte Browser-Tests (Desktop und 375 px)
+  einschließlich Transkription, Fehlererhalt, Zitatansicht, Wiederaufnahme des
+  Antwort-Pollings und Löschung bestanden. Reales Mikrofon und Safari bleiben
+  separate Gerätechecks. Setup, Begründung, Grenzen: `docs/06-local-coaching.md`.
+
+### Konsolidierung mit aktueller Teamarbeit
+
+- `origin/main` brachte parallel Fact-Check, Web-Zweitquelle, Frage-Simulator
+  und eine Analyseansicht mit. Die separate neue `/coaching`-Implementierung
+  wurde deshalb wieder entfernt: ein gemeinsamer Pfad über `/factcheck`,
+  `/questions` und `/questions/answers` nutzt nun die Team-Module.
+- Standard ist native Ollama-Inferenz, wenn `LLM_BASE_URL` und `LLM_MODEL` leer
+  sind. Der kompatible Adapter bleibt explizit konfigurierbar. Websuche und
+  deren Checkbox sind standardmäßig aus; keine unbeabsichtigten Suchanfragen.
+- JSON-Schemas für Aussagen, Urteile und Fragen ergänzen die Team-Verweis- und
+  Zitatprüfung. Ein ungültiges Zitat ist technisch `unchecked`, nicht die
+  Behauptung „keine Evidenz gefunden“. Bei einer ungültigen Antwortbewertung
+  wird keine darauf beruhende Nachfrage übernommen.
+- Im ersten realen integrierten Lauf waren Frage-Verweise fehlerhaft. Mit
+  JSON-Schema war die Ausgabe strukturell korrekt, doch eine korrigierte Antwort
+  erhielt trotz passender Erklärung noch `contradicts`. Der Antwort-Prompt
+  trennt jetzt ausdrücklich neue Antwort und frühere Behauptung. Das zeigt:
+  gültiges JSON und gültiges Zitat beweisen kein richtiges Urteil.
+- Danach echter Smoke auf demselben synthetischen Lernlabor-Fall bestanden:
+  Quellenvergleich 10,1 s (stützt/widerspricht/nicht gefunden), passende Frage
+  6,1 s, korrigierte Antwort als gestützt mit Zitat 4,1 s. Einzelner Lauf auf M2
+  Pro/32 GB, kein Qualitätsbenchmark. Alle synthetischen Jobs/Quellen entfernt.
+- Die Team-Job-Pipeline löscht Requests nach Abschluss. Ergebnisse bleiben
+  in S3; die zuvor beschriebene separate Lösch-UI ist nicht mehr vorhanden.
+  Setup und Speichergrenzen in `docs/06-local-coaching.md` entsprechen dem
+  konsolidierten Stand. Kein OpenAI-Schlüssel oder gehosteter Modellaufruf nötig.
 ## Fact-Check End-to-End (24.10.2026)
 
 Umgebung: Linux-Laptop, Docker. Isolierter Compose-Stack (`-p factcheck-e2e`,
@@ -249,3 +408,31 @@ frühere Entscheidung „nur Text“ ist damit für diesen Pfad aufgehoben.
   (Multipart-Upload, Gesprächsreihenfolge). Nicht geprüft: echtes LLM,
   echte Deepgram-Antwort, Mikrofon/Sprachausgabe auf echten Geräten
   (insbesondere iOS Safari).
+
+## Lokaler integrierter Abnahmestand (24.10.2026, M2 Pro)
+
+Aktueller Stand nach Zusammenführung mit `origin/main` (`9ab7a6f`):
+Fact-Check und Frage-Simulator verwenden standardmäßig das oben beschriebene
+lokale Ollama-Modell, nicht den optionalen OpenAI-kompatiblen Cloudadapter.
+Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
+
+- 67 Backend-Tests, 85 Frontend- und 18 Mobile-Unit-Tests bestanden.
+- Vollständiger Browserlauf: 44 Tests bestanden. Danach erweiterter
+  Quellen-/Frage-/Antwort-Flow: 2 Tests bestanden (Desktop und mobile Breite).
+- Nutzer fand die Audio-Option nicht: Sie stand unterhalb der Kamera und war
+  in Large view ausgeblendet. Jetzt steht **Speech analysis** direkt oberhalb
+  der Kamera und bleibt in beiden Ansichten sichtbar. Nach dieser Änderung
+  8 gezielte Browserprüfungen bestanden (Sichtbarkeit, Wechsel mit Mikrofon,
+  große Ansicht, Audio-Upload, Transkript, Quellenvergleich und Fragerunde).
+  Screenshots auf Desktop und mobiler Breite visuell geprüft.
+- Typecheck und Lint beider Workspaces sowie finaler Next.js-Produktionsbuild
+  bestanden. OpenAPI-Export mit laufender API identisch, TypeScript-Vertrag
+  daraus aktualisiert. Alle sechs Compose-Dienste healthy; lokales Modell
+  über `/api/factcheck/settings` verfügbar.
+- Reale lokale Modellaufrufe und Whisper-Fixture wie oben erfolgreich;
+  automatisierte Browserprüfungen verwenden synthetische Kamera/Audio-Daten
+  und deterministische API-Antworten. Das ist keine Safari-/Mikrofon- oder
+  allgemeine Modellqualitätsvalidierung. Nutzerprüfung mit echtem Mikrofon
+  nach der Korrektur bestätigt: funktioniert, Verarbeitung als langsam
+  empfunden, vom Nutzer für diesen Stand ausdrücklich akzeptiert. Keine
+  gemessene Laufzeit oder Wortfehlerrate aus diesem informellen Versuch.

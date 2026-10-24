@@ -9,6 +9,9 @@ import type { LiveFeedback } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { FactCheckPanel } from "./FactCheckPanel";
 import { FeedbackMoment, LiveNav, MissingRecording } from "./shared";
+import { RecordedTranscript } from "./RecordedTranscript";
+import { PoseEvidence } from "./PoseEvidence";
+import { PoseEventDownload } from "./PoseEventDownload";
 import { PoseDownload } from "./PoseDownload";
 import { QuestionSimulator } from "./QuestionSimulator";
 import { TranscriptAnalysis } from "./TranscriptAnalysis";
@@ -64,7 +67,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             {recording.notice}
           </p>
         )}
-        {recording.config.mode === "demo" && (
+        {recording.config.mode === "local" && (
           <p className="live-demo-notice">
             <strong>Demo feedback, real recording.</strong> These markers are
             scripted examples, not detections or an assessment of how you
@@ -81,7 +84,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             <MessageSquare size={19} />
             <strong>{recording.feedback.length}</strong>
             <span>
-              {recording.config.mode === "demo"
+              {recording.config.mode === "local"
                 ? "Demo markers"
                 : "Feedback moments"}
             </span>
@@ -95,6 +98,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
               onSelect={(item) => setSelected({ ...item })}
             />
             <PoseDownload blob={recording.poseLog} />
+            <PoseEventDownload events={recording.poseEvents} />
             <div className="recording-retention">
               <Download size={16} />
               <p>
@@ -115,6 +119,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 <p>{selected.detail}</p>
                 <strong>Try this</strong>
                 <p>{selected.action}</p>
+                <PoseEvidence event={selected.evidence} />
               </section>
             )}
           </div>
@@ -166,11 +171,11 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
               )}
               <p className="field-hint">
                 {recording.chunksSent} recording uploads/parts{" "}
-                {recording.config.mode === "demo"
+                {recording.config.mode === "local"
                   ? "processed by the local demo"
                   : "sent to the backend"}
                 . {(recording.bytesSent / 1024 / 1024).toFixed(1)} MB{" "}
-                {recording.config.mode === "demo" ? "kept local" : "sent"}.
+                {recording.config.mode === "local" ? "kept local" : "sent"}.
               </p>
             </section>
             <section className="next-review-step">
@@ -189,9 +194,13 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             </section>
           </aside>
         </div>
+        <RecordedTranscript recording={recording} onSelect={jump} />
         {recording.config.mode === "backend" && (
           <>
-            <TranscriptAnalysis recording={recording} />
+            <details className="transcript-import">
+              <summary>Import or replace word timestamps</summary>
+              <TranscriptAnalysis recording={recording} />
+            </details>
             <FactCheckPanel recording={recording} onSelect={jump} />
             <QuestionSimulator recording={recording} onSelect={jump} />
           </>

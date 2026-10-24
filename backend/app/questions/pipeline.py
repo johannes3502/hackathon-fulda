@@ -27,7 +27,8 @@ import httpx
 import psycopg
 
 from app.events import Event, merge_timeline
-from app.factcheck.llm import ChatModel, LLMError
+from app.factcheck.llm import ChatModel, LLMError, structured_json
+from app.factcheck.drafts import AnswerJudgment, QuestionDrafts
 from app.factcheck.models import ClaimResult, Evidence
 from app.factcheck.pipeline import Passage, upload_passages, verified_evidence
 from app.factcheck.transcript import Sentence, clock, sentences
@@ -70,6 +71,8 @@ Gib den Auszug und ein wörtliches Zitat daraus an (exakt kopiert, höchstens ei
 Jede Frage ist kurz, konkret, in der Sprache des Transkripts und in wenigen Sätzen beantwortbar. \
 Sie wird vorgelesen: ganze Sätze, keine Aufzählungen, Klammern oder Abkürzungen. \
 Verrate nicht die Antwort aus der Quelle. Keine Wertung der Person, keine Punkte, keine Noten.
+Jede Frage muss tatsächlich etwas fragen, keine reine Feststellung. Erzeuge weniger Fragen,
+wenn keine weitere sinnvolle Frage belegt ist. Bereits behandelte Quelleninhalte sind keine Lücke.
 Antworte nur mit JSON:
 {"questions": [{"kind": "contradiction|unsupported|gap|clarification", "question": "<Frage>", \
 "reason": "<ein Satz: worauf sich die Frage stützt>", "finding": <Befundnummer oder null>, \
@@ -80,6 +83,10 @@ Höchstens {limit} Fragen, die wichtigsten zuerst."""
 ANSWER_PROMPT = """{persona}
 Du vergleichst die Antwort auf deine Rückfrage nach dem Vortrag mit nummerierten Auszügen. \
 Urteile ausschließlich anhand der Auszüge, nicht mit eigenem Wissen.
+Bewerte ausschließlich die NEUE ANTWORT, nicht die frühere Aussage im Vortrag.
+Korrigiert die Antwort einen früheren Fehler und stimmt nun mit der Quelle überein,
+ist das Urteil "supports". Die frühere Aussage ist nur Kontext für die Frage.
+Urteil und Erklärung müssen denselben Vergleich der neuen Antwort beschreiben.
 - "supports": ein Auszug bestätigt den Kern der Antwort.
 - "contradicts": ein Auszug widerspricht der Antwort ausdrücklich, z. B. andere Zahl, anderes Datum, andere Person.
 - "not_found": die Auszüge behandeln das nicht eindeutig, oder die Antwort enthält keine prüfbare Aussage.
@@ -220,11 +227,11 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
     elif not has_sources:
         notices.append("Keine fertig verarbeiteten Quellen: keine Fragen zu fehlenden Inhalten.")
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1)) or "(keine Auszüge)"
-    answer = llm.complete_json(
+    answer = structured_json(llm,
         QUESTION_PROMPT.replace("{persona}", PERSONAS[request.persona]).replace("{limit}", str(config.max_questions)),
         f"Transkript (Satznummer, Zeit, Satz):\n{transcript}\n\n"
         f"Faktencheck-Befunde (Nummer, Zeit, Urteil, Behauptung):\n{_numbered_findings(request.claims)}\n\n"
-        f"Quellenauszüge:\n{context}",
+        f"Quellenauszüge:\n{context}", QuestionDrafts,
     )
     questions = parse_questions(answer, items, request.claims, passages, config.max_questions,
                                 config.min_quote_chars)
@@ -268,9 +275,8 @@ def review_answer(request: AnswerRequest, llm: ChatModel,
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1))
     said = f"\nGesagt im Vortrag: {question.transcript}" if question.transcript else ""
     try:
-        answer = llm.complete_json(ANSWER_PROMPT.replace("{persona}", PERSONAS[request.persona]),
-                                   f"Frage: {question.question}\nAnlass: {question.reason}{said}\n\n"
-                                                  f"Antwort: {request.answer}\n\nAuszüge:\n{context}")
+        answer = structured_json(llm, ANSWER_PROMPT.replace("{persona}", PERSONAS[request.persona]), f"Frage: {question.question}\nAnlass: {question.reason}{said}\n\n"
+                                                  f"Antwort: {request.answer}\n\nAuszüge:\n{context}", AnswerJudgment)
     except (LLMError, httpx.HTTPError) as error:
         log.warning("Answer review failed (%s)", type(error).__name__)
         return AnswerReview(verdict="unchecked", explanation="", checked=checked, reply=fallback, model=llm.model,
@@ -280,15 +286,15 @@ def review_answer(request: AnswerRequest, llm: ChatModel,
     reply = _text(answer, "reply", 500) or fallback
     evidence = None
     if verdict not in ("supports", "contradicts", "not_found"):
-        verdict, explanation, reply = "not_found", "", fallback
+        verdict, explanation, reply = "unchecked", "", fallback
         notes.append("Modellantwort ohne gültiges Urteil verworfen.")
     elif verdict != "not_found":
         evidence = verified_evidence(answer.get("quote"), answer.get("passage"), passages,
                                      request.config.min_quote_chars)
         if evidence is None:
-            verdict, explanation, reply = "not_found", "", fallback
+            verdict, explanation, reply = "unchecked", "", fallback
             notes.append("Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen.")
-    follow_text = _text(answer, "follow_up", 500)
+    follow_text = _text(answer, "follow_up", 500) if verdict != "unchecked" else ""
     follow_up = Question(
         id=f"{question.id}.f", kind="follow_up", question=follow_text,
         reason=f"Nachfrage zur Antwort auf: {question.question}"[:300], t_ms=question.t_ms,

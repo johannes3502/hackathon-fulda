@@ -8,6 +8,7 @@ import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import type { LiveFeedback } from "@/features/live/contracts";
 import { FeedbackMoment, LiveNav, MissingRecording } from "./shared";
 import { VideoPlayback } from "./VideoPlayback";
+import { PoseEvidence } from "./PoseEvidence";
 export function FeedbackReplay({ sessionId }: { sessionId: string }) {
   const { recordings } = useLiveSessions();
   const recording = recordings[sessionId];
@@ -34,19 +35,15 @@ export function FeedbackReplay({ sessionId }: { sessionId: string }) {
           <div>
             <h1>Watch the moment. Find your next step.</h1>
             <p>
-              {recording.config.title} · {recording.feedback.length}{" "}
-              {recording.config.mode === "demo"
-                ? "scripted markers"
-                : "feedback moments"}
+              {recording.config.title} · {recording.feedback.length} feedback
+              moments
             </p>
           </div>
         </div>
-        {recording.config.mode === "demo" && (
-          <p className="live-demo-notice">
-            Scripted examples are aligned to this recording’s timeline for
-            testing playback. They do not describe detections in your video.
-          </p>
-        )}
+        <p className="live-demo-notice">
+          Local gesture observations use visible landmarks and a neutral
+          baseline. They are prototype heuristics, not a quality score.
+        </p>
         <div className="feedback-replay-grid">
           <aside className="moment-browser panel">
             <div className="panel-title-row">
@@ -110,6 +107,7 @@ export function FeedbackReplay({ sessionId }: { sessionId: string }) {
                 </div>
                 <h2>{current.title}</h2>
                 <p>{current.detail}</p>
+                <PoseEvidence event={current.evidence} />
                 <div className="replay-action">
                   <strong>Your next step</strong>
                   <p>{current.action}</p>

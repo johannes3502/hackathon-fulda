@@ -1,7 +1,13 @@
-# Pose-Datenpunkte — MVP
+# Pose-Datenpunkte und Beobachtungen
 
-Ziel: Kamera starten, Pose-Landmarks pro Sample erfassen und als JSONL loggen.  
-Keine Bewertung, kein Backend, kein Face-Mesh, keine Iris/Pupille, keine Finger.
+Kamera starten, Pose-Landmarks pro Sample erfassen und als JSONL loggen.
+Darauf laufen kalibrierte Beobachtungsregeln: Hand über Schulter, Hände
+zusammen, seitliche Torso-Neigung/Position und verschränkte Arme. Keine Qualitätsbewertung, kein Face-Mesh,
+keine Iris/Pupille, keine Finger.
+
+Recherche, Formeln, Konfiguration, Unsicherheit und Evaluationsplan:
+[Gesten-Evaluation](../docs/04-gesture-evaluation.md).
+[Jury-Anleitung](../docs/05-jury-demo.md).
 
 ## Modell
 
@@ -120,7 +126,7 @@ Regeln:
 - Nur Samples loggen, wenn `pose_present` true ist.
 - Nicht sichtbare Beine als `null` loggen, nicht interpolieren.
 - Keine Glättung im Roh-Log; Glättung erst bei der Auswertung.
-- `t_ms` relativ zum ersten Pose-Sample; bei Aufnahme später an `MediaRecorder.onstart` ausrichten.
+- `t_ms` in der Vorschau relativ zum ersten Pose-Sample; bei Aufnahme an `MediaRecorder.onstart` ausgerichtet.
 
 ## Nicht im MVP
 
@@ -155,8 +161,8 @@ Aufnahme-Logs ausgegeben.
   installierten JS-/WASM-Dateien nach `public/pose/runtime` (generiert, gitignored).
   Im Browser sind keine CDN-/Modell-Downloads von Drittanbietern nötig.
 - `IMAGE`-Modus pro Frame vermeidet das zeitliche Smoothing des VIDEO-Graphen.
-  Keine zusätzliche Glättung im Log. Einziger Live-Hinweis bisher: „Arme
-  verschränkt“ (siehe unten); noch keine Pose-Events in Review/Timeline.
+  Keine zusätzliche Glättung im Roh-Log. Die separate Auswertung erzeugt
+  nachvollziehbare Beobachtungen mit Mindestdauer; keine Pose-Qualitätsnote.
 - Jeder Log-Eintrag enthält alle 21 Schlüssel aus der Indexliste. Tupel sind
   `[x,y,z,visibility,presence]`; fehlende Konfidenzwerte sind `null`, nicht erfunden.
   Ungültige Koordinaten sind `null`. Für Beine gelten zusätzlich die Sichtbarkeitsregeln.
@@ -198,25 +204,17 @@ sind technische Prototyp-Konfiguration, keine validierte Genauigkeit.
   keine Nase als Forward-Kriterium. Nicht nutzbare/degenerierte Augen ergeben
   `false`, was **keine** gesicherte Abwendung bedeutet.
 
-### Live-Hinweis „Arme verschränkt“ (Heuristik, nicht validiert)
+### Arme verschränkt und weitere Beobachtungen
 
-Implementierung und Konstanten: `src/features/pose/cues.ts` (`CROSS_ARMS`).
-Läuft in Vorschau und Aufnahme im Browser; Anzeige nur als Chip auf dem Video
-(„Arms crossed. Try an open stance. · Heuristic“). Keine Speicherung als Event,
-keine Aussage über Haltung oder Emotion.
+Die Geometrie und der optionale Debug-Readout aus der Team-Implementierung sind
+erhalten: `cues.ts` (`CROSS_ARMS`) und `PoseDebug.tsx`. Die zeitliche Zustandsmaschine
+läuft jetzt gemeinsam mit den anderen Regeln in `PoseEvaluator`. Dadurch gelten
+Kalibrierung, Aufnahmestart, Datenlücken und ein einzelner abschaltbarer Hinweis
+auch für diese Regel. Beobachtungen erscheinen im Review und Evidenz-Export.
+Der frühere separate Chip und seine tolerierte Fortsetzung über verdeckte
+Handgelenke wurden durch die gemeinsame Evidenzprüfung ersetzt.
 
-Pro Sample gilt „verschränkt“, wenn alle Bedingungen erfüllt sind:
-
-- beide `*_wrist_cross >= 0.1` (jedes Handgelenk über die Körpermitte),
-- beide `*_wrist_height` in `[-1.3, 0.2]` (etwa zwischen Schulter und Hüfte),
-- beide `*_elbow_deg <= 120` (Ellbogen gebeugt).
-
-Fehlt ein Wert (z. B. Handgelenk unter dem anderen Arm verdeckt), ist das
-Ergebnis `null`, nicht `false`. Zustandsmaschine pro Episode: Hinweis nach
-2 s durchgehend „verschränkt“; Ende nach 0,5 s „nicht verschränkt“ oder 1,5 s
-ohne Messung; danach 20 s Cooldown. Ein Hinweis pro Episode, keine
-Wiederholung. Bekannte Grenzen: 2D-Geometrie, gefaltete Hände vor dem Körper
-oder ein Presenter in beiden Händen können ähnlich aussehen.
+Alle Formeln und Konfigurationen: [Gesten-Evaluation](../docs/04-gesture-evaluation.md).
 
 Quellen: [MediaPipe Web Guide](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js),
 [Pose Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker).

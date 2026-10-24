@@ -59,7 +59,7 @@ it("returns null instead of guessing when points are not usable", () => {
   hidden[15].visibility = 0;
   expect(armsCrossed(sample(hidden))).toBeNull();
 });
-it("hints once per episode after the hold time, then cools down", () => {
+it("native adapter hints once per episode after the hold time, then cools down", () => {
   const cue = new CrossArmsCue();
   const run = (from: number, to: number, value: boolean | null) => {
     let active = false;
@@ -77,7 +77,7 @@ it("hints once per episode after the hold time, then cools down", () => {
   expect(run(6000, 9000, true)).toBe(false);
   expect(cue.update(true, 5600 + CROSS_ARMS.cooldownMs)).toBe(true);
 });
-it("does not hint for a quick crossing", () => {
+it("native adapter does not hint for a quick crossing", () => {
   const cue = new CrossArmsCue();
   for (let t = 0; t < 1000; t += 100) cue.update(true, t);
   for (let t = 1000; t <= 1600; t += 100) cue.update(false, t);

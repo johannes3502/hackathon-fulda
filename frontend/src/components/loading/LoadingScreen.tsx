@@ -109,4 +109,3 @@ export function LoadingScreen({ label = "Einen Moment bitte" }: { label?: string
     </section>
   );
 }
-

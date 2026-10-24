@@ -32,22 +32,25 @@ def _remove_job(job_id: str):
 async def analyze(
     recording: UploadFile = File(description="Synthetic audio/video recording (WebM, MP4, WAV, ...)"),
     config: str | None = Form(default=None, description="AudioConfig JSON; first 3000 ms are calibration"),
-    transcribe: bool = Form(default=True, description="Send audio to configured ASR (default: Deepgram EU). false = local signal analysis only"),
+    local_only: bool = Form(default=False, description="Require local Whisper; reject hosted or synthetic ASR before storing the recording"),
+    transcribe: bool = Form(default=True, description="Run configured ASR (default: local Whisper). false = local signal analysis only"),
 ) -> AcceptedJob:
     """Store in S3 and enqueue analysis. Poll status_url for the result.
 
-    German filler preservation is unverified. Originals are deleted after
-    terminal processing. Demo recordings must be synthetic.
+    Whisper runs locally; German filler preservation is model-dependent.
+    Originals are deleted after terminal processing. Demo recordings must be synthetic.
     """
     try:
         parsed = AudioConfig.model_validate_json(config) if config else AudioConfig()
     except ValidationError as error:
         raise HTTPException(422, error.errors(include_url=False, include_context=False)) from error
     if transcribe:
+        if local_only and os.getenv("ASR_PROVIDER", "whisper").strip().lower() not in {"whisper", "faster-whisper"}:
+            raise HTTPException(503, "This recording requires local Whisper; configure ASR_PROVIDER=whisper")
         try:
             configured_transcriber()
         except (ValueError, KeyError) as error:
-            raise HTTPException(503, "ASR is not configured; set provider credentials or transcribe=false") from error
+            raise HTTPException(503, "ASR is not configured; check ASR_PROVIDER/WHISPER_* or DEEPGRAM_API_KEY, or submit transcribe=false") from error
     job_id = str(uuid4())
     try:
         await run_in_threadpool(_store_upload, job_id, recording.file, AnalysisOptions(audio=parsed, transcribe=transcribe))

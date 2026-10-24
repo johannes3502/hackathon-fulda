@@ -9,7 +9,7 @@ export function TranscriptAnalysis({
 }: {
   recording: LiveRecording;
 }) {
-  const { save } = useLiveSessions();
+  const { update } = useLiveSessions();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -43,21 +43,34 @@ export function TranscriptAnalysis({
         recording.durationMs,
       );
       if (active.signal.aborted) return;
-      save({
-        ...recording,
+      update(recording.id, (take) => ({
+        ...take,
         words,
         factCheck: undefined,
+        questions: undefined,
+        answers: undefined,
+        transcript: {
+          words,
+          provider: "imported",
+          synthetic: false,
+          notices: [
+            "Imported word timestamps; verify they match this recording.",
+          ],
+        },
         feedback: [
-          ...recording.feedback.filter(
-            (f) => !f.id.startsWith("words-") && !f.id.startsWith("fact-"),
+          ...take.feedback.filter(
+            (f) =>
+              !f.id.startsWith("words-") &&
+              !f.id.startsWith("fact-") &&
+              !f.id.startsWith("question-"),
           ),
           ...result.feedback,
         ].sort((a, b) => a.startMs - b.startMs),
         metrics: [
-          ...recording.metrics.filter((m) => !m.id.startsWith("words-")),
+          ...take.metrics.filter((m) => !m.id.startsWith("words-")),
           ...result.metrics,
         ],
-      });
+      }));
       setNotice("Transcript analysis added to this take.");
     } catch (error) {
       if (!active.signal.aborted)
@@ -74,9 +87,8 @@ export function TranscriptAnalysis({
     <section className="panel">
       <h2>Analyze a timestamped transcript</h2>
       <p>
-        {recording.words?.length
-          ? `This take has a transcript with ${recording.words.length} words. Importing another one replaces it and clears the fact-check.`
-          : "This take has no transcript. Turn on transcription before recording, or upload words from this take to analyze pauses, fillers and pace and to enable the fact-check."}
+        You can replace the automatic transcript with word timestamps from this
+        take. Importing recalculates pauses, fillers and pace.
       </p>
       <label htmlFor="transcript-file">Word timestamps (JSON)</label>
       <input

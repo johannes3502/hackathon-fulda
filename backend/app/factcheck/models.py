@@ -21,7 +21,7 @@ EvidenceKind = Literal["upload", "web"]
 class FactCheckConfig(BaseModel):
     """Prototype limits, not tuned. Returned with every result."""
 
-    max_claims: int = Field(default=12, ge=1, le=30)
+    max_claims: int = Field(default=6, ge=1, le=30)
     top_k: int = Field(default=5, ge=1, le=10, description="Uploaded passages per claim")
     web_results: int = Field(default=4, ge=1, le=8, description="Web passages per claim")
     min_quote_chars: int = Field(default=12, ge=1, description="Shorter quotes are not accepted as evidence")

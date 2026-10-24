@@ -58,6 +58,7 @@ GENERATED = {"questions": [
 
 
 def request(**kwargs) -> QuestionRequest:
+    kwargs.setdefault("config", {"max_questions": 5})
     return QuestionRequest(words=TRANSCRIPT, collection_id=uuid4(), claims=CLAIMS, **kwargs)
 
 
@@ -129,7 +130,7 @@ def test_answer_review_uses_question_evidence_and_verifies_quotes():
 
     invented = review_answer(AnswerRequest(question=question(), answer="Aus Käse."),
                              Model({"verdict": "contradicts", "passage": 1, "quote": "besteht ganz aus Käse und Milch"}))
-    assert invented.verdict == "not_found" and invented.evidence is None and invented.follow_up is None
+    assert invented.verdict == "unchecked" and invented.evidence is None and invented.follow_up is None
     assert any("nicht wörtlich" in n for n in invented.notes)
 
 
@@ -145,6 +146,7 @@ def test_answer_review_without_passages_or_model_is_unchecked():
 def test_api_requires_model_and_accepts_jobs(monkeypatch):
     client = TestClient(app)
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.setenv("LLM_MODEL", "requires-explicit-base-url")
     body = {"words": [w.model_dump() for w in TRANSCRIPT]}
     assert client.post("/questions", json=body).status_code == 503
     assert client.post("/questions", json={"words": []}).status_code == 422

@@ -39,18 +39,18 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker, FaceLandmarker (Iris, Kopfausrichtung), HandLandmarker |
 | Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
 | Medien-Verarbeitung | `ffmpeg` im Backend: Clips schneiden, WebM/MP4 remuxen (seekbar machen) |
-| Transkription | Gehostete ASR-API hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}`), damit der Anbieter austauschbar bleibt |
+| Transkription | Lokales Whisper (`faster-whisper`) hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}` + Text), Deepgram optional; Anbieter bleibt austauschbar |
 
 **Vorschläge, noch zu bestätigen** (Bestätigung im `docs/02-ai-decision-log.md` festhalten; Vorlage: `templates/ai-decision-log.md`)
 
-- **Transkription:** Stufe A (zuerst): Audio nach dem Stoppen hochladen, Wort-Timestamps zurück. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg → Anbieter mit Füllwort-Option prüfen (z. B. Deepgram, AssemblyAI) oder `faster-whisper`/CrisperWhisper als lokale Alternative. Wort-Timestamps und Füllwort-Unterstützung des gewählten Modells vor der Entscheidung gegen die aktuelle Doku prüfen.
+- **Transkription:** Stufe A (umgesetzt): Audio nach dem Stoppen hochladen, Wort-Timestamps und Text zurück. Standard ist lokales `faster-whisper` (deutsch), damit keine Audiodaten an einen Cloudanbieter gehen; Deepgram bleibt als optionaler Adapter verfügbar. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg; deutsche Füllwortqualität ist ungeprüft. Wort-Timestamps sind vorhanden.
 - **Embeddings:** umgesetzt mit lokalem `jinaai/jina-embeddings-v2-base-de` (Deutsch/Englisch, FastEmbed/ONNX) hinter einem austauschbaren `Embedder`-Interface; Retrieval-Qualität mit echten Dokumenten noch nicht gemessen.
-- **Fact-Check und Frage-Agent:** ein LLM-Anbieter für beides. Umgesetzt: beliebiger OpenAI-kompatibler Endpunkt (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`); konkreter Anbieter und Modell sind noch offen. Web-Zweitquelle über Such-APIs (Wikipedia-API ohne Schlüssel, optional Tavily), kein eigenes Scraping.
+- **Fact-Check und Frage-Agent:** auf Nutzerwunsch lokal und ohne API-Schlüssel: Ollama mit `qwen3.5:4b-q4_K_M` für beide Aufgaben. JSON-Schema, Satzverweis-/Zitatprüfung im Code; Details in `docs/06-local-coaching.md`. Web-Zweitquelle über Team-API vorhanden, für den lokalen Standard aus; kein eigenes Scraping.
 - **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
-- **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
+- **Hosting:** Nutzer bestätigt lokale Vorführung auf `localhost`; kein öffentliches Deployment nötig. Für andere Geräte/öffentliche Hosts bleibt HTTPS für `getUserMedia` erforderlich.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
-**Offen:** konkreter LLM-Anbieter und Modell (Schnittstelle: OpenAI-kompatibel), Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Stille-Erkennung für das Antwortende im Voice-Agent (umgesetzt: Button „Done“), Produktname.
+**Offen:** belastbare Schwellenwerte, automatische Aufbewahrungsdauer/Cleanup, Füllwortqualität, Fact-Check-Quellen im Web, automatisches Antwortende per Stille-Erkennung, Produktname. Umgesetzt: Post-Transkription lokal und Text-Fragerunde mit Quellenvergleich ohne Noten.
 
 ## 4. Architektur
 
@@ -137,6 +137,8 @@ docs/
   01-product.md                    # Features und offene Punkte
   02-ai-decision-log.md            # tatsächliche Entscheidungen und Prüfergebnisse
   03-architecture.md               # Architektur als Mermaid-Diagramme; bei Architektur-Änderungen mittesten
+  04-gesture-evaluation.md         # Recherche, Messregeln und Grenzen der Gestenheuristiken
+  05-jury-demo.md                  # Lokale Vorführung und dokumentierte Geräte-Abnahme
 templates/
   ai-decision-log.md               # Vorlage für die AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
@@ -155,7 +157,7 @@ Hybrid-Suche (pgvector + deutsche Volltextsuche). Der Fact-Check ist umgesetzt
 LLM extrahiert Aussagen mit Satznummern, Timestamps kommen aus den Wörtern;
 pro Aussage zuerst Retrieval in den hochgeladenen Quellen, danach optional
 Websuche (Wikipedia/Tavily); Zitate werden per `quote_in_text` geprüft,
-Ergebnisse sind `fact`-Events. LLM über OpenAI-kompatible API, Anbieter offen.
+Ergebnisse sind `fact`-Events. LLM standardmäßig lokal über Ollama; optional OpenAI-kompatibel.
 Der Frage-Simulator ist umgesetzt (`backend/app/questions/`, `POST /questions`,
 `POST /questions/answers`, Panel in `/live/[id]/review`): Fragen aus
 Fact-Check-Funden (Widerspruch, nicht belegt), Lücken gegenüber den Quellen und
@@ -165,22 +167,31 @@ Nachfrage), ohne Punkte oder Noten; Fragen mit gesprochener Stelle sind
 `question`-Events. Voice-Agent: Rolle `student` (neugieriger Erstsemester) oder
 `tutor` (Professor/Tutor) wählbar; der Browser liest Fragen und Reaktionen per
 `speechSynthesis` vor, gesprochene Antworten gehen über
-`POST /questions/answers/voice` an Deepgram und werden danach wie getippte
+`POST /questions/answers/voice` an den konfigurierten Transcriber (standardmäßig lokales Whisper) und werden danach wie getippte
 Antworten gegen die Quellen geprüft. Im Live-Studio lässt sich die
-Transkription (Deepgram) vor der Aufnahme zuschalten; die Wörter sind Eingabe
+Transkription (lokales Whisper) vor der Aufnahme zuschalten; die Wörter sind Eingabe
 für den Fact-Check. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
-erste Live-Regel „Arme verschränkt“ als Overlay-Hinweis, weitere Regeln und
-Pose-Events für die Timeline sind noch offen (`frontend/DATA_POINTS.md`).
+Darauf laufen lokale, kalibrierte Gesten-/Haltungsheuristiken (Hand hoch,
+Hände zusammen, Arme verschränkt, seitliche Neigung/Position) mit
+Live-Hinweis, Review-Markern und Evidenz-Export. `/gestures` zeigt denselben
+Regelablauf mit synthetischen Landmarks; keine Genauigkeitsvalidierung.
+Recherche und Regeln: `docs/04-gesture-evaluation.md`; Jury-Abnahme und
+noch offene Geräte-Gates: `docs/05-jury-demo.md`. Nutzerentscheidung:
+lokale Vorführung reicht; kein öffentliches Deployment erforderlich.
+Eye Contact wird nicht aus Pose-/Iris-Punkten behauptet.
 Der Aufnahme-Pfad nutzt die Audio-Job-API
-mit lokaler Signalanalyse und Status-Polling. ASR ist optional und im
-Live-Studio per Opt-in zuschaltbar. Umgesetzt sind zwei getrennte
+mit lokaler Signalanalyse und Status-Polling. Im Backend-Modus ist lokales
+Whisper standardmäßig eingeschaltet und abschaltbar; `local_only=true` blockiert
+einen unbeabsichtigten Cloud-/JSON-Anbieter. Transkript, Quellenvergleich und
+Text-Fragerunde sind ins Web-Review eingebunden. Umgesetzt sind zwei getrennte
 Analyse-Pipelines mit S3-Persistenz für kombinierte Jobs, beide mit `t_ms` ab Aufnahmestart im
 gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als
 Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription
-(`backend/app/transcription/`, Deepgram Nova-3 über EU-Endpunkt; deutsche
-Füllworterhaltung ungeprüft). Silero VAD v6.2 (ONNX, lokal) erkennt
+(`backend/app/transcription/`, standardmäßig lokales faster-whisper; Deepgram
+Nova-3 über EU-Endpunkt optional; deutsche Füllworterhaltung ungeprüft).
+Das Ergebnis enthält zusätzlich den zusammengesetzten Transkripttext. Silero VAD v6.2 (ONNX, lokal) erkennt
 Sprachaktivität; RMS und YIN bleiben erhalten, Standard-Kalibrierung 3 s. Die Umstellung des Speichers
 ist eine separate Implementierungsaufgabe.
 

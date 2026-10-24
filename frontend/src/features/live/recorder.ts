@@ -3,6 +3,7 @@ import type {
   LiveMessage,
   LiveProgress,
   LiveRecording,
+  LiveTranscript,
   VideoTransport,
 } from "./contracts";
 import { upsertFeedback } from "./protocol";
@@ -32,6 +33,7 @@ export class LiveRecorder {
   private stopping = false;
   private failed = false;
   private latestMetricMs = -1;
+  private transcript?: LiveTranscript;
   private progress: LiveProgress = {
     phase: "connecting",
     elapsedMs: 0,
@@ -64,8 +66,8 @@ export class LiveRecorder {
       this.latestMetricMs = message.atMs;
       this.progress.metrics = message.metrics;
     }
-    if (message.type === "transcript") this.progress.words = message.words;
     if (message.type === "error") this.fail(message.message);
+    if (message.type === "transcript") this.transcript = message.transcript;
     this.publish();
   };
   private fail(message: string) {
@@ -145,7 +147,7 @@ export class LiveRecorder {
         try {
           if (this.disposed || this.failed) return;
           await this.transport.send(event.data, meta);
-          if (this.config.mode === "demo") {
+          if (this.config.mode === "local") {
             this.progress.chunksSent++;
             this.progress.bytesSent += event.data.size;
           }
@@ -253,11 +255,12 @@ export class LiveRecorder {
       mimeType: video.type,
       feedback: this.progress.feedback,
       metrics: this.progress.metrics,
-      words: this.progress.words,
+      words: this.transcript?.words,
       chunksSent: this.progress.chunksSent,
       bytesSent: this.progress.bytesSent,
       completion: this.failed ? "interrupted" : "complete",
       notice: this.progress.notice,
+      transcript: this.transcript,
     });
   }
   dispose() {

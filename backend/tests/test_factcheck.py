@@ -111,8 +111,9 @@ def test_openai_compatible_contract(monkeypatch):
         failing.complete_json("s", "u")
 
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
-    with pytest.raises(ValueError):
-        configured_llm()
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    from app.factcheck.local import LocalOllamaChat
+    assert isinstance(configured_llm(), LocalOllamaChat)
     monkeypatch.setenv("LLM_BASE_URL", "http://localhost:11434/v1")
     monkeypatch.setenv("LLM_MODEL", "local")
     monkeypatch.setenv("LLM_JSON_MODE", "false")
@@ -150,7 +151,7 @@ def test_uploads_first_quotes_verified_and_web_second():
     assert supported.transcript == "Unsere Hochschule hat 9000 Studierende."
 
     # Discarded upload judgment falls through to the web, which has no quote for it either.
-    assert invented.verdict == "not_found" and invented.evidence is None
+    assert invented.verdict == "unchecked" and invented.evidence is None
     assert invented.checked == ["upload", "web"] and any("nicht wörtlich" in n for n in invented.notes)
 
     assert moon.verdict == "contradicts" and moon.checked == ["upload", "web"]
@@ -160,7 +161,7 @@ def test_uploads_first_quotes_verified_and_web_second():
     assert sorted(retrieved) == sorted(["Hochschule Studierende", "Gründung Hochschule", "Mond Zusammensetzung"])
 
     assert [(e.t_ms, e.type, e.source, e.severity) for e in result.events] == [
-        (5000, "fact", "factcheck", "info"), (9000, "fact", "factcheck", "hint"), (13000, "fact", "factcheck", "warning")]
+        (5000, "fact", "factcheck", "info"), (9000, "fact", "factcheck", "info"), (13000, "fact", "factcheck", "warning")]
     assert result.events[2].payload["verdict"] == "contradicts" and "t_ms" not in result.events[2].payload
     assert result.sources_checked and result.web_provider == "wikipedia" and result.model == "test-model"
 
@@ -224,6 +225,7 @@ def test_wikipedia_searcher_contract():
 def test_api_settings_validation_and_accept(monkeypatch):
     client = TestClient(app)
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.setenv("LLM_MODEL", "requires-explicit-base-url")
     monkeypatch.setenv("WEB_SEARCH_PROVIDER", "none")
     assert client.get("/factcheck/settings").json() == {
         "available": False, "model": None, "llm_host": None, "web_provider": None}

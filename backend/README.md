@@ -142,20 +142,34 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
   this replaces the previous synchronous 200 response. Poll the status URL:
   `queued` → `running` → `completed` (with `result`) or `failed` (with `error`).
   Decode failures occur in the worker and are reported as failed jobs.
-- The frontend camera flow uploads completed recordings with `transcribe=false`
-  and polls this job API. This keeps its signal analysis local. Optional paid
-  ASR is available through the API; the UI still imports word timestamps separately.
+- The frontend backend mode uploads completed recordings with local Whisper
+  transcription on by default, and polls this job API. The checkbox can disable
+  transcription. It always sends `local_only=true`; when transcribing, a hosted
+  or synthetic ASR configuration is rejected before storing the recording.
 - `result.events` uses word-based tempo and acoustic pauses without duplicate
   events. Raw pipeline events remain in `audio.events` / `transcription.events`.
 - Silero v6.2 is installed and checksum-verified at image build time. CPU ONNX
   inference runs locally, without PyTorch or runtime downloads. `activity_detector:
   "energy"` explicitly selects the old energy gate for DSP tests/debugging.
-- Set `DEEPGRAM_API_KEY` in `.env`, then recreate backend/worker. Default ASR:
-  Nova-3, German, batch upload to `https://api.eu.deepgram.com/v1/listen`.
-  The audio is sent to this third party; only synthetic demo recordings are
-  intended at this stage. German filler preservation is **unverified** and the
-  English-only `filler_words` feature is not enabled.
-- Without a key, submit `transcribe=false` for local signal analysis, or set
+- Default ASR is local `faster-whisper` (`ASR_PROVIDER=whisper`, German).
+  The worker loads the model once per process; audio stays on the VM. Word
+  timestamps come from `word_timestamps=True`. Filler preservation and German
+  quality are model-dependent and not measured here.
+- `WHISPER_MODEL` is a **build argument** (default `small`). The Dockerfile
+  downloads the CTranslate2 model into `/app/models/whisper`; the runtime path
+  is `WHISPER_MODEL_PATH`. Change the model in `.env`, then
+  `docker compose up --build -d --wait`. CPU defaults to `int8`; available
+  sizes include `tiny`, `base`, `small`, `medium`, `large-v3`. Each worker
+  process holds its own model, so raise `CELERY_WORKER_CONCURRENCY` only with
+  enough RAM.
+- Optional tuning: `WHISPER_DEVICE` (`cpu`/`cuda`), `WHISPER_COMPUTE_TYPE`,
+  `WHISPER_LANGUAGE` (empty = auto-detect), `WHISPER_BEAM_SIZE`,
+  `WHISPER_VAD_FILTER`, `WHISPER_INITIAL_PROMPT`.
+- `ASR_PROVIDER=deepgram` remains available: set `DEEPGRAM_API_KEY` and
+  recreate backend/worker. Audio is then sent to the EU endpoint; only
+  synthetic demo recordings are intended. German filler preservation is
+  **unverified** and the English-only `filler_words` feature is not enabled.
+- Without ASR, submit `transcribe=false` for local signal analysis, or set
   `ASR_PROVIDER=json` to explicitly replay `app/demo/words.json`. Demo output is
   flagged `synthetic_demo=true`; those words are invented and not aligned to an
   arbitrary upload. Failed ASR never silently turns into fabricated feedback.
@@ -181,9 +195,32 @@ docker compose cp backend/tests/fixtures/speech-de.wav backend:/tmp/speech-de.wa
 docker compose exec -T backend python -m scripts.smoke_audio /tmp/speech-de.wav
 ```
 
-Use `--transcribe` only when the desired provider is configured. With
-`ASR_PROVIDER=json` this checks the explicit deterministic demo; with
-`ASR_PROVIDER=deepgram` it sends the synthetic audio to the paid ASR API.
+Use `--transcribe` to run the configured provider. The default local Whisper
+model works without credentials; `ASR_PROVIDER=json` checks the explicit
+deterministic demo, and `ASR_PROVIDER=deepgram` sends synthetic audio to the
+paid ASR API.
+
+## Local source comparison and questions
+
+The fact-check and question modules below default to native Ollama with
+`qwen3.5:4b-q4_K_M` when `LLM_BASE_URL` and `LLM_MODEL` are empty.
+Compose reaches the host at `OLLAMA_URL=http://host.docker.internal:11434`.
+No API key or cloud fallback. Web search is off by default.
+[Setup, evaluation and limits](../docs/06-local-coaching.md).
+
+The explicit GGUF tag works with structured output in tested Ollama 0.40.10;
+the default macOS MLX variant returned HTTP 501. Native local requests use
+JSON schemas plus code validation of references and quotes. Invalid evidence
+is `unchecked`, rather than a finding that evidence is absent.
+
+Synthetic real-model integration check (Ollama must be running):
+
+```sh
+docker compose exec -T backend python - < backend/scripts/smoke_coaching.py
+```
+
+This checks `/factcheck`, `/questions` and `/questions/answers` and removes
+its synthetic source and result objects. No general accuracy claim follows.
 
 For local inference outside Docker, from `backend/`:
 
@@ -199,12 +236,15 @@ contract tests use mocked HTTP responses and do not prove German ASR quality.
 ### Transcription (`app/transcription/`, `POST /transcription/analyze-words`)
 
 ```
-recording → FFmpeg WAV → Transcriber → words {word, start_ms, end_ms}
-  → events: filler (incl. repetition) | pause | pace   (source "asr")
+recording → FFmpeg 16 kHz WAV → Transcriber → words {word, start_ms, end_ms}
+  → text + events: filler (incl. repetition) | pause | pace   (source "asr")
 ```
 
-- `Transcriber` keeps the provider exchangeable. `DeepgramTranscriber` maps
-  seconds to millisecond word timestamps; `JsonTranscriber` replays demo words.
+- `Transcriber` keeps the provider exchangeable. `WhisperTranscriber` runs
+  `faster-whisper` locally and maps CTranslate2 word timestamps to
+  milliseconds; `DeepgramTranscriber` is the optional hosted adapter and
+  `JsonTranscriber` replays demo words. `RecordingAnalysis.text` joins the
+  words into a readable transcript; timestamps remain authoritative.
 - Fillers use a configurable list (still open, see `docs/01-product.md`);
   repetitions ("ich ich") are `filler` events with `payload.kind = "repetition"`.
 - Word-based pause and words-per-minute complement the signal-based values.
@@ -310,21 +350,21 @@ GET /factcheck/settings    configured model, LLM host and web provider (for cons
   (whitespace, case and quote style ignored) and has at least
   `min_quote_chars` characters. Upload evidence names file and page/slide;
   web evidence names title and URL.
-- Model: any OpenAI-compatible `POST {LLM_BASE_URL}/chat/completions`
+- Default model: native local Ollama. Optional adapter: `POST {LLM_BASE_URL}/chat/completions`
   (OpenAI, hosted open models, Ollama, vLLM, LM Studio). Configure
-  `LLM_BASE_URL`, `LLM_MODEL` and, if needed, `LLM_API_KEY` in `.env`; without
-  them `/factcheck` answers 503. `LLM_JSON_MODE=false` for servers without
+  `LLM_BASE_URL`, `LLM_MODEL` and, if needed, `LLM_API_KEY` in `.env` only to
+  explicitly use this optional adapter. Empty URL/model selects local Ollama. `LLM_JSON_MODE=false` for servers without
   `response_format=json_object`; `LLM_TEMPERATURE` stays unset unless the model
   accepts it. A local server on the host is reachable from the containers as
   `http://host.docker.internal:<port>/v1`. Calls are not retried (they may be
   billed); `LLM_CONCURRENCY` claims are judged in parallel.
-- Web search (`WEB_SEARCH_PROVIDER`): `wikipedia` (default, MediaWiki API, no
-  key, `WEB_SEARCH_LANGUAGE=de`), `tavily` (`TAVILY_API_KEY`) or `none`. Only
+- Web search (`WEB_SEARCH_PROVIDER`): `wikipedia` (optional, MediaWiki API, no
+  key, `WEB_SEARCH_LANGUAGE=de`), `tavily` (`TAVILY_API_KEY`) or `none` (default). Only
   search APIs, no HTML scraping. The client can switch it off per request
   (`use_web=false`).
 - Third parties: transcript sentences go to the LLM host; short search queries
   go to the web provider. The review UI names both before the check starts.
-- Limits (`FactCheckConfig`, returned with every result): 12 claims, 5 upload
+- Limits (`FactCheckConfig`, returned with every result): 6 claims, 5 upload
   passages and 4 web passages per claim. Not tuned; quality of claim
   extraction and judgments depends on the chosen model and is not measured.
 
@@ -337,7 +377,7 @@ the end-to-end check with a deterministic stand-in model.
 
 Asks follow-up questions after the talk and compares typed answers with the
 sources. Input is the transcript plus the fact-check findings of the same
-recording; it uses the same OpenAI-compatible model as the fact-check.
+recording; it uses the same local model (or explicit compatible adapter) as the fact-check.
 
 ```
 POST /questions {words, collection_id?, claims[]} → S3 question-jobs/{id}/request.json
@@ -368,7 +408,7 @@ GET /questions/answers/{id}
 - Third parties: transcript sentences, findings, upload passages and the typed
   answer go to the LLM host. Stored requests (transcript, answer text) are
   deleted after the job finishes.
-- Limits (`QuestionConfig`): 5 questions, 6 upload passages for gaps, 5 per
+- Limits (`QuestionConfig`): 3 questions, 6 upload passages for gaps, 5 per
   answer review. Not tuned; question quality depends on the model.
 
 Tests: `tests/test_questions.py` (scripted model answers, reference checks,
