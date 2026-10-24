@@ -289,8 +289,9 @@ flowchart TD
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
     SP["/stats-preview<br/>Stats-Karte mit Replay"] --> SC["StatsCard<br/>Three.js-Ring, vier Kriterien<br/>synthetische Demo-Werte"]
     SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
-    LOADING -. "Suspense-Fallback beim Laden" .-> HOME
-    HOME["/ - Start"] -->|"direkt ins Monitoring"| LIVE["/live<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
+    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Kamera aktivieren -> Aufnahme starten"]
+    STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
     LIVE --> DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
     LIVE --> SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]

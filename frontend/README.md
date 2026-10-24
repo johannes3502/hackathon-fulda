@@ -34,7 +34,7 @@ rebuild after changing dependencies or configuration.
 
 - **Sample demo** (`/demo`): deterministic rehearsal, sample transcript, judge questions
   and review. Works without camera, microphone or backend credentials.
-- **Monitoring studio** (`/` opens `/live`): Large view opens by default. Choose **Enable camera**, then
+- **Monitoring studio** (`/` and `/live`): Large view opens by default. Choose **Enable camera**, then
   **Start recording** for real silent video with clearly labeled scripted markers.
 - **Recording options → Backend · audio analysis after recording:** enable camera
   and microphone, then **Start recording**. Speak normally for the first three seconds

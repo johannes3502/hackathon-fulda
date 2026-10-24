@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LiveSessionProvider } from "@/features/live/LiveSessionProvider";
 import "@fontsource/noto-serif-display/latin-400.css";
 import "./globals.css";
 import "./live.css";
@@ -13,7 +14,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <LiveSessionProvider>{children}</LiveSessionProvider>
+      </body>
     </html>
   );
 }

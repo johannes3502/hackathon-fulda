@@ -75,6 +75,9 @@ test("large view scales feedback and preserves an active recording", async ({
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
   const originalWidth = (await video.boundingBox())!.width;
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
   const cue = page.locator(".cue-message");
   const originalFontSize = await cue.evaluate((el) =>
     parseFloat(getComputedStyle(el).fontSize),
@@ -89,7 +92,6 @@ test("large view scales feedback and preserves an active recording", async ({
   if (info.project.name === "desktop") {
     expect((await video.boundingBox())!.width).toBeGreaterThan(originalWidth);
   }
-  await page.getByRole("button", { name: "Start recording" }).click();
   await expect(cue).toHaveText("Review this gesture moment", {
     timeout: 12000,
   });

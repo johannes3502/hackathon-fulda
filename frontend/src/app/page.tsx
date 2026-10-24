@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { LiveStudio } from "@/components/live/LiveStudio";
 export default function Page() {
-  redirect("/live");
+  return <LiveStudio />;
 }

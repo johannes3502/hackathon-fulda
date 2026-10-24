@@ -207,32 +207,16 @@ export function LiveStudio() {
           <div className="studio-main">
             <div className="live-control-bar">
               {!progress ? (
-                <>
-                  <Button
-                    disabled={cameraStatus === "pending"}
-                    onClick={() =>
-                      cameraStatus === "active"
-                        ? void start()
-                        : void enable(mode === "backend")
-                    }
-                  >
-                    {cameraStatus === "active" ? (
-                      <Radio size={17} />
-                    ) : (
-                      <Camera size={17} />
-                    )}
-                    {cameraStatus === "pending"
-                      ? "Waiting for camera permission…"
-                      : cameraStatus === "active"
-                        ? "Start recording"
-                        : "Enable camera"}
-                  </Button>
-                  {cameraStatus === "active" && (
+                cameraStatus === "active" && (
+                  <>
+                    <Button onClick={() => void start()}>
+                      <Radio size={17} /> Start recording
+                    </Button>
                     <Button variant="ghost" onClick={stopCamera}>
                       <CameraOff size={17} /> Turn camera off
                     </Button>
-                  )}
-                </>
+                  </>
+                )
               ) : progress.phase === "connecting" ? (
                 <Button variant="outline" onClick={cancel}>
                   Cancel connection
@@ -262,7 +246,7 @@ export function LiveStudio() {
                   )}
                   {largeView ? "Standard view" : "Large view"}
                 </Button>
-                {largeView && (
+                {largeView && progress && (
                   <strong className="live-view-time">
                     {time(progress?.elapsedMs ?? 0)}
                   </strong>
@@ -350,8 +334,24 @@ export function LiveStudio() {
                   <span className="stage-camera">
                     <CameraOff size={32} />
                   </span>
-                  <h2>Your monitoring starts here.</h2>
-                  <p>Click Enable camera to preview your framing.</p>
+                  <h2>Practice your presentation.</h2>
+                  <p>
+                    {cameraStatus === "pending"
+                      ? "Choose Allow in your browser’s camera permission prompt."
+                      : "First, enable your camera to see yourself here."}
+                  </p>
+                  {!progress && (
+                    <Button
+                      disabled={cameraStatus === "pending"}
+                      onClick={() => void enable(mode === "backend")}
+                    >
+                      <Camera size={18} />
+                      {cameraStatus === "pending"
+                        ? "Waiting for camera permission…"
+                        : "Enable camera"}
+                    </Button>
+                  )}
+                  <p>Nothing is recorded until you press Start recording.</p>
                 </div>
               )}
               <div className="stage-bottom">
@@ -533,83 +533,85 @@ export function LiveStudio() {
               review. Download it before refreshing or leaving this workspace.
             </p>
           </div>
-          <aside className="coaching-column">
-            <section className="cue-panel">
-              <div className="panel-title-row">
-                <h2>
-                  <Eye size={18} />{" "}
-                  {mode === "demo" ? "Live feedback" : "Audio feedback"}
-                </h2>
-                <span>{mode === "demo" ? "Scripted" : "From backend"}</span>
-              </div>
-              <div aria-live="polite" aria-atomic="true">
-                <p className="cue-message">
-                  {latest?.title ?? "One useful moment at a time."}
-                </p>
-                <p className="live-cue-detail">
-                  {latest?.action ??
-                    (mode === "demo"
-                      ? "Start a recording to try example feedback markers and video replay."
-                      : `Audio heuristics appear after you finish. Pose logging is separate from feedback. ${transcribe ? "Transcript-based feedback follows the audio analysis." : "Transcription is off."}`)}
-                </p>
-              </div>
-              {latest && (
-                <span className="cue-caption">
-                  {latest.category} · {time(latest.startMs)}–
-                  {time(latest.endMs)}
-                </span>
-              )}
-            </section>
-            {progress && (
-              <section className="panel live-events">
+          {progress && (
+            <aside className="coaching-column">
+              <section className="cue-panel">
                 <div className="panel-title-row">
-                  <h2>Session observations</h2>
-                  <span className="badge">
-                    {progress?.feedback.length ?? 0}
-                  </span>
+                  <h2>
+                    <Eye size={18} />{" "}
+                    {mode === "demo" ? "Live feedback" : "Audio feedback"}
+                  </h2>
+                  <span>{mode === "demo" ? "Scripted" : "From backend"}</span>
                 </div>
-                {progress?.feedback.length ? (
-                  <div className="event-feed">
-                    {progress.feedback.toReversed().map((item) => (
-                      <div key={item.id}>
-                        <span className={`feedback-kind ${item.kind}`}>
-                          {item.category} · {time(item.startMs)}
-                        </span>
-                        <strong>{item.title}</strong>
-                        <p>{item.detail}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="live-empty">
-                    <CheckCircle2 size={24} />
-                    <p>No observations yet.</p>
-                    <span>
-                      {mode === "demo"
-                        ? "Three scripted markers arrive in the first 10 seconds."
-                        : "No feedback does not imply a perfect performance."}
-                    </span>
-                  </div>
+                <div aria-live="polite" aria-atomic="true">
+                  <p className="cue-message">
+                    {latest?.title ?? "One useful moment at a time."}
+                  </p>
+                  <p className="live-cue-detail">
+                    {latest?.action ??
+                      (mode === "demo"
+                        ? "Start a recording to try example feedback markers and video replay."
+                        : `Audio heuristics appear after you finish. Pose logging is separate from feedback. ${transcribe ? "Transcript-based feedback follows the audio analysis." : "Transcription is off."}`)}
+                  </p>
+                </div>
+                {latest && (
+                  <span className="cue-caption">
+                    {latest.category} · {time(latest.startMs)}–
+                    {time(latest.endMs)}
+                  </span>
                 )}
               </section>
-            )}
-            {!!progress?.metrics.length && (
-              <section className="panel live-events">
-                <h2>Backend metrics</h2>
-                <dl className="backend-metrics">
-                  {progress.metrics.map((metric) => (
-                    <div key={metric.id}>
-                      <dt>{metric.label}</dt>
-                      <dd>
-                        {metric.value ?? "Not enough data"}{" "}
-                        {metric.value !== null && metric.unit}
-                      </dd>
+              {progress && (
+                <section className="panel live-events">
+                  <div className="panel-title-row">
+                    <h2>Session observations</h2>
+                    <span className="badge">
+                      {progress?.feedback.length ?? 0}
+                    </span>
+                  </div>
+                  {progress?.feedback.length ? (
+                    <div className="event-feed">
+                      {progress.feedback.toReversed().map((item) => (
+                        <div key={item.id}>
+                          <span className={`feedback-kind ${item.kind}`}>
+                            {item.category} · {time(item.startMs)}
+                          </span>
+                          <strong>{item.title}</strong>
+                          <p>{item.detail}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </dl>
-              </section>
-            )}
-          </aside>
+                  ) : (
+                    <div className="live-empty">
+                      <CheckCircle2 size={24} />
+                      <p>No observations yet.</p>
+                      <span>
+                        {mode === "demo"
+                          ? "Three scripted markers arrive in the first 10 seconds."
+                          : "No feedback does not imply a perfect performance."}
+                      </span>
+                    </div>
+                  )}
+                </section>
+              )}
+              {!!progress?.metrics.length && (
+                <section className="panel live-events">
+                  <h2>Backend metrics</h2>
+                  <dl className="backend-metrics">
+                    {progress.metrics.map((metric) => (
+                      <div key={metric.id}>
+                        <dt>{metric.label}</dt>
+                        <dd>
+                          {metric.value ?? "Not enough data"}{" "}
+                          {metric.value !== null && metric.unit}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              )}
+            </aside>
+          )}
         </div>
         {Object.values(recordings).length > 0 && (
           <section className="recent-recordings">

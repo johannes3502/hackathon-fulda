@@ -7,7 +7,7 @@ test("home opens monitoring directly and keeps the sample optional", async ({
     route.fulfill({ json: [] }),
   );
   await page.goto("/");
-  await expect(page).toHaveURL(/\/live$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(
     page.getByRole("button", { name: "Standard view", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -21,6 +21,19 @@ test("home opens monitoring directly and keeps the sample optional", async ({
     page.getByRole("button", { name: "Start recording", exact: true }),
   ).toHaveCount(0);
   await expect(page.getByLabel("Feedback source")).toBeHidden();
+  await expect(
+    page
+      .locator(".stage-placeholder")
+      .getByRole("button", { name: "Enable camera", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Nothing is recorded until you press Start recording.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Live feedback", exact: true }),
+  ).toHaveCount(0);
   const monitor = await page
     .getByRole("region", { name: "Live camera preview" })
     .boundingBox();

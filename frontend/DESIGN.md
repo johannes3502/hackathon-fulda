@@ -9,9 +9,11 @@ links and selected states, #526158 for secondary copy. Product headings and
 controls use one sans family; the serif is reserved for the 418 mark and existing
 specialized data previews. The common AppShell also wraps the analysis view.
 
-Start directly in the recording studio via `/` → `/live`. Large view is the
+Both `/` and `/live` render the recording studio directly. Large view is the
 default; Standard view reveals settings and navigation. The monitoring preview
-leads with one primary action: Enable camera, then Start recording. Recording
+leads with a central Enable camera button and explicit permission guidance.
+Start recording appears only once the preview is ready. Empty feedback is hidden
+until recording starts. Recording
 options are collapsed; the sample remains available at `/demo`. Optional sample
 context and practice options are disclosures. The home screen no longer shows
 a synthetic score card or a second explanation of the rehearsal flow. Sources
