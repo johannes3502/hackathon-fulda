@@ -397,14 +397,15 @@ flowchart TD
     DRAWER["AppShell Navigations-Drawer (Menü)<br/>Open Sans + #3803bf, verbindet /, /live,<br/>/sources, /review-preview, /gestures, /demo"]
     LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>Three.js, statischer Fallback"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
-    SP["/ und /stats-preview<br/>Startseite: StatsCard als Start +<br/>Monatsfortschritt, Kriterienvergleich & Sessions"] --> SC["StatsCard + Monatsdiagramme<br/>Three.js-Ring, vier Kriterien,<br/>6-Monats-Verlauf (synthetisch)"]
+    SP["/ und /stats-preview<br/>Aufnahmeübersicht im Browser-Arbeitsbereich"] --> SC["StatsDashboard<br/>Anzahl, Dauer, Hinweise und Transkripte<br/>aus aufgenommenen Takes, sonst Leerzustand"]
     DRAWER --> SP
     DRAWER --> LIVE
     DRAWER --> SRC
     DRAWER --> RP
     DRAWER --> WALK
     DRAWER --> DEMOPAGE
-    SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
+    RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ohne Scores und Performance-Kurve"]
+    SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
     LIVE["/live - LiveStudio<br/>Large View als Standard, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]

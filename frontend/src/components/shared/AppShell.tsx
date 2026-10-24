@@ -58,8 +58,8 @@ export function DrawerTriggerButton() {
 export const NAV_ITEMS = [
   {
     href: "/",
-    label: "Start & Stats",
-    description: "Aktuelle Stats-Karte, Monatsfortschritt & Diagramme",
+    label: "Start & Aufnahmen",
+    description: "Aufgenommene Takes, Dauer und Hinweise im Arbeitsbereich",
     icon: BarChart3,
   },
   {
@@ -76,8 +76,8 @@ export const NAV_ITEMS = [
   },
   {
     href: "/review-preview",
-    label: "Analyse-Review",
-    description: "Zeitachsen-Analyse & Video-Momente im Detail",
+    label: "Analyse-Beispiel",
+    description: "Synthetische Video-Momente auf einer Zeitachse",
     icon: LineChart,
   },
   {

@@ -724,3 +724,31 @@ recreation. Those fixtures were removed too.
 - [Celery with Redis](https://docs.celeryq.dev/en/stable/getting-started/backends-and-brokers/redis.html)
 - [Celery task and worker configuration](https://docs.celeryq.dev/en/stable/userguide/configuration.html)
 - [Redis Docker image](https://hub.docker.com/_/redis)
+
+## Synthetischer Datenbank-Seed
+
+Drei feste Beispiel-Sessions mit je einem Take, vorberechneten Wort-Timestamps,
+daraus abgeleiteten ASR-Events und einer Template-Review einspielen:
+
+```sh
+docker compose up -d postgres
+docker compose run --rm --no-deps -v ./backend/scripts:/app/scripts:ro backend python -m scripts.seed_demo
+```
+
+Von der Repository-Wurzel ausführen; das lokale Backend-Image muss vorhanden sein
+(`docker compose build backend`). Alternativ aus `backend/` mit gesetzten
+`POSTGRES_*`-Variablen: `python -m scripts.seed_demo`.
+
+Der Seed schreibt in die bestehenden Tabellen `sessions`, `takes`, `events`,
+`reviews` und `jobs`. Er verwendet feste UUIDs, eine Transaktion und einen
+Advisory Lock. Erneute Aufrufe überspringen vorhandene Seed-Sessions vollständig;
+auch manuelle Änderungen daran bleiben erhalten. Andere Daten werden nicht
+verändert oder gelöscht. Die Ausgabe nennt Session-/Take-IDs und Review-Pfade.
+Es werden keine Medien hochgeladen, keine Modelle aufgerufen und keine Scores
+angelegt. Titel, `syntheticDemo` und Review-Hinweise kennzeichnen die Daten als
+synthetisch; nicht gemessene Pose-Coverage bleibt unbekannt.
+
+Lesbar über `GET /api/sessions/{sessionId}` und
+`GET /api/takes/{takeId}/timeline` bzw. `/review`. Das bestehende Web-Studio nutzt
+weiterhin den Browser-Arbeitsbereich und die ältere Audio-Job-API; der Seed
+legt deshalb keine lokalen Videos oder Frontend-Aufnahmen an.

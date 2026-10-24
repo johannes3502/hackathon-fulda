@@ -11,7 +11,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
-import { STAT_LABELS, summarizeStats } from "@/components/stats/stats";
+import { STAT_LABELS } from "@/components/stats/stats";
 import { PerformanceGraph } from "./PerformanceGraph";
 import {
   boundedTime,
@@ -50,7 +50,6 @@ export function ReviewAnalysis({
   const [loop, setLoop] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mediaReady, setMediaReady] = useState(false);
-  const overall = data.stats ? summarizeStats(data.stats) : null;
   const moments = [...data.moments].sort((a, b) => a.tMs - b.tMs);
   const visible = moments.filter(
     (item) => criterion === null || item.criterion === criterion,
@@ -126,17 +125,10 @@ export function ReviewAnalysis({
               </p>
             </div>
             <div className="review418-summary">
-              <span className="review418-summary-number">
-                {overall ?? "–"}
-                {overall !== null && <small>%</small>}
-              </span>
+              <span className="review418-summary-number">{moments.length}</span>
               <span>
-                Gesamt
-                {overall !== null ? (
-                  <small>Ø der vier Kriterien</small>
-                ) : (
-                  <small>Noch keine Bewertung</small>
-                )}
+                Momente
+                <small>auf der Zeitachse</small>
               </span>
             </div>
           </div>
@@ -145,7 +137,9 @@ export function ReviewAnalysis({
             aria-label="Kriterien und Filter für Momente"
           >
             {Object.entries(STAT_LABELS).map(([key, label]) => {
-              const value = data.stats?.[key as Criterion];
+              const count = moments.filter(
+                (moment) => moment.criterion === key,
+              ).length;
               return (
                 <button
                   type="button"
@@ -158,12 +152,8 @@ export function ReviewAnalysis({
                 >
                   <span>{label}</span>
                   <strong>
-                    {value ?? "–"}
-                    {value !== undefined && <small>%</small>}
+                    {count} <small>Momente</small>
                   </strong>
-                  <span className="review418-criterion-bar" aria-hidden="true">
-                    <i style={{ width: `${value ?? 0}%` }} />
-                  </span>
                 </button>
               );
             })}
@@ -172,8 +162,8 @@ export function ReviewAnalysis({
             <span>
               {data.notice ??
                 (data.demo
-                  ? "Demo: Video, Bewertungen und Anmerkungen sind synthetisch. Der Verlauf ist illustrativ."
-                  : "Zeitmarken stammen aus den vorhandenen Events. Kriterien-Scores und Performance-Verlauf sind noch nicht berechnet.")}
+                  ? "Demo: Video und Anmerkungen sind synthetisch. Die Zeitachse zeigt die Beispiel-Momente."
+                  : "Zeitmarken stammen aus den vorhandenen Events. Die Anzahl der Hinweise ist keine Bewertung.")}
             </span>
             <button
               type="button"
