@@ -62,6 +62,14 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   consider; green means explicit positive feedback or labelled tracking readiness.
   Ordinary gestures, pauses, calibration and hidden hints remain neutral. Color
   always has a text label; tracking readiness is not a performance assessment.
+  Optional recording fullscreen expands the existing camera stage without
+  remounting the video or recorder. A compact badge at the right edge combines
+  the current cue's contextual SVG symbol, color and short title, using the same
+  pacing and hint visibility as the normal panel. Green readiness is explicitly
+  labelled tracking status. Timer, hint toggle, start/finish and exit remain
+  reachable. Browser fullscreen is preferred; a viewport fallback supports
+  Escape, contained keyboard focus and scroll locking. The camera and skeleton
+  keep the same contain projection in both views; overlays stay out of the video.
 - **Review:** two primary views, Review moments and Practice questions.
   Four `ReviewScores` cards above playback show 0–100 prototype ratings on the
   user's explicit request (`evidence-share-v1`). Formula: positive assessed

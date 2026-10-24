@@ -47,6 +47,14 @@ ohne eigene Aufnahme ist das Review-Ziel ausdrücklich ein Beispiel. Die
 Darstellung Hell/Dunkel/System wird lokal gespeichert. Daraus entstehen keine
 neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.md`.
 
+Aufnahme-Vollbild (25.10.2026, Nutzerauftrag): Optional über „Fullscreen“ im
+Kamerabild, auch während einer laufenden Aufnahme. Hinweise erscheinen als
+kompakte farbige Kennzeichen mit zum Ereignis passendem Symbol und Kurztitel am
+rechten Rand. Zeit, Hinweise ein/aus, Aufnahme starten/beenden und Ausstieg
+bleiben erreichbar. Vorhandene Hinweisregeln und Anzeigezeiten gelten weiter;
+grüner Trackingstatus ist kein Lob für den Vortrag. Ohne native Vollbild-API
+wird die Browserfläche ausgefüllt; Escape oder der Ausstiegsknopf führen zurück.
+
 ---
 
 ## 3. Offen — muss das Team entscheiden

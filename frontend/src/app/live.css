@@ -115,6 +115,168 @@
   font-size: 1.75rem;
   font-variant-numeric: tabular-nums;
 }
+.stage-view-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.stage-view-actions .button {
+  color: white;
+  background: #17171ad9;
+}
+.stage-view-actions .button:hover {
+  background: #303034;
+}
+.fullscreen-time {
+  color: white;
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.live-workspace .live-camera-stage.recording-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  background: #17171a;
+}
+.recording-fullscreen .camera-video {
+  object-fit: contain;
+}
+.recording-fullscreen .stage-top {
+  align-items: center;
+  padding: max(12px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right)) 12px
+    max(16px, env(safe-area-inset-left));
+}
+.recording-fullscreen .live-pose-status,
+.recording-fullscreen .live-pose-debug,
+.recording-fullscreen .live-pose-lab {
+  display: none;
+}
+.fullscreen-cue-rail {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 6;
+  width: min(220px, calc(100% - 32px));
+  pointer-events: none;
+}
+.fullscreen-cue {
+  --signal: #bfdbfe;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 12px;
+  border: 1px solid var(--signal);
+  border-radius: 20px;
+  color: white;
+  background: #111827ed;
+  text-align: center;
+  box-shadow: 0 4px 24px #0004;
+  pointer-events: auto;
+}
+.fullscreen-cue[data-feedback="attention"] {
+  --signal: #fca5a5;
+}
+.fullscreen-cue[data-feedback="positive"] {
+  --signal: #86efac;
+}
+.fullscreen-cue-symbol {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid var(--signal);
+  color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 15%, #111827);
+}
+.fullscreen-cue-copy {
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.fullscreen-cue-copy small {
+  color: var(--signal);
+  font-size: 0.75rem;
+}
+.fullscreen-cue-copy strong {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+.recording-fullscreen .stage-bottom {
+  padding: 12px max(16px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.fullscreen-controls {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+.fullscreen-consent,
+.fullscreen-notice {
+  color: #e2e8f0;
+  max-width: 75ch;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin: 0 auto;
+}
+.fullscreen-control-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.recording-fullscreen .stage-bottom .button-ghost,
+.recording-fullscreen .stage-bottom .button-outline {
+  color: white;
+  background: #303034;
+}
+.recording-fullscreen .live-captions {
+  left: 16px;
+  right: 260px;
+  bottom: 90px;
+}
+@media (max-width: 600px) {
+  .recording-fullscreen .stage-demo {
+    display: none;
+  }
+  .fullscreen-cue-rail {
+    width: min(152px, calc(100% - 32px));
+  }
+  .fullscreen-cue {
+    padding: 12px 8px;
+  }
+  .recording-fullscreen .live-captions {
+    right: 16px;
+    bottom: 90px;
+  }
+}
+@media (max-height: 500px) {
+  .fullscreen-cue-rail {
+    width: min(240px, calc(100% - 32px));
+  }
+  .fullscreen-cue {
+    flex-direction: row;
+    text-align: left;
+    padding: 8px;
+  }
+  .fullscreen-cue-symbol {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+  }
+}
 body:has(.live-workspace) .app-header,
 body:has(.live-workspace-large) .app-footer {
   display: none;
