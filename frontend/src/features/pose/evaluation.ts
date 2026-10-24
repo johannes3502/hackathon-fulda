@@ -57,37 +57,37 @@ export type PoseRuleMode = "on" | "review" | "off";
 export const RULE_COPY: Record<PoseRule, readonly [string, string, string]> = {
   hand_raised: [
     "Hand above shoulder",
-    "A wrist stayed above its shoulder in the camera image.",
+    "A wrist stayed above its shoulder in the camera image. A held gesture can mark emphasis; its purpose depends on the spoken point.",
     "Replay this emphasis: did the movement support the point you were making?",
   ],
   hands_together: [
     "Hands held together",
-    "Your wrists stayed close together in front of your torso.",
+    "Your wrists stayed close together in front of your torso. This can be a comfortable resting position; check whether it limits a gesture you wanted to make.",
     "Review whether this was intentional. Try opening your hands for the next explanation if comfortable.",
   ],
   torso_lean: [
     "Sideways lean",
-    "Your torso angle changed sideways from your neutral position.",
+    "Your torso angle changed sideways from your neutral position. A held lean may shift your balance; check whether it was comfortable and intentional.",
     "Check the moment in context. Return to your comfortable starting position if you want to compare.",
   ],
   body_shift: [
     "Sideways position change",
-    "Your torso moved sideways in the camera image from its neutral position.",
+    "Your torso moved sideways in the camera image from its neutral position. Movement can support a transition; check whether you remained in frame. Camera movement can also cause this marker.",
     "Was this move intentional? Replay it in context. Camera movement can also cause this observation.",
   ],
   arms_crossed: [
     "Arms crossed in front of torso",
-    "A wrist crossed the body midline with a bent elbow; the other hand was crossed or tucked under the arm in the camera image.",
-    "Review this held position in context. Try another hand position if comfortable; no emotion or intent is inferred.",
+    "A wrist crossed the body midline with a bent elbow; the other hand was crossed or tucked under the arm in the camera image. Holding this position can limit room for an explanatory gesture; it says nothing about personality or emotion.",
+    "If comfortable, release your arms and try an open hand movement with the main point. Compare the versions in the video.",
   ],
   head_turned: [
     "Head turned to the side",
-    "Your nose moved towards one ear compared with your neutral head position in the camera image.",
+    "Your nose moved towards one ear compared with your neutral head position in the camera image. Staying turned can direct your explanation towards the slides; check the context. Eye contact is not measured.",
     "Replay this moment: were you reading the slides? Turn back towards the audience when it fits. Eye contact is not measured.",
   ],
   head_down: [
     "Head tilted down",
-    "Your nose dropped below your neutral head position relative to the ears in the camera image.",
+    "Your nose dropped below your neutral head position relative to the ears in the camera image. Check whether reading notes kept your head down through an explanation. Eye contact is not measured.",
     "Replay this moment: were you reading notes? Lift your head towards the audience if comfortable. Eye contact is not measured.",
   ],
 };

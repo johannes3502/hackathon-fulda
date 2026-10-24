@@ -5,6 +5,7 @@ from statistics import median
 from pydantic import ValidationError
 
 from app.review.errors import ReviewError
+from app.review.coaching import sentence_pause
 from app.review.models import Aggregate, Coverage, MAX_DURATION_MS, PosePayload, ReviewEvent, Take
 
 
@@ -48,6 +49,7 @@ def merge_events(events: list[ReviewEvent]) -> list[ReviewEvent]:
     for group in groups:
         chosen = sorted(group, key=lambda event: (
             -(event.source == "asr" and event.payload.get("mid_sentence") is True),
+            -sentence_pause(event),
             -event.duration_ms, event.event_id))[0]
         if len(group) > 1:
             ids = sorted({identifier for event in group for identifier in [event.event_id, *event.payload.get("merged_from", [])]})

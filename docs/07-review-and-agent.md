@@ -25,6 +25,38 @@ Quellenauszüge und getippte Antworten den lokalen Rechner. Nur synthetische
 Demo-Daten verwenden. Die direkte ElevenLabs-Fragerunde benötigt keinen
 Gemini-Key; sie ist unabhängig vom getippten Fragepfad.
 
+## Kurzreview und Modell-Ausfall
+
+Das Web-Review benötigt für Kamera- und Sprachhinweise kein LLM. Feste Texte
+werden anhand der tatsächlich erhobenen Events ausgewählt: Beobachtung und
+Messwert, mögliche Bedeutung als Übungshinweis, konkreter nächster Schritt.
+Tempo, Lautstärke, Tonhöhenvariation, Füllwörter, Wiederholungen und Pausen
+haben eigene Erklärungen. Langsameres Sprechen, Pausen und Gesten sind nicht
+pauschal Fehler; die Hinweise fordern zum Prüfen des Kontexts auf.
+
+Stärken und Verbesserungen sind standardmäßig gemeinsam sichtbar. Eine
+ASR-Pause nach einem Satzende kann als positiver Moment erscheinen, wenn
+Satzzeichen und Wort-Timestamps vorliegen. Eine bereits quellengeprüfte,
+gestützte Aussage ist ebenfalls ein positiver Moment. Die Satzgrenze bleibt
+eine ASR-Heuristik, das Quellenurteil eine Modellinterpretation. Fehlende
+Warnungen, unbekannte Messzeit und nicht abgeschlossene Quellenchecks liefern
+kein Lob. Ohne positive Evidenz benennt das Review diese Grenze.
+Der kombinierte Audiojob behält dafür Wortpausen samt Satzkontext. Er ersetzt
+nur überlappende akustische Pausen; zusätzliche reine Signalpausen und die
+Roh-Ergebnisse beider Pipelines bleiben erhalten. Auch der persistente
+Pausen-Merge erhält belegte ASR-Satzgrenzen und die beteiligten Event-IDs.
+
+Die separate persistente Take-Review-API liefert dieselbe Grundstruktur mit
+`observation`, fester `interpretation`, `nextAction` und bis zu drei belegten
+`strengths`. Fehlt die LLM-Konfiguration oder scheitert ein Anbieteraufruf,
+entsteht weiterhin eine Template-Review aus den Daten dieses Takes. Ein
+Anbieterfehler wird nicht erneut angefragt; ungültige Formulierungen dürfen
+einmal korrigiert werden. Die Review bleibt ein abgeschlossener Job;
+`generator`, `limitations` und Verifikationsdaten benennen den Fallback.
+Ein konfiguriertes Cloud-Modell braucht weiterhin Einwilligung. Der Worker
+prüft sie erneut, falls sich die Konfiguration während der Wartezeit ändert.
+Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
+
 ## ElevenLabs konfigurieren
 
 - Einen privaten Conversational Agent anlegen. In **Security** die Authentifizierung

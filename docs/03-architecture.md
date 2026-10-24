@@ -41,7 +41,7 @@ flowchart TB
         EMB["Lokale Embeddings<br/>jina-embeddings-v2-base-de<br/>FastEmbed/ONNX"]
         FACT["Fact-Check<br/>Aussagen extrahieren, RAG zuerst,<br/>Web optional (Standard aus), Zitat-Check"]
         QUEST["Frage-Simulator / Voice-Agent<br/>Rolle: Student oder Professor/Tutor,<br/>Fragen aus Funden + Quellen,<br/>gesprochene Antwort -> ASR,<br/>Antwort-Abgleich mit Zitat-Check"]
-        REVIEW["Take-Review<br/>Probe + Timestamp-Offset, Merge,<br/>Coverage, Evidence Cards,<br/>Template oder LLM + Code-Verifier"]
+        REVIEW["Take-Review<br/>Probe + Timestamp-Offset, Merge,<br/>Coverage, Evidence Cards,<br/>Template oder LLM + Code-Verifier<br/>Beobachtung, Erklärung, Übung + belegte Stärken"]
     end
 
     subgraph Infra["Infrastruktur (Docker Compose)"]
@@ -225,7 +225,8 @@ sequenceDiagram
         end
         W->>W: Füller, Pausen, Tempo (Wort-Analyse)
     end
-    W->>W: merge_timeline (Events deduplizieren)
+    W->>W: Wortpausen mit Satzkontext behalten, überlappende Signalpausen ersetzen
+    W->>W: merge_timeline, übrige Signalpausen behalten
     W->>S3: Ergebnis speichern, Original löschen
 
     loop Polling 1x/s (max 11 min)
@@ -268,13 +269,18 @@ sequenceDiagram
     A->>Q: Job-ID
     Q->>W: review_generate
     W->>P: Konsistenter Snapshot (Revision)
-    W->>W: Finale Events, Pausen-Merge, Coverage, Karten, max 3 Findings
+    W->>W: Finale Events, Pausen-Merge, Coverage, Karten, max 3 Findings + 3 belegte Stärken
     opt mode=llm
-        W->>L: Begrenzte Evidence Cards + erlaubte Platzhalter-Texte
-        L-->>W: JSON-Auswahl
-        W->>W: Schema/Katalog prüfen, ein Retry, dann Template
+        W->>W: Konfiguration und Cloud-Einwilligung erneut prüfen
+        alt Modell verfügbar und Cloud erlaubt
+            W->>L: Evidence Cards + Platzhalter-Texte
+            L-->>W: JSON-Auswahl oder Fehler
+            W->>W: Schema/Katalog prüfen, ein Korrekturversuch, Anbieterfehler direkt zu Template
+        else Keine Modellkonfiguration oder keine Cloud-Einwilligung
+            W->>W: Datenbasierte Template-Review ohne Modellaufruf
+        end
     end
-    W->>P: review.v1 + Verification, nur wenn Eltern/Revision bestehen
+    W->>P: review.v1 + Verification, auch Fallback completed, Eltern/Revision prüfen
     C->>A: GET /jobs/id, /takes/id/timeline, /takes/id/review
     A-->>C: Events + peakMs + Review, keine Clip-/Video-URL
     C->>C: Sprung in lokaler Aufnahme (Client-Vertrag)
@@ -451,7 +457,7 @@ flowchart TD
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]
     P1 --> PREV["/practice/sessionId/review<br/>ReviewWorkspace: Findings, Retry,<br/>Evidenz-Sprung"]
 
-    LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video und Feedback nebeneinander,<br/>lesbare, farbige Zeitstempel zum Springen,<br/>Transkript, Quellencheck und Exporte als Details"]
+    LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video, Stärken und nächste Übungsschritte<br/>Feste Erklärungen aus Messdaten ohne LLM<br/>Transkript, Quellencheck und Exporte als Details"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>sourceCollectionId des aufgenommenen Takes"]
     LREV -->|"POST /questions/agent + /agent/session<br/>oder /questions + /answers"| QAPI["ElevenLabs-Dialog oder getippte Fragen<br/>Startup, Thesis, Schule, Nonprofit<br/>eine Frage pro Schritt"]
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
@@ -626,10 +632,10 @@ flowchart LR
     F --> EV
     G --> EV
 
-    EV --> MT["Legacy merge_timeline()<br/>Tempo aus ASR, Pausen akustisch"]
+    EV --> MT["Legacy merge_timeline()<br/>Tempo und Pausenkontext aus ASR<br/>nur überlappende Signalpausen ersetzen"]
     EV --> PERSIST["Take-Adapter + Browser-Pose-Vertrag<br/>eventId, dedupeKey, tMs, peakMs,<br/>durationMs, stage, ruleVersion<br/>kein gaze, kein Medien-Key"]
-    PERSIST --> REVIEWMERGE["Finale Review-Timeline<br/>Pausen: ASR mit mid_sentence, sonst längste<br/>WPM und Silben/s getrennt<br/>stabil nach Start, Peak, ID"]
-    REVIEWMERGE --> REPORT["Aggregate + explizite Coverage<br/>max 3 geerdete Findings<br/>review.v1 in Postgres"]
+    PERSIST --> REVIEWMERGE["Finale Review-Timeline<br/>Pausen: ASR innerhalb des Satzes oder mit belegtem Satzende<br/>sonst längste, alle Event-IDs behalten<br/>WPM und Silben/s getrennt, stabil nach Start, Peak, ID"]
+    REVIEWMERGE --> REPORT["Aggregate + explizite Coverage<br/>max 3 geerdete Findings + 3 belegte Stärken<br/>Beobachtung, feste Erklärung und Übungsschritt<br/>review.v1 in Postgres, auch ohne LLM"]
     MT --> FILTER["Sprachmarker-Filter pro Take<br/>Speech / pause / pace / filler / volume / pitch"]
     FILTER --> UI["Timestamp-Timeline im Frontend<br/>Klick springt zum Videoclip ±2s"]
     REPORT -. "Client-Anbindung separat" .-> UI

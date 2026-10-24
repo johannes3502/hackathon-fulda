@@ -107,6 +107,8 @@ def test_no_baseline_means_no_relative_finding():
     observation = report.findings[0].observation
     assert "Baseline-Vergleich ist nicht verfügbar" in observation
     assert report.findings[0].evidence.delta is None
+    assert "keine Haltungsreferenz" in report.findings[0].interpretation
+    assert report.findings[0].next_action.suggestion_id == "practice_posture_no_reference"
 
 
 def test_overlapping_pauses_prefer_reliable_mid_sentence_asr_and_keep_ids():
@@ -118,6 +120,18 @@ def test_overlapping_pauses_prefer_reliable_mid_sentence_asr_and_keep_ids():
     assert merge_events(merged) == merged
     assert merge_events([signal, asr.model_copy(update={"payload": {"mid_sentence": False}})])[0].event_id == "vad"
     assert len(merge_events([signal, speech_event("later", t_ms=4500)])) == 2
+
+
+def test_pause_merge_preserves_positive_sentence_context_in_the_real_take_path():
+    signal = speech_event("vad", duration_ms=3000)
+    asr = speech_event("sentence", source="asr", t_ms=1500, duration_ms=2000,
+                       mid_sentence=False, before="Gedanke.", after="Danach")
+    report, _ = build_review(timeline_fixture([signal, asr]), ReviewRequest())
+    assert report.findings == [] and len(report.strengths) == 1
+    assert report.strengths[0].event_ids == ["sentence", "vad"]
+    interruption = asr.model_copy(update={"event_id": "interruption", "duration_ms": 1000,
+                                          "payload": {"mid_sentence": True}})
+    assert merge_events([signal, asr, interruption])[0].event_id == "interruption"
 
 
 def test_pace_units_and_medians_stay_separate():
@@ -179,6 +193,92 @@ def test_empty_review_is_complete_without_imaginary_strengths():
     assert report.summary.text.startswith("0 Ereignisse")
 
 
+@pytest.mark.parametrize("language", ["de", "en"])
+@pytest.mark.parametrize("kind,payload", [
+    ("pace", {"direction": "fast", "window_wpm": [210, 220, 230]}),
+    ("pace", {"direction": "slow", "window_wpm": [80]}),
+    ("volume", {"direction": "quiet", "window_delta_db": [-8, -6]}),
+    ("volume", {"direction": "loud", "window_delta_db": [8]}),
+    ("pitch", {"window_std_st": [0.4, 0.6]}),
+    ("filler", {"kind": "filler", "word": "ähm"}),
+    ("filler", {"kind": "repetition", "word": "ich"}),
+    ("pause", {"mid_sentence": True, "before": "mitten"}),
+])
+def test_practice_findings_have_fixed_explanation_and_action(language, kind, payload):
+    event = speech_event("practice", kind, "asr").model_copy(update={"payload": payload})
+    report, _ = build_review(timeline_fixture([event]), ReviewRequest(language=language))
+    finding = report.findings[0]
+    assert finding.interpretation and finding.next_action.text
+    assert finding.evidence.event_ids == ["practice"] and finding.evidence.peak_ms == 1000
+    assert "practice_" in finding.next_action.suggestion_id
+    assert report.strengths == []
+
+
+def test_strengths_retain_evidence_alongside_priority_adjustments():
+    pause = speech_event("sentence-pause", "pause", "asr", before="Gedanke.", after="Danach", mid_sentence=False)
+    supported = speech_event("supported", "fact", "factcheck", t_ms=5000, verdict="supports", checked=["upload"],
+        evidence={"kind": "upload", "quote": "Der Pilot startet mit zwölf Personen.",
+                  "passage": "Der Pilot startet mit zwölf Personen."})
+    events = [ReviewEvent.model_validate(pose_event()), pause, supported]
+    report, _ = build_review(timeline_fixture(events), ReviewRequest(language="en"))
+    assert len(report.findings) == 1 and report.findings[0].interpretation
+    assert {tuple(item.event_ids) for item in report.strengths} == {("sentence-pause",), ("supported",)}
+    assert report.coverage.events_mentioned == 3
+    assert any("sentence boundary is an ASR heuristic" in item.text for item in report.strengths)
+    assert any("name the source" in item.text for item in report.strengths)
+
+
+def test_strength_selection_keeps_sources_visible_among_many_pauses():
+    pauses = [speech_event(f"pause-{index}", "pause", "asr", t_ms=index * 3000,
+                           before="Gedanke.", mid_sentence=False) for index in range(10)]
+    supported = speech_event("source", "fact", "factcheck", duration_ms=100, verdict="supports",
+        evidence={"kind": "upload", "quote": "Die Aussage steht in dieser Quelle.",
+                  "passage": "Die Aussage steht in dieser Quelle."})
+    report, _ = build_review(timeline_fixture([*pauses, supported], duration=30_000), ReviewRequest())
+    assert len(report.strengths) == 3 and any(item.event_ids == ["source"] for item in report.strengths)
+    assert report.findings == []
+
+
+@pytest.mark.parametrize("source,payload", [
+    ("asr", {"mid_sentence": False}),
+    ("speech", {"mid_sentence": False, "before": "Gedanke."}),
+    ("asr", {"mid_sentence": False, "before": "mitten"}),
+])
+def test_missing_sentence_evidence_does_not_become_strength(source, payload):
+    report, _ = build_review(timeline_fixture([speech_event("pause", "pause", source, **payload)]), ReviewRequest())
+    assert report.strengths == []
+
+
+def test_unverified_support_is_not_a_strength():
+    event = speech_event("unsupported", "fact", "factcheck", verdict="supports",
+        evidence={"kind": "upload", "quote": "An invented quotation.", "passage": "Different source text."})
+    report, _ = build_review(timeline_fixture([event]), ReviewRequest())
+    assert report.strengths == []
+    assert report.findings[0].next_action.suggestion_id == "practice_unchecked"
+
+
+def test_provider_outage_falls_back_once_and_preserves_explanations():
+    from app.factcheck.llm import LLMError
+    class Unavailable:
+        model = "synthetic-outage"
+        calls = 0
+        def complete_json(self, system, user):
+            self.calls += 1
+            raise LLMError("private provider response")
+    model = Unavailable()
+    report, verification = build_review(timeline_fixture(), ReviewRequest(mode="llm"), model)
+    assert model.calls == 1 and verification["failureCodes"] == {"E_LLM_UNAVAILABLE": 1}
+    assert report.generator.mode == "template" and report.findings[0].interpretation
+    assert report.findings[0].next_action
+    assert "private provider response" not in report.model_dump_json()
+
+
+def test_unconfigured_model_returns_explicit_fallback():
+    report, verification = build_review(timeline_fixture(), ReviewRequest(mode="llm"))
+    assert report.generator.mode == "template" and verification["fallbackRate"] == 1
+    assert any("Coaching-Templates" in item for item in report.limitations)
+
+
 @pytest.mark.parametrize("quote,passage,expected", [
     ("Die Wirkungsweise ist großartig.", "Die Wirkungs-\nweise ist großartig.", "exact"),
     ("Die Straße ist lang genug.", "Die STRASSE ist lang genug.", "exact"),
@@ -214,6 +314,10 @@ def test_source_verdict_stays_fixed_and_unknown_checks_are_not_not_found():
     unchecked = contradicted.model_copy(update={"payload": {"verdict": "not_found", "checked": []}})
     report, _ = build_review(timeline_fixture([unchecked]), ReviewRequest())
     assert "kein Beleg gefunden" not in report.findings[0].observation
+    web_only = unchecked.model_copy(update={"payload": {"verdict": "not_found", "checked": ["web"]}})
+    report, _ = build_review(timeline_fixture([web_only]), ReviewRequest())
+    assert "geprüften Webquellen kein Beleg gefunden" in report.findings[0].observation
+    assert report.findings[0].next_action.suggestion_id == "practice_not_found"
 
 
 # Twenty adversarial fixtures exercise the writer boundary, not model accuracy.
@@ -271,6 +375,17 @@ def test_valid_claim_and_unknown_suggestion_do_not_change_values():
     value, code = verify_claim(claim, {card["id"]: card}, set())
     assert value["suggestion"] is None and code == "E_SUGGESTION_UNKNOWN"
     assert "12.1 deg" in resolve(value["text"], card)
+
+
+def test_valid_model_wording_cannot_remove_practice_explanation_or_step():
+    card = card_for(ReviewEvent.model_validate(pose_event()), "en")
+    class MinimalModel:
+        model = "synthetic-minimal"
+        def complete_json(self, system, user):
+            return {"claims": [{"evidenceIds": [card["id"]], "template": "observation", "text": card["allowedTexts"][0]}]}
+    report, verification = build_review(timeline_fixture(), ReviewRequest(mode="llm", language="en"), MinimalModel())
+    assert report.generator.mode == "llm" and verification["fallbackRate"] == 0
+    assert report.findings[0].interpretation and report.findings[0].next_action
 
 
 def test_five_minute_sixty_event_template_budget():

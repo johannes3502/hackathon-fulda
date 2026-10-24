@@ -115,7 +115,15 @@ def execute(job_id):
                 # Event upload can race job startup; compare against this exact snapshot.
                 revision = db.require_take(connection, take["id"])["revision"]
             options = ReviewRequest.model_validate(job["input"])
-            value = (*build_review(timeline, options, configured_llm() if options.mode == "llm" else None), revision)
+            llm = None
+            # Recheck consent in the worker: configuration can appear after an
+            # unconfigured/local-only request was queued.
+            if options.mode == "llm" and timeline.session.consent.scope == "local-and-cloud-analysis":
+                try:
+                    llm = configured_llm()
+                except ValueError:
+                    pass
+            value = (*build_review(timeline, options, llm), revision)
         else:
             value = model_job(job, take)
     except Exception as failure:
@@ -167,8 +175,8 @@ def execute(job_id):
             connection.execute("UPDATE sessions SET status='review_ready' WHERE id=%s AND NOT EXISTS"
                 " (SELECT 1 FROM takes WHERE session_id=%s AND status != 'review_ready')", (take["session_id"], take["session_id"]))
             result = {"reviewId": str(report.review_id)}
-            if verification["degraded"]:
-                job_error = {"code": "E_REVIEW_VERIFICATION", "message": "LLM-Verifikation überschreitet die Fallback-Grenze. Geprüfte Template-Review ist verfügbar."}
+            # A grounded fallback is a completed review. Degradation remains
+            # visible in generator, limitations and stored verification metrics.
         else:
             name, result, events = value
             if name in {"factcheck", "questions"}:

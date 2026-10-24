@@ -119,7 +119,7 @@ Event {
 - **Persistente Review:** `POST /sessions`, `/sessions/{id}/takes`, `/takes/{id}/events`, optional `/audio`, dann `/review`; `GET /timeline`, `/review`, `/jobs/{id}`. Neue POSTs brauchen `Idempotency-Key`. Template-Review ist Standard; LLM nur über geprüfte Evidence Cards und Platzhalter. `DELETE /sessions/{id}` kaskadiert Metadaten und entfernt temporäres Audio. P1/P2-Anbindung über Take-`/factcheck`, `/questions`, `/questions/answers`; Details in `docs/06-backend-review-api.md`.
 - **Fact-Check:** (1) LLM extrahiert prüfbare Aussagen mit Timestamp aus dem Transkript, (2) Top-k-Chunks pro Aussage aus pgvector, (3) LLM urteilt mit wörtlichem Zitat, (4) Code prüft per String-Match, dass das Zitat im Chunk steht. Drei Ergebnisse: *stützt*, *widerspricht*, *in den Quellen nicht gefunden*. Letzteres ist nicht „falsch“. Web-Fetch kommt erst danach als Zweitquelle.
 - **Frage-Agent:** Eingabe sind Transkript, Quellen-Chunks und die Fact-Check-Funde. Er fragt gezielt nach Widersprüchen und Lücken und vergleicht Antworten mit den Quellen. Ausgabe ohne Punkte oder Noten.
-- **Fallback:** Fällt Modell, API oder Kamera aus, spielt die App eine vorberechnete Beispiel-Session deterministisch ab. Sie ist zugleich der Standard-Einstieg für den Produktreview (Wert in unter 3 Minuten), Live-Aufnahme ist der zweite Pfad (30–60 s reichen).
+- **Fallback:** Bei LLM-Ausfall bleibt der Kurzreview aus den erhobenen Events als Template verfügbar. Die vorberechnete Beispiel-Session ist ein eigener, gekennzeichneter Demo-Pfad; sie ersetzt keine Daten einer echten Aufnahme. Sie dient dem Produktreview (Wert in unter 3 Minuten), Live-Aufnahme ist der zweite Pfad (30–60 s reichen).
 - **Datenschutz:** Demo-Daten synthetisch. Live-Aufnahmen der Jury sind echte personenbezogene Daten: Einwilligungshinweis, Originalaufnahme nach der Verarbeitung löschen, Drittanbieter-APIs benennen (relevant für die KI-Reflection).
 - **Daten und Secrets:** Postgres mit pgvector und SeaweedFS; der vorhandene Compose-Stack ist in Abschnitt 6 beschrieben. Secrets nur in `.env`, nicht committen.
 - **Hintergrundjobs:** Lange Backend-Arbeiten (z. B. Transkription, Ingest, Review) als Celery-Tasks ausführen. Async-API-Routen publizieren über `app.jobs.enqueue_task` und geben eine Job-ID zurück; im Request nicht auf das Ergebnis warten. Nur IDs/Object-Keys in Redis, Medien temporär in S3. Tasks müssen bei erneuter Zustellung sicher wiederholbar sein.
@@ -299,3 +299,17 @@ ElevenLabs ist auf Nutzerwunsch als optionaler Sprachdialog integriert; Nutzer
 konfiguriert `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` selbst. Kontext als
 Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Keine Bewertungs-Scores; Sprachreaktionen sind nicht zitateverifiziert.
 Einrichtung und offene Grenzen: `docs/07-review-and-agent.md`.
+
+## Datenbasierter Kurzreview-Fallback (24.10.2026)
+
+Web-Kamera-/Sprachreview nutzt feste Erklärungen und konkrete Übungsschritte
+aus den erhobenen Events, ohne LLM-Abhängigkeit. Stärken und Verbesserungen
+sind gemeinsam sichtbar. Positive Evidenz: ASR-Pause mit belegter Satzgrenze
+oder bereits quellengeprüfte gestützte Aussage; fehlende Warnungen sind kein
+Lob. Die persistente Take-Review füllt `interpretation`, `nextAction` und
+belegte `strengths`. Fehlende Modellkonfiguration, Anbieterfehler oder
+verworfene Modellformulierungen ergeben einen abgeschlossenen Review-Job mit
+Template-/Teilfallback; `generator`, `limitations` und Verifikationsdaten
+benennen den Ersatz. Anbieterfehler werden nicht erneut angefragt.
+Cloud-Einwilligung wird vor dem tatsächlichen Aufruf erneut geprüft.
+Details: `docs/07-review-and-agent.md`, `docs/06-backend-review-api.md`.

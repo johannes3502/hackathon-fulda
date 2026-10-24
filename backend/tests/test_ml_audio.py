@@ -153,7 +153,7 @@ def test_whisper_environment_is_validated(monkeypatch):
         configured_transcriber()
 
 
-def test_combined_pipeline_uses_asr_tempo_and_audio_pauses(monkeypatch):
+def test_combined_pipeline_preserves_asr_pace_and_pause_context(monkeypatch):
     monkeypatch.setenv("ASR_PROVIDER", "json")
     monkeypatch.setenv("ASR_DEMO_WORDS_PATH", str(Path(__file__).parents[1] / "app/demo/words.json"))
     result = run_analysis(FIXTURE, AnalysisOptions(audio=AudioConfig(activity_detector="energy")))
@@ -163,7 +163,36 @@ def test_combined_pipeline_uses_asr_tempo_and_audio_pauses(monkeypatch):
     assert result.text
     assert any(event.type == "filler" and event.t_ms == 1200 for event in result.events)
     assert all(event.source == "asr" for event in result.events if event.type == "pace")
-    assert all(event.source == "speech" for event in result.events if event.type == "pause")
+    word_pauses = [event for event in result.transcription.events if event.type == "pause"]
+    assert all(event in result.events for event in word_pauses)
+    assert all(not any(event.t_ms < pause.t_ms + pause.duration_ms and
+                       pause.t_ms < event.t_ms + event.duration_ms for pause in word_pauses)
+               for event in result.events if event.type == "pause" and event.source == "speech")
+
+
+@pytest.mark.parametrize("punctuation,positive", [(".", True), ("", False)])
+def test_completed_pipeline_delivers_sentence_context_and_keeps_audio_only_gaps(monkeypatch, punctuation, positive):
+    from app.events import Event
+    from app.speech.job_models import StreamedTranscript
+    from app.transcription.models import Word
+    from app.review.coaching import sentence_pause
+    from app.speech.models import AudioAnalysis, AudioSeries, AudioSummary
+
+    signal = Event(t_ms=400, duration_ms=2700, type="pause", source="speech", severity="info", payload={})
+    audio_only = signal.model_copy(update={"t_ms": 5000, "duration_ms": 2000})
+    audio = AudioAnalysis(summary=AudioSummary(duration_ms=10_000, active_ms=5300, median_level_db=None,
+        median_f0_hz=None, f0_range_st=None, syllables_per_second=None, pause_count=2),
+        series=AudioSeries(hop_ms=10, t_ms=[], level_db=[], f0_hz=[], active=[], syllable_peaks_ms=[]),
+        events=[signal, audio_only], heuristics={})
+    monkeypatch.setattr("app.speech.pipeline.analyze_recording", lambda *args: audio)
+    words = [Word(word=f"Gedanke{punctuation}", start_ms=0, end_ms=500),
+             Word(word="Danach", start_ms=3000, end_ms=3500)]
+    result = run_analysis(FIXTURE, AnalysisOptions(live_transcript=StreamedTranscript(provider="deepgram", words=words)))
+    pauses = [event for event in result.events if event.type == "pause"]
+    assert len(pauses) == 2 and signal in result.audio.events
+    assert pauses[0].source == "asr" and pauses[0].payload["mid_sentence"] is (not positive)
+    assert sentence_pause(pauses[0]) is positive
+    assert pauses[1] == audio_only
 
 
 @pytest.fixture

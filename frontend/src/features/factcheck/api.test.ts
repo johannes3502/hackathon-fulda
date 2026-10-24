@@ -124,3 +124,32 @@ it("maps verdicts to timeline moments without scores", () => {
   expect(missing).toMatchObject({ kind: "suggestion", endMs: 10000 });
   expect(missing.title).toContain("Not found in sources");
 });
+
+it("only praises a supported claim with verified source evidence", () => {
+  const claim = {
+    ...result.claims[0],
+    verdict: "supports" as const,
+    explanation: "",
+  };
+  const review = (evidence = claim.evidence) =>
+    factFeedback({ ...result, claims: [{ ...claim, evidence }] }, 10_000)[0];
+  expect(review().kind).toBe("observation");
+  expect(review(null).title).toContain("Could not be checked");
+  const supported = review({ ...claim.evidence!, quote_verified: "exact" });
+  expect(supported.kind).toBe("positive");
+  expect(supported.detail).toContain("this specific statement");
+  expect(supported.action).toContain("name the source");
+});
+
+it("treats a failed source check as a technical observation with a retry step", () => {
+  const item = factFeedback(
+    {
+      ...result,
+      claims: [{ ...result.claims[1], verdict: "unchecked", explanation: "" }],
+    },
+    10_000,
+  )[0];
+  expect(item.kind).toBe("observation");
+  expect(item.detail).toContain("does not establish a content error");
+  expect(item.action).toContain("retry the source comparison");
+});

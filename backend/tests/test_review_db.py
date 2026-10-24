@@ -33,9 +33,9 @@ def api(monkeypatch):
     client = TestClient(app)
     def post(path, body=None, key=None, **kwargs):
         return client.post(path, json=body, headers={"Idempotency-Key": key or str(uuid4())}, **kwargs)
-    def create(duration=10000):
+    def create(duration=10000, scope="local-analysis"):
         request = {"title": "Synthetic review fixture", "consent": {"granted": True,
-            "at": datetime.now(timezone.utc).isoformat(), "version": "test", "scope": "local-analysis"}}
+            "at": datetime.now(timezone.utc).isoformat(), "version": "test", "scope": scope}}
         response = post("/sessions", request)
         assert response.status_code == 201, response.text
         session_id = response.json()["session"]["sessionId"]
@@ -249,7 +249,7 @@ def test_question_jobs_and_answer_comparison_are_take_scoped(api, monkeypatch):
 def test_llm_failure_persists_grounded_fallback_and_failure_metrics(api, monkeypatch):
     from app.review import router
     client, post, create, *_ = api
-    _, take_id = create()
+    _, take_id = create(scope="local-and-cloud-analysis")
     post(f"/takes/{take_id}/events", {"events": [pose_event()]})
     monkeypatch.setattr(router, "require_llm", lambda identifier: None)
     class UnsafeModel:
@@ -260,11 +260,61 @@ def test_llm_failure_persists_grounded_fallback_and_failure_metrics(api, monkeyp
     response = post(f"/takes/{take_id}/review", {"mode": "llm"})
     worker.execute(UUID(response.json()["jobId"]))
     job = client.get(f"/jobs/{response.json()['jobId']}").json()["job"]
-    assert job["status"] == "failed" and job["error"]["code"] == "E_REVIEW_VERIFICATION"
+    assert job["status"] == "completed" and job["error"] is None
     report = client.get(f"/takes/{take_id}/review").json()["review"]
     assert report["generator"]["mode"] == "template" and "99" not in report["findings"][0]["observation"]
     evaluation = client.get(f"/takes/{take_id}/evaluation").json()["evaluation"]
     assert evaluation["verification"]["fallbackRate"] == 1 and evaluation["humanLabeledClaims"] is None
+
+
+@pytest.mark.parametrize("configuration_appears", [False, True])
+def test_unconfigured_llm_completes_local_review_without_leaking_after_queueing(api, monkeypatch, configuration_appears):
+    from app.review import router
+    client, post, create, *_ = api
+    _, take_id = create()
+    post(f"/takes/{take_id}/events", {"events": [pose_event()]})
+    def missing():
+        raise ValueError("No model configured")
+    monkeypatch.setattr(router, "configured_llm", missing)
+    monkeypatch.setattr("app.factcheck.llm.configured_llm", missing)
+    response = post(f"/takes/{take_id}/review", {"mode": "llm"})
+    assert response.status_code == 202
+    if configuration_appears:
+        def unexpected():
+            pytest.fail("A local-only session must never contact a newly configured model")
+        monkeypatch.setattr("app.factcheck.llm.configured_llm", unexpected)
+    worker.execute(UUID(response.json()["jobId"]))
+    job = client.get(f"/jobs/{response.json()['jobId']}").json()["job"]
+    assert job["status"] == "completed"
+    report = client.get(f"/takes/{take_id}/review").json()["review"]
+    assert report["generator"]["mode"] == "template"
+    assert report["findings"][0]["interpretation"] and report["findings"][0]["nextAction"]
+
+
+def test_configured_review_still_requires_cloud_consent(api, monkeypatch):
+    from app.review import router
+    _, post, create, *_ = api
+    _, take_id = create()
+    monkeypatch.setattr(router, "configured_llm", lambda: object())
+    response = post(f"/takes/{take_id}/review", {"mode": "llm"})
+    assert response.status_code == 409 and response.json()["error"]["code"] == "E_CLOUD_CONSENT_REQUIRED"
+
+
+def test_review_survives_model_configuration_disappearing_after_queueing(api, monkeypatch):
+    from app.review import router
+    client, post, create, *_ = api
+    _, take_id = create(scope="local-and-cloud-analysis")
+    post(f"/takes/{take_id}/events", {"events": [pose_event()]})
+    monkeypatch.setattr(router, "configured_llm", lambda: object())
+    response = post(f"/takes/{take_id}/review", {"mode": "llm"})
+    assert response.status_code == 202
+    def missing():
+        raise ValueError("Model configuration removed")
+    monkeypatch.setattr("app.factcheck.llm.configured_llm", missing)
+    worker.execute(UUID(response.json()["jobId"]))
+    job = client.get(f"/jobs/{response.json()['jobId']}").json()["job"]
+    report = client.get(f"/takes/{take_id}/review").json()["review"]
+    assert job["status"] == "completed" and report["generator"]["mode"] == "template"
 
 
 def test_audio_cleanup_failure_never_reports_success_and_redelivery_only_cleans(api, monkeypatch):

@@ -954,3 +954,29 @@ Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
   Expo-Abhängigkeitswarnungen; Mobile-SDK und Lockfile wurden in diesem
   Provider-Change nicht geändert. Retention/TTL und die geplanten
   Sitzungsgrenzen bleiben offen.
+
+## Datenbasierter Kurzreview und Stärken (24.10.2026)
+
+- Nutzerauftrag: Kurzreview bei LLM-Ausfall anhand der erhobenen Daten
+  fortsetzen; gute Momente zeigen und Verbesserungen mit Warum und Übungsschritt
+  erklären. Keine neue Anbieter-, Qualitätsgrenzen- oder Score-Entscheidung.
+- Feste Coaching-Texte für Sprach- und Kameraereignisse; Messwerte und Zeiten
+  bleiben aus dem Take. Die persistente Review nutzt `interpretation`,
+  `nextAction` und vorhandene `strengths`. Positive Evidenz: Pause nach belegtem
+  ASR-Satzende oder `supports` mit geprüftem Quellenzitat. Fehlende Warnungen,
+  unbekannte Coverage und ungeprüfte Quellenurteile erzeugen kein Lob.
+  Kombinierter Audiojob und Take-Merge erhalten ASR-Satzkontext und ersetzen
+  überlappende Signalpausen; zusätzliche Signalpausen und Rohdaten bleiben erhalten.
+- Ein LLM-Konfigurationsfehler, Anbieterfehler oder Verifikations-Fallback
+  liefert eine abgeschlossene Review. Generator, Grenzen und Verifikationsdaten
+  machen den Ersatz sichtbar. Kein erneuter Anbieteraufruf nach Ausfall;
+  Cloud-Einwilligung wird im Worker erneut geprüft. Ein inzwischen konfiguriertes
+  Modell darf eine lokal freigegebene Session nicht nachträglich hochladen.
+- Geprüft: **281 Backend-Tests** inklusive PostgreSQL und lokalem Silero ONNX
+  ohne Skips, **232 Web-Unit-Tests**,
+  Typecheck, Lint und Produktionsbuild. **10 Chromium-Prüfungen** in Desktop-
+  und Mobile-Viewports für gemischte Stärken/Verbesserungen bei fehlendem Modell,
+  Pose-Hinweise, Quellencheck und zeitgenaue Wiedergabe. Mobile-Screenshot geprüft;
+  alle zwölf Mermaid-Architekturdiagramme geparst.
+- Grenzen: synthetische Daten und simulierte Modell-Ausfälle. Kein neuer echter
+  Provider-, Mikrofon-, Geräte- oder pädagogischer Genauigkeitsnachweis.

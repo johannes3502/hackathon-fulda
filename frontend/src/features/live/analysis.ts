@@ -1,6 +1,7 @@
 import type { components } from "../../../../api/schema";
 import type { LiveFeedback, LiveMetric, LiveTranscript } from "./contracts";
 import { feedbackEnabled, type FeatureFlags } from "./feature-flags";
+import { reviewEventCopy } from "./review-copy";
 
 type Word = components["schemas"]["Word"];
 // Match the live-caption adapter's allowance for encoder/frame rounding.
@@ -212,13 +213,20 @@ export function analysisResult(
     return {
       id: `${e.source === "asr" ? "words" : source}-${i}`,
       category: String(e.type),
-      kind: e.severity === "warning" ? "attention" : "suggestion",
       startMs: Math.min(durationMs, e.t_ms),
       endMs: Math.min(durationMs, e.t_ms + e.duration_ms),
       title: `${e.type}${direction}${word}`,
-      detail: `${source === "words" || e.source === "asr" ? "Word timestamp" : "Audio signal"} heuristic. Review this observation in context; it is not a performance score.`,
-      action:
-        "Replay the surrounding seconds and decide whether you want to practice this moment.",
+      ...reviewEventCopy({
+        type: String(e.type),
+        source: e.source ?? (source === "words" ? "asr" : "speech"),
+        severity: String(e.severity),
+        durationMs: Math.max(
+          0,
+          Math.min(durationMs, e.t_ms + e.duration_ms) -
+            Math.min(durationMs, e.t_ms),
+        ),
+        payload: e.payload,
+      }),
     };
   });
   const metrics: LiveMetric[] = Object.entries(value.summary).map(

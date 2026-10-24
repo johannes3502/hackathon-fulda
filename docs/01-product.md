@@ -122,6 +122,11 @@ neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.m
   Wiederanlauf-/Cleanup-Regel für nie erneut zugestellte, verwaiste Jobs.
 - Neue Session-API verlangt Einwilligung; Cloud-Verarbeitung benötigt den
   Scope `local-and-cloud-analysis`. Lokaler Template-Pfad ohne LLM bleibt verfügbar.
+  Der Kurzreview zeigt Stärken und Übungsschritte zusammen. Feste Erklärungen
+  und nächste Schritte nutzen die Events des Takes; fehlende LLM-Konfiguration
+  oder Anbieterfehler verhindern keinen abgeschlossenen Template-Review.
+  Stärken brauchen positive Evidenz (Satzgrenzen-Pause oder quellengeprüfte
+  gestützte Aussage); fehlende Warnungen gelten nicht als Lob.
 - Keine echten personenbezogenen Daten in der Demo.
 
 ### Technik

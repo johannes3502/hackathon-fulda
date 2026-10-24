@@ -357,7 +357,9 @@ früheren Referenzen. Wortbasiertes ASR-Tempo bleibt separat.
 Wichtig:
 
 - Audio-Pace ist **Silben/s**, ASR-Pace ist **WPM**. Niemals als dieselbe Metrik ausgeben.
-- Pausen aus VAD und ASR deduplizieren. Bevorzugt wird die ASR-Pause, wenn `mid_sentence` belastbar ist; sonst die längere.
+- Pausen aus VAD und ASR deduplizieren. ASR-Pausen innerhalb eines Satzes haben
+  Vorrang, danach ASR-Pausen mit belegtem Satzende im `before`-Wort, sonst die
+  längere Pause. Alle beteiligten Event-IDs bleiben erhalten.
 - `window_delta_db`/`window_std_st`/`window_wpm` sind Arrays. Vor dem Review median/min/max berechnen, nicht als Roharray an das LLM geben.
 
 ## 5. Timebase und Timestamp-Validierung
@@ -928,6 +930,20 @@ Regeln:
 - „Nicht auswertbar“ mit Grund.
 - Stärken nur aus belegten Aggregaten oder positiven Ereignissen; sonst weglassen.
 
+Umgesetzt im Katalog `2026-10-24.v2`: `observation` enthält die Messung,
+`interpretation` eine feste, passende Übungserklärung und `nextAction` einen
+konkreten nächsten Schritt. Mögliche Effekte sind als Möglichkeit formuliert,
+nicht als beobachtete Publikumsreaktion. Das Modell kann diese Erklärung und
+den Übungsschritt nicht entfernen. Es gelten weiterhin keine neuen
+Qualitätsschwellen oder Scores.
+
+Bis zu drei Stärken werden neben den maximal drei Fokus-Findings ausgewählt,
+ohne diese zu verdrängen: ASR-Pausen mit `mid_sentence=false` und vorhandenem
+Satzende im `before`-Wort sowie `supports`-Befunde mit geprüftem Quellenzitat.
+Jede Stärke referenziert ihre Event-IDs. Eine Pause allein, ein ungeprüftes
+Quellenurteil oder ausbleibende Warnungen reichen nicht aus. Fehlt positive
+Evidenz, wird diese Grenze in `limitations` genannt.
+
 ### 8.2 P1 — LLM als Formulierer
 
 Das LLM bekommt **keine** rohen Events und keine ganze Session, sondern 8–15 Evidence Cards.
@@ -1097,9 +1113,14 @@ Jede Claim wird geprüft:
 | Überlappender Widerspruch | `E_OVERLAP_CONFLICT` | einen droppen, loggen |
 | Maximale Länge | `E_TOO_LONG` | Claim droppen |
 
-Wenn ein Claim zweimal fehlschlägt: Template für dieses Finding. Wenn > 20 % der Claims fallbacken: Job als `failed` markieren und Prompt/Katalog prüfen.
-Die geprüfte Template-/Teilfallback-Review bleibt dabei per GET verfügbar;
-der Job meldet `E_REVIEW_VERIFICATION`. Kein Report mit ungeprüften Claims wird gespeichert.
+Wenn ein Claim zweimal fehlschlägt: Template für dieses Finding. Anbieterfehler
+führen ohne zweiten Anbieteraufruf direkt zum Template. Auch bei fehlender
+LLM-Konfiguration entsteht eine Review. Bei mehr als 20 % Fallbacks bleibt
+`verification.degraded=true` als Diagnose erhalten; der Job ist mit der
+geprüften Template-/Teilfallback-Review **completed**, und GET liefert sie.
+`generator` und `limitations` machen den Ersatzpfad sichtbar. Kein Report mit
+ungeprüften Claims wird gespeichert. Cloud-Einwilligung bleibt Pflicht für
+tatsächliche Modellaufrufe und wird im Worker erneut geprüft.
 
 ### 8.5 Zitatprüfung
 

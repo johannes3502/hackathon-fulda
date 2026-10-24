@@ -263,8 +263,9 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
   transcription on by default, and polls this job API. The checkbox can disable
   transcription. It always sends `local_only=true`; when transcribing, a hosted
   or synthetic ASR configuration is rejected before storing the recording.
-- `result.events` uses word-based tempo and acoustic pauses without duplicate
-  events. Raw pipeline events remain in `audio.events` / `transcription.events`.
+- `result.events` uses word-based tempo and keeps word pauses with sentence
+  context, replacing only overlapping acoustic pauses. Acoustic-only pauses
+  remain. Raw pipeline events remain in `audio.events` / `transcription.events`.
 - Silero v6.2 is installed and checksum-verified at image build time. CPU ONNX
   inference runs locally, without PyTorch or runtime downloads. `activity_detector:
   "energy"` explicitly selects the old energy gate for DSP tests/debugging.

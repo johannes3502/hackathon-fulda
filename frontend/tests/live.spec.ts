@@ -781,10 +781,9 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
     await jump.focus();
     await page.keyboard.press("Enter");
     await expect(jump).toHaveAttribute("aria-pressed", "true");
-    await expect(jump).toHaveAttribute("data-feedback", "attention");
-    await expect(jump.locator(".timeline-time")).toHaveCSS(
-      "color",
-      "rgb(255, 171, 180)",
+    await expect(jump).toHaveAttribute(
+      "data-feedback",
+      title.startsWith("pause") ? "neutral" : "attention",
     );
     await expect(page.locator(".review-observation h3")).toHaveText(title);
     bounds.push((await jump.boundingBox())!);
@@ -799,6 +798,98 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
   await timeline.scrollIntoViewIfNeeded();
   await page.screenshot({
     path: info.outputPath("readable-timestamp-jumps.png"),
+  });
+});
+
+test("data-based review keeps strengths and actionable feedback when the model is unavailable", async ({
+  page,
+}, info) => {
+  const jobId = "12345678-1234-1234-1234-123456789abc";
+  await page.route("**/api/factcheck/settings", (route) =>
+    route.fulfill({
+      json: {
+        available: false,
+        model: null,
+        llm_host: null,
+        web_provider: null,
+      },
+    }),
+  );
+  await page.route("**/api/speech/analyze", (route) =>
+    route.fulfill({ status: 202, json: { job_id: jobId } }),
+  );
+  await page.route("**/api/speech/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        job_id: jobId,
+        status: "completed",
+        result: {
+          audio: { summary: { pause_count: 1 } },
+          transcription: { summary: { filler_count: 1 } },
+          words: [
+            { word: "Gedanke.", start_ms: 0, end_ms: 100 },
+            { word: "Danach", start_ms: 400, end_ms: 600 },
+          ],
+          asr_provider: "synthetic-fixture",
+          synthetic_demo: true,
+          notices: [],
+          events: [
+            {
+              type: "pause",
+              source: "asr",
+              severity: "info",
+              t_ms: 100,
+              duration_ms: 300,
+              payload: {
+                gap_ms: 300,
+                before: "Gedanke.",
+                after: "Danach",
+                mid_sentence: false,
+              },
+            },
+            {
+              type: "filler",
+              source: "asr",
+              severity: "hint",
+              t_ms: 700,
+              duration_ms: 200,
+              payload: { kind: "filler", word: "ähm" },
+            },
+          ],
+        },
+      },
+    }),
+  );
+  await backend(page, true);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  const list = page.locator(".review-clip-list");
+  await expect(list).toContainText("Keep doing this");
+  await expect(list).toContainText("Try an adjustment");
+  await list.getByRole("button").filter({ hasText: "filler" }).click();
+  await expect(page.locator(".review-observation")).toContainText(
+    "Occasional fillers are normal",
+  );
+  await expect(page.locator(".review-next-action")).toContainText(
+    "silent thinking pause",
+  );
+  await list.getByRole("button").filter({ hasText: "pause" }).click();
+  await expect(page.locator(".review-observation")).toContainText(
+    "What worked and why",
+  );
+  await expect(page.locator(".review-observation")).toContainText(
+    "sentence-ending punctuation",
+  );
+  await expect(page.locator(".review-next-action")).toContainText(
+    "keep this space",
+  );
+  await expect(
+    page.getByRole("button", { name: "Replay section" }),
+  ).toBeVisible();
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("grounded-fallback-review.png"),
+    fullPage: true,
   });
 });
 

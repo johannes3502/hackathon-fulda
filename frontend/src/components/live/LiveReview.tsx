@@ -32,10 +32,11 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
   const recording = recordings[sessionId];
   const [selected, setSelected] = useState<LiveFeedback | null>(null);
   const [view, setView] = useState<"moments" | "questions">("moments");
-  const [all, setAll] = useState(false);
+  const [all, setAll] = useState(true);
   if (!recording) return <MissingRecording />;
   const moments = reviewMoments(recording.feedback);
   const practice = moments.filter(needsPractice);
+  const strengths = moments.filter((item) => item.kind === "positive");
   const visible = all || !practice.length ? moments : practice;
   const appearance = cueAppearance(selected, "ready");
   const mode =
@@ -113,7 +114,11 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                         ? "Start with one adjustment"
                         : "Watch with fresh eyes"}
                   </h2>
-                  <span className="badge">{practice.length} to revisit</span>
+                  <span className="badge">
+                    {strengths.length}{" "}
+                    {strengths.length === 1 ? "strength" : "strengths"} ·{" "}
+                    {practice.length} to revisit
+                  </span>
                 </div>
                 {selected ? (
                   <div className={`review-observation ${selected.kind}`}>
@@ -131,6 +136,11 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                       · {time(selected.startMs)}
                     </span>
                     <h3>{selected.title}</h3>
+                    <strong>
+                      {selected.kind === "positive"
+                        ? "What worked and why"
+                        : "What happened and why it matters"}
+                    </strong>
                     <p>{selected.detail}</p>
                     {selected.action && (
                       <div className="review-next-action">
@@ -151,12 +161,12 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 ) : (
                   <p className="review-intro">
                     {practice.length
-                      ? "Choose a moment below. Watch what happened, then try the suggested adjustment."
+                      ? "Choose a strength or an adjustment below. Watch what happened, learn why it matters, then try the next step."
                       : "No adjustments were flagged. Watch the take and decide what you want to practice; missing feedback is not an assessment."}
                   </p>
                 )}
                 <div className="panel-title-row review-list-heading">
-                  <h3>Clips to revisit</h3>
+                  <h3>Strengths and next steps</h3>
                   {!!practice.length && (
                     <button
                       className="text-button"
@@ -186,7 +196,12 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                           <span>
                             <strong>{item.title}</strong>
                             <small>
-                              {item.category} · {time(range.start * 1000)}–
+                              {item.kind === "positive"
+                                ? "Keep doing this"
+                                : needsPractice(item)
+                                  ? "Try an adjustment"
+                                  : "Observation"}{" "}
+                              · {item.category} · {time(range.start * 1000)}–
                               {time(range.end * 1000)}
                             </small>
                           </span>
@@ -204,6 +219,8 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                   </p>
                 )}
                 <p className="field-hint">
+                  {!strengths.length &&
+                    "No specific strengths were established from the available data. Missing warnings are not proof that a skill was measured. "}
                   Camera and voice observations use prototype heuristics. They
                   are suggestions to review, not grades.
                 </p>

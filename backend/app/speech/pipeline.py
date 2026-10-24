@@ -37,10 +37,16 @@ def run_analysis(recording: Path, options: AnalysisOptions) -> RecordingAnalysis
             notices.append("Synthetische Demo: Wort-Timestamps sind vorberechnet, keine ASR-Erkennung.")
         elif provider in {"whisper", "faster-whisper"}:
             notices.append("Lokale Whisper-Transkription: Füllwörter und Wortgrenzen sind modellabhängig.")
-    # ASR supplies tempo; acoustic speech segments supply pauses. Preserve raw
-    # events on each pipeline, but expose no duplicates on the merged timeline.
-    audio_events = [event for event in audio.events if transcription is None or event.type != "pace"]
-    word_events = [event for event in transcription.events if event.type != "pause"] if transcription else []
+    # Keep ASR pause context for the review. Only replace acoustic pauses that
+    # actually overlap a word-based pause; acoustic-only gaps remain available.
+    # Both raw pipelines stay intact, and ASR remains the source for word pace.
+    word_events = transcription.events if transcription else []
+    word_pauses = [event for event in word_events if event.type == "pause"]
+    audio_events = [event for event in audio.events
+        if not (transcription is not None and event.type == "pace")
+        and not (event.type == "pause" and any(
+            event.t_ms < pause.t_ms + pause.duration_ms and pause.t_ms < event.t_ms + event.duration_ms
+            for pause in word_pauses))]
     return RecordingAnalysis(
         audio=audio, words=words, text=transcript_text(words), transcription=transcription,
         events=merge_timeline(audio_events, word_events), asr_provider=provider,

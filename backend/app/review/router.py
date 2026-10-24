@@ -82,6 +82,15 @@ def require_llm(take_id):
     return model
 
 
+def review_preflight(take_id):
+    try:
+        require_llm(take_id)
+    except ReviewError as error:
+        if error.code != "E_LLM_UNAVAILABLE":
+            raise
+        # Missing configuration still permits a local, evidence-based review.
+
+
 async def dispatch(value):
     status, body = value
     if status == 202:
@@ -168,7 +177,7 @@ async def audio(take_id: UUID, idempotency_key: Key,
 async def start_review(take_id: UUID, idempotency_key: Key, request: ReviewRequest | None = None):
     options = request or ReviewRequest()
     value = await run_in_threadpool(service.reserve_job, take_id, "review_generate", service.json_model(options), checked_key(idempotency_key),
-        preflight=(lambda: require_llm(take_id)) if options.mode == "llm" else None)
+        preflight=(lambda: review_preflight(take_id)) if options.mode == "llm" else None)
     return await dispatch(value)
 
 

@@ -234,7 +234,7 @@ it("uploads a complete recording only after stopping and maps real feedback", as
   expect(receive.mock.calls[0][0].feedback).toMatchObject({
     startMs: 100,
     endMs: 700,
-    kind: "suggestion",
+    kind: "observation",
   });
   expect(receive.mock.calls[1][0].metrics[1].value).toBeNull();
   transport.close();
