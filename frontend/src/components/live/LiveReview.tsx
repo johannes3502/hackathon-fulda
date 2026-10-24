@@ -26,6 +26,9 @@ import { PoseDownload } from "./PoseDownload";
 import { QuestionPractice } from "./QuestionPractice";
 import { TranscriptAnalysis } from "./TranscriptAnalysis";
 import { VideoPlayback } from "./VideoPlayback";
+import { ReviewScores } from "./ReviewScores";
+import { reviewScores } from "@/features/live/review-scores";
+import { feedbackToMoment } from "../analysis/review-data";
 import "./review-accessibility.css";
 
 export function LiveReview({ sessionId }: { sessionId: string }) {
@@ -97,6 +100,14 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
         </div>
         {view === "moments" ? (
           <>
+            <ReviewScores
+              scores={reviewScores(
+                moments.map((item) => feedbackToMoment(item)),
+                recording.durationMs,
+                recording.factCheck?.claims,
+              )}
+              demo={recording.transcript?.synthetic ?? false}
+            />
             <div className="review-stage-grid">
               <VideoPlayback
                 recording={recording}

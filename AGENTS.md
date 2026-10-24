@@ -16,6 +16,14 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 **Leitplanken:** nur diese fünf Features; keine erfundenen Scores, Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeits-/Notenbewertung; nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
 
+**Expliziter Nutzerauftrag (24.10.2026):** Im Review vier 0–100-Prototyp-Scores
+für Gestik, Fachwissen, Flow und Struktur statt bloßer Moment-Anzahlen anzeigen.
+Die Version `evidence-share-v1` bewertet die erfasste Evidenz: positive Zeitanteile
+gegen positive + kritische Zeitanteile; Fachwissen bevorzugt über entscheidbare
+Quellenurteile. Formel, Datenabdeckung und fehlende Daten bleiben sichtbar;
+ohne Evidenz kein Score. Keine Validierungs- oder Benotungsbehauptung. Der
+Zeitverlauf ist eine geglättete Linie mit ausdrücklich interpolierten Übergängen.
+
 ## 2. Ablauf
 
 1. **Vorbereitung:** Nutzer lädt Quellen hoch (PDF, PPTX, Text). Backend zerlegt sie in Chunks mit Quelle und Seite/Folie und legt sie für die Suche ab.

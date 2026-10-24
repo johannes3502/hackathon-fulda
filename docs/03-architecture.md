@@ -476,7 +476,9 @@ flowchart TD
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
     RP --> RA["ReviewAnalysis + PerformanceGraph / FeedbackGraph<br/>qualitativer Event-Saldo, positive Hinweise oben<br/>neutrale Mittellinie, Anpassungshinweise unten<br/>video.currentTime, Zeitmarken, Abschnitt-Loop"]
-    LREV --> FGRAPH["VideoPlayback + FeedbackGraph unter dem Video<br/>Event-Intervalle statt erfundener Scores<br/>Klick / Zeitregler / Tastatur-Zeitmarken → lokales Video"]
+    LREV --> SCORES["ReviewScores über dem Video<br/>evidence-share-v1: 4 Kriterien, 0–100<br/>Zeitanteile / Quellenurteile, Abdeckung und fehlende Daten"]
+    RA --> SCORES
+    LREV --> FGRAPH["VideoPlayback + FeedbackGraph unter dem Video<br/>Durchgehende kubische Linie, Zwischenwerte interpoliert<br/>Cursor an video.currentTime, gute Momente oben<br/>Klick / Zeitregler / Tastatur-Zeitmarken → lokales Video"]
     LA --> RA
 
     SRC -->|"collection_id aus localStorage"| UPLOAD["POST /sources<br/>POST /sources/search"]

@@ -50,6 +50,16 @@ neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.m
 
 ## 3. Offen — muss das Team entscheiden
 
+Ergänzender Nutzerauftrag (24.10.2026): Vier 0–100-Scores über dem Review-Video
+statt Moment-Anzahlen. `evidence-share-v1` nutzt bewertete positive bzw. kritische
+Zeitanteile (Überlappungen derselben Art vereinigt); Fachwissen nutzt bevorzugt
+gestützte / (gestützte + widersprochene) Aussagen. Nicht gefunden, ungeprüft,
+neutrale Beobachtungen und unbeobachtete Zeit erzeugen keine Benotung. Kein
+Score ohne bewertbare Evidenz; Zeitabdeckung und Formel stehen im UI.
+Die Graph-Darstellung ist jetzt eine durchgehende kubische Linie ohne
+Säulenflächen, mit beweglichem Wiedergabepunkt. Zwischenwerte sind als
+Interpolation gekennzeichnet, nicht als zusätzliche Messungen.
+
 Review-Graph (24.10.2026, Nutzerauftrag): Timestamp-Momente als qualitativer
 Verlauf unter dem Video. Nach Nutzerkorrektur positive Momente oberhalb,
 Anpassungshinweise unterhalb der neutralen Mittellinie. Die Ausschläge bilden

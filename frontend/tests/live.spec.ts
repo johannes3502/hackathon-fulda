@@ -154,7 +154,10 @@ async function noOverflow(page: Page) {
 }
 async function enable(page: Page) {
   await page.goto("/live");
-  await page.getByText("Recording options", { exact: true }).click();
+  await page
+    .getByRole("region", { name: "Studio options" })
+    .getByText("Recording options", { exact: true })
+    .click();
   await page.getByLabel("Create a transcript").uncheck();
   await page.getByRole("button", { name: "Enable camera" }).click();
   await expect(

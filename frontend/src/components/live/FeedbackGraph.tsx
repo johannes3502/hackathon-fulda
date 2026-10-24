@@ -2,7 +2,12 @@
 
 import { useId, useMemo, useState } from "react";
 import type { LiveFeedback } from "@/features/live/contracts";
-import { feedbackGraph } from "@/features/live/feedback-graph";
+import {
+  feedbackGraph,
+  feedbackLinePath,
+  lineSamples,
+  lineValueAt,
+} from "@/features/live/feedback-graph";
 import { time } from "@/lib/utils";
 import "./feedback-graph.css";
 
@@ -35,22 +40,8 @@ export function FeedbackGraph({
   const x = (value: number) =>
     (clamp(value) / Math.max(1, graph.durationMs)) * 1000;
   const y = (value: number) => 120 + (value / graph.extent) * 88;
-  const path = graph.samples
-    .map(
-      (point, index) =>
-        `${index ? "L" : "M"}${x(point.tMs)},${y(point.balance)}`,
-    )
-    .join(" ");
-  const signalPath = graph.samples
-    .slice(1)
-    .map((point, index) => {
-      const previous = graph.samples[index];
-      return previous.balance || point.balance
-        ? `M${x(previous.tMs)},${y(previous.balance)} L${x(point.tMs)},${y(point.balance)}`
-        : "";
-    })
-    .join(" ");
-  const area = `${path} L1000,120 L0,120 Z`;
+  const knots = useMemo(() => lineSamples(graph.samples), [graph.samples]);
+  const signalPath = feedbackLinePath(knots, graph.durationMs, graph.extent);
   const selected = graph.moments.find(
     (moment) => moment.feedback.id === (hoveredId ?? selectedId),
   );
@@ -99,13 +90,14 @@ export function FeedbackGraph({
           </p>
         </div>
         <span className="feedback-graph-clock">
-          {time(clamp(positionMs))} / {time(graph.durationMs)}
+          {time(Math.floor(clamp(positionMs) / 1000) * 1000)} /{" "}
+          {time(graph.durationMs)}
         </span>
       </div>
       <p className="feedback-graph-explanation" id={`${id}-description`}>
         {de
-          ? "Qualitatives Feedback, kein Score: Gelungene Momente nach oben, Hinweise nach unten. Größere Ausschläge bedeuten mehr gleichzeitige Hinweise. Ohne Feedback bleibt die Leistung unbekannt."
-          : "Qualitative feedback, not a score: positive moments rise, adjustments dip. Larger changes mean more concurrent feedback. No feedback means performance is unknown."}
+          ? "Gelungene Momente oben, Hinweise unten. Die Linie verbindet Ereigniswerte mit geglätteten Übergängen. Zwischenwerte sind interpoliert, keine zusätzlichen Messungen."
+          : "Positive moments above, adjustments below. The line connects event values with smooth transitions. Between-event values are interpolated, not additional measurements."}
       </p>
       <div className="feedback-graph-layout">
         <div className="feedback-graph-axis" aria-hidden="true">
@@ -147,10 +139,10 @@ export function FeedbackGraph({
             >
               <defs>
                 <clipPath id={`${id}-upper`}>
-                  <rect width="1000" height="120" />
+                  <rect width="1000" height="118" />
                 </clipPath>
                 <clipPath id={`${id}-lower`}>
-                  <rect y="120" width="1000" height="120" />
+                  <rect y="122" width="1000" height="118" />
                 </clipPath>
               </defs>
               <rect
@@ -184,16 +176,9 @@ export function FeedbackGraph({
                 className="feedback-graph-baseline"
               />
               <path
-                d={area}
-                fill="var(--success)"
-                opacity="0.16"
-                clipPath={`url(#${id}-upper)`}
-              />
-              <path
-                d={area}
-                fill="var(--error)"
-                opacity="0.16"
-                clipPath={`url(#${id}-lower)`}
+                d={signalPath}
+                className="feedback-graph-line feedback-graph-context-line"
+                stroke="var(--muted)"
               />
               <path
                 d={signalPath}
@@ -215,6 +200,14 @@ export function FeedbackGraph({
                 className="feedback-graph-playhead"
               />
             </svg>
+            <i
+              aria-hidden="true"
+              className="feedback-graph-cursor"
+              style={{
+                left: `${x(positionMs) / 10}%`,
+                top: `${y(lineValueAt(knots, clamp(positionMs))) / 2.4}%`,
+              }}
+            />
             {graph.moments.map((moment) => (
               <i
                 key={moment.feedback.id}

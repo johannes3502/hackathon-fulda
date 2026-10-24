@@ -33,7 +33,13 @@ export function PerformanceGraph({
         feedback={moments.map((moment) => ({
           id: moment.id,
           category: moment.criterion ?? "note",
-          kind: moment.kind === "note" ? "observation" : moment.kind,
+          kind: moment.assessment
+            ? moment.assessment === "neutral"
+              ? "observation"
+              : moment.assessment
+            : moment.kind === "note"
+              ? "observation"
+              : moment.kind,
           startMs: moment.tMs,
           endMs: moment.tMs + moment.durationMs,
           title: moment.title,

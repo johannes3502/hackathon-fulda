@@ -1,5 +1,71 @@
 import { expect, test } from "@playwright/test";
 
+test("four evidence-based scores sit above the video and the curve is continuous", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/review-preview");
+  const scores = page.getByRole("region", {
+    name: "Bewertung der vier Kriterien",
+  });
+  await expect(scores.locator(".review-score-card")).toHaveCount(4);
+  await expect(scores.locator(".review-score-value")).toHaveText([
+    "100/100",
+    "0/100",
+    "43/100",
+    "100/100",
+  ]);
+  const values = await scores.locator(".review-score-value").allTextContents();
+  expect(
+    (await scores.boundingBox())!.y + (await scores.boundingBox())!.height,
+  ).toBeLessThan((await page.locator("video").boundingBox())!.y);
+  await scores.getByRole("button").filter({ hasText: "Flow" }).click();
+  await expect(page.locator(".review418-moment")).toHaveCount(2);
+  await expect(scores.locator(".review-score-value")).toHaveText(values);
+  await page
+    .getByRole("button", { name: "Alle Kriterien", exact: true })
+    .click();
+  const graph = page.getByRole("region", { name: "Dein Performance-Verlauf" });
+  const path = await graph
+    .locator(".feedback-graph-context-line")
+    .getAttribute("d");
+  expect(path).toContain("C");
+  expect(path!.match(/M/g)).toHaveLength(1);
+  expect(path).not.toContain("L");
+  const slider = graph.getByRole("slider", { name: "Zeitpunkt im Video" });
+  await slider.focus();
+  await page.keyboard.press("Home");
+  const cursor = graph.locator(".feedback-graph-cursor");
+  await expect(cursor).toHaveCSS("left", "0px");
+  await page.keyboard.press("ArrowRight");
+  await expect
+    .poll(() =>
+      cursor.evaluate((element) =>
+        parseFloat((element as HTMLElement).style.left),
+      ),
+    )
+    .toBeGreaterThan(0);
+  await scores
+    .getByText("Wie wird der Score berechnet?", { exact: true })
+    .click();
+  await expect(scores).toContainText(
+    "Neutrale Beobachtungen und nicht beobachtete Zeit fließen nicht ein",
+  );
+  await scores.locator("summary").click();
+  await page.screenshot({
+    path: info.outputPath("scores-and-line.png"),
+    fullPage: true,
+  });
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
 test("review graph places strengths above neutral, adjustments below and seeks the video", async ({
   page,
 }, info) => {

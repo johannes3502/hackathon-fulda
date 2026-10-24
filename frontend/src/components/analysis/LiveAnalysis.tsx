@@ -20,6 +20,7 @@ export function LiveAnalysis({ sessionId }: { sessionId: string }) {
         videoUrl: recording.videoUrl,
         demo: false,
         performance: [],
+        claims: recording.factCheck?.claims,
         moments: recording.feedback.map((item) => {
           const factIndex = /^fact-(\d+)$/.exec(item.id);
           const claim = factIndex

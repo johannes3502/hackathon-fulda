@@ -84,9 +84,24 @@
 }
 .feedback-graph-line {
   fill: none;
-  stroke-width: 2.5;
+  stroke-width: 3;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+}
+.feedback-graph-context-line {
+  opacity: 0.35;
+}
+.feedback-graph-cursor {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2;
 }
 .feedback-graph-playhead {
   stroke: var(--primary);

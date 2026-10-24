@@ -1,0 +1,109 @@
+"use client";
+
+import {
+  REVIEW_SCORE_VERSION,
+  SCORE_LABELS,
+  type ScoreCriterion,
+  type ReviewScore,
+} from "@/features/live/review-scores";
+import "./review-scores.css";
+
+export function ReviewScores({
+  scores,
+  selected,
+  onSelect,
+  demo = false,
+}: {
+  scores: Record<ScoreCriterion, ReviewScore>;
+  selected?: ScoreCriterion | null;
+  onSelect?: (criterion: ScoreCriterion) => void;
+  demo?: boolean;
+}) {
+  return (
+    <section
+      data-score-version={REVIEW_SCORE_VERSION}
+      className="review-scores"
+      aria-label="Bewertung der vier Kriterien"
+      lang="de"
+    >
+      <div className="review-scores-heading">
+        <h2>Deine vier Kriterien</h2>
+        <span>{demo ? "Demo · " : ""}Prototyp-Score · 0–100</span>
+      </div>
+      <div className="review-score-grid">
+        {(Object.entries(SCORE_LABELS) as [ScoreCriterion, string][]).map(
+          ([key, label]) => {
+            const score = scores[key];
+            const content = (
+              <>
+                <span className="review-score-label">{label}</span>
+                <strong className="review-score-value">
+                  {score.value ?? "–"}
+                  {score.value !== null && <small>/100</small>}
+                </strong>
+                <span className="review-score-bar" aria-hidden="true">
+                  <i style={{ width: `${score.value ?? 0}%` }} />
+                </span>
+                <span className="review-score-evidence">
+                  {score.value === null
+                    ? score.source === "claims"
+                      ? "Keine entscheidbaren Aussagen"
+                      : "Noch keine bewertbaren Daten"
+                    : score.source === "claims"
+                      ? `${score.supported} von ${score.supported + score.contradicted} Aussagen gestützt`
+                      : `${(score.assessedMs / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })} s bewertet · ${Math.round(score.coverage * 100)} % der Aufnahme`}
+                </span>
+                {score.source === "claims" && score.unassessed > 0 && (
+                  <span className="review-score-unknown">
+                    {score.unassessed} Aussagen offen · nicht als falsch
+                    gewertet
+                  </span>
+                )}
+              </>
+            );
+            return onSelect ? (
+              <button
+                key={key}
+                type="button"
+                className={`review-score-card review418-criterion${selected === key ? " active" : ""}`}
+                aria-pressed={selected === key}
+                onClick={() => onSelect(key)}
+              >
+                {content}
+              </button>
+            ) : (
+              <article
+                key={key}
+                className="review-score-card"
+                aria-label={`Bewertung ${label}`}
+              >
+                {content}
+              </article>
+            );
+          },
+        )}
+      </div>
+      <details className="review-score-method">
+        <summary>Wie wird der Score berechnet?</summary>
+        <p>
+          Gestik, Flow und Struktur: 100 × positiv bewertete Sekunden ÷
+          (positive + kritische Sekunden). Überlappende Hinweise derselben Art
+          zählen zeitlich nur einmal. Neutrale Beobachtungen und nicht
+          beobachtete Zeit fließen nicht ein.
+        </p>
+        <p>
+          Fachwissen: Wenn ein Quellencheck vorliegt, zählt der Anteil
+          gestützter Aussagen an allen gestützten oder widersprochenen Aussagen.
+          „Nicht gefunden“ und ungeprüfte Aussagen bleiben offen. Ohne
+          Quellencheck gelten die bewerteten Zeitanteile.
+        </p>
+        <p>
+          Der Score bewertet die erfasste Evidenz dieses Takes. Er ist eine
+          offengelegte Prototyp-Heuristik, keine validierte Benotung der
+          gesamten Präsentation. Ohne ausreichende Daten steht „–“ statt einer
+          erfundenen Zahl.
+        </p>
+      </details>
+    </section>
+  );
+}
