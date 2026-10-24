@@ -71,14 +71,17 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   the video: timestamps on the horizontal axis, a dashed neutral midpoint,
   explicit positive feedback above and adjustments below. The line is the net
   count of simultaneous directional events, scaled to the take's maximum absolute
-  count. A continuous cubic line through unique time knots replaces step/bar
-  shapes without overshoot. Intermediate values are labelled as interpolated;
+  count. A continuous angular line through unique time knots shows changes
+  without smoothing or invented fluctuations. Intermediate values are labelled as interpolated;
   the area is not filled. A moving point follows this interpolation during
   playback. Height is not measured presentation quality. Ordinary observations stay
   neutral; gaps contain no directional evidence, not proof of good performance.
   The same `FeedbackGraph` serves live playback and the analysis example. A click
   selects the nearest event, the labelled slider seeks exact times, and the
-  disclosure offers full timestamp buttons with at least 48px targets for dense
+  colored playback strip shares the graph's time scale and green/red/neutral
+  intervals, split exactly at zero crossings. Played time is highlighted; future
+  time is muted. Play/pause, native video controls and keyboard seeking stay
+  synchronized through media events. The disclosure offers full timestamp buttons with at least 48px targets for dense
   or simultaneous events. The playhead follows `video.currentTime`.
   Review controls are at least 48px high, supporting text at least 0.9375rem,
   body copy 1–1.0625rem, with larger headings and comfortable line spacing.

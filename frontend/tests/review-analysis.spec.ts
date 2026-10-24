@@ -29,9 +29,9 @@ test("four evidence-based scores sit above the video and the curve is continuous
   const path = await graph
     .locator(".feedback-graph-context-line")
     .getAttribute("d");
-  expect(path).toContain("C");
+  expect(path).toContain("L");
   expect(path!.match(/M/g)).toHaveLength(1);
-  expect(path).not.toContain("L");
+  expect(path).not.toContain("C");
   const slider = graph.getByRole("slider", { name: "Zeitpunkt im Video" });
   await slider.focus();
   await page.keyboard.press("Home");
@@ -66,6 +66,62 @@ test("four evidence-based scores sit above the video and the curve is continuous
   ).toBe(true);
 });
 
+test("colored playback stays aligned with video, graph, keyboard seeking and play/pause", async ({
+  page,
+}, info) => {
+  await page.goto("/review-preview");
+  const graph = page.getByRole("region", { name: "Dein Performance-Verlauf" });
+  const playback = graph.getByRole("group", { name: "Wiedergabe zum Verlauf" });
+  const slider = playback.getByRole("slider", { name: "Zeitpunkt im Video" });
+  const player = page.locator("video");
+  const progress = playback.locator(".feedback-playback-progress");
+  const cursor = graph.locator(".feedback-graph-cursor");
+  await expect(
+    playback.getByRole("button", { name: "Video abspielen" }),
+  ).toBeEnabled();
+  await slider.focus();
+  await page.keyboard.press("Home");
+  await expect(progress).toHaveCSS("clip-path", "inset(0px 100% 0px 0px)");
+  // A native video seek must move both indicators to exactly the same fraction.
+  await player.evaluate((video: HTMLVideoElement) => {
+    video.currentTime = 45;
+  });
+  await expect(slider).toHaveValue("45000");
+  await expect(progress).toHaveCSS("clip-path", "inset(0px 50% 0px 0px)");
+  expect(
+    await cursor.evaluate((element) => (element as HTMLElement).style.left),
+  ).toBe("50%");
+  const gradient = await progress.evaluate(
+    (element) => (element as HTMLElement).style.background,
+  );
+  expect(gradient).toContain("var(--success)");
+  expect(gradient).toContain("var(--error)");
+  const track = await playback
+    .locator(".feedback-playback-track")
+    .boundingBox();
+  const plot = await graph.locator(".feedback-graph-plot").boundingBox();
+  expect(Math.abs(track!.x - plot!.x)).toBeLessThan(2);
+  expect(Math.abs(track!.width - plot!.width)).toBeLessThan(2);
+  expect(track!.y).toBeGreaterThan(plot!.y + plot!.height);
+  await slider.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect
+    .poll(() => player.evaluate((video: HTMLVideoElement) => video.currentTime))
+    .toBeCloseTo(45.1, 1);
+  await playback.getByRole("button", { name: "Video abspielen" }).click();
+  await expect
+    .poll(() => player.evaluate((video: HTMLVideoElement) => video.currentTime))
+    .toBeGreaterThan(45.2);
+  await playback.getByRole("button", { name: "Video pausieren" }).click();
+  await expect
+    .poll(() => player.evaluate((video: HTMLVideoElement) => video.paused))
+    .toBe(true);
+  await expect(
+    playback.getByRole("button", { name: "Video abspielen" }),
+  ).toBeVisible();
+  await graph.screenshot({ path: info.outputPath("colored-playback.png") });
+});
+
 test("review graph places strengths above neutral, adjustments below and seeks the video", async ({
   page,
 }, info) => {
@@ -94,7 +150,7 @@ test("review graph places strengths above neutral, adjustments below and seeks t
       ),
     ).toBeGreaterThan(50);
     const videoBounds = await page.locator("video").boundingBox();
-    const plot = graph.locator("svg");
+    const plot = graph.getByRole("img", { name: /Feedback-Verlauf/ });
     const plotBounds = await plot.boundingBox();
     expect(plotBounds!.y).toBeGreaterThan(videoBounds!.y + videoBounds!.height);
     await expect(

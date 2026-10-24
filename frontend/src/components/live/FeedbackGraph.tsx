@@ -1,12 +1,14 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
+import { Pause, Play } from "lucide-react";
 import type { LiveFeedback } from "@/features/live/contracts";
 import {
   feedbackGraph,
   feedbackLinePath,
   lineSamples,
   lineValueAt,
+  playbackGradient,
 } from "@/features/live/feedback-graph";
 import { time } from "@/lib/utils";
 import "./feedback-graph.css";
@@ -18,6 +20,9 @@ export function FeedbackGraph({
   selectedId,
   onSelect,
   onSeek,
+  playing,
+  onTogglePlayback,
+  playbackDisabled = false,
   language = "en",
 }: {
   feedback: LiveFeedback[];
@@ -26,6 +31,9 @@ export function FeedbackGraph({
   selectedId?: string;
   onSelect: (item: LiveFeedback) => void;
   onSeek: (tMs: number) => void;
+  playing: boolean;
+  onTogglePlayback: () => void;
+  playbackDisabled?: boolean;
   language?: "en" | "de";
 }) {
   const id = useId();
@@ -42,6 +50,11 @@ export function FeedbackGraph({
   const y = (value: number) => 120 + (value / graph.extent) * 88;
   const knots = useMemo(() => lineSamples(graph.samples), [graph.samples]);
   const signalPath = feedbackLinePath(knots, graph.durationMs, graph.extent);
+  const gradient = useMemo(
+    () => playbackGradient(knots, graph.durationMs),
+    [knots, graph.durationMs],
+  );
+  const progress = (clamp(positionMs) / Math.max(1, graph.durationMs)) * 100;
   const selected = graph.moments.find(
     (moment) => moment.feedback.id === (hoveredId ?? selectedId),
   );
@@ -89,15 +102,11 @@ export function FeedbackGraph({
               : "See the moment. Jump back into the context."}
           </p>
         </div>
-        <span className="feedback-graph-clock">
-          {time(Math.floor(clamp(positionMs) / 1000) * 1000)} /{" "}
-          {time(graph.durationMs)}
-        </span>
       </div>
       <p className="feedback-graph-explanation" id={`${id}-description`}>
         {de
-          ? "Gelungene Momente oben, Hinweise unten. Die Linie verbindet Ereigniswerte mit geglätteten Übergängen. Zwischenwerte sind interpoliert, keine zusätzlichen Messungen."
-          : "Positive moments above, adjustments below. The line connects event values with smooth transitions. Between-event values are interpolated, not additional measurements."}
+          ? "Gelungene Momente oben, Hinweise unten. Gerade Linien verbinden die Ereigniswerte. Zwischenwerte sind interpoliert, keine zusätzlichen Messungen."
+          : "Positive moments above, adjustments below. Straight lines connect event values. Between-event values are interpolated, not additional measurements."}
       </p>
       <div className="feedback-graph-layout">
         <div className="feedback-graph-axis" aria-hidden="true">
@@ -231,18 +240,72 @@ export function FeedbackGraph({
               <span key={tick}>{time((graph.durationMs * tick) / 4)}</span>
             ))}
           </div>
-          <input
-            className="feedback-graph-scrubber"
-            type="range"
-            min="0"
-            max={Math.max(1, graph.durationMs)}
-            step="100"
-            value={clamp(positionMs)}
-            disabled={!graph.durationMs}
-            aria-label={de ? "Zeitpunkt im Video" : "Video position"}
-            aria-valuetext={time(clamp(positionMs))}
-            onChange={(event) => onSeek(Number(event.target.value))}
-          />
+          <div
+            className="feedback-playback"
+            role="group"
+            aria-label={de ? "Wiedergabe zum Verlauf" : "Timeline playback"}
+          >
+            <div className="feedback-playback-seek">
+              <div className="feedback-playback-track" aria-hidden="true">
+                <div
+                  className="feedback-playback-upcoming"
+                  style={{ background: gradient }}
+                />
+                <div
+                  className="feedback-playback-progress"
+                  style={{
+                    background: gradient,
+                    clipPath: `inset(0 ${100 - progress}% 0 0)`,
+                  }}
+                />
+              </div>
+              <input
+                className="feedback-graph-scrubber"
+                type="range"
+                min="0"
+                max={Math.max(1, graph.durationMs)}
+                step="100"
+                value={clamp(positionMs)}
+                disabled={!graph.durationMs}
+                aria-label={de ? "Zeitpunkt im Video" : "Video position"}
+                aria-valuetext={time(clamp(positionMs))}
+                onChange={(event) => onSeek(Number(event.target.value))}
+              />
+            </div>
+            <div className="feedback-playback-controls">
+              <button
+                type="button"
+                className="feedback-playback-toggle"
+                onClick={onTogglePlayback}
+                disabled={playbackDisabled || !graph.durationMs}
+                aria-label={
+                  playing
+                    ? de
+                      ? "Video pausieren"
+                      : "Pause video"
+                    : de
+                      ? "Video abspielen"
+                      : "Play video"
+                }
+              >
+                {playing ? (
+                  <Pause size={19} aria-hidden="true" />
+                ) : (
+                  <Play size={19} aria-hidden="true" />
+                )}
+                {playing ? "Pause" : de ? "Abspielen" : "Play"}
+              </button>
+              <span className="feedback-graph-clock">
+                {time(Math.floor(clamp(positionMs) / 1000) * 1000)} /{" "}
+                {time(graph.durationMs)}
+              </span>
+            </div>
+            <p className="feedback-playback-hint">
+              {de
+                ? "Kräftig eingefärbt = bereits abgespielt · Farben wie im Verlauf"
+                : "Highlighted = already played · Colors match the graph"}
+            </p>
+          </div>
         </div>
       </div>
       <div className="feedback-graph-selection" aria-live="polite">

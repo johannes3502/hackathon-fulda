@@ -138,12 +138,104 @@
   color: var(--muted);
 }
 .feedback-graph-scrubber {
+  appearance: none;
   display: block;
   width: 100%;
-  min-height: 44px;
-  margin: 4px 0 0;
-  accent-color: var(--primary);
+  height: 48px;
+  margin: 0;
+  background: transparent;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+.feedback-graph-scrubber::-webkit-slider-runnable-track {
+  height: 12px;
+  background: transparent;
+}
+.feedback-graph-scrubber::-moz-range-track {
+  height: 12px;
+  background: transparent;
+}
+.feedback-graph-scrubber::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -4px;
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+.feedback-graph-scrubber::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+.feedback-graph-scrubber:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.feedback-playback {
+  margin-top: 12px;
+  padding-block: 4px 12px;
+  border-block: 1px solid var(--border);
+}
+.feedback-playback-seek {
+  position: relative;
+  margin-inline: -10px;
+}
+.feedback-playback-track {
+  position: absolute;
+  inset: 18px 10px;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--border);
+  pointer-events: none;
+}
+.feedback-playback-upcoming,
+.feedback-playback-progress {
+  position: absolute;
+  inset: 0;
+}
+.feedback-playback-upcoming {
+  opacity: 0.22;
+}
+.feedback-playback-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.feedback-playback-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--soft-accent);
+  color: var(--foreground);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.feedback-playback-toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.feedback-playback-hint {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
 }
 .feedback-graph-selection {
   min-height: 72px;
