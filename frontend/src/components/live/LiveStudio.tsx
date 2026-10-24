@@ -32,6 +32,7 @@ import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { PoseDownload } from "./PoseDownload";
 import { PoseDevMode } from "./PoseDevMode";
 import { poseFeedback } from "@/features/pose/testPoses";
+import { CoachCue } from "./CoachCue";
 import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
 
@@ -291,10 +292,8 @@ export function LiveStudio() {
                 pose.state?.phase === "running" &&
                 pose.state.armsCrossed &&
                 !poseLab && (
-                  <span className="live-pose-cue" role="status">
-                    Arms crossed. Try an open stance.
-                    <small>Heuristic</small>
-                  </span>
+                  <CoachCue message="Try uncrossing your arms!" />
+                )}
                 )}
               {cameraStatus === "active" &&
                 poseLab &&

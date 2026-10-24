@@ -91,6 +91,7 @@ Diese Werte werden aus den geloggten Punkten berechnet, nicht zusätzlich getrac
 | `left_arm_open_deg`, `right_arm_open_deg` | Torso-Achse ↔ Oberarm |
 | `left_wrist_height`, `right_wrist_height` | relativ zur Schulterbreite |
 | `left_wrist_cross`, `right_wrist_cross` | Handgelenk entlang der Schulterlinie, ab Körpermitte, in Schulterbreiten; positiv = über die Mitte auf die Gegenseite |
+| `left_forearm_deg`, `right_forearm_deg` | Unterarm ↔ Schulterlinie, 0–90°, 0 = parallel |
 | `legs_visible` | Knie und Knöchel ausreichend sichtbar |
 
 ## Log-Schema
@@ -216,6 +217,8 @@ sind technische Prototyp-Konfiguration, keine validierte Genauigkeit.
 - Wrist-Cross: Projektion (Handgelenk − Schultermitte) auf die Achse rechte →
   linke Schulter, geteilt durch die Schulterbreite. Vorzeichen so gewählt, dass
   positiv „auf der Gegenseite“ heißt; unabhängig von Spiegelung und Bildseite.
+- Forearm: Winkel Ellbogen → Handgelenk zur Schulterlinie in der Bildebene,
+  auf `[0,90]` gefaltet; 0 = parallel zur Schulterlinie.
 - `eyes_forward`: Alle Augenpunkte 1–6 müssen nutzbar sein. Die kleinere/größere
   Augenbreite (innerer–äußerer Punkt in X/Y/Z) muss mindestens 0,65 sein und die
   Tiefendifferenz der Augenmitten höchstens 0,35 ihres 2D-Abstands. Kein Yaw und
@@ -225,21 +228,27 @@ sind technische Prototyp-Konfiguration, keine validierte Genauigkeit.
 ### Live-Hinweis „Arme verschränkt“ (Heuristik, nicht validiert)
 
 Implementierung und Konstanten: `src/features/pose/cues.ts` (`CROSS_ARMS`).
-Läuft in Vorschau und Aufnahme im Browser; Anzeige nur als Chip auf dem Video
-(„Arms crossed. Try an open stance. · Heuristic“). Keine Speicherung als Event,
-keine Aussage über Haltung oder Emotion.
+Läuft in Vorschau und Aufnahme im Browser; Anzeige nur als Coach-Sprechblase
+oben links auf dem Video („Try uncrossing your arms! · Heuristic“). Keine
+Speicherung als Event, keine Aussage über Haltung oder Emotion. Der Button
+„Pose debug“ zeigt jede Bedingung live mit Wert und Ergebnis.
 
 Pro Sample gilt „verschränkt“, wenn alle Bedingungen erfüllt sind:
 
-- beide `*_wrist_cross >= 0.1` (jedes Handgelenk über die Körpermitte),
+- beide `*_wrist_cross >= -0.25` (Handgelenk an, nahe oder über der
+  Körpermitte). Bei echter Aufnahme mit verschränkten Armen schätzt MediaPipe
+  die verdeckten Handgelenke dort, wo sich die Unterarme treffen, also an der
+  Mitte (gemessen: 0,06 / −0,09), nicht auf der Gegenseite,
 - beide `*_wrist_height` in `[-1.3, 0.2]` (etwa zwischen Schulter und Hüfte),
-- beide `*_elbow_deg <= 120` (Ellbogen gebeugt).
+- beide `*_elbow_deg <= 120` (Ellbogen gebeugt),
+- beide `*_forearm_deg <= 40` (Unterarm etwa parallel zur Schulterlinie;
+  schließt aneinandergelegte Hände mit Fingerspitzen nach oben aus).
 
 Fehlt ein Wert (z. B. Handgelenk unter dem anderen Arm verdeckt), ist das
-Ergebnis `null`, nicht `false`. Zustandsmaschine pro Episode: Hinweis nach
-2 s durchgehend „verschränkt“; Ende nach 0,5 s „nicht verschränkt“ oder 1,5 s
-ohne Messung; danach 20 s Cooldown. Ein Hinweis pro Episode, keine
-Wiederholung. Bekannte Grenzen: 2D-Geometrie, gefaltete Hände vor dem Körper
+Ergebnis `null`, nicht `false`. Zustandsmaschine pro Episode: Hinweis sofort
+bei „verschränkt“ (`holdMs` derzeit 0); Ende nach 0,5 s „nicht verschränkt“
+oder 1,5 s ohne Messung; derzeit kein Cooldown (`cooldownMs` 0). Ein Hinweis
+pro Episode, keine Wiederholung. Bekannte Grenzen: 2D-Geometrie, gefaltete Hände vor dem Körper
 oder ein Presenter in beiden Händen können ähnlich aussehen.
 
 Quellen: [MediaPipe Web Guide](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js),

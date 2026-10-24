@@ -1,19 +1,29 @@
 import type { PoseSample } from "./sample";
 // Prototype heuristics, not validated thresholds or assessments.
 export const CROSS_ARMS = {
-  // Each wrist past the body midline, in shoulder widths.
-  minCross: 0.1,
+  // Each wrist at, near or past the body midline, in shoulder widths.
+  // MediaPipe usually places the hidden wrists of crossed arms at the
+  // midline rather than on the opposite side, so "past" alone misses them.
+  minCross: -0.25,
   // Wrists between roughly shoulder and hip, in shoulder widths (up positive).
   minWristHeight: -1.3,
   maxWristHeight: 0.2,
   maxElbowDeg: 120,
-  holdMs: 2000,
+  // Forearms roughly level with the shoulders; rejects hands pressed
+  // together with fingertips up in front of the chest.
+  maxForearmDeg: 40,
+  // No hold or cooldown for now: hint shows as soon as arms cross.
+  holdMs: 0,
   releaseMs: 500,
   // Crossed wrists are often hidden under the other arm, so a missing
   // measurement ends an episode later than a clear "not crossed".
   unknownReleaseMs: 1500,
-  cooldownMs: 20000,
+  cooldownMs: 0,
 };
+type Timing = Pick<
+  typeof CROSS_ARMS,
+  "holdMs" | "releaseMs" | "unknownReleaseMs" | "cooldownMs"
+>;
 
 type Pair = [left: number | null, right: number | null];
 export type CrossArmsCheck = {
@@ -21,12 +31,14 @@ export type CrossArmsCheck = {
   cross: Pair;
   height: Pair;
   elbow: Pair;
+  forearm: Pair;
 };
 export const passes = {
   cross: (v: number) => v >= CROSS_ARMS.minCross,
   height: (v: number) =>
     v >= CROSS_ARMS.minWristHeight && v <= CROSS_ARMS.maxWristHeight,
   elbow: (v: number) => v <= CROSS_ARMS.maxElbowDeg,
+  forearm: (v: number) => v <= CROSS_ARMS.maxForearmDeg,
 };
 
 /** Per-sample inputs and result; crossed is null when points are not usable. */
@@ -39,6 +51,10 @@ export function crossArmsCheck(sample: PoseSample | null): CrossArmsCheck {
       d?.right_wrist_height ?? null,
     ] as Pair,
     elbow: [d?.left_elbow_deg ?? null, d?.right_elbow_deg ?? null] as Pair,
+    forearm: [
+      d?.left_forearm_deg ?? null,
+      d?.right_forearm_deg ?? null,
+    ] as Pair,
   };
   const entries = Object.entries(check) as [keyof typeof passes, Pair][];
   const crossed = entries.some(([, pair]) => pair.includes(null))
@@ -61,25 +77,25 @@ export class CrossArmsCue {
   private lastCrossed = -Infinity;
   private cooldownUntil = -Infinity;
   private active = false;
+  constructor(private timing: Timing = CROSS_ARMS) {}
   update(crossed: boolean | null, now: number) {
+    const { holdMs, releaseMs, unknownReleaseMs, cooldownMs } = this.timing;
     if (crossed) {
       this.since ??= now;
       this.lastCrossed = now;
     } else if (
       this.since !== null &&
       now - this.lastCrossed >=
-        (crossed === false
-          ? CROSS_ARMS.releaseMs
-          : CROSS_ARMS.unknownReleaseMs)
+        (crossed === false ? releaseMs : unknownReleaseMs)
     ) {
-      if (this.active) this.cooldownUntil = now + CROSS_ARMS.cooldownMs;
+      if (this.active) this.cooldownUntil = now + cooldownMs;
       this.active = false;
       this.since = null;
     }
     if (
       !this.active &&
       this.since !== null &&
-      this.lastCrossed - this.since >= CROSS_ARMS.holdMs &&
+      this.lastCrossed - this.since >= holdMs &&
       now >= this.cooldownUntil
     )
       this.active = true;
