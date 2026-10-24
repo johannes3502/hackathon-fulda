@@ -75,7 +75,8 @@ Lies nur, was du für die Aufgabe brauchst:
 
 1. **`docs/01-product.md`** — fixe Features, offene Entscheidungen.
 2. **`docs/00-requirements.md`** — Hackathon-Regeln, Bewertung, Checklisten.
-3. **`templates/ai-decision-log.md`** — Pflicht für die AI Reflection.
+3. **`docs/02-ai-decision-log.md`** — tatsächliches Log für die AI Reflection;
+   Vorlage: `templates/ai-decision-log.md`.
 4. **`templates/team-roles.md`** — Rollen, Gates, RACI.
 
 ---
@@ -84,10 +85,14 @@ Lies nur, was du für die Aufgabe brauchst:
 
 ```
 AGENTS.md                          # Einstiegspunkt
+compose.yaml                       # lokales Backend + PostgreSQL + S3
+.env.example                       # lokale Konfiguration ohne echte Secrets
+backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
 Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
 docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
   01-product.md                    # fixe Features + offene Punkte
+  02-ai-decision-log.md            # tatsächliche Entscheidungen und Prüfergebnisse
 templates/
   ai-decision-log.md               # AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
@@ -127,7 +132,7 @@ Die vollständige Liste steht in `docs/01-product.md`, Abschnitt 3. Kurz:
 4. Frage-Simulator: Anzahl, Modus, Bewertung.
 5. Speicherung und Löschung von Audio, Video, Transkript.
 6. Webcam-basiertes Eye Tracking oder Hardware.
-7. Stack, Hosting, Modelle, Latenz und Fallback.
+7. Hosting, Modelle, Latenz und Fallback; lokaler Stack: `backend/README.md`.
 8. Produktname.
 
 ---
@@ -136,10 +141,11 @@ Die vollständige Liste steht in `docs/01-product.md`, Abschnitt 3. Kurz:
 
 - [ ] Offene Punkte priorisieren; nur entscheiden, was für den vertikalen Slice
       nötig ist.
-- [ ] Stack und Hosting festlegen; „Hello World“ deployen.
+- [x] Lokalen Backend-Stack und Docker Compose anlegen.
+- [ ] Hosting festlegen; „Hello World“ deployen.
 - [ ] Vertikalen Slice bauen: Live-Input → Transkript → Feedback-Timeline →
       Frage-Simulator.
-- [ ] AI Decision Log starten.
+- [x] AI Decision Log starten (`docs/02-ai-decision-log.md`).
 - [ ] Laptop-/Smartphone-Test und Fallback vorbereiten.
 - [ ] Pitch und AI Reflection aus dem Log ableiten.
 

@@ -2,8 +2,8 @@
 
 **Status:** Thema fix (24.10.2026).
 **Grundlage:** Erste Feature-Beschreibungen des Teams. Es gibt noch kein
-Fein-Konzept, keine Scores, keine Schwellenwerte und keine technische
-Festlegung.
+Fein-Konzept, keine Scores und keine Schwellenwerte. Das lokale technische
+Grundgerüst ist inzwischen festgelegt (Abschnitt 3, Technik).
 
 > **Regel:** Keine zusätzlichen Features erfinden. Alles, was unten nicht steht,
 > ist offen und muss entschieden werden.
@@ -61,12 +61,19 @@ Produktentscheidung.
 - Werden Antworten bewertet?
 
 ### Daten und Datenschutz
+- Lokales Grundgerüst: PostgreSQL und S3-Dateispeicher mit persistenten
+  Docker-Volumes, ausschließlich für synthetische Entwicklungsdaten.
+  Kein Aufnahme-/Upload-Endpunkt und keine automatische Aufzeichnung.
+  Der Smoke-Test entfernt seine synthetischen Audiodaten wieder.
 - Werden Audio, Video und Transkript gespeichert? Wie lange?
 - Einwilligung, Löschung, lokale Verarbeitung?
 - Keine echten personenbezogenen Daten in der Demo.
 
 ### Technik
-- Stack, Hosting, Modelle und Anbieter.
+- Lokaler Stack (24.10.2026): FastAPI, MediaPipe, PostgreSQL,
+  MediaRecorder im Browser und SeaweedFS als S3-Dateispeicher;
+  FFmpeg im Backend. Setup und Speicherverhalten: `backend/README.md`.
+- Hosting, konkrete Analysemodelle und externe Anbieter bleiben offen.
 - Latenz, Ausfall-Fallback, Kosten.
 - Browser- und Geräte-Support (Laptop und Smartphone).
 
@@ -95,3 +102,4 @@ einbauen**:
 | Datum | Änderung | Grund |
 |---|---|---|
 | 24.10.2026 | Produkt angelegt | Thema auf Live-Präsentationstrainer festgelegt; fünf erste Features genannt. |
+| 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
