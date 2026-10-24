@@ -1,4 +1,4 @@
-import { SessionSetupForm } from "@/components/setup/SessionSetupForm";
+import { redirect } from "next/navigation";
 export default function Page() {
-  return <SessionSetupForm />;
+  redirect("/live");
 }

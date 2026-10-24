@@ -9,7 +9,10 @@ links and selected states, #526158 for secondary copy. Product headings and
 controls use one sans family; the serif is reserved for the 418 mark and existing
 specialized data previews. The common AppShell also wraps the analysis view.
 
-Start with a one-click sample, or open the recording studio. Optional sample
+Start directly in the recording studio via `/` → `/live`. Large view is the
+default; Standard view reveals settings and navigation. The monitoring preview
+leads with one primary action: Enable camera, then Start recording. Recording
+options are collapsed; the sample remains available at `/demo`. Optional sample
 context and practice options are disclosures. The home screen no longer shows
 a synthetic score card or a second explanation of the rehearsal flow. Sources
 lead directly into recording. Camera diagnostics, server settings, title and
@@ -17,8 +20,9 @@ duration are available on demand. Consent, upload destination, transcription
 opt-in, errors and recording-retention notices remain visible. Empty observation
 feeds are omitted before recording; review leads with duration and moments.
 
-Desktop and mobile use the same buttons, fields and spacing. No new routes,
-scoring logic, recording defaults or service dependencies were introduced.
+Desktop and mobile use the same buttons, fields and spacing. The sample setup
+moved to `/demo`; scoring logic, recording defaults and service dependencies
+are unchanged.
 The sections below record earlier component directions; this shared interface
 supersedes the former blue workspace palette and separate analysis header.
 

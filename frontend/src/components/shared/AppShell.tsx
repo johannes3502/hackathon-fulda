@@ -65,8 +65,8 @@ export function AppShell({
             <>
               <ol className="help-list">
                 <li>
-                  Choose demo feedback or audio analysis, then enable your
-                  camera.
+                  Enable your camera and check that your upper body is visible.
+                  Recording options let you switch to audio analysis.
                 </li>
                 <li>Start recording when you are ready.</li>
                 <li>

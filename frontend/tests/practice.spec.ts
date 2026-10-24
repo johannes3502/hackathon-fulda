@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 async function sample(page: Page) {
-  await page.goto("/");
+  await page.goto("/demo");
   await page.getByRole("button", { name: "Try sample demo" }).click();
   await expect(
     page.getByRole("button", { name: "Continue with demo preview" }),
@@ -37,7 +37,7 @@ test("complete no-permission rehearsal, evidence, retry and restored report", as
       throw new Error("The demo must not request media");
     };
   });
-  await page.goto("/");
+  await page.goto("/demo");
   await noOverflow(page);
   await page.screenshot({
     path: `test-results/setup-${info.project.name}.png`,
@@ -152,7 +152,7 @@ test("complete no-permission rehearsal, evidence, retry and restored report", as
 test("custom context, simulation mode, interruption, failure and active refresh recovery", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/demo");
   await page
     .getByText("Customize the sample rehearsal", { exact: true })
     .click();
@@ -333,7 +333,7 @@ test("unavailable camera and unavailable browser storage do not block the demo",
 test("keyboard skip navigation and help dialog work at both widths", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/demo");
   const skip = page.getByRole("link", { name: "Skip to content" });
   await expect(skip).toHaveCSS("clip-path", "inset(50%)");
   await page.keyboard.press("Tab");

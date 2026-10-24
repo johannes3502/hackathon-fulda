@@ -92,7 +92,7 @@ export function ReviewWorkspace() {
     <AppShell step={3}>
       <div className="workspace review-workspace">
         <div className="workspace-back">
-          <Link href="/">
+          <Link href="/demo">
             <ArrowLeft size={15} /> Start new practice
           </Link>
           <DemoBadge />

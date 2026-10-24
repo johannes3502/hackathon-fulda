@@ -290,10 +290,10 @@ flowchart TD
     SP["/stats-preview<br/>Stats-Karte mit Replay"] --> SC["StatsCard<br/>Three.js-Ring, vier Kriterien<br/>synthetische Demo-Werte"]
     SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
     LOADING -. "Suspense-Fallback beim Laden" .-> HOME
-    HOME["/ - Start<br/>Demo mit einem Klick,<br/>optionales Setup"] -->|"Demo starten"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
-    HOME -->|"Session konfigurieren"| PRAC
-    HOME --> LIVE["/live<br/>LiveStudio: Kamera, Pose-Overlay,<br/>MediaRecorder, Transkription (Opt-in)"]
-    HOME --> SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]
+    HOME["/ - Start"] -->|"direkt ins Monitoring"| LIVE["/live<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE --> DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
+    DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
+    LIVE --> SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]
     SRC -->|"Weiter zur Aufnahme"| LIVE
 
     PRAC --> STATE{"Phasen"}

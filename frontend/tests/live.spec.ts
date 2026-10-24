@@ -58,8 +58,11 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 async function enable(page: Page) {
-  await page.goto("/live");
-  await page.getByRole("button", { name: "Enable camera preview" }).click();
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Standard view", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Enable camera" }).click();
   await expect(
     page.getByRole("button", { name: "Turn camera off" }),
   ).toBeVisible();
@@ -84,11 +87,9 @@ test("large view scales feedback and preserves an active recording", async ({
     await cue.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
   ).toBeGreaterThan(originalFontSize * 1.5);
   if (info.project.name === "desktop") {
-    expect((await video.boundingBox())!.width).toBeGreaterThan(
-      originalWidth * 1.5,
-    );
+    expect((await video.boundingBox())!.width).toBeGreaterThan(originalWidth);
   }
-  await page.getByRole("button", { name: "Record with demo feedback" }).click();
+  await page.getByRole("button", { name: "Start recording" }).click();
   await expect(cue).toHaveText("Review this gesture moment", {
     timeout: 12000,
   });
@@ -140,7 +141,7 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   page.on("pageerror", (error) => errors.push(error.message));
   await syntheticCamera(page);
   await enable(page);
-  await page.getByRole("button", { name: "Record with demo feedback" }).click();
+  await page.getByRole("button", { name: "Start recording" }).click();
   await expect(
     page.getByText("Review this gesture moment").first(),
   ).toBeVisible({ timeout: 12000 });
@@ -232,6 +233,10 @@ async function backend(page: Page, transcribe = false) {
     route.fulfill({ json: { status: "ok" } }),
   );
   await page.goto("/live");
+  await page
+    .getByRole("button", { name: "Standard view", exact: true })
+    .click();
+  await page.getByText("Recording options", { exact: true }).click();
   await page.getByLabel("Feedback source").selectOption("backend");
   await expect(
     page.getByText("analysis results remain stored", { exact: false }),
@@ -240,8 +245,8 @@ async function backend(page: Page, transcribe = false) {
     await page
       .getByLabel("Transcribe speech for word analysis and fact-check")
       .check();
-  await page.getByRole("button", { name: "Enable camera preview" }).click();
-  await page.getByRole("button", { name: "Record & analyze audio" }).click();
+  await page.getByRole("button", { name: "Enable camera" }).click();
+  await page.getByRole("button", { name: "Start recording" }).click();
   await expect(
     page.getByRole("button", { name: "Finish & review" }),
   ).toBeVisible();
@@ -403,7 +408,7 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
   await page
     .getByLabel("Your local camera feed")
     .evaluate((v: HTMLVideoElement) => v.pause());
-  await page.getByRole("button", { name: "Record with demo feedback" }).click();
+  await page.getByRole("button", { name: "Start recording" }).click();
   await expect(page.getByLabel("Local pose capture")).toContainText(
     /[1-9]\d* pose samples/,
   );
@@ -532,7 +537,7 @@ test("automatic landmarks align with the mirrored video in both sizes and clear 
   await expect(overlay).toBeVisible();
   await page.getByRole("button", { name: "Turn camera off" }).click();
   await expect(overlay).toHaveCount(0);
-  await page.getByRole("button", { name: "Enable camera preview" }).click();
+  await page.getByRole("button", { name: "Enable camera" }).click();
   await expect(overlay).toBeVisible();
 });
 
@@ -552,7 +557,7 @@ test("pose model failure preserves camera recording controls", async ({
     page.getByText("Pose detection failed.", { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Record with demo feedback" }),
+    page.getByRole("button", { name: "Start recording" }),
   ).toBeEnabled();
   await expect(
     page.getByRole("button", { name: "Retry landmarks" }),

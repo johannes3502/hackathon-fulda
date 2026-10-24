@@ -19,15 +19,49 @@
   color: var(--primary);
   background: var(--soft-accent);
 }
+.workspace.live-workspace {
+  max-width: 1600px;
+}
+.live-studio-grid {
+  grid-template-columns: minmax(0, 1fr) 260px;
+}
+.studio-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.live-workspace .workspace-back {
+  margin-bottom: 16px;
+}
 .live-workspace .workspace-heading {
-  margin-bottom: 28px;
+  margin-bottom: 16px;
+}
+.recording-settings > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.recording-settings[open] > summary {
+  margin-bottom: 20px;
+}
+.recording-consent {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .live-studio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .live-view-toolbar {
+  margin-left: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
 }
 .live-view-time {
   font-size: 28px;
@@ -49,9 +83,9 @@ body:has(.live-workspace-large) .app-footer,
 }
 .live-workspace-large .live-studio-grid {
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(240px, 1fr) auto auto auto;
+  grid-template-rows: auto minmax(240px, 1fr) auto auto;
   gap: 12px;
-  height: calc(100dvh - 92px);
+  height: calc(100dvh - 24px);
   align-items: stretch;
 }
 .live-workspace-large .studio-main,
@@ -59,7 +93,7 @@ body:has(.live-workspace-large) .app-footer,
   display: contents;
 }
 .live-workspace-large .live-camera-stage {
-  grid-row: 1;
+  grid-row: 2;
   height: 100%;
   min-height: 240px;
   aspect-ratio: auto;
@@ -68,7 +102,7 @@ body:has(.live-workspace-large) .app-footer,
   object-fit: contain;
 }
 .live-workspace-large .cue-panel {
-  grid-row: 2;
+  grid-row: 3;
   padding: 16px 24px;
 }
 .live-workspace-large .cue-panel [aria-live] {
@@ -94,7 +128,7 @@ body:has(.live-workspace-large) .app-footer,
   font-size: 14px;
 }
 .live-workspace-large .studio-main > .live-control-bar {
-  grid-row: 3;
+  grid-row: 1;
   margin: 0;
 }
 .live-workspace-large .camera-message {
@@ -114,7 +148,7 @@ body:has(.live-workspace-large) .app-footer,
   }
 }
 .live-camera-stage {
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
 }
 .live-pose-overlay {
   position: absolute;
@@ -208,9 +242,10 @@ body:has(.live-workspace-large) .app-footer,
 }
 .live-control-bar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 12px;
-  margin: 16px 0 10px;
+  margin: 0 0 12px;
 }
 .live-workspace .camera-message {
   font-size: 12px;

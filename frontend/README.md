@@ -32,12 +32,12 @@ rebuild after changing dependencies or configuration.
   Mount it during pending work with an optional `label`; no simulated percentage
   or artificial delay. Reduced motion and unavailable WebGL use a static logo.
 
-- **Try sample demo:** deterministic rehearsal, sample transcript, judge questions
+- **Sample demo** (`/demo`): deterministic rehearsal, sample transcript, judge questions
   and review. Works without camera, microphone or backend credentials.
-- **Open camera studio** (`/live`): enable the camera, then **Record with demo
-  feedback** for real silent video with clearly labeled scripted markers.
-- **Backend · audio analysis after recording:** enable camera and microphone,
-  then **Record & analyze audio**. Speak normally for the first three seconds
+- **Monitoring studio** (`/` opens `/live`): Large view opens by default. Choose **Enable camera**, then
+  **Start recording** for real silent video with clearly labeled scripted markers.
+- **Recording options → Backend · audio analysis after recording:** enable camera
+  and microphone, then **Start recording**. Speak normally for the first three seconds
   of calibration. After stopping, local Silero/RMS/YIN analysis runs in Celery;
   feedback and measurements appear in review. This mode uses `transcribe=false`.
 - **Rewatch feedback sections:** seek to a marker, loop the surrounding section,

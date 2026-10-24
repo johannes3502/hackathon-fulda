@@ -74,7 +74,7 @@ export function PracticeStudio() {
     <AppShell step={2}>
       <div className="workspace">
         <div className="workspace-back">
-          <Link href="/">
+          <Link href="/demo">
             <ArrowLeft size={15} /> Start new practice
           </Link>
           <DemoBadge />

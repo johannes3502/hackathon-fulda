@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowLeft,
+  FileText,
+  Play,
   Camera,
   CameraOff,
   CheckCircle2,
@@ -35,9 +36,10 @@ import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
 
 const cameraCopy = {
-  idle: "Camera off. Enable a preview to check your framing.",
+  idle: "Enable your camera to check your framing. Then start recording when you’re ready.",
   pending: "Waiting for camera permission. Nothing is being recorded or sent.",
-  active: "Local camera preview. Recording starts only when you choose Start.",
+  active:
+    "Local camera preview. Keep your upper body in view, then choose Start recording.",
   denied:
     "Camera permission was denied. Allow camera access in your browser, then try again.",
   unavailable:
@@ -65,7 +67,7 @@ export function LiveStudio() {
   const [progress, setProgress] = useState<LiveProgress | null>(null);
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [largeView, setLargeView] = useState(false);
+  const [largeView, setLargeView] = useState(true);
   const [poseDebug, setPoseDebug] = useState(false);
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
@@ -173,17 +175,20 @@ export function LiveStudio() {
         className={`workspace live-workspace${largeView ? " live-workspace-large" : ""}`}
       >
         <div className="workspace-back">
-          <Link href="/">
-            <ArrowLeft size={15} /> Home
-          </Link>
+          <nav className="studio-links" aria-label="Studio resources">
+            <Link href="/sources">
+              <FileText size={15} /> Sources
+            </Link>
+            <Link href="/demo">
+              <Play size={15} /> Sample demo
+            </Link>
+          </nav>
           <LiveBadge mode={mode} />
         </div>
         <div className="workspace-heading">
           <div>
             <h1>Record your presentation</h1>
-            <p>
-              Record a take, get feedback, and revisit the moments that matter.
-            </p>
+            <p>Enable your camera, check your framing, then start recording.</p>
           </div>
           <div className="session-time">
             <Clock3 size={18} />
@@ -198,24 +203,72 @@ export function LiveStudio() {
             {error}
           </p>
         )}
-        <div className="live-view-toolbar">
-          <Button
-            variant="outline"
-            aria-pressed={largeView}
-            aria-controls="live-studio"
-            onClick={() => setLargeView(!largeView)}
-          >
-            {largeView ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-            {largeView ? "Standard view" : "Large view"}
-          </Button>
-          {largeView && (
-            <strong className="live-view-time">
-              {time(progress?.elapsedMs ?? 0)}
-            </strong>
-          )}
-        </div>
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
+            <div className="live-control-bar">
+              {!progress ? (
+                <>
+                  <Button
+                    disabled={cameraStatus === "pending"}
+                    onClick={() =>
+                      cameraStatus === "active"
+                        ? void start()
+                        : void enable(mode === "backend")
+                    }
+                  >
+                    {cameraStatus === "active" ? (
+                      <Radio size={17} />
+                    ) : (
+                      <Camera size={17} />
+                    )}
+                    {cameraStatus === "pending"
+                      ? "Waiting for camera permission…"
+                      : cameraStatus === "active"
+                        ? "Start recording"
+                        : "Enable camera"}
+                  </Button>
+                  {cameraStatus === "active" && (
+                    <Button variant="ghost" onClick={stopCamera}>
+                      <CameraOff size={17} /> Turn camera off
+                    </Button>
+                  )}
+                </>
+              ) : progress.phase === "connecting" ? (
+                <Button variant="outline" onClick={cancel}>
+                  Cancel connection
+                </Button>
+              ) : (
+                <Button
+                  disabled={progress.phase === "finishing"}
+                  onClick={() => owner.current?.stop()}
+                >
+                  <Square size={14} fill="currentColor" />
+                  {progress.phase === "finishing"
+                    ? "Preparing video & feedback…"
+                    : "Finish & review"}
+                </Button>
+              )}
+              <div className="live-view-toolbar">
+                <Button
+                  variant="ghost"
+                  aria-pressed={largeView}
+                  aria-controls="live-studio"
+                  onClick={() => setLargeView(!largeView)}
+                >
+                  {largeView ? (
+                    <Minimize2 size={18} />
+                  ) : (
+                    <Maximize2 size={18} />
+                  )}
+                  {largeView ? "Standard view" : "Large view"}
+                </Button>
+                {largeView && (
+                  <strong className="live-view-time">
+                    {time(progress?.elapsedMs ?? 0)}
+                  </strong>
+                )}
+              </div>
+            </div>
             <section
               className="media-stage live-camera-stage"
               aria-label="Live camera preview"
@@ -297,10 +350,8 @@ export function LiveStudio() {
                   <span className="stage-camera">
                     <CameraOff size={32} />
                   </span>
-                  <h2>Step into your practice space.</h2>
-                  <p>
-                    Turn on your camera. Take a breath. Begin when you’re ready.
-                  </p>
+                  <h2>Your monitoring starts here.</h2>
+                  <p>Click Enable camera to preview your framing.</p>
                 </div>
               )}
               <div className="stage-bottom">
@@ -319,55 +370,6 @@ export function LiveStudio() {
                 </span>
               </div>
             </section>
-            <div className="live-control-bar">
-              {!progress ? (
-                <>
-                  <Button
-                    variant="outline"
-                    disabled={cameraStatus === "pending"}
-                    onClick={() =>
-                      cameraStatus === "active"
-                        ? stopCamera()
-                        : void enable(mode === "backend")
-                    }
-                  >
-                    {cameraStatus === "active" ? (
-                      <CameraOff size={17} />
-                    ) : (
-                      <Camera size={17} />
-                    )}
-                    {cameraStatus === "active"
-                      ? "Turn camera off"
-                      : cameraStatus === "pending"
-                        ? "Permission pending…"
-                        : "Enable camera preview"}
-                  </Button>
-                  <Button
-                    disabled={cameraStatus !== "active"}
-                    onClick={() => void start()}
-                  >
-                    <Radio size={17} />
-                    {mode === "demo"
-                      ? "Record with demo feedback"
-                      : "Record & analyze audio"}
-                  </Button>
-                </>
-              ) : progress.phase === "connecting" ? (
-                <Button variant="outline" onClick={cancel}>
-                  Cancel connection
-                </Button>
-              ) : (
-                <Button
-                  disabled={progress.phase === "finishing"}
-                  onClick={() => owner.current?.stop()}
-                >
-                  <Square size={14} fill="currentColor" />
-                  {progress.phase === "finishing"
-                    ? "Preparing video & feedback…"
-                    : "Finish & review"}
-                </Button>
-              )}
-            </div>
             <p className="camera-message" role="status">
               {progress
                 ? (progress.notice ??
@@ -375,9 +377,19 @@ export function LiveStudio() {
                     ? "Demo feedback is scripted. No video is uploaded. Pose landmarks and logging stay local."
                     : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis${transcribe ? " and transcription" : ""}.`))
                 : cameraCopy[cameraStatus]}
+              {mode === "backend" && !progress && (
+                <span className="recording-consent">
+                  By starting, you agree to send your video and microphone audio
+                  to <strong>{endpoint}</strong> after stopping.
+                  {transcribe &&
+                    " Audio is also sent to the configured speech recognition provider (default: Deepgram, EU endpoint)."}{" "}
+                  The original is removed after processing; analysis results
+                  remain stored.
+                </span>
+              )}
             </p>
-            <section className="panel live-settings">
-              <h2>Recording settings</h2>
+            <details className="live-settings recording-settings">
+              <summary>Recording options</summary>
               <fieldset disabled={!!progress}>
                 <details className="connection-settings">
                   <summary>Title and duration</summary>
@@ -438,13 +450,6 @@ export function LiveStudio() {
                         {health}
                       </p>
                     )}
-                    <p className="field-hint">
-                      By starting, you agree to send your complete video and
-                      microphone audio to <strong>{endpoint}</strong> after
-                      stopping. The backend stores the upload for its analysis
-                      job and removes the original after processing; analysis
-                      results remain stored.
-                    </p>
                     <label className="live-transcribe">
                       <input
                         type="checkbox"
@@ -461,7 +466,7 @@ export function LiveStudio() {
                   </div>
                 )}
               </fieldset>
-            </section>
+            </details>
             <details
               className="live-settings studio-diagnostics"
               aria-label="Local pose capture"
