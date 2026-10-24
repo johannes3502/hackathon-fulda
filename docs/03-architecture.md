@@ -24,7 +24,7 @@ flowchart TB
 
     subgraph Backend["backend/ - FastAPI (Python 3.12) Port 8000"]
         MAIN["FastAPI App<br/>Health, CORS, Router"]
-        SP["Speech-Router<br/>POST /speech/analyze<br/>GET /speech/jobs/id"]
+        SP["Speech-Router<br/>POST /speech/analyze<br/>GET /speech/jobs/id<br/>WS /speech/live"]
         TR["Transcription-Router<br/>POST /transcription/analyze-words"]
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
         CEL["Celery App + Jobs"]

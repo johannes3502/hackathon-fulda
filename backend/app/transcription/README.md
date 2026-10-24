@@ -11,19 +11,60 @@ Celery-Job wandelt sie in WAV und ruft den konfigurierten `Transcriber` auf.
 Daraus entstehen die Timeline-Events (`source="asr"`). Exakte WPM, Pausen und
 Füllwörter kommen ausschließlich aus diesem Pfad.
 
-## Stufe B: Live-Transkript per WebSocket (geplant, nicht umgesetzt)
+## Stufe B: Live-Transkript per WebSocket (Backend-Prototyp umgesetzt)
 
-Nur für die Anzeige während der Aufnahme. Timeline-Events entstehen weiterhin
-aus Stufe A.
+`WS /speech/live` in `app/speech/live.py` streamt nahezu in Echtzeit ein
+Transkript während der Aufnahme. Timeline-Events entstehen weiterhin aus
+Stufe A.
 
 ```
-AudioWorklet (Browser)
+AudioWorklet (Browser)                     [offen, noch nicht verdrahtet]
   → PCM 16 kHz mono Int16, ~100 ms pro Frame
-  → wss://<backend>/speech/live          (binäre WS-Nachrichten)
+  → ws://<backend>/speech/live            (binäre WS-Nachrichten)
   → FastAPI-WebSocket-Handler (async, kein Celery)
-  → StreamingTranscriber (anbieterneutral)
-  ← vorläufige / endgültige Wörter → JSON-Nachrichten an den Browser
+  → StreamingTranscriber → WhisperStreamingTranscriber (faster-whisper)
+  ← vorläufige / endgültige Wörter → JSON-Nachrichten
 ```
+
+Der Handler hält je Prozess **einen** Live-Slot (`asyncio.Semaphore(1)`); ein
+weiterer Client wird mit Close-Code 1013 abgewiesen. Puffer, Deduplizierung
+und Abschlusstimeouts liegen im Handler — der `StreamingTranscriber`-Adapter
+dechiffriert nur ein PCM-Fenster und liefert fensterrelative Wörter:
+
+```python
+class StreamingTranscriber(Protocol):
+    def transcribe_window(self, samples: np.ndarray, sample_rate: int) -> list[Word]:
+        """Int16-float32-PCM (~100 ms) rein; Wörter relativ zum Fensteranfang raus."""
+        ...
+```
+
+`configured_streaming_transcriber()` folgt dem Muster von
+`configured_transcriber()`; lokal läuft `WhisperStreamingTranscriber`.
+Standard-`WHISPER_*`-Werte gelten, Überschreibungen über
+`WHISPER_LIVE_MODEL`, `WHISPER_LIVE_BEAM_SIZE` und `WHISPER_LIVE_*`.
+
+### Nachrichtenprotokoll (umgesetzt)
+
+Browser → Backend:
+
+| Nachricht | Inhalt |
+|---|---|
+| Text `{"type": "start", "sample_rate": 16000}` | Pflichtnachricht vor jedem Audio; nur 16 kHz wird akzeptiert |
+| Binär | PCM Int16 little-endian, mono, 16 kHz |
+| Text `{"type": "stop"}` | Restfenster transkribieren und finalisieren |
+
+Backend → Browser:
+
+| Nachricht | Inhalt |
+|---|---|
+| `{"type": "ready", "sample_rate"}` | Nach akzeptiertem `start`, vor allen Audiomeldungen |
+| `{"type": "words", "final": bool, "words": [{word, start_ms, end_ms}]}` | Nach jedem 2-s-Fenster (`WHISPER_LIVE_CHUNK_MS`); Zeiten absolut ab Sessionstart, 10-s-Rollfenster (max. `WHISPER_LIVE_MAX_WINDOW_MS`), bereits dedupliziert (Cursor über Wortende) |
+| `{"type": "text", "final": bool, "text"}` | Kumulativer Lesetext, nach jedem `words`-Frame |
+| `{"type": "done"}` | Abschluss, danach Close 1000 |
+| `{"type": "error", "message"}` | Protokoll- oder Modellfehler; Close 1011 |
+
+Endgültige Zeiten sind absolut (ab Sessionstart); für Alignment mit dem
+Video rechnet der Browser den `performance.now()`-Offset selbst dazu.
 
 ### Entscheidungen
 
@@ -31,55 +72,36 @@ AudioWorklet (Browser)
   `MediaRecorder`-Chunks sind nicht eigenständig dekodierbar, Safari liefert MP4
   statt WebM. PCM ist browserübergreifend gleich und von jedem Anbieter oder
   lokalen Modell verarbeitbar. Das Worklet wird ohnehin für Pegel und F0 genutzt.
-- **Backend als Proxy.** API-Keys bleiben auf dem Server, der Anbieter ist
-  austauschbar, ohne das Frontend anzufassen.
 - **Kein Celery.** Eine dauerhaft offene Verbindung gehört in den
   FastAPI-Prozess; Celery bleibt für lange Batch-Jobs.
 - **Keine HTTP-Segment-Uploads (5–10 s).** Mehr Latenz und an Segmentgrenzen
-  abgeschnittene Wörter.
+  abgeschnittene Wörter. Stattdessen baut der Handler ein Rollfenster
+  (bis 10 s) und dechiffriert alle ~2 s neu; der Cursor über Wortenden
+  dedupliziert die Überlappung.
+- **Whisper-Fenster statt „echter" Streaming-Decoder.** `faster-whisper`
+  dechiffriert Blöcke; nahezu in Echtzeit erfordert genug CPU-Kraft
+  (`WHISPER_LIVE_MODEL=tiny`, `WHISPER_LIVE_BEAM_SIZE=1` für schwache Hosts).
 
-### Anbieterneutrales Interface (Entwurf)
+Finalisierung neben explizitem `stop`: 30 s Stille
+(`WHISPER_LIVE_MAX_IDLE_SECONDS`) oder 600 s Audiolänge
+(`WHISPER_LIVE_MAX_SECONDS`) schließen die Session ordnungsgemäß mit
+Final-Frames. Wörter vor der Übergabegrenze eines Fensters erscheinen im
+folgenden Fenster — dedupliziert, können dadurch leicht verzögert abschließen.
 
-```python
-class StreamingTranscriber(Protocol):
-    async def stream(
-        self, frames: AsyncIterator[bytes], sample_rate: int
-    ) -> AsyncIterator[LiveWords]:
-        """PCM-Int16-Frames rein, Wörter mit start_ms/end_ms (relativ zum
-        ersten Frame) und Flag `final` raus."""
-        ...
-```
+### Messung
 
-Umsetzbar mit einer gehosteten Streaming-ASR (WebSocket des Anbieters) oder
-lokal (z. B. `faster-whisper` auf gleitenden Fenstern). Die Konfiguration
-folgt dem Muster von `configured_transcriber()`.
+`python -m scripts.smoke_live <recording>` streamt eine WAV-Datei in
+Realzeit und meldet Fenster-Latenz (p50/p95/max) — siehe
+`backend/README.md`.
 
-### Nachrichtenprotokoll (Entwurf)
+### Offen (Frontend)
 
-Browser → Backend:
-
-| Nachricht | Inhalt |
-|---|---|
-| Text `{"type": "start", "session_id", "sample_rate": 16000, "offset_ms"}` | `offset_ms` = erster PCM-Frame minus `MediaRecorder.onstart` (`performance.now()`) |
-| Binär | PCM Int16 little-endian, mono |
-| Text `{"type": "stop"}` | Stream beenden, Restergebnisse abwarten |
-
-Backend → Browser:
-
-| Nachricht | Inhalt |
-|---|---|
-| `{"type": "words", "final": bool, "words": [{word, start_ms, end_ms}]}` | Zeiten bereits um `offset_ms` verschoben, also auf der gemeinsamen Zeitachse |
-| `{"type": "error", "message"}` | Live-Anzeige abschalten, Aufnahme läuft weiter |
-
-### Hinweise
-
-- **Zeitachse:** Ohne `offset_ms` passen die Live-Zeiten nicht zum Video.
-- **Fehlertoleranz:** Bricht der Live-Stream ab, läuft die Aufnahme weiter;
-  Stufe A liefert trotzdem das vollständige Transkript.
-- **Datenschutz:** Live-Streaming schickt Audio schon während der Aufnahme an
-  den Anbieter. Einwilligungshinweis und Anbieter in der Oberfläche benennen.
-- **Hosting:** Hinter TLS-Proxy (`wss://`) WebSocket-Upgrade erlauben;
-  ausgehende Verbindungen zum ASR-Anbieter im Venue-Netz früh testen.
-- **Frontend-Einstieg:** `VideoTransport.send()` in
-  `frontend/src/features/live/transport.ts` ist heute leer und der natürliche
-  Ort für den Live-Pfad (bzw. ein eigener Audio-Transport neben dem Video).
+- Browser-Sender aus dem `AudioWorklet` fehlt; natürlicher Ort ist
+  `frontend/src/features/live/transport.ts`.
+- Live-Zeiten laufen auf der Sessionzeitachse; für Alignment mit dem Video muss
+  der Browser `performance.now()`-Offset selbst anrechnen.
+- Bricht der Live-Stream ab, läuft die Aufnahme weiter; Stufe A liefert
+  trotzdem das vollständige Transkript.
+- Datenschutzhinweis in der Oberfläche: Audio wird während der Aufnahme an
+  das Backend geschickt (lokal, kein Cloudanbieter).
+- Füllwortqualität ist modellabhängig und ungeprüft.

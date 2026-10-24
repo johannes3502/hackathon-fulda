@@ -23,6 +23,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 15 | README und Altbestand aufräumen | Haupt-README auf 17 Zeilen gekürzt; alten Frontend-Plan, doppelte Produktnotiz und überholte Video-WebSocket-Dokumentation entfernt; ungenutzte Validatoren und Handshake-Typen gestrichen | Referenzen vor dem Löschen geprüft; aktuelle HTTP-Upload-/Job-Grenze im Handoff dokumentiert, API-Tooling-Anleitung zentralisiert. Zwei Tests entfernten ausschließlich die gelöschten WebSocket-Helfer; Replay- und HTTP-Tests bleiben aktiv | Ausdrücklicher Nutzerauftrag für Vereinfachung und Cleanup | Compose-Start, Typecheck, Lint, 25 Frontend-Tests, Backend-Smoke-Test und lokale Markdown-Links bestanden |
 | 16 | Quellen-Upload und RAG-Retrieval (Feature 2, Vorbereitung für Fact-Check und Frage-Agent) | Claude Code: `app/sources/` mit Extraktion (PDF pro Seite, PPTX pro Folie inkl. Notizen/Tabellen, DOCX, TXT/MD), Chunking mit Seiten-/Folienangabe, lokalem Embedding-Modell hinter `Embedder`-Interface, pgvector + deutscher Volltextsuche mit Reciprocal Rank Fusion, Celery-Ingest, REST-API und Frontend-Seite `/sources`; Postgres-Image auf `pgvector/pgvector:0.8.6-pg18-trixie` umgestellt | Embedding-Anbieter war offen; lokales Modell gewählt, damit keine Dokumente an Dritte gehen (≈0,6 GB RAM pro Prozess). Erste Keyword-Suche zerlegte „260.000“ anders als PostgreSQL und fand die Zahl nicht; korrigiert, indem PostgreSQL die Suchanfrage selbst tokenisiert. Gemessener CPU-Durchsatz des Modells auf einem 12-Kern-Linux-Laptop nur ≈3 Abschnitte/s (1 MB Text ≈ 6 min); Test auf Mac M5 Pro steht aus, schnellere Alternativen gemessen (MiniLM-L12 ≈12/s, potion-multilingual ≈800/s). Next-Proxy puffert Uploads standardmäßig nur bis 10 MB; `proxyClientMaxBodySize` auf 100 MB gesetzt (betraf auch Aufnahmen). Kein OCR. Suche liefert immer Top-k, auch wenn nichts passt. Retrieval-Qualität nur mit synthetischen Mini-Dokumenten geprüft, keine Genauigkeitsaussage | Nutzerauftrag (Quellen hochladen, später für Fact-Check/Fragerunde nutzen); Modell-, Chunking- und Ranking-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_sources.py` (inkl. DB-Roundtrip gegen pgvector), `backend/scripts/smoke_sources.py` im Compose-Stack bestanden; Frontend-Unit-Tests, Typecheck, Lint; Browser-Check Desktop/375 px ohne Konsolenfehler |
 | 17 | Lokale Whisper-Transkription als Standard | Codex: faster-whisper hinter dem bestehenden `Transcriber`-Protokoll, lokales Modell im Image, Deepgram nur noch optional; `RecordingAnalysis.text` und regeneriertes API-Schema | Modellqualität, deutsche Füllwörter und Wortgrenzen nicht bewertet. Docker-Build mit Modelldownload nicht geprüft. PyAV 15.1.0 nötig, da 19.0.2 den faster-whisper-Dekoder bricht. Kein Cloud-Zwang, aber auch kein Nachweis besserer Erkennung | Nutzerauftrag: Speech-to-Text mit lokalem Modell, Review vor Push | Nach dem Merge mit main: 46 Backend-Tests bestanden, zwei übersprungen; echter `tiny`-Lauf über `run_analysis` mit synthetischer deutscher Sprache; API-Aktualitätscheck bestanden; Details unten |
+| 18 | Live-Transkription nahezu in Echtzeit, Backend-Prototyp (Stufe B) | Claude: `WS /speech/live` in `app/speech/live.py`: PCM-Int16-Frames über WebSocket, Start/Stop-Steuerung, 10-s-Rollfenster (alle ≥ 2 s neu transkribiert), Wort-Cursor dedupliziert die Fensterüberlappung, kumulativer Text, Abschluss durch `stop`, 30 s Stille oder 600 s Audio; ein Live-Slot pro Prozess (`asyncio.Semaphore(1)`, Überlastungsverweigerung 1013). `StreamingTranscriber`-Protokoll + `WhisperStreamingTranscriber` in `app/transcription/streaming.py`; Modellcache der Batch-ASR geteilt (`_load_whisper_model` → `load_whisper_model`). Latenz-/Smoke-Skript `scripts/smoke_live.py`; `WHISPER_LIVE_*`-Konfiguration in `.env.example`/`compose.yaml` | Deduplizierung verschiebt Fenstergrenzwörter leicht (sie erscheinen im nächsten Fenster); kein „echter" Streaming-Decoder, Laufzeitverhalten fremder Hosts unbewiesen. Browser-Sender fehlt, OpenAPI sagt nichts über WebSocket-Routen. `medium` auf einer 7,7-GB-VM OOM → schwache Hosts müssen `WHISPER_LIVE_MODEL=tiny` + `WHISPER_LIVE_BEAM_SIZE=1` setzen. Smoke-Live gegen ein echtes Modell noch nicht gemessen (Docker in dieser VM nicht verfügbar) | Team-Auftrag „near-realtime"-Wortlieferung als Teilprogramm; Chunk-/Fenster-/Timeout-Limits selbst gewählt, Team kann überschreiben | 12 neue WebSocket-Tests (Fake-Transcriber mit ton-codierten Wörtern, Protokoll-/Beschäftigungs-/Zeitüberschreitungspfade) bestanden; 58 Backend-Tests gesamt; API-Aktualitätscheck; Details unten |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -207,3 +208,27 @@ TypeScript, ESLint, Produktionsbuild und API-Aktualitätscheck bestanden.
   verfügbar), deutsche Füllwortqualität, menschliche Stimmen, GPU/`cuda`,
   Latenz und Speicherbedarf des `small`-Modells pro Worker. Keine Aussage zur
   Erkennungsgenauigkeit.
+
+## Live-Transkription als Backend-Prototyp (24.10.2026)
+
+- Nutzerauftrag: das Near-Realtime-Deliverable (`WS /speech/live` +
+  `StreamingTranscriber`) umsetzen, testen, pushen. Der Browser-Sender ist
+  ausdrücklich nicht Teil dieses Auftrags.
+- Architektur: `app/speech/live.py` hält Puffer, Rollfenster und einen
+  Live-Slot pro Prozess; `app/transcription/streaming.py` kapselt
+  `faster-whisper` hinter `StreamingTranscriber.transcribe_window()` und
+  liefert fensterrelative Wörter. Der Handler verschiebt sie auf die
+  Sessionzeitachse, dedupliziert über einen Cursor (Ende des zuletzt
+  gesendeten Wortes) und sendet kumulative Text-Meldungen (`transcript_text`
+  aus `app/transcription/text.py`).
+- Protokoll: `start`/`ready`/Binär-PCM/`stop` → `words`/`text` (final-Flag),
+  `done`; Fehler als `error` + Close 1011; Überlastung als Close 1013; nur
+  16 kHz Eingang. Endgültige Zeiten sind absolut; Video-Alignment rechnet der
+  Browser selbst.
+- Konfiguration: `WHISPER_LIVE_MODEL`, `WHISPER_LIVE_BEAM_SIZE`
+  (Fallbacks auf `WHISPER_MODEL`/`WHISPER_BEAM_SIZE`), `WHISPER_LIVE_CHUNK_MS`
+  (2000), `WHISPER_LIVE_MAX_WINDOW_MS` (10000),
+  `WHISPER_LIVE_MAX_SECONDS` (600), `WHISPER_LIVE_MAX_IDLE_SECONDS` (30).
+- Messwerte aus Eintrag 17 (gleiche 2,5-Kern-VM): `tiny` warm ≈ 1,0 s für
+  6,8 s Sprachclip → sollte Echtzeit halten; `small`/beam 5 ≈ 4,8 s → für den
+  Live-Einsatz Beam 1 (≈ 3,3 s) oder `tiny` wählen. `medium` OOM.

@@ -82,7 +82,9 @@ Produktentscheidung.
   FFmpeg im Backend. Celery führt lange Arbeiten in einem separaten Worker
   aus, Redis dient als Queue und temporärer Ergebnisspeicher. Die
   Post-Transkription nutzt standardmäßig lokales faster-whisper hinter einem
-  austauschbaren Interface; Deepgram Nova-3 (EU) ist optional. Deutsche
+  austauschbaren Interface; Deepgram Nova-3 (EU) ist optional. Eine
+  Live-Transkription existiert als Backend-Prototyp (`WS /speech/live`,
+  ebenfalls lokales faster-whisper); der Browser-Sender fehlt noch. Deutsche
   Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und
   Speicherverhalten: `backend/README.md`.
 - Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
@@ -119,3 +121,4 @@ einbauen**:
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
 | 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |
 | 24.10.2026 | Lokale Whisper-Transkription als Standard | Nutzerauftrag: Speech-to-Text mit einem lokalen Modell statt Cloud-Zwang; Deepgram bleibt optional. |
+| 24.10.2026 | Live-Transkription als Backend-Prototyp | Nutzerauftrag: Transcript nahezu in Echtzeit während der Aufnahme (`WS /speech/live`); Browser-Sender offen. |

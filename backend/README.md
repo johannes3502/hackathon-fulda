@@ -160,6 +160,9 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
   sizes include `tiny`, `base`, `small`, `medium`, `large-v3`. Each worker
   process holds its own model, so raise `CELERY_WORKER_CONCURRENCY` only with
   enough RAM.
+- **Selection is per machine, not per request.** Each teammate picks a
+  `WHISPER_MODEL` that fits their device; see "Whisper model size per device"
+  below. Download happens once at image build, not per job.
 - Optional tuning: `WHISPER_DEVICE` (`cpu`/`cuda`), `WHISPER_COMPUTE_TYPE`,
   `WHISPER_LANGUAGE` (empty = auto-detect), `WHISPER_BEAM_SIZE`,
   `WHISPER_VAD_FILTER`, `WHISPER_INITIAL_PROMPT`.
@@ -178,6 +181,94 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
 - Originals are deleted after terminal processing (including analysis failure).
   If storage is unavailable or a process is killed, cleanup can be delayed;
   queued/stalled jobs and analysis results have no automatic expiry yet.
+
+### Whisper model size per device
+
+`WHISPER_MODEL` is shared by everyone who runs the same image, so pick a size
+that matches the machine that executes the worker. The Docker build downloads
+the model once into `/app/models/whisper`; afterwards no network is needed for
+inference.
+
+| Device / RAM | Suggested `WHISPER_MODEL` | Why |
+|---|---|---|
+| 4–8 GB RAM, older laptop, Raspberry Pi, CI runner | `tiny` or `base` | Keeps CPU + memory low, still maps word timestamps. |
+| 8–16 GB RAM, Apple M1–M3 or modern Intel/AMD | `base` or `small` | Good German readability; roughly realtime-speed on small clips. |
+| 16 GB+ RAM (e.g. Apple M-series with 24/32 GB) | `small`, `medium` or `large-v3` | Better German quality; still practical because RAM is not tight. |
+
+Quality and German filler-word preservation are **not measured** here; pick a
+bigger model only if you have the memory budget for it:
+
+| Model | Approx. disk / RAM per worker (`int8`, CPU) |
+|---|---|
+| `tiny` | ~75 MB |
+| `base` | ~140 MB |
+| `small` | ~480 MB |
+| `medium` | ~1.5 GB (untested on 8 GB-limited hosts) |
+| `large-v3` | ~3 GB |
+
+How to switch for one machine:
+
+```sh
+# repo root
+sed -i 's/^WHISPER_MODEL=.*/WHISPER_MODEL=base/' .env
+docker compose up --build -d --wait
+```
+
+Runtime model switching is intentionally **not** supported: `WHISPER_MODEL_PATH`
+points at the model baked into the image, so changing `WHISPER_MODEL` requires a
+rebuild (`docker compose up --build`). This keeps inference deterministic and
+offline. On CPU-only hosts, `small` balances quality and speed for
+6–10-second clips; it processes that clip roughly at realtime speed (~1.4× of
+the clip duration, measured on a 2.5-core Linux VM; not guaranteed elsewhere).
+
+Measured reference on this repo's fixture (6.8 s German speech, CPU `int8`):
+
+| Model | Processing time (warm) |
+|---|---|
+| `tiny` (beam 5) | ~1.0 s |
+| `small` (beam 5) | ~4.8 s |
+| `small` (beam 1) | ~3.3 s |
+
+`medium` was not measurable on a 7.7 GB host (OOM-killed) — treat it as a
+16 GB+ model.
+
+### Live transcription (`WS /speech/live`, backend prototype)
+
+Near-realtime transcript while recording, same local Whisper, without Celery.
+
+```
+client PCM (16 kHz mono Int16, ~100 ms binary frames)
+  → WS /speech/live → StreamingTranscriber (faster-whisper over a rolling window)
+  ← {"type":"words"|"text","final":bool,…} + {"type":"ready"|"done"|"error"}
+```
+
+- Protocol: first message `{"type":"start","sample_rate":16000}` (only 16 kHz
+  is accepted) → `ready`; then binary Int16 frames; `{"type":"stop"}`
+  finalizes with final frames and `done`. Full tables live in
+  `backend/app/transcription/README.md`.
+- The handler transcribes when ≥ 2 s of new audio arrived
+  (`WHISPER_LIVE_CHUNK_MS`) over a rolling window of max 10 s
+  (`WHISPER_LIVE_MAX_WINDOW_MS`); an end cursor deduplicates words that
+  overlap between windows. `WHISPER_LIVE_MAX_IDLE_SECONDS` (30 s silence)
+  and `WHISPER_LIVE_MAX_SECONDS` (600 s audio) also finalize a session.
+- One live session at a time per process (`asyncio.Semaphore(1)`); a second
+  client is closed with status 1013 ("at capacity"). This is not designed as
+  a public multi-tenant endpoint yet.
+- Tuning: `WHISPER_LIVE_MODEL` / `WHISPER_LIVE_BEAM_SIZE` default to the
+  batch `WHISPER_*` values; weak hosts prefer `WHISPER_LIVE_MODEL=tiny` and
+  `WHISPER_LIVE_BEAM_SIZE=1`.
+- Measure a recording end-to-end against Compose or a local uvicorn server:
+
+  ```sh
+  docker compose cp backend/tests/fixtures/speech-de.wav backend:/tmp/speech-de.wav
+  docker compose exec -T backend python -m scripts.smoke_live /tmp/speech-de.wav
+  ```
+
+  The script streams the WAV at real-time pace and reports window latency
+  (p50/p95/max): a max below ~1 s on the tiny model means the server keeps
+  up with speech. Results are host-dependent; the browser sender
+  (`frontend/src/features/live/transport.ts`) is not wired yet, so there is
+  no end-to-end frontend measurement at this stage.
 
 Example from the repository root, using only the synthetic fixture:
 
