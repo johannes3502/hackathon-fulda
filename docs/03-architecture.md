@@ -18,6 +18,9 @@ flowchart TB
         MR["MediaRecorder / Vision Camera<br/>Video + Audio"]
     end
 
+    WEB -->|"LiveSessionProvider: abgeschlossene Takes und Review-Updates"| IDB["Browser IndexedDB<br/>Video, Pose-Log, Transkript, Feedback,<br/>Fragen, Antworten, Gespräch"]
+    IDB -->|"Nach Reload: Blob-URLs neu erzeugen"| WEB
+
     subgraph API["api/ - Geteilter API-Vertrag"]
         OAS["openapi.json + schema.d.ts<br/>generiert aus FastAPI"]
     end
@@ -766,7 +769,7 @@ Zusätzlich (außerhalb Postgres):
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), optional Profil-ID/Token (`pp_…`) und zufälliger `deviceKey`; Token ist XSS-exponiert |
-| Browser-Speicher (Live-Workspace) | FeatureFlags, presentationMode und sourceCollectionId pro Take, ElevenLabs-Gespräch, Wörter, Pose-Events mit runtime, Fact-Check-Ergebnis, Fragen und Antworten; nur bis zum Neuladen |
+| Browser IndexedDB `presentation-recordings`, Store `recordings` | Abgeschlossene Live-Takes inklusive Video-/Pose-Log-Blobs, Config mit FeatureFlags/presentationMode/sourceCollectionId, ElevenLabs-Gespräch, Wörter, Pose-Events, Fact-Check, Fragen und Antworten; pro Take gespeichert, nach Reload wiederhergestellt. Objekt-URLs nur im Arbeitsspeicher. Löschen im Review entfernt den lokalen Take, keine Backend-Daten/Quellen. |
 
 ## 9. Event-Modell: gemeinsame Timeline
 

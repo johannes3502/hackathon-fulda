@@ -5,24 +5,43 @@ import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import type { LiveConfig, LiveFeedback } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
+import { useLiveSessions } from "@/features/live/LiveSessionProvider";
+export function SessionStorageNotice() {
+  const { loaded, saving, storageError } = useLiveSessions();
+  return (
+    <p className={storageError ? "status-warning" : "field-hint"} role="status">
+      {storageError ??
+        (!loaded
+          ? "Loading saved sessions…"
+          : saving
+            ? "Saving session in this browser… Keep this tab open until saving finishes."
+            : "Sessions are saved in this browser, including video and feedback. Clearing browser data removes them; download important videos as a backup.")}
+    </p>
+  );
+}
 export function LiveBadge({ mode }: { mode: LiveConfig["mode"] }) {
   return (
     <span className={`demo-badge ${mode === "backend" ? "backend-badge" : ""}`}>
       <Radio size={13} />
-      {mode === "local"
-        ? "Local feedback"
-        : "Local gestures + backend audio"}
+      {mode === "local" ? "Local feedback" : "Local gestures + backend audio"}
     </span>
   );
 }
 export function MissingRecording() {
+  const { loaded, storageError } = useLiveSessions();
   return (
     <AppShell experience="live">
       <div className="empty-state panel">
-        <h1>This recording isn’t in this workspace.</h1>
-        <p>
-          Video stays in browser memory. Refreshing or leaving the live
-          workspace releases it. Start a new session to record again.
+        <h1>
+          {!loaded
+            ? "Loading saved session…"
+            : "This recording isn’t available in this browser."}
+        </h1>
+        <p role="status">
+          {storageError ??
+            (!loaded
+              ? "Restoring your video and feedback."
+              : "Open it in the browser where it was recorded. Deleted sessions and cleared browser data cannot be restored here.")}
         </p>
         <Button asChild>
           <Link href="/live">

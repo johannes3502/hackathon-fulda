@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,7 +19,7 @@ import { clipRange } from "@/features/live/protocol";
 import { cueAppearance } from "@/features/live/cue-appearance";
 import { time } from "@/lib/utils";
 import { FactCheckPanel } from "./FactCheckPanel";
-import { MissingRecording } from "./shared";
+import { MissingRecording, SessionStorageNotice } from "./shared";
 import { RecordedTranscript } from "./RecordedTranscript";
 import { PoseEvidence } from "./PoseEvidence";
 import { PoseEventDownload } from "./PoseEventDownload";
@@ -32,7 +33,10 @@ import { feedbackToMoment } from "../analysis/review-data";
 import "./review-accessibility.css";
 
 export function LiveReview({ sessionId }: { sessionId: string }) {
-  const { recordings } = useLiveSessions();
+  const { recordings, remove } = useLiveSessions();
+  const router = useRouter();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const recording = recordings[sessionId];
   const [selected, setSelected] = useState<LiveFeedback | null>(null);
   const [view, setView] = useState<"moments" | "questions">("moments");
@@ -80,6 +84,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             {recording.notice}
           </p>
         )}
+        <SessionStorageNotice />
         <div
           className="review-view-switch"
           role="group"
@@ -255,8 +260,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             <details className="review-details">
               <summary>Recording details and exports</summary>
               <p className="field-hint">
-                The video is held in this browser tab. Download it before
-                refreshing or leaving.{" "}
+                This session is saved locally in this browser.{" "}
                 {recording.config.mode === "backend" ||
                 recording.analysisUploaded
                   ? "The backend removes its original after processing; analysis results remain stored."
@@ -287,14 +291,50 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
               >
                 Detailed timeline
               </Link>
+              <div className="recording-delete">
+                {confirmDelete ? (
+                  <>
+                    <p>
+                      Delete this session’s local video, feedback and question
+                      history? This cannot be undone. Uploaded source materials
+                      are kept.
+                    </p>
+                    <Button
+                      variant="outline"
+                      disabled={deleting}
+                      onClick={async () => {
+                        setDeleting(true);
+                        if (await remove(sessionId)) router.push("/live");
+                        else setDeleting(false);
+                      }}
+                    >
+                      {deleting ? "Deleting…" : "Delete permanently"}
+                    </Button>{" "}
+                    <Button
+                      variant="outline"
+                      disabled={deleting}
+                      onClick={() => setConfirmDelete(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    Delete saved session
+                  </Button>
+                )}
+              </div>
             </details>
           </>
         ) : (
           <QuestionPractice recording={recording} onSelect={jump} />
         )}
         <p className="review-retention field-hint">
-          Your video stays available in this tab. Download it in Review moments
-          before refreshing.
+          Saved sessions are available on this browser and device. Download your
+          video in Review moments to keep a separate copy.
         </p>
       </div>
     </AppShell>

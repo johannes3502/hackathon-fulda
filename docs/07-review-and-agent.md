@@ -192,6 +192,18 @@ Inhalts-Kategorie auf den Fact-Check beschränkt.
 
 ## Daten und Grenzen
 
+Abgeschlossene Live-Sessions einschließlich Video, Pose-Log, Analyse und
+Fragen-/Gesprächsverlauf werden pro Take in Browser-IndexedDB gespeichert.
+Updates aus späteren Analysen und Gesprächen werden ebenfalls gespeichert.
+Nach Reload entstehen neue Objekt-URLs aus den gespeicherten Blobs. Studio
+(„Past sessions“) und Dashboard zeigen die gespeicherten Takes; im Review unter
+„Recording details and exports“ lässt sich ein Take mit Bestätigung lokal löschen.
+Speicherfehler lassen die aktuelle Aufnahme im Tab verfügbar und zeigen einen
+Download-Hinweis. Der Browser kann Daten bei Speicherdruck verdrängen; Löschen
+der Browserdaten entfernt die Historie. Keine Cloud-Synchronisation, keine
+automatische Löschung der separaten Backend-Ergebnisse oder Quellen. Bereits
+vor dieser Änderung aus dem Arbeitsspeicher verlorene Takes sind nicht rekonstruierbar.
+
 Websuche geprüft am 25.10.2026: synthetischer Textdialog über denselben privaten
 ElevenLabs-Agenten und den App-Prompt ohne Upload-Auszüge. Der Agent rief
 `search_web` zum Thema Mars/Eisenoxid auf; das Gesprächsprotokoll enthält

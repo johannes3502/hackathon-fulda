@@ -32,7 +32,7 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
 - `/` and `/stats-preview` begin with a presentation introduction: primary action
   “Neue Präsentation” opens the existing `/live` studio, secondary action prepares
   sources. Three steps explain preparation, recording and review. A recent take
-  links back into its review while it is available in browser memory.
+  links back into its review; completed takes persist locally in IndexedDB.
   Below, `StatsDashboard` shows counts, durations and observations from actual
   recordings in the current workspace, with an empty state before the first take.
   No synthetic percentages, monthly histories or performance scores appear.
@@ -117,7 +117,8 @@ finger tracking, and speech features lock during a take; Pose Lab is diagnostic.
 Camera and skeleton use the same crop and mirror projection. Live review shows
 observed events, source-backed findings and explicit evidence-share prototype
 scores with visible coverage and missing-data states.
-Local media stays in browser memory, with download and retention guidance.
+Completed local media and review data persist in IndexedDB, with visible saving
+and error states, download guidance and confirmed deletion in the review.
 Backend transcription names Deepgram EU when streaming is enabled and explains
 the local Whisper fallback. A completed stream supplies the review transcript.
 

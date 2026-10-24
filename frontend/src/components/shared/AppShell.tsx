@@ -223,9 +223,10 @@ export function AppShell({
                   walkthrough is separately labelled and needs no camera.
                 </p>
                 <p>
-                  Recordings live in browser memory only. Download before
-                  refreshing or leaving the live workspace. Backend retention is
-                  controlled by your backend.
+                  Completed sessions are saved in this browser for later review.
+                  Delete them in Recording details and exports. Clearing browser
+                  data removes them; download important videos as a backup.
+                  Backend retention is controlled by your backend.
                 </p>
               </>
             ) : (

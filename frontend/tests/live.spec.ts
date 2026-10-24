@@ -1883,9 +1883,13 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     .getByRole("button", { name: "End conversation", exact: true })
     .click();
   await expect.poll(() => closed.size).toBe(1);
-  await expect.poll(() => page.evaluate(
-    () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
-  )).toBeGreaterThan(stoppedBeforeEnd);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+      ),
+    )
+    .toBeGreaterThan(stoppedBeforeEnd);
   const stats = page.getByRole("heading", { name: "Your take at a glance" });
   await expect(stats).toBeVisible();
   await expect(stats).toBeFocused();
@@ -1902,7 +1906,9 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     .getByRole("button", { name: "Back to questions", exact: true })
     .click();
   await expect(stats).not.toBeVisible();
-  await expect(page.getByRole("heading", { name: "Meet your teacher." })).toBeFocused();
+  await expect(
+    page.getByRole("heading", { name: "Meet your teacher." }),
+  ).toBeFocused();
   await page
     .getByRole("button", { name: "Start a new conversation", exact: true })
     .click();
@@ -1929,4 +1935,130 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   await expect.poll(() => closed.size).toBe(3);
   expect(kickoffs).toBe(0);
   await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
+  await expect(
+    page.getByText("Sessions are saved in this browser", { exact: false }),
+  ).toBeVisible();
+  await page.reload();
+  await page
+    .getByRole("group", { name: "Review steps" })
+    .getByRole("button", { name: "Practice questions" })
+    .click();
+  await page.getByText("Conversation transcript", { exact: true }).click();
+  await expect(page.locator(".conversation-transcript")).toContainText(
+    "Ich habe noch ein paar Fragen. Bist du bereit?",
+  );
+  expect(closed.size).toBe(3);
+});
+
+test("past sessions keep video and updated feedback across reload and can be deleted", async ({
+  page,
+}, info) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  await enable(page);
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  await page.waitForTimeout(600);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  const reviewUrl = page.url();
+  await expect(
+    page.getByText("Sessions are saved in this browser", { exact: false }),
+  ).toBeVisible();
+  const originalUrl = await page
+    .getByLabel("Recorded pitch video")
+    .getAttribute("src");
+  await page
+    .getByText("Recording details and exports", { exact: true })
+    .click();
+  await page
+    .getByText("Replace transcript timestamps", { exact: true })
+    .click();
+  await page.route("**/api/transcription/analyze-words", (route) =>
+    route.fulfill({
+      json: { events: [], summary: {} },
+    }),
+  );
+  await page.getByLabel("Word timestamps (JSON)").setInputFiles({
+    name: "words.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify([{ word: "Saved transcript", start_ms: 0, end_ms: 100 }]),
+    ),
+  });
+  await expect(
+    page.getByText("Transcript analysis added to this take."),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Sessions are saved in this browser", { exact: false }),
+  ).toBeVisible();
+  await page.reload();
+  const video = page.getByLabel("Recorded pitch video");
+  await expect(video).toBeVisible();
+  await expect
+    .poll(() => video.evaluate((el: HTMLVideoElement) => el.readyState))
+    .toBeGreaterThanOrEqual(2);
+  expect(await video.getAttribute("src")).not.toBe(originalUrl);
+  await page.getByText("Transcript and source checks", { exact: true }).click();
+  await expect(
+    page.getByText("Saved transcript", { exact: false }).first(),
+  ).toBeVisible();
+  await page.goto("/live");
+  await expect(
+    page.getByRole("heading", { name: "Past sessions" }),
+  ).toBeVisible();
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("past-sessions.png"),
+    fullPage: true,
+  });
+  await page.locator(".recent-recordings a").click();
+  await expect(page).toHaveURL(reviewUrl);
+  await page
+    .getByText("Recording details and exports", { exact: true })
+    .click();
+  await page.getByRole("button", { name: "Delete saved session" }).click();
+  await page.getByRole("button", { name: "Delete permanently" }).click();
+  await expect(page).toHaveURL(/\/live$/);
+  await page.reload();
+  await expect(
+    page.getByText("Sessions are saved in this browser", { exact: false }),
+  ).toBeVisible();
+  await expect(page.locator(".recent-recordings a")).toHaveCount(0);
+  await page.goto(reviewUrl);
+  await expect(
+    page.getByRole("heading", {
+      name: "This recording isn’t available in this browser.",
+    }),
+  ).toBeVisible();
+});
+
+test("failed browser storage keeps the current video playable and shows a warning", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    IDBObjectStore.prototype.put = () => {
+      throw new DOMException("Synthetic quota failure", "QuotaExceededError");
+    };
+  });
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  await enable(page);
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  await page.waitForTimeout(600);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(
+    page.getByText("Could not save this session", { exact: false }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .getByLabel("Recorded pitch video")
+        .evaluate((el: HTMLVideoElement) => el.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
 });
