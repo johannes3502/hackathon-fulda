@@ -398,6 +398,7 @@ sequenceDiagram
         FE->>BE: POST /questions/agent/session
         BE->>E: Signed URL anfordern (API-Key bleibt serverseitig)
         BE-->>FE: Signed URL, Cache-Control no-store
+        Note over E: Gespeicherte First message leer; keine feste Begrüßung
         FE->>E: SDK-WebSocket mit Kontext und Modus im Prompt-Override, first_message leer
         E-->>FE: Verbindung bestätigt
         FE->>E: user_message fordert kurzen Fragensatz und erste Frage aus Transkript an

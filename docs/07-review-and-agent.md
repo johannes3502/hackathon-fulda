@@ -77,6 +77,11 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
 
 - Einen privaten Conversational Agent anlegen. In **Security** die Authentifizierung
   und die Overrides für **System prompt** und **First message** aktivieren.
+- **First message auch im Agenten selbst leer speichern.** Die gespeicherte
+  Begrüßung wird direkt vorgelesen und durchläuft nicht den System-Prompt.
+  Ein Prompt wie „keine Vorstellung“ entfernt sie daher nicht. Der leere
+  Standard verhindert, dass ohne wirksamen Client-Override erneut „Hallo,
+  ich bin Leo … Worum ging es in deiner Präsentation?“ abgespielt wird.
 - Der API-Schlüssel braucht unter **ElevenAgents** die Berechtigung **Write**
   (`convai_write`). **Read** kann den Agenten laden, aber keine Signed URL
   ausstellen; dieser Aufruf scheitert dann mit HTTP 401 `missing_permissions`.
@@ -150,6 +155,24 @@ im ElevenLabs-Konto angelegt oder verändert.
   Collection wirken sich weiterhin auf spätere Fragen aus.
 
 ## Verifikation
+
+Der optionale Konfigurationstest liest den tatsächlich konfigurierten Agenten
+und prüft den leeren Standard sowie beide Override-Berechtigungen. Er benötigt
+`ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` in der Prozessumgebung und startet
+kein Gespräch; ein wieder eingetragener Begrüßungstext lässt ihn fehlschlagen:
+
+```sh
+RUN_CLOUD_SMOKE=1 PYTHONPATH=backend python -m pytest backend/tests/test_question_agent.py -k live_agent -q
+```
+
+Am 25.10.2026 schlug dieser Test zunächst am gespeicherten Leo-Begrüßungstext
+fehl. Nur dieses Feld wurde im konfigurierten Agenten geleert; alle anderen
+Gesprächs-, Plattform- und Workflow-Einstellungen blieben beim Rücklesen gleich.
+Danach bestanden alle 17 Question-Agent-Tests einschließlich des Live-Checks.
+Eine neue echte Voice-WebSocket-Session mit synthetischem Pflanzenversuch
+lieferte „Ich habe ein paar Fragen.“ und eine konkrete Frage zur gleichen
+Wassermenge sowie Audio – auch ohne `first_message` im Client-Override.
+Ein physisches Mikrofon oder die Audioausgabe am Gerät wurde dabei nicht geprüft.
 
 Synthetische Tests prüfen Prompt-Schwerpunkte aller vier Modi, Quellenbindung,
 Job-Wiederzustellung, serverseitige Authentifizierung, Fehlermeldungen sowie
