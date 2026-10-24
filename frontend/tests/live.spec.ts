@@ -1185,23 +1185,11 @@ test("live captions send PCM only during recording and a disconnect keeps the ta
       }
     });
   });
-  await page.goto("/");
-  await page.getByLabel("Speech analysis").selectOption("backend");
-  await page
-    .getByRole("button", { name: "Standard view", exact: true })
-    .click();
-  await page.getByText("Recording options", { exact: true }).click();
-  await page.getByLabel("Stream transcription with Deepgram (EU)").check();
-  await expect(page.locator(".recording-consent")).toContainText(
-    "during recording",
-  );
-  await page
-    .getByRole("button", { name: "Enable camera", exact: true })
-    .click();
-  expect(frames).toBe(0);
-  await page
-    .getByRole("button", { name: "Start recording", exact: true })
-    .click();
+  await backend(page, true, async () => {
+    await page.getByLabel("Stream transcription with Deepgram (EU)").check();
+    await expect(page.locator(".recording-consent")).toContainText("Deepgram");
+    expect(frames).toBe(0);
+  });
   await expect(page.getByLabel("Live captions", { exact: true })).toContainText(
     "Recording continues",
   );

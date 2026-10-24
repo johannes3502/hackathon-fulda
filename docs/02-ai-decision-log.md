@@ -750,3 +750,16 @@ Prüfergebnis: 106 Backend-Tests bestanden, zwei lokale Modell-/Datenbanktests
 übersprungen; nach Integration von Team-main 174 Frontend-Tests bestanden;
 Typecheck und ESLint bestanden; OpenAPI und
 TypeScript-Vertrag regeneriert und auf Aktualität geprüft.
+
+Abschlussprüfung im tatsächlichen Projektordner: 106 Backend-Tests bestanden,
+zwei übersprungen; 174 Web-Unit-Tests, Typecheck, OpenAPI-Aktualität und zwei
+Compose-Konfigurationstests bestanden. ESLint für Quellen bestanden mit
+`--ignore-pattern '.next-*/**'` (zusätzliche generierte UI-Caches vorhanden).
+Drei Desktop-Browserfälle mit synthetischem Kamera-/Audioeingang bestanden:
+Deepgram-Finalisierung bis zum letzten Wort und Wiederverwendung im Review,
+Caption-Abbruch mit weiterhin abspielbarer Aufnahme sowie Signalfeedback-Ausfall.
+Der ältere Abbruchtest verwendet nun denselben Aufnahme-Setup-Helfer wie der
+neue Erfolgsfall. Die lokale `.env` stand noch auf Deepgram ohne Schlüssel;
+`ASR_PROVIDER=whisper` wurde als lokaler Ersatzweg eingerichtet, kein Schlüssel
+geändert oder eingecheckt. Aktivierung: `DEEPGRAM_API_KEY` setzen und Frontend,
+Backend sowie Worker neu bauen/starten. Kein echter Anbieteraufruf getestet.
