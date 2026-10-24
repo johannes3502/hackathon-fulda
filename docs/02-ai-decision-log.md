@@ -531,7 +531,8 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
   IMAGE/VIDEO und Lite/Heavy umschaltbar machen, VIDEO als Standard und
   GPU-first mit CPU-Fallback verwenden. Sprach-/Pausenfeedback soll separat
   schaltbar sein. Branch: `feat/integrated-coach-flags`; kein Merge nach `main`.
-- Integrierte Remote-Stände: `main` (`0fb7dfc`, inklusive Start-/Readiness-Fix),
+- Integrierte Remote-Stände: `main` (`d00963d`, inklusive Start-/Readiness-Fix
+  und gemeinsamer Open-Sans-/Akzentgestaltung),
   `goal` (`3b1ee02`), `feat/local-whisper-asr` (`4c697c0`),
   `feat/johannes-pose-requirements` (`b22102b`, inklusive T12),
   `hassan-poselog` (`67d1c8f`) und `bench/embedding-benchmark` (`ab8fd8a`).
