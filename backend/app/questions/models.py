@@ -5,6 +5,10 @@ Question kinds, in the order they are asked:
 not found in the checked sources), `gap` (an upload passage the talk leaves
 out), `clarification` (vague or unexplained passage), `follow_up` (asked after
 an answer). Answers get the fact-check verdicts, no points or grades.
+
+Personas change only the voice of the questions and replies (`student`: a
+curious first-semester student; `tutor`: a professor or tutor). Grounding in
+the uploaded lecture materials and fact-check findings is the same for both.
 """
 
 from typing import Literal
@@ -17,6 +21,7 @@ from app.factcheck.models import ClaimResult, Evidence, EvidenceKind, Verdict
 from app.transcription.models import Word
 
 QuestionKind = Literal["contradiction", "unsupported", "gap", "clarification", "follow_up"]
+Persona = Literal["student", "tutor"]
 
 
 class QuestionConfig(BaseModel):
@@ -33,6 +38,7 @@ class QuestionRequest(BaseModel):
     collection_id: UUID | None = Field(default=None, description="Uploaded sources for gaps and answer reviews")
     claims: list[ClaimResult] = Field(default_factory=list, max_length=30,
                                       description="Fact-check findings of the same transcript")
+    persona: Persona = Field(default="tutor", description="Who asks: curious student or professor/tutor")
     config: QuestionConfig = Field(default_factory=QuestionConfig)
 
 
@@ -52,6 +58,7 @@ class Question(BaseModel):
 class QuestionResult(BaseModel):
     questions: list[Question]
     events: list[Event]
+    persona: Persona = "tutor"
     model: str
     sources_used: bool
     config: QuestionConfig
@@ -69,6 +76,16 @@ class AnswerRequest(BaseModel):
     question: Question
     answer: str = Field(min_length=1, max_length=4000)
     collection_id: UUID | None = None
+    persona: Persona = "tutor"
+    config: QuestionConfig = Field(default_factory=QuestionConfig)
+
+
+class VoiceAnswerRequest(BaseModel):
+    """Multipart `request` field of a spoken answer; the audio is a separate file."""
+
+    question: Question
+    collection_id: UUID | None = None
+    persona: Persona = "tutor"
     config: QuestionConfig = Field(default_factory=QuestionConfig)
 
 
@@ -78,6 +95,8 @@ class AnswerReview(BaseModel):
     evidence: Evidence | None = None
     checked: list[EvidenceKind] = Field(description="Where the answer was compared")
     follow_up: Question | None = None
+    reply: str = Field(default="", description="What the persona says back, to be read aloud; no grading")
+    answer: str | None = Field(default=None, description="Transcript of a spoken answer")
     model: str
     notes: list[str] = Field(default_factory=list)
 

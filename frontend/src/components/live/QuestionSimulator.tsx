@@ -18,13 +18,16 @@ import {
   ANSWER_LABELS,
   generateQuestions,
   KIND_LABELS,
+  PERSONA_LABELS,
   questionFeedback,
   reviewAnswer,
   withFollowUp,
   type AnswerReview,
+  type Persona,
   type Question,
   type QuestionResult,
 } from "@/features/questions/api";
+import { VoiceConversation } from "./VoiceConversation";
 import { collectionId, listSources } from "@/features/sources/api";
 import type { components } from "../../../../api/schema";
 import { time } from "@/lib/utils";
@@ -64,6 +67,11 @@ export function QuestionSimulator({
   const [readySources, setReadySources] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [persona, setPersona] = useState<Persona>(
+    recording.questions?.persona ?? "tutor",
+  );
+  // A new round remounts the voice conversation, which ends a running one.
+  const [round, setRound] = useState(0);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
@@ -88,6 +96,7 @@ export function QuestionSimulator({
   const words = recording.words ?? [];
   const claims = recording.factCheck?.claims ?? [];
   const result = recording.questions;
+  const askedBy = result?.persona ?? "tutor";
   const canRun = !busy && !!settings?.available && words.length > 0;
 
   function withQuestions(
@@ -110,10 +119,11 @@ export function QuestionSimulator({
     controller.current = active;
     setBusy(true);
     setNotice(null);
+    setRound((n) => n + 1);
     try {
       const generated = await generateQuestions(
         endpoint,
-        { words, collectionId: collection, claims },
+        { words, collectionId: collection, claims, persona },
         active.signal,
       );
       if (active.signal.aborted) return;
@@ -138,7 +148,24 @@ export function QuestionSimulator({
     }
   }
 
-  const answered = Object.keys(recording.answers ?? {}).length;
+  function answered(question: Question, answer: string, review: AnswerReview) {
+    update(recording.id, (current) => {
+      if (!current.questions) return current;
+      const questions = review.follow_up
+        ? withFollowUp(
+            current.questions.questions,
+            question.id,
+            review.follow_up,
+          )
+        : current.questions.questions;
+      return {
+        ...withQuestions(current, { ...current.questions, questions }),
+        answers: { ...current.answers, [question.id]: { answer, review } },
+      };
+    });
+  }
+
+  const answeredCount = Object.keys(recording.answers ?? {}).length;
   return (
     <section
       className="panel fact-check questions"
@@ -150,15 +177,16 @@ export function QuestionSimulator({
         </h2>
         {result && (
           <span className="badge">
-            {answered}/{result.questions.length} answered
+            {answeredCount}/{result.questions.length} answered
           </span>
         )}
       </div>
       <p>
-        After your talk, a simulated audience asks follow-up questions: first
+        After your talk, a simulated listener asks follow-up questions: first
         about statements your sources contradict or don’t back, then about
-        source content you left out. Your typed answers are compared with your
-        sources. No points, no grades.
+        source content you left out. Talk with them by voice or type your
+        answers; each answer is compared with your sources. No points, no
+        grades.
       </p>
       <dl className="fact-check-inputs">
         <div>
@@ -195,9 +223,28 @@ export function QuestionSimulator({
         <p className="field-hint">
           Starting sends your transcript sentences, fact-check findings and
           matching source passages to {settings.llm_host} (model{" "}
-          {settings.model}). Each answer you submit is sent there too.
+          {settings.model}). Each answer you submit is sent there too. Spoken
+          answers first go to the speech recognition service configured on the
+          backend (Deepgram EU by default) and are deleted after processing;
+          questions are read aloud by your browser.
         </p>
       )}
+      <fieldset className="persona-picker" disabled={busy}>
+        <legend>Who asks?</legend>
+        {(Object.keys(PERSONA_LABELS) as Persona[]).map((key) => (
+          <label key={key} className={persona === key ? "selected" : ""}>
+            <input
+              type="radio"
+              name="persona"
+              value={key}
+              checked={persona === key}
+              onChange={() => setPersona(key)}
+            />
+            <strong>{PERSONA_LABELS[key].name}</strong>
+            <span className="muted small">{PERSONA_LABELS[key].detail}</span>
+          </label>
+        ))}
+      </fieldset>
       <Button onClick={() => void generate()} disabled={!canRun}>
         {busy
           ? "Preparing questions…"
@@ -210,13 +257,32 @@ export function QuestionSimulator({
       </p>
       {result && (
         <>
+          {result.persona && result.persona !== persona && (
+            <p className="field-hint">
+              These questions were asked by the{" "}
+              {PERSONA_LABELS[askedBy].name.toLowerCase()}. Ask new questions to
+              switch roles.
+            </p>
+          )}
+          {result.questions.length > 0 && (
+            <VoiceConversation
+              key={round}
+              recording={recording}
+              persona={askedBy}
+              collection={collection}
+              disabled={!settings?.available}
+              onAnswered={answered}
+            />
+          )}
           <ol className="fact-claims">
             {result.questions.map((question, index) => (
               <QuestionCard
-                key={question.id}
+                // Remount when a spoken answer arrives so the draft shows it.
+                key={`${question.id}:${recording.answers?.[question.id]?.answer ?? ""}`}
                 number={index + 1}
                 question={question}
                 recording={recording}
+                persona={askedBy}
                 collection={collection}
                 disabled={!settings?.available}
                 onSelect={() => {
@@ -227,26 +293,7 @@ export function QuestionSimulator({
                   if (moment) onSelect({ ...moment });
                 }}
                 onAnswered={(answer, review) =>
-                  update(recording.id, (current) => {
-                    if (!current.questions) return current;
-                    const questions = review.follow_up
-                      ? withFollowUp(
-                          current.questions.questions,
-                          question.id,
-                          review.follow_up,
-                        )
-                      : current.questions.questions;
-                    return {
-                      ...withQuestions(current, {
-                        ...current.questions,
-                        questions,
-                      }),
-                      answers: {
-                        ...current.answers,
-                        [question.id]: { answer, review },
-                      },
-                    };
-                  })
+                  answered(question, answer, review)
                 }
               />
             ))}
@@ -266,6 +313,7 @@ function QuestionCard({
   number,
   question,
   recording,
+  persona,
   collection,
   disabled,
   onSelect,
@@ -274,6 +322,7 @@ function QuestionCard({
   number: number;
   question: Question;
   recording: LiveRecording;
+  persona: Persona;
   collection: string | null;
   disabled: boolean;
   onSelect: () => void;
@@ -298,7 +347,7 @@ function QuestionCard({
     try {
       const reviewed = await reviewAnswer(
         recording.config.endpoint,
-        { question, answer, collectionId: collection },
+        { question, answer, collectionId: collection, persona },
         active.signal,
       );
       if (!active.signal.aborted) onAnswered(answer, reviewed);
@@ -372,7 +421,14 @@ function QuestionCard({
           <span className={`fact-verdict ${review.verdict}`}>
             {ANSWER_LABELS[review.verdict]}
           </span>
-          {review.explanation && <p>{review.explanation}</p>}
+          {review.reply && (
+            <p>
+              <strong>{PERSONA_LABELS[persona].name}:</strong> {review.reply}
+            </p>
+          )}
+          {review.explanation && (
+            <p className="muted small">{review.explanation}</p>
+          )}
           {review.evidence && <Source evidence={review.evidence} />}
           {question.evidence && !review.evidence && (
             <details>

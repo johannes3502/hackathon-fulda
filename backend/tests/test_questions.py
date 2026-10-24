@@ -1,5 +1,6 @@
 """Question simulator with scripted model answers. Synthetic data only."""
 
+import json
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
@@ -203,3 +204,111 @@ def test_tasks_are_idempotent_and_delete_the_stored_request(monkeypatch):
     tasks.review_answer.run("job-2")
     assert store[(tasks.ANSWER_PREFIX, "status.json")]["status"] == "failed"
     assert (tasks.ANSWER_PREFIX, "request.json") not in store
+
+
+def test_persona_changes_the_role_not_the_grounding():
+    tutor = Model({"questions": []})
+    generate_questions(request(), tutor, retrieve=lambda c, q, k: [hit()], ready_sources=lambda c: 1)
+    student = Model({"questions": []})
+    result = generate_questions(request(persona="student"), student, retrieve=lambda c, q, k: [hit()],
+                                ready_sources=lambda c: 1)
+    assert result.persona == "student" and any("Studierender" in n for n in result.notices)
+    assert student.prompts[0][0].startswith(pipeline.PERSONAS["student"])
+    assert tutor.prompts[0][0].startswith(pipeline.PERSONAS["tutor"])
+    # Same transcript, findings and passages reach the model in both roles.
+    assert student.prompts[0][1] == tutor.prompts[0][1]
+
+
+def test_spoken_reply_is_kept_only_with_a_verified_quote():
+    reply = "Ah, okay, in den Unterlagen steht ja Silikatgestein."
+    model = Model({"verdict": "supports", "passage": 1, "quote": "überwiegend aus Silikatgestein",
+                   "explanation": "Der Artikel nennt Silikatgestein.", "reply": reply})
+    review = review_answer(AnswerRequest(question=question(), answer="Aus Gestein.", persona="student"), model)
+    assert review.reply == reply and model.prompts[0][0].startswith(pipeline.PERSONAS["student"])
+
+    invented = review_answer(AnswerRequest(question=question(), answer="Aus Käse.", persona="student"),
+                             Model({"verdict": "contradicts", "passage": 1, "quote": "besteht ganz aus Käse",
+                                    "reply": "Laut Folie 9 ist der Mond aus Milch."}))
+    assert invented.reply == pipeline.FALLBACK_REPLY["student"]
+    bare = review_answer(AnswerRequest(question=question(evidence=None), answer="Aus Gestein."), model)
+    assert bare.verdict == "unchecked" and bare.reply == pipeline.FALLBACK_REPLY["tutor"]
+
+
+class Transcriber:
+    def __init__(self, words):
+        self.words = words
+
+    def transcribe(self, audio_path):
+        return self.words
+
+
+def test_voice_answer_is_transcribed_then_reviewed(monkeypatch, tmp_path):
+    from app.questions.models import VoiceAnswerRequest
+    from app.transcription.models import Word
+
+    monkeypatch.setattr(pipeline, "extract_audio", lambda recording, target: target)
+    voice = VoiceAnswerRequest(question=question(), persona="tutor")
+    model = Model({"verdict": "supports", "passage": 1, "quote": "überwiegend aus Silikatgestein",
+                   "explanation": "Passt.", "reply": "Richtig, die Quelle nennt Silikatgestein."})
+    words = [Word(word="Aus", start_ms=0, end_ms=200), Word(word="Gestein.", start_ms=200, end_ms=700)]
+    review = pipeline.review_voice_answer(voice, tmp_path / "a.webm", Transcriber(words), model, retrieve=None)
+    assert review.answer == "Aus Gestein." and review.verdict == "supports"
+    assert "Antwort: Aus Gestein." in model.prompts[0][1]
+
+    silent = pipeline.review_voice_answer(voice, tmp_path / "a.webm", Transcriber([]), model, retrieve=None)
+    assert silent.verdict == "unchecked" and silent.reply == pipeline.UNHEARD_REPLY["tutor"]
+    assert len(model.prompts) == 1
+
+
+def test_voice_api_needs_asr_and_stores_the_audio(monkeypatch):
+    client = TestClient(app)
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example/v1")
+    monkeypatch.setenv("LLM_MODEL", "demo-model")
+    monkeypatch.setenv("ASR_PROVIDER", "deepgram")
+    monkeypatch.delenv("DEEPGRAM_API_KEY", raising=False)
+    files = {"recording": ("answer.webm", b"synthetic", "audio/webm")}
+    form = {"request": json.dumps({"question": question().model_dump(mode="json"), "persona": "student"})}
+    assert client.post("/questions/answers/voice", files=files, data=form).status_code == 503
+    monkeypatch.setenv("DEEPGRAM_API_KEY", "test-key")
+    assert client.post("/questions/answers/voice", files=files,
+                       data={"request": '{"persona": "student"}'}).status_code == 422
+
+    stored = []
+    enqueue = AsyncMock(return_value="task")
+    monkeypatch.setattr(questions_router, "_store", lambda job, req, prefix, status, recording:
+                        stored.append((req, recording.read())))
+    monkeypatch.setattr(questions_router, "enqueue_task", enqueue)
+    response = client.post("/questions/answers/voice", files=files, data=form)
+    assert response.status_code == 202
+    assert response.json()["status_url"] == f"/questions/answers/{response.json()['job_id']}"
+    assert enqueue.await_args.args[0] is questions_router.review_voice_answer
+    assert stored[0][0].persona == "student" and stored[0][1] == b"synthetic"
+
+
+def test_voice_task_deletes_audio_and_request(monkeypatch):
+    from app import tasks
+    from app.factcheck import llm
+    from app.questions.models import VoiceAnswerRequest
+    from app.transcription import transcriber
+
+    store: dict = {(tasks.ANSWER_PREFIX, "recording"): b"synthetic",
+                   (tasks.ANSWER_PREFIX, "request.json"): VoiceAnswerRequest(question=question()).model_dump(mode="json")}
+    monkeypatch.setattr(tasks.storage, "read_json", lambda job, name, prefix: store.get((prefix, name)))
+    monkeypatch.setattr(tasks.storage, "write_json",
+                        lambda job, name, value, prefix: store.__setitem__((prefix, name), value))
+    s3 = Mock()
+    s3.delete_object.side_effect = lambda Bucket, Key: store.pop(tuple(Key.split("/")[::2]), None)
+    monkeypatch.setattr(tasks, "s3_client", lambda: s3)
+    monkeypatch.setenv("S3_BUCKET", "test")
+    redis = Mock()
+    redis.lock.return_value.acquire.return_value = True
+    monkeypatch.setattr("app.connections.redis_client", lambda: redis)
+    monkeypatch.setattr(llm, "configured_llm", lambda: Model({}))
+    monkeypatch.setattr(transcriber, "configured_transcriber", lambda: Transcriber([]))
+    monkeypatch.setattr(pipeline, "extract_audio", lambda recording, target: target)
+
+    tasks.review_voice_answer.run("job-3")
+    status = store[(tasks.ANSWER_PREFIX, "status.json")]
+    assert status["status"] == "completed" and status["result"]["reply"] == pipeline.UNHEARD_REPLY["tutor"]
+    assert (tasks.ANSWER_PREFIX, "recording") not in store and (tasks.ANSWER_PREFIX, "request.json") not in store
+    assert s3.download_file.call_args.args[1] == f"{tasks.ANSWER_PREFIX}/job-3/recording"

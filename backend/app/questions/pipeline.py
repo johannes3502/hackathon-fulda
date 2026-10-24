@@ -11,10 +11,15 @@ Generation:
    `unsupported` question needs a matching finding.
 
 Answer review: the answer is compared with the question's evidence and fresh
-upload passages, judged with a verbatim quote like a fact-check claim.
+upload passages, judged with a verbatim quote like a fact-check claim. The
+persona's spoken reply is replaced by a neutral line whenever the verdict is
+not backed by a verified quote, so the voice never states unchecked content.
+Spoken answers are transcribed first with the configured ASR.
 """
 
 import logging
+import tempfile
+from pathlib import Path
 from typing import Callable
 from uuid import UUID
 
@@ -27,21 +32,43 @@ from app.factcheck.models import ClaimResult, Evidence
 from app.factcheck.pipeline import Passage, upload_passages, verified_evidence
 from app.factcheck.transcript import Sentence, clock, sentences
 from app.questions.models import (
-    AnswerRequest, AnswerReview, Question, QuestionKind, QuestionRequest, QuestionResult,
+    AnswerRequest, AnswerReview, Persona, Question, QuestionKind, QuestionRequest, QuestionResult,
+    VoiceAnswerRequest,
 )
 from app.sources import retrieval
 from app.sources.models import SourceHit
+from app.transcription.pipeline import extract_audio
+from app.transcription.transcriber import Transcriber
 
 log = logging.getLogger(__name__)
 
-QUESTION_PROMPT = """Du stellst nach einem Vortrag als kritisches, faires Publikum gezielte Rückfragen \
-an die vortragende Person. Vorrang in dieser Reihenfolge:
+PERSONAS: dict[Persona, str] = {
+    "student": "Du bist ein neugieriger Studierender im ersten Semester. Du hast den Vortrag gerade gehört und \
+kennst die Vorlesungsunterlagen (die Quellenauszüge), verstehst das Thema aber noch nicht gut. Du sprichst \
+einfach und direkt, duzt die vortragende Person und fragst nach Begriffen, Begründungen und Beispielen, die dir \
+nicht klar geworden sind. Steht in den Unterlagen etwas anderes, sagst du das ehrlich und fragst, was nun stimmt.",
+    "tutor": "Du bist Lehrperson des Fachs (Professur oder Tutorium) und kennst die Vorlesungsunterlagen \
+(die Quellenauszüge). Du fragst fachlich präzise, kritisch und fair, siezt die vortragende Person und \
+verlangst Begründungen, Belege und saubere Abgrenzungen. Bei Widersprüchen nennst du die Quelle.",
+}
+FALLBACK_REPLY: dict[Persona, str] = {
+    "student": "Okay, danke! Dazu habe ich in den Unterlagen aber nichts Eindeutiges gefunden.",
+    "tutor": "Danke. Dazu finde ich in den Unterlagen keine eindeutige Stelle.",
+}
+UNHEARD_REPLY: dict[Persona, str] = {
+    "student": "Sorry, ich habe dich akustisch nicht verstanden. Kannst du das nochmal sagen?",
+    "tutor": "Ich habe Ihre Antwort akustisch nicht verstanden. Bitte wiederholen Sie sie.",
+}
+
+QUESTION_PROMPT = """{persona}
+Du stellst nach dem Vortrag gezielte Rückfragen an die vortragende Person. Vorrang in dieser Reihenfolge:
 1. "contradiction": eine Quelle widerspricht einer Aussage (Befund mit Urteil "widerspricht"). Gib den Befund an.
 2. "unsupported": eine Aussage ist in den Quellen nicht belegt (Befund mit Urteil "nicht gefunden"). Gib den Befund an.
 3. "gap": ein wichtiger Inhalt eines Quellenauszugs fehlt im Vortrag oder wird nur angerissen. \
 Gib den Auszug und ein wörtliches Zitat daraus an (exakt kopiert, höchstens ein Satz).
 4. "clarification": eine vage, unbegründete oder unklare Stelle im Transkript. Gib die Satznummern an.
 Jede Frage ist kurz, konkret, in der Sprache des Transkripts und in wenigen Sätzen beantwortbar. \
+Sie wird vorgelesen: ganze Sätze, keine Aufzählungen, Klammern oder Abkürzungen. \
 Verrate nicht die Antwort aus der Quelle. Keine Wertung der Person, keine Punkte, keine Noten.
 Antworte nur mit JSON:
 {"questions": [{"kind": "contradiction|unsupported|gap|clarification", "question": "<Frage>", \
@@ -50,7 +77,8 @@ Antworte nur mit JSON:
 "query": "<kurze Suchanfrage, um eine Antwort in den Quellen zu prüfen>"}]}
 Höchstens {limit} Fragen, die wichtigsten zuerst."""
 
-ANSWER_PROMPT = """Du vergleichst die Antwort auf eine Rückfrage nach einem Vortrag mit nummerierten Auszügen. \
+ANSWER_PROMPT = """{persona}
+Du vergleichst die Antwort auf deine Rückfrage nach dem Vortrag mit nummerierten Auszügen. \
 Urteile ausschließlich anhand der Auszüge, nicht mit eigenem Wissen.
 - "supports": ein Auszug bestätigt den Kern der Antwort.
 - "contradicts": ein Auszug widerspricht der Antwort ausdrücklich, z. B. andere Zahl, anderes Datum, andere Person.
@@ -59,9 +87,12 @@ Bei "supports" und "contradicts" gib die Nummer des Auszugs und ein wörtliches 
 ein zusammenhängendes Stück aus genau diesem Auszug, exakt kopiert, höchstens zwei Sätze.
 Begründe in einem Satz in der Sprache der Antwort, ohne Wertung der Person, ohne Punkte oder Noten.
 Lässt die Antwort die Frage offen oder widerspricht sie den Auszügen, stelle eine kurze Nachfrage, sonst leer.
+Formuliere außerdem deine gesprochene Reaktion in deiner Rolle: ein bis zwei Sätze, die vorgelesen werden, \
+passend zum Urteil, inhaltlich nur aus den Auszügen, ohne die Nachfrage zu wiederholen, ohne Lob in Punkten \
+oder Noten und ohne Bewertung der Person.
 Antworte nur mit JSON:
 {"verdict": "supports|contradicts|not_found", "passage": <Nummer oder null>, "quote": "<Zitat oder leer>", \
-"explanation": "<ein Satz>", "follow_up": "<Nachfrage oder leer>"}"""
+"explanation": "<ein Satz>", "reply": "<gesprochene Reaktion>", "follow_up": "<Nachfrage oder leer>"}"""
 
 FINDING_LABELS = {"contradicts": "widerspricht", "not_found": "nicht gefunden", "supports": "stützt",
                   "unchecked": "nicht geprüft"}
@@ -169,7 +200,9 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
     config = request.config
     items = sentences(request.words)
     transcript, truncated = _numbered_transcript(items)
-    notices = [f"Fragen stammen vom Sprachmodell {llm.model}; sie sind Übungsfragen, keine Bewertung.",
+    notices = [f"Fragen stammen vom Sprachmodell {llm.model} in der Rolle "
+               f"{'Studierender' if request.persona == 'student' else 'Lehrperson'}; "
+               "sie sind Übungsfragen, keine Bewertung.",
                "Antworten werden nur mit den Quellen verglichen, es gibt keine Punkte oder Noten."]
     if truncated:
         notices.append("Langes Transkript: nur der Anfang wurde für die Fragen verwendet.")
@@ -188,7 +221,7 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
         notices.append("Keine fertig verarbeiteten Quellen: keine Fragen zu fehlenden Inhalten.")
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1)) or "(keine Auszüge)"
     answer = llm.complete_json(
-        QUESTION_PROMPT.replace("{limit}", str(config.max_questions)),
+        QUESTION_PROMPT.replace("{persona}", PERSONAS[request.persona]).replace("{limit}", str(config.max_questions)),
         f"Transkript (Satznummer, Zeit, Satz):\n{transcript}\n\n"
         f"Faktencheck-Befunde (Nummer, Zeit, Urteil, Behauptung):\n{_numbered_findings(request.claims)}\n\n"
         f"Quellenauszüge:\n{context}",
@@ -200,8 +233,8 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
               for q in questions if q.t_ms is not None]
     if not questions:
         notices.append("Das Modell hat keine belastbaren Rückfragen vorgeschlagen.")
-    return QuestionResult(questions=questions, events=merge_timeline(events), model=llm.model,
-                          sources_used=bool(passages), config=config, notices=notices)
+    return QuestionResult(questions=questions, events=merge_timeline(events), persona=request.persona,
+                          model=llm.model, sources_used=bool(passages), config=config, notices=notices)
 
 
 def evidence_passage(evidence: Evidence) -> Passage:
@@ -228,29 +261,32 @@ def review_answer(request: AnswerRequest, llm: ChatModel,
         except (psycopg.Error, ValueError) as error:
             log.warning("Answer source lookup failed (%s)", type(error).__name__)
             notes.append("Abruf der Quellen fehlgeschlagen.")
+    fallback = FALLBACK_REPLY[request.persona]
     if not passages:
-        return AnswerReview(verdict="unchecked", explanation="", checked=checked, model=llm.model,
+        return AnswerReview(verdict="unchecked", explanation="", checked=checked, reply=fallback, model=llm.model,
                             notes=notes + ["Keine Quellenauszüge zum Vergleich vorhanden."])
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1))
     said = f"\nGesagt im Vortrag: {question.transcript}" if question.transcript else ""
     try:
-        answer = llm.complete_json(ANSWER_PROMPT, f"Frage: {question.question}\nAnlass: {question.reason}{said}\n\n"
+        answer = llm.complete_json(ANSWER_PROMPT.replace("{persona}", PERSONAS[request.persona]),
+                                   f"Frage: {question.question}\nAnlass: {question.reason}{said}\n\n"
                                                   f"Antwort: {request.answer}\n\nAuszüge:\n{context}")
     except (LLMError, httpx.HTTPError) as error:
         log.warning("Answer review failed (%s)", type(error).__name__)
-        return AnswerReview(verdict="unchecked", explanation="", checked=checked, model=llm.model,
+        return AnswerReview(verdict="unchecked", explanation="", checked=checked, reply=fallback, model=llm.model,
                             notes=notes + ["Sprachmodell nicht erreichbar."])
     verdict = answer.get("verdict")
     explanation = _text(answer, "explanation", 500)
+    reply = _text(answer, "reply", 500) or fallback
     evidence = None
     if verdict not in ("supports", "contradicts", "not_found"):
-        verdict, explanation = "not_found", ""
+        verdict, explanation, reply = "not_found", "", fallback
         notes.append("Modellantwort ohne gültiges Urteil verworfen.")
     elif verdict != "not_found":
         evidence = verified_evidence(answer.get("quote"), answer.get("passage"), passages,
                                      request.config.min_quote_chars)
         if evidence is None:
-            verdict, explanation = "not_found", ""
+            verdict, explanation, reply = "not_found", "", fallback
             notes.append("Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen.")
     follow_text = _text(answer, "follow_up", 500)
     follow_up = Question(
@@ -260,4 +296,18 @@ def review_answer(request: AnswerRequest, llm: ChatModel,
         evidence=question.evidence, query=question.query,
     ) if follow_text else None
     return AnswerReview(verdict=verdict, explanation=explanation, evidence=evidence, checked=checked,
-                        follow_up=follow_up, model=llm.model, notes=notes)
+                        follow_up=follow_up, reply=reply, model=llm.model, notes=notes)
+
+
+def review_voice_answer(request: VoiceAnswerRequest, recording: Path, transcriber: Transcriber, llm: ChatModel,
+                        retrieve: Callable[[UUID, str, int], list[SourceHit]] | None = retrieval.search
+                        ) -> AnswerReview:
+    """Transcribe a spoken answer, then review it like a typed one."""
+    with tempfile.TemporaryDirectory() as workdir:
+        words = transcriber.transcribe(extract_audio(recording, Path(workdir) / "answer.wav"))
+    text = " ".join(w.word for w in words).strip()[:4000]
+    if not text:
+        return AnswerReview(verdict="unchecked", explanation="", checked=[], reply=UNHEARD_REPLY[request.persona],
+                            answer="", model=llm.model, notes=["Keine Sprache in der Antwort erkannt."])
+    review = review_answer(AnswerRequest(answer=text, **request.model_dump()), llm, retrieve)
+    return review.model_copy(update={"answer": text})

@@ -146,6 +146,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/questions/answers/voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Voice Answer Review
+         * @description Transcribe a spoken answer with the configured ASR, then compare it with the sources.
+         *
+         *     Audio goes to the ASR provider (default: Deepgram EU), the transcript to
+         *     the configured language model. Audio and request are deleted after
+         *     processing. The result has the transcript in `answer` and the persona's
+         *     reply to read aloud; poll `/questions/answers/{job_id}`.
+         */
+        post: operations["start_voice_answer_review_questions_answers_voice_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/questions/answers/{job_id}": {
         parameters: {
             query?: never;
@@ -361,10 +386,21 @@ export interface components {
             /** Collection Id */
             collection_id?: string | null;
             config?: components["schemas"]["QuestionConfig"];
+            /**
+             * Persona
+             * @default tutor
+             * @enum {string}
+             */
+            persona: "student" | "tutor";
             question: components["schemas"]["Question"];
         };
         /** AnswerReview */
         AnswerReview: {
+            /**
+             * Answer
+             * @description Transcript of a spoken answer
+             */
+            answer?: string | null;
             /**
              * Checked
              * @description Where the answer was compared
@@ -378,6 +414,12 @@ export interface components {
             model: string;
             /** Notes */
             notes?: string[];
+            /**
+             * Reply
+             * @description What the persona says back, to be read aloud; no grading
+             * @default
+             */
+            reply: string;
             /**
              * Verdict
              * @description `unchecked`: no passage to compare with or the check failed
@@ -453,6 +495,19 @@ export interface components {
              * @default true
              */
             transcribe: boolean;
+        };
+        /** Body_start_voice_answer_review_questions_answers_voice_post */
+        Body_start_voice_answer_review_questions_answers_voice_post: {
+            /**
+             * Recording
+             * @description Spoken answer (WebM, MP4, WAV, ...)
+             */
+            recording: string;
+            /**
+             * Request
+             * @description VoiceAnswerRequest JSON: question, collection_id, persona
+             */
+            request: string;
         };
         /** Body_upload_source_sources_post */
         Body_upload_source_sources_post: {
@@ -762,6 +817,13 @@ export interface components {
             collection_id?: string | null;
             config?: components["schemas"]["QuestionConfig"];
             /**
+             * Persona
+             * @description Who asks: curious student or professor/tutor
+             * @default tutor
+             * @enum {string}
+             */
+            persona: "student" | "tutor";
+            /**
              * Words
              * @description Word timestamps relative to recording start
              */
@@ -776,6 +838,12 @@ export interface components {
             model: string;
             /** Notices */
             notices: string[];
+            /**
+             * Persona
+             * @default tutor
+             * @enum {string}
+             */
+            persona: "student" | "tutor";
             /** Questions */
             questions: components["schemas"]["Question"][];
             /** Sources Used */
@@ -1141,6 +1209,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_voice_answer_review_questions_answers_voice_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_start_voice_answer_review_questions_answers_voice_post"];
             };
         };
         responses: {

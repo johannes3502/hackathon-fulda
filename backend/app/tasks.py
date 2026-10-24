@@ -81,8 +81,9 @@ QUESTION_PREFIX = "question-jobs"
 ANSWER_PREFIX = "answer-jobs"
 
 
-def _model_job(task, job_id: str, prefix: str, job_model, run, error: str) -> dict[str, str]:
-    """Shared body of LLM jobs: lock, reuse terminal results, delete the stored request.
+def _model_job(task, job_id: str, prefix: str, job_model, run, error: str,
+               inputs: tuple[str, ...] = ("request.json",)) -> dict[str, str]:
+    """Shared body of LLM jobs: lock, reuse terminal results, delete the stored inputs.
 
     `run(request)` maps the stored request JSON to the result model.
     """
@@ -106,7 +107,8 @@ def _model_job(task, job_id: str, prefix: str, job_model, run, error: str) -> di
                 logging.getLogger(__name__).warning("%s job %s failed (%s)", prefix, job_id, type(failure).__name__)
                 status = job_model(job_id=job_id, status="failed", error=error)
             storage.write_json(job_id, "status.json", status.model_dump(mode="json"), prefix)
-        s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=storage.key(job_id, "request.json", prefix))
+        for name in inputs:
+            s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=storage.key(job_id, name, prefix))
         return {"job_id": job_id, "status_key": storage.key(job_id, "status.json", prefix)}
     finally:
         lock.release()
@@ -151,3 +153,24 @@ def review_answer(self, job_id: str) -> dict[str, str]:
     return _model_job(self, job_id, ANSWER_PREFIX, AnswerJob,
                       lambda request: pipeline.review_answer(AnswerRequest.model_validate(request), configured_llm()),
                       "Antwort konnte nicht verglichen werden. LLM-Konfiguration und Erreichbarkeit prüfen.")
+
+
+@celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
+def review_voice_answer(self, job_id: str) -> dict[str, str]:
+    """Transcribe one spoken answer and compare it with the sources; audio and request are deleted afterwards."""
+    from app.factcheck.llm import configured_llm
+    from app.questions import pipeline
+    from app.questions.models import AnswerJob, VoiceAnswerRequest
+    from app.transcription.transcriber import configured_transcriber
+
+    def run(request: dict):
+        with tempfile.TemporaryDirectory() as workdir:
+            recording = Path(workdir) / "recording"
+            s3_client().download_file(os.environ["S3_BUCKET"], storage.key(job_id, "recording", ANSWER_PREFIX),
+                                      str(recording))
+            return pipeline.review_voice_answer(VoiceAnswerRequest.model_validate(request), recording,
+                                                configured_transcriber(), configured_llm())
+
+    return _model_job(self, job_id, ANSWER_PREFIX, AnswerJob, run,
+                      "Gesprochene Antwort konnte nicht verarbeitet werden. ASR- und LLM-Konfiguration prüfen.",
+                      inputs=("request.json", "recording"))

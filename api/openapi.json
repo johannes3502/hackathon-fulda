@@ -169,6 +169,15 @@
           "config": {
             "$ref": "#/components/schemas/QuestionConfig"
           },
+          "persona": {
+            "default": "tutor",
+            "enum": [
+              "student",
+              "tutor"
+            ],
+            "title": "Persona",
+            "type": "string"
+          },
           "question": {
             "$ref": "#/components/schemas/Question"
           }
@@ -182,6 +191,18 @@
       },
       "AnswerReview": {
         "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Transcript of a spoken answer",
+            "title": "Answer"
+          },
           "checked": {
             "description": "Where the answer was compared",
             "items": {
@@ -228,6 +249,12 @@
             },
             "title": "Notes",
             "type": "array"
+          },
+          "reply": {
+            "default": "",
+            "description": "What the persona says back, to be read aloud; no grading",
+            "title": "Reply",
+            "type": "string"
           },
           "verdict": {
             "description": "`unchecked`: no passage to compare with or the check failed",
@@ -444,6 +471,27 @@
           "recording"
         ],
         "title": "Body_analyze_speech_analyze_post",
+        "type": "object"
+      },
+      "Body_start_voice_answer_review_questions_answers_voice_post": {
+        "properties": {
+          "recording": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Spoken answer (WebM, MP4, WAV, ...)",
+            "title": "Recording",
+            "type": "string"
+          },
+          "request": {
+            "description": "VoiceAnswerRequest JSON: question, collection_id, persona",
+            "title": "Request",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recording",
+          "request"
+        ],
+        "title": "Body_start_voice_answer_review_questions_answers_voice_post",
         "type": "object"
       },
       "Body_upload_source_sources_post": {
@@ -1162,6 +1210,16 @@
           "config": {
             "$ref": "#/components/schemas/QuestionConfig"
           },
+          "persona": {
+            "default": "tutor",
+            "description": "Who asks: curious student or professor/tutor",
+            "enum": [
+              "student",
+              "tutor"
+            ],
+            "title": "Persona",
+            "type": "string"
+          },
           "words": {
             "description": "Word timestamps relative to recording start",
             "items": {
@@ -1201,6 +1259,15 @@
             },
             "title": "Notices",
             "type": "array"
+          },
+          "persona": {
+            "default": "tutor",
+            "enum": [
+              "student",
+              "tutor"
+            ],
+            "title": "Persona",
+            "type": "string"
           },
           "questions": {
             "items": {
@@ -1895,6 +1962,48 @@
           }
         },
         "summary": "Start Answer Review",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/answers/voice": {
+      "post": {
+        "description": "Transcribe a spoken answer with the configured ASR, then compare it with the sources.\n\nAudio goes to the ASR provider (default: Deepgram EU), the transcript to\nthe configured language model. Audio and request are deleted after\nprocessing. The result has the transcript in `answer` and the persona's\nreply to read aloud; poll `/questions/answers/{job_id}`.",
+        "operationId": "start_voice_answer_review_questions_answers_voice_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_start_voice_answer_review_questions_answers_voice_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Voice Answer Review",
         "tags": [
           "questions"
         ]

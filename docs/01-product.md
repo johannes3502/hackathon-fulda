@@ -76,9 +76,18 @@ ist weiterhin offen; die Karte behauptet keine gemessene persönliche Bewertung.
 - Umgesetzt (24.10.2026, Nutzerauftrag): bis zu 5 Fragen pro Runde, zuerst zu
   Widersprüchen und nicht belegten Aussagen aus dem Fact-Check, dann zu
   Quelleninhalten, die im Vortrag fehlen, dann zu unklaren Stellen.
-- Antworten nur als Text; Abgleich mit den Quellen (stützt / widerspricht /
-  nicht gefunden) plus optionale Nachfrage. Keine Punkte, keine Noten.
-- Offen: Spracheingabe für Antworten, Schwierigkeitsgrad, Anzahl der Fragen.
+- Antworten getippt oder gesprochen; Abgleich mit den Quellen (stützt /
+  widerspricht / nicht gefunden) plus optionale Nachfrage. Keine Punkte,
+  keine Noten.
+- Voice-Agent (24.10.2026, Nutzerauftrag): Gespräch nach dem Vortrag in zwei
+  Rollen, „Curious student“ (naiv, duzt, fragt nach Begriffen und Beispielen)
+  und „Professor / tutor“ (präzise, siezt, fragt nach Belegen). Fragen und
+  Reaktionen liest der Browser vor (`speechSynthesis`); die gesprochene
+  Antwort wird per Deepgram transkribiert und gegen die hochgeladenen
+  Vorlesungsunterlagen geprüft. Die Rolle ändert nur den Stil, nicht die
+  Quellenbindung.
+- Offen: automatisches Antwortende per Stille-Erkennung (aktuell Button
+  „Done“), Sprache außer Deutsch, Anzahl der Fragen.
 
 ### Daten und Datenschutz
 - Lokales Grundgerüst: PostgreSQL und S3-Dateispeicher mit persistenten
@@ -138,5 +147,6 @@ einbauen**:
 | 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
 | 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |
+| 24.10.2026 | Voice-Agent mit zwei Rollen | Nutzerauftrag: nach dem Vortrag mit einem Agenten sprechen, der Fragen stellt und Antworten gegen die Vorlesungsunterlagen prüft; Rollen „dummer Schüler“ (umgesetzt als neugieriger Erstsemester) und Professor/Tutor. |
 | 24.10.2026 | Frage-Simulator umgesetzt | Nutzerauftrag: Feature 5 vollständig einbauen; Fragen aus Fact-Check-Funden und Quellen, getippte Antworten gegen Quellen geprüft, ohne Bewertung. |
 | 24.10.2026 | Fact-Check mit RAG und Web-Zweitquelle | Nutzerauftrag: hochgeladene Quellen (z. B. Vorlesungsfolien) zuerst, Web nur als Fallback; LLM über OpenAI-kompatible API, Anbieter offen. Transkription im Live-Studio als Opt-in. |
