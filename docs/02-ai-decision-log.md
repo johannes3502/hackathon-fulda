@@ -404,4 +404,6 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
   automatisierte Browserprüfungen verwenden synthetische Kamera/Audio-Daten
   und deterministische API-Antworten. Das ist keine Safari-/Mikrofon- oder
   allgemeine Modellqualitätsvalidierung. Nutzerprüfung mit echtem Mikrofon
-  nach der Korrektur erneut angefragt; Ergebnis steht noch aus.
+  nach der Korrektur bestätigt: funktioniert, Verarbeitung als langsam
+  empfunden, vom Nutzer für diesen Stand ausdrücklich akzeptiert. Keine
+  gemessene Laufzeit oder Wortfehlerrate aus diesem informellen Versuch.

@@ -80,7 +80,7 @@ Vor-Ort-Abnahme nicht. Keine echten Juryaufnahmen als Testfixtures einchecken.
 | Reale Zeitzuordnung | Marker führt zur tatsächlich gezeigten Bewegung, einschließlich Anfang/Ende der Aufnahme | Offen – vor Ort ausführen |
 | Safari/iPhone (optional) | Berechtigung, Modell, MP4-Aufnahme, Stop, Replay und Download | Nicht qualifiziert; für die lokale Laptop-Demo nicht vorausgesetzt |
 | Lokale Dienste / Assets | App, Modell-Assets und optional Compose-Audio-Backend vor Start laden | Lokal prüfen; keine öffentliche URL benötigt |
-| Lokale KI | Whisper, Quellenvergleich, Frage und Antwort auf synthetischen Daten | Reale lokale Modelle und Desktop-/Mobile-Viewport-Flows geprüft; echtes Mikrofon vor Ort prüfen |
+| Lokale KI | Whisper, Quellenvergleich, Frage und Antwort auf synthetischen Daten | Reale lokale Modelle und Desktop-/Mobile-Viewport-Flows geprüft; Nutzer bestätigt Mikrofon/Transkript funktioniert, langsam, für diesen Stand akzeptiert |
 | Lokaler Fallback | `/gestures` und vorbereitete Sprach-/Frage-Session vorher öffnen | Automatisiert prüfen; am Stand wiederholen |
 | Einwilligung | Vor Aufnahme erklären: lokal oder optional Backend-Audio-Upload, Speicherung, Download/Verlassen | UI-Hinweise vorhanden; Team erklärt vor Ort |
 

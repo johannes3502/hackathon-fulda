@@ -144,8 +144,10 @@ sind im Protokoll beschrieben. Modelle können weiterhin falsch urteilen.
 
 Whisper `small` transkribierte die 6,845-s-eSpeak-Fixture mit 13 Wort-Timestamps:
 „In unserem Prototyp üben wir Präsentationen. Wir sprechen deutlich und erklären
-unsere Quellen.“ Das bestätigt die lokale Verbindung; echte Mikrofone,
-Dialekte, Füllwörter und Zeitgenauigkeit bleiben gesondert zu prüfen.
+unsere Quellen.“ Das bestätigt die lokale Verbindung. Der Nutzer bestätigte
+anschließend auch den echten Mikrofon-/Transkriptfluss: funktioniert, aber
+langsam; für diesen Stand akzeptiert. Dialekte, Füllwörter und Zeitgenauigkeit
+sind damit nicht allgemein geprüft.
 
 ## Primärquellen
 
