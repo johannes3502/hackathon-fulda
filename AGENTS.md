@@ -146,6 +146,8 @@ Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO,
 pgvector und die vollständige Aufnahme-/Clip-/Review-Pipeline aus der
 Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
+Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
+Bewertungs-/Feedback-Regeln darauf sind noch offen (`frontend/DATA_POINTS.md`).
 Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
 jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte

@@ -170,3 +170,9 @@ TypeScript, ESLint, Produktionsbuild und API-Aktualitätscheck bestanden.
   prüft PostgreSQL, S3, Queue und API-Antwort während eines Worker-Jobs.
 - Frontend-Seiten und `/api/health/ready` per HTTP geprüft. Keine neue
   Kamera-/Mikrofon-, Smartphone-, Anbieter- oder Deployment-Prüfung.
+- Neue Pose-Capture-Arbeit aus main integriert; Konflikte in den kurzen
+  Frontend-/Handoff-Anleitungen und der verschobenen Ignore-Datei gelöst.
+  Generierte Pose-Runtime bleibt in Git und im Docker-Build-Kontext ignoriert.
+- Danach erneut Typecheck, ESLint und 34 Frontend-Tests bestanden; Pose-Worker,
+  JS-/WASM-Runtime und Modell über HTTP erreichbar, Modell-Prüfsumme stimmt
+  mit dem eingecheckten Asset überein.

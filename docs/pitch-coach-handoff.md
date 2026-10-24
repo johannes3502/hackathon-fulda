@@ -26,6 +26,11 @@ around a selected marker. Download before refresh or leaving `/live`. The
 backend stores queued uploads and results in S3 and deletes originals after
 terminal processing; there are no event clips or persistent session history yet.
 
+Pose capture runs locally in a MediaPipe worker and exports JSONL without
+sending landmarks to the backend. Preview and recording logs use separate time
+anchors; a take resets the preview log. The recording log remains downloadable
+in review. [Data points and heuristics](../frontend/DATA_POINTS.md).
+
 The old video WebSocket prototype has been removed. A separate live audio
 transcription design remains [planned, not implemented](../backend/app/transcription/README.md).
 
@@ -46,7 +51,7 @@ the sample controls and validate external input before dispatching events.
   without attributing it to a new user recording. Storage failure leaves the
   in-memory sample usable.
 
-Pose/gesture/gaze detection, source ingest/fact-check, judge questions and
+Pose/gesture/gaze feedback rules, source ingest/fact-check, judge questions and
 answer evaluation still use sample data. Session persistence, presigned uploads
 and event-clip retrieval are also pending. Keep these boundaries visible when
 connecting new services; no fabricated scores or model results.

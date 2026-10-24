@@ -24,6 +24,18 @@ and retains analysis results in S3; original uploads are deleted after terminal
 processing. See [storage behavior and limits](../backend/README.md).
 Failed analysis preserves the local recording. Sample findings are simulated.
 
+## Local pose capture
+
+In the camera studio, choose **Start pose capture**, then **Stop pose capture**
+and **Download pose JSONL**. A local MediaPipe worker records landmarks without
+uploading them. Starting a take resets the preview log and anchors it to video
+start; the take's log can also be downloaded in review. Download preview data
+before starting a take to keep it. These samples do not replace scripted feedback.
+
+[Data points and heuristics](DATA_POINTS.md) · [Model provenance](public/pose/README.md).
+`npm run dev` and `npm run build` prepare the runtime assets automatically;
+deploy `public/pose` with the frontend. Model failures leave recording available.
+
 ## Backend connection
 
 Compose sets `NEXT_PUBLIC_API_URL=/api`. Next.js forwards requests to
