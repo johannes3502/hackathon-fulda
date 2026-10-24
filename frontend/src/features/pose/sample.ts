@@ -163,6 +163,15 @@ export function poseSample(
     const v = sub(p[0], mid(shoulders[0], shoulders[1]));
     return (side * (v[0] * axis[0] + v[1] * axis[1])) / span;
   };
+  // Forearm direction against the shoulder line, folded to [0,90]; 0 = level.
+  const forearm = (e: number, w: number) => {
+    const p = get(e, w)?.map(planar);
+    const a =
+      p && shoulders
+        ? angle(sub(p[1], p[0]), sub(shoulders[0], shoulders[1]))
+        : null;
+    return a === null ? null : Math.min(a, 180 - a);
+  };
   return {
     t_ms: Math.round(tMs),
     image: { width, height },
@@ -187,6 +196,8 @@ export function poseSample(
       right_wrist_height: wrist(12, 16),
       left_wrist_cross: cross(15, -1),
       right_wrist_cross: cross(16, 1),
+      left_forearm_deg: forearm(13, 15),
+      right_forearm_deg: forearm(14, 16),
     },
     quality: {
       pose_present: true,
