@@ -145,7 +145,7 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph Host["docker compose (localhost only)"]
-        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000"]
+        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000<br/>Health: Homepage, Studio, Review, Backend"]
         BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, --reload"]
         WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Concurrency 2"]
         PG[("postgres<br/>pgvector :5432<br/>Volume: postgres_data")]

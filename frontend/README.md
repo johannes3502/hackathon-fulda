@@ -4,6 +4,15 @@ Start the full stack using the [root README](../README.md), then open
 <http://localhost:3000>. Changes in `frontend/src/` reload automatically;
 rebuild after changing dependencies or configuration.
 
+If Turbopack reports a newly merged module as missing although it exists inside
+the container, restart only the frontend with `docker compose restart frontend`
+(`docker --context colima compose restart frontend` when using Colima). The
+file watcher can miss new files across the host mount. This cleared the stale
+`lab-events` and review-component errors without changing source files or data.
+The frontend healthcheck also compiles `/live` and `/live/healthcheck/review`,
+so a working homepage cannot conceal a broken studio or review. The review probe
+opens the missing-recording state; it does not create a take or access a recording.
+
 ## Use
 
 - **Recording dashboard** (`/`, also `/stats-preview`): counts, durations and

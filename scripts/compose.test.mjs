@@ -1,11 +1,24 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import test from "node:test";
 
 // Resolves anchors and interpolation without requiring a running Docker engine.
 const { services } = JSON.parse(execFileSync("docker", [
   "compose", "--env-file", ".env.example", "config", "--format", "json",
 ], { encoding: "utf8" }));
+
+for (const failedPath of [null, "/", "/live", "/live/healthcheck/review", "/api/health/ready"]) {
+  test(`frontend healthcheck ${failedPath ? `rejects a failure on ${failedPath}` : "accepts healthy routes"}`, () => {
+    const [, command, flag, script] = services.frontend.healthcheck.test;
+    assert.equal(command, "node");
+    assert.equal(flag, "-e");
+    const result = spawnSync(process.execPath, ["-e", `
+      globalThis.fetch = async url => ({ ok: new URL(url).pathname !== ${JSON.stringify(failedPath)} });
+      ${script}
+    `], { encoding: "utf8", timeout: 5000 });
+    assert.equal(result.status, failedPath ? 1 : 0, result.stderr);
+  });
+}
 
 test("each image has one builder, preventing concurrent exports to the same tag", () => {
   const built = new Set();
