@@ -1,90 +1,123 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-> **Einstiegspunkt für Menschen und Agents.**
-> Lies dieses File zuerst. Das Thema ist fix.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Archiv (`archive/`) ist nicht Scope.
 
----
+## 1. Projekt
 
-## 0. Mission & Status
+**Live-Präsentationstrainer** (8. Hackathon Fulda, 24.–25.10.2026, Thema Future Education): analysiert Auftritt und Sprache, macht Feedback timestamp-genau zurückspulbar und fragt danach gezielt nach. Web-App für Laptop und Smartphone, öffentliche URL, kein Login.
 
-**Mission:** Beim 8. Hackathon Fulda (24.–25.10.2026) einen funktionsfähigen
-**Live-Präsentationstrainer** bauen.
+| # | Feature | Inhalt |
+|---|---|---|
+| 1 | Posture / Gesture / Eye Tracking | Pose-, Gesten- und Blick-Landmarks aus der Kamera; Regeln darauf erzeugen Events (z. B. „Haltung auffällig“) |
+| 2 | Transkription + Fact-Check | Transkript mit Wort-Timestamps; Abgleich der Aussagen per RAG mit vorab hochgeladenen Quellen (PDF, PPTX, …); Web-Fetch-Agent als Zweitquelle |
+| 3 | Sprechmerkmale | Tempo, Pausen, Zögern, Füllwörter, Lautstärke (zu leise/laut) |
+| 4 | Timestamp-Review | Events auf einer Timeline; Klick springt zur Stelle und spielt den Clip des Events ab |
+| 5 | Frage-Simulator | Agent stellt nach der Präsentation Fragen, abgeleitet aus Transkript, Quellen und Fact-Check-Funden |
 
-**Status (24.10.2026):**
-- Thema und Feature-Rahmen sind **fix**.
-- Die fünf Features sind **erste Beschreibungen**, kein ausgearbeitetes Konzept.
-- Alte Viva-Unterlagen und Research sind gelöscht.
-- Kein Feature hinzufügen, das nicht in `docs/01-product.md` steht.
+**Leitplanken:** nur diese fünf Features; keine erfundenen Scores, Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeits-/Notenbewertung; nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
 
-**Ein Satz:** *Ein Live-Präsentationstrainer, der Auftritt und Sprache
-analysiert, Feedback timestamp-genau zurückspulbar macht und danach Fragen
-simuliert.*
+## 2. Ablauf
 
----
+1. **Vorbereitung:** Nutzer lädt Quellen hoch (PDF, PPTX, Text). Backend zerlegt sie in Chunks mit Quelle und Seite/Folie und legt sie für die Suche ab.
+2. **Aufnahme:** Kamera und Mikro laufen. Im Browser erzeugt MediaPipe live Pose-/Blick-Landmarks, daraus entstehen Events; das Mikro liefert den Pegel.
+3. **Upload:** Nach dem Stoppen wird die komplette Aufnahme hochgeladen.
+4. **Analyse (Backend):** Transkription mit Wort-Timestamps, Sprechmerkmale, Fact-Check. Pro Event wird ein kurzer Clip geschnitten, die Aufnahme danach gelöscht.
+5. **Review:** Timeline über alle Events; Klick spielt den Clip, ggf. mit Skelett-Overlay.
+6. **Frage-Simulator:** Der Agent stellt gezielte Rückfragen, vor allem zu Widersprüchen und Lücken aus dem Fact-Check, und vergleicht die Antworten mit den Quellen.
 
-## 1. Fixe Features
+## 3. Tech-Stack
 
-| # | Feature |
+**Entschieden (Zielarchitektur; aktueller Umsetzungsstand in Abschnitt 6)**
+
+| Schicht | Technik |
 |---|---|
-| 1 | Live Posture / Gesture / Eye Tracking |
-| 2 | Audio-Transkription; Fact-Checking über Daten-Upload und Web-Fetch-Agent |
-| 3 | Pausen, Zögern, Sprechtempo, Füllwörter (Liste offen: „…“) |
-| 4 | Nach dem Feedback zurückscrollen und Fehler timestamp-basiert ansehen |
-| 5 | Frage-Simulator im Anschluss (Details offen) |
+| Frontend | Next.js (App Router) + TypeScript; Kamera, MediaPipe und `MediaRecorder` laufen ausschließlich client-seitig |
+| Backend | Python 3.12 + FastAPI |
+| Datenbank | Postgres mit `pgvector` (Docker Compose): Sessions, Events, Transkript, Quellen-Chunks + Embeddings |
+| Objektspeicher | MinIO, S3-kompatibel (Docker Compose): Uploads, Event-Clips, Snapshots; Browser lädt per Presigned URL direkt hoch |
+| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker, FaceLandmarker (Iris, Kopfausrichtung), HandLandmarker |
+| Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
+| Medien-Verarbeitung | `ffmpeg` im Backend: Clips schneiden, WebM/MP4 remuxen (seekbar machen) |
+| Transkription | Gehostete ASR-API hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}`), damit der Anbieter austauschbar bleibt |
 
-**Wichtig:** Das sind erste Feature-Beschreibungen. Keine Scores,
-Schwellenwerte, Modelle, UI-Details oder zusätzlichen Features erfinden.
-Offene Punkte stehen in `docs/01-product.md`, Abschnitt 3.
+**Vorschläge, noch zu bestätigen** (Bestätigung im `docs/02-ai-decision-log.md` festhalten; Vorlage: `templates/ai-decision-log.md`)
 
----
+- **Transkription:** Stufe A (zuerst): Audio nach dem Stoppen hochladen, Wort-Timestamps zurück. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg → Anbieter mit Füllwort-Option prüfen (z. B. Deepgram, AssemblyAI) oder `faster-whisper`/CrisperWhisper als lokale Alternative. Wort-Timestamps und Füllwort-Unterstützung des gewählten Modells vor der Entscheidung gegen die aktuelle Doku prüfen.
+- **Embeddings:** mehrsprachiges Modell (Inhalte sind deutsch), z. B. Voyage, OpenAI oder lokal bge-m3 / multilingual-e5. Bei wenigen kleinen Dokumenten reicht auch Long-Context ohne Vektoren.
+- **Fact-Check und Frage-Agent:** ein LLM-Anbieter für beides. Für den Web-Fetch-Agent Anbieter-Tool für Suche/Abruf nutzen, kein eigenes Scraping.
+- **Stimme:** Lautstärke per RMS im Browser, relativ zu einer Kalibrierung (ca. 3 s normales Sprechen). Keine Tonhöhen-Analyse.
+- **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
+- **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
-## 2. Harte Fakten
+**Offen:** ASR- und LLM-Anbieter, Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
 
-| Punkt | Fakt |
-|---|---|
-| Event | 8. Hackathon Fulda, 24.–25.10.2026 |
-| Ort | Hochschule Fulda, Halle 8 |
-| Thema | Future Education – Lernen, Lehren und Prüfen neu denken |
-| Unser Produkt | Live-Präsentationstrainer (eigene Challenge; keine Pflicht-Challenge) |
-| Beispiel-Challenges | 6 Vorschläge, ausdrücklich nur Orientierung |
-| Team | mind. 8 Mitglieder (laut Mail; vor Ort bestätigen) |
-| Registrierung | https://hackathon.kaleidoscode.de/register-team |
-| Challenge | `Challenge_HackathonFulda2026_de.pdf` (24.10.2026); Original: https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK |
-| Bewertung | 40 % Pitch (3 Min + 2 Min AI Reflection), 40 % Produktreview, 20 % Technik |
-| Prototyp | lauffähig, eigenständig testbar, Web auf Laptop/Smartphone |
-| WLAN | SSID `Hackathon`, Passwort `Hackathon2026` |
-
-**Harte Deadlines:**
-
-| Zeit | Was |
-|---|---|
-| Sa 10:30 | Scope locked (erledigt: Thema fix) |
-| Sa 11:00 | Coding-Start |
-| Sa 17:30 | Coachings (1–2 Personen) |
-| Sa 19:30 | Pitch-Coaching |
-| So 09:30 | **Feature Freeze** |
-| So 10:30 | **Jury-Walkthrough** — Prototyp lauffähig, 2–3 Min Erklärung |
-| So 10:45 | **Submission** (Puffer; Coding endet 11:00) |
-| So 12:15 | **Pitch** (3 + 2 Minuten) |
-
----
-
-## 3. Leseordnung
-
-Lies nur, was du für die Aufgabe brauchst:
-
-1. **`docs/01-product.md`** — fixe Features, offene Entscheidungen.
-2. **`docs/00-requirements.md`** — Hackathon-Regeln, Bewertung, Checklisten.
-3. **`docs/02-ai-decision-log.md`** — tatsächliches Log für die AI Reflection;
-   Vorlage: `templates/ai-decision-log.md`.
-4. **`templates/team-roles.md`** — Rollen, Gates, RACI.
-
----
-
-## 4. Repo-Map
+## 4. Architektur
 
 ```
-AGENTS.md                          # Einstiegspunkt
+Browser (Next.js, TS)
+ ├─ Kamera → MediaPipe (Pose/Face/Hand) → Regeln → Events + Landmarks      [live, lokal]
+ ├─ Mikro  → AudioWorklet → Pegel/Lautstärke                               [live, lokal]
+ └─ MediaRecorder → komplette Aufnahme ──(Presigned URL)──► MinIO
+                                                     │
+ Quellen-Upload (PDF/PPTX) ──────────────────────────┤
+                                                     ▼
+                                          FastAPI (Python 3.12)
+     ┌──────────────┬─────────────────┬──────────────┴───┬─────────────────┐
+     ▼              ▼                 ▼                  ▼                 ▼
+ Ingest/RAG    Transkription    Sprechanalyse        Fact-Check        Frage-Agent
+ (Chunks +     (Transcriber →   (Tempo, Pausen,     (Aussagen ↔       (Fragen aus
+ Embeddings)   Wort-Timestamps)  Füllwörter)        Quellen-Chunks)    Fact-Check-Funden)
+     │                                                   ▲                 │
+     └───────────── Retrieval (pgvector) ────────────────┴─────────────────┘
+                                   │
+                  ffmpeg: Clip + Snapshot pro Event, Original löschen
+                                   ▼
+        Postgres (Sessions, Events, Transkript, Chunks)   MinIO (Clips, Snapshots, Uploads)
+                                   ▼
+                    Review-UI: Timeline über gemeinsame Zeitachse
+```
+
+### Event-Schema (Vertrag zwischen Frontend und Backend)
+
+Jede Analyse schreibt in dasselbe Schema; die Timeline liest nur dieses.
+
+```
+Event {
+  session_id, id,
+  t_ms          // relativ zum Aufnahmestart
+  duration_ms,
+  type          // posture | gesture | gaze | filler | pause | pace | volume | fact | question
+  severity      // info | hint | warning
+  source        // browser | asr | speech | factcheck | agent
+  clip_key?, snapshot_key?   // Objektspeicher
+  payload       // typabhängig: Landmarks, Wort, Quelle + Zitat, Frage …
+}
+```
+
+### Regeln
+
+- **Gemeinsame Zeitachse:** Alle Events tragen `t_ms` relativ zum Aufnahmestart. Der Landmark-Takt wird an `MediaRecorder.onstart` verankert (`performance.now()`), das Review nutzt nur `video.currentTime`.
+- **Pose-Events:** Regeln auf Landmark-Winkeln, kalibriert gegen eine Baseline (erste Sekunden neutrale Haltung), mit Mindestdauer gegen Flackern. Schwellenwerte sind Konfiguration und im UI als „Heuristik“ gekennzeichnet. Kamera-Framing: Oberkörper muss sichtbar sein, sonst Hinweis statt Auswertung.
+- **Clips statt Vollvideo:** Das Backend schneidet pro Event ein Fenster (ca. 5 s vor/nach, mit Re-Encode für präzise Schnitte) plus Snapshot-Frame und löscht die Originalaufnahme. Aufnahme vorher remuxen, weil `MediaRecorder`-WebM nicht seekbar ist.
+- **Fact-Check:** (1) LLM extrahiert prüfbare Aussagen mit Timestamp aus dem Transkript, (2) Top-k-Chunks pro Aussage aus pgvector, (3) LLM urteilt mit wörtlichem Zitat, (4) Code prüft per String-Match, dass das Zitat im Chunk steht. Drei Ergebnisse: *stützt*, *widerspricht*, *in den Quellen nicht gefunden*. Letzteres ist nicht „falsch“. Web-Fetch kommt erst danach als Zweitquelle.
+- **Frage-Agent:** Eingabe sind Transkript, Quellen-Chunks und die Fact-Check-Funde. Er fragt gezielt nach Widersprüchen und Lücken und vergleicht Antworten mit den Quellen. Ausgabe ohne Punkte oder Noten.
+- **Fallback:** Fällt Modell, API oder Kamera aus, spielt die App eine vorberechnete Beispiel-Session deterministisch ab. Sie ist zugleich der Standard-Einstieg für den Produktreview (Wert in unter 3 Minuten), Live-Aufnahme ist der zweite Pfad (30–60 s reichen).
+- **Datenschutz:** Demo-Daten synthetisch. Live-Aufnahmen der Jury sind echte personenbezogene Daten: Einwilligungshinweis, Originalaufnahme nach der Verarbeitung löschen, Drittanbieter-APIs benennen (relevant für die KI-Reflection).
+- **Daten und Secrets:** Ziel sind Postgres mit pgvector und MinIO; der vorhandene Compose-Stack ist in Abschnitt 6 beschrieben. Secrets nur in `.env`, nicht committen.
+- **Layout (Ziel):** `frontend/` (Next.js), `backend/` (FastAPI); die vorhandene Compose-Datei heißt `compose.yaml`.
+
+## 5. Priorität
+
+1. Aufnahme → Upload → Transkript → Events → Timeline mit Clip-Sprung (Rückgrat, Features 2a und 4).
+2. Pose-Events (2–3 Regeln) und Sprechmerkmale aus Wort-Timestamps.
+3. Quellen-Upload, Ingest und RAG-Fact-Check.
+4. Frage-Agent auf den Fact-Check-Funden.
+5. Stretch: Live-Transkript, Web-Fetch.
+
+## 6. Repo und aktueller Stand
+
+```
+AGENTS.md                          # Einstiegspunkt und Zielarchitektur
 compose.yaml                       # lokales Backend + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
 backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
@@ -93,69 +126,20 @@ backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
 Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
 docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
-  01-product.md                    # fixe Features + offene Punkte
+  01-product.md                    # Features und offene Punkte
   02-ai-decision-log.md            # tatsächliche Entscheidungen und Prüfergebnisse
 templates/
-  ai-decision-log.md               # AI Reflection
+  ai-decision-log.md               # Vorlage für die AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
 ```
 
----
+Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
+PostgreSQL **ohne pgvector** und **SeaweedFS als S3-Speicher**. MinIO,
+pgvector, das Next.js-Frontend und die Analyse-/Aufnahme-Pipeline aus der
+Zielarchitektur sind noch nicht umgesetzt. Die Umstellung des Speichers
+ist eine separate Implementierungsaufgabe; dieser Merge ändert keine Dienste.
 
-## 5. Regeln für Build und Agents
-
-1. **Thema ist fix.** Kein Pivot, keine neuen Produktideen.
-2. **Keine erfundenen Features.** Nur die fünf Features aus
-   `docs/01-product.md`; Details offen markieren statt raten.
-3. **Keine erfundenen Zahlen.** Keine Schwellenwerte, Genauigkeiten oder
-   Marktgrößen ohne Quelle.
-4. **Keine echten personenbezogenen Daten.** Demo-Daten synthetisch.
-5. **Datenspeicherung ist offen.** Vor Audio-/Video-/Transkript-Speicherung
-   entscheiden und dokumentieren.
-6. **AI Decision Log** ab Coding-Start führen, mindestens 5 Einträge.
-7. **Öffentliche URL + QR-Code.** Kein Login, keine Installation.
-8. **90-Sekunden-Wert.** Der Prototyp muss ohne Erklärung funktionieren.
-9. **Laptop + Smartphone testen.**
-10. **Deterministischer Fallback**, wenn Modell oder API ausfällt.
-11. **AI Reflection nicht erfinden.** Nur echte Fehler und Korrekturen.
-12. **Keine Überclaims.** „In unserem Prototyp …“ statt „validiert“.
-13. **Feature Freeze So 09:30.** Danach nur Bugfixes und Demo-Härtung.
-14. **Submission vor 11:00 Sonntag.**
-
----
-
-## 6. Offene Punkte (nicht raten)
-
-Die vollständige Liste steht in `docs/01-product.md`, Abschnitt 3. Kurz:
-
-1. Zielgruppe und Setting.
-2. Metriken, Schwellenwerte, Scores und Live-vs.-Post-Analyse.
-3. Fact-Check: Upload-Formate, Web-Quellen, Umgang mit „keine Quelle“.
-4. Frage-Simulator: Anzahl, Modus, Bewertung.
-5. Speicherung und Löschung von Audio, Video, Transkript.
-6. Webcam-basiertes Eye Tracking oder Hardware.
-7. Hosting, Modelle, Latenz und Fallback; lokaler Stack: `backend/README.md`.
-8. Produktname.
-
----
-
-## 7. Nächste Schritte
-
-- [ ] Offene Punkte priorisieren; nur entscheiden, was für den vertikalen Slice
-      nötig ist.
-- [x] Lokalen Backend-Stack und Docker Compose anlegen.
-- [ ] Hosting festlegen; „Hello World“ deployen.
-- [ ] Vertikalen Slice bauen: Live-Input → Transkript → Feedback-Timeline →
-      Frage-Simulator.
-- [x] AI Decision Log starten (`docs/02-ai-decision-log.md`).
-- [ ] Laptop-/Smartphone-Test und Fallback vorbereiten.
-- [ ] Pitch und AI Reflection aus dem Log ableiten.
-
----
-
-## 8. Quellen
-
-- Offizielle Challenge-PDF: `Challenge_HackathonFulda2026_de.pdf` (24.10.2026).
-- Organisator-Mails, konsolidiert in `docs/00-requirements.md`.
-- Feature-Beschreibungen des Teams vom 24.10.2026, festgehalten in
-  `docs/01-product.md`.
+Start, Smoke-Test und IDE-Debugging: `backend/README.md`. Persistente Volumes
+sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
+Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`
+abgeglichen werden; dort ist noch das bisherige Grundgerüst dokumentiert.
