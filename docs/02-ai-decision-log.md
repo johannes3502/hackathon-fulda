@@ -911,3 +911,46 @@ Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
 - Offen: echte deutsche Prompts/Quellen, Rate-Limits unter Last, EU-Region,
   Frontend-Einwilligungstext für Google, finaler Lauf mit
   `gemini-3.8-flash`. Evidenz: `docs/11-deep-research-validation.md`.
+
+## Branch-Review und Integration von Gemini (24.10.2026)
+
+- Nutzerauftrag: `voice-agent-plan` prüfen, Fehler beheben, vereinfachen und in
+  `main` integrieren. Ausgangspunkt `26c4394`; Teamänderungen bis `c0ae192`
+  einschließlich des durchgängigen Backend-Aufnahmepfads sind integriert.
+- Konfiguration: Gemini verlangt den Schlüssel bereits vor Speicherung und
+  Queue-Auftrag. Google-Key-Aliase gelten nur für den exakten HTTPS-Host
+  `generativelanguage.googleapis.com`; andere Endpoints erhalten ausschließlich
+  einen expliziten `LLM_API_KEY`. Ungültige URLs und nicht endliche Zahlenoptionen
+  sind nicht verfügbar. `available` bleibt eine Konfigurationsprüfung ohne
+  Anbieteraufruf. Explizit leeres Modell oder leere Basis-URL deaktivieren den
+  Pfad auch in Compose; der Timeout-Default ist einheitlich 45 s.
+- Modellantworten: Schema und Anweisung zur Behandlung von Transkript, Quellen
+  und Antworten als nicht vertrauenswürdige Daten bleiben im Systemprompt.
+  JSON-Modus allein garantiert keine Schema- oder Evidenzkorrektheit. Abgeschnittene,
+  blockierte und nicht objektförmige Antworten werden verworfen; bestehende
+  Quellenprüfung und geprüfter Template-Fallback bleiben erhalten.
+- API-Vertrag vollständig regeneriert. Das Maximum von fünf Anfangsfragen ist
+  kein globales Follow-up-Limit oder Sitzungstimer; weitergehende TTS-/Question-
+  Lanes bleiben als Plan gekennzeichnet. Der getippte Fragepfad benennt Google
+  Gemini vor dem Start. Anleitung und Mermaid-Diagramme folgen dem aktuellen
+  Studio; Browserprüfungen verwenden sichtbare Regionen statt vorübergehendem
+  verstecktem Next.js-Streaming-Markup.
+- Geprüft: **249 Backend-Tests ohne Skips** mit PostgreSQL/pgvector und lokalem
+  Silero ONNX; **219 Web- und 18 Mobile-Unit-Tests**; Lint und Typecheck beider
+  Workspaces, Web-Produktionsbuild, API-Aktualitätscheck und drei Compose-Checks.
+  **20 gezielte Chromium-Prüfungen** in Desktop-/Mobile-Viewports: Aufnahme,
+  Upload, Fehlererhalt des Videos, Fact-Check, getippte Antwort, gemockter
+  ElevenLabs-Dialog und Verbindungsabbau, Einstieg, Appearance und Navigation.
+  Alle zwölf Architekturdiagramme mit Mermaid geparst.
+- Lokaler Compose-Smoke: API bleibt während eines Celery-Jobs erreichbar,
+  PostgreSQL/S3-Roundtrip und anonymer Zugriff geprüft. Review-Smoke bestätigt
+  Idempotenz, zwei synthetische Events, Template-Review, Löschung des temporären
+  Audios und Session-Kaskade; ein Take mit 60 Events ebenfalls verarbeitet.
+  Die synthetische Pause hat Abstand zur 2-s-Heuristik, damit überlappende
+  Analyseframes sie nicht unter die Grenze kürzen.
+- Grenzen: In dieser Umgebung fehlt der Gemini-Key; kein erneuter echter
+  Cloud-Aufruf. ElevenLabs ist im Browser gemockt, keine physische Geräte- oder
+  Genauigkeitsabnahme. `npm audit` meldet acht bereits auf `main` vorhandene
+  Expo-Abhängigkeitswarnungen; Mobile-SDK und Lockfile wurden in diesem
+  Provider-Change nicht geändert. Retention/TTL und die geplanten
+  Sitzungsgrenzen bleiben offen.

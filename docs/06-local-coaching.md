@@ -55,33 +55,37 @@ Konfiguration, nicht Erreichbarkeit, Kontingent oder Modellzugang.
 
 1. Unter `/sources` eine synthetische PDF/PPTX/TXT-Quelle hochladen und **Ready**
    abwarten. Es wird die Quellen-Collection dieses Browsers verwendet.
-2. Unter `/live` direkt **oberhalb der Kamera** bei **Speech analysis**
-   **Live + full backend analysis** wählen. Unter **Options → Recording options**
+2. Jede Aufnahme unter `/live` nutzt Live-Feedback und volle Backend-Analyse.
+   Unter **Options → Recording options**
    **Create a transcript** eingeschaltet lassen und für rein lokale Transkription
    **Stream transcription with Deepgram (EU)** ausschalten.
-3. Kamera und Mikro erlauben. Für die ersten drei Sekunden neutral stehen und
-   normal sprechen: Pose und Stimme brauchen ihre jeweilige Baseline.
-4. Während der Aufnahme liefert **On · local speech analysis** jetzt alle fünf
-   Sekunden Live-Hinweise zu Lautstärke, Tonhöhenvariation, Tempo und Pausen.
-   Die ersten drei Sekunden normal sprechen (Kalibrierung). Mikrofon-PCM geht
+3. Kamera und Mikro erlauben. Für die Pose zunächst neutral stehen; die Stimme
+   kalibriert aus drei Sekunden erkannter stimmhafter Sprache, auch nach einem
+   stillen Anfang, und passt die Referenz danach langsam an.
+4. Während der Aufnahme liefert der Signal-Stream alle fünf Sekunden
+   Live-Hinweise zu Lautstärke, Tonhöhenvariation, Tempo und Pausen. Mikrofon-PCM geht
    währenddessen an den lokalen Server; kein Whisper nötig. Die Regeln sind
    Heuristiken, Tempo ist eine Silbenrate. Live-Hinweise lassen sich ausblenden.
    Kurzen Vortrag aufnehmen → **Finish & review**. Ein vollständiger Upload
    geht an den lokalen Server; ASR-Ergebnisse kommen nach der Aufnahme.
-5. Transkript prüfen. Ein Wort anklicken spielt die Umgebung im Video ab.
+5. Unter **Review moments → Transcript and source checks** das Transkript prüfen.
+   Ein Wort anklicken spielt die Umgebung im Video ab.
    Fehlerhafte Wörter können über den Import korrigierter Wort-Timestamps
    ersetzt werden. Dabei werden veraltete Quellenbefunde und Fragen im Browser verworfen.
 6. **Check facts** → Aussage, Quellenort und Zitat ansehen. Der Zeitknopf
-   springt zum zugehörigen Moment. **Start question round** erzeugt bis zu drei
+   springt zum zugehörigen Moment. Unter **Practice questions → Practice by typing**
+   erzeugt **Start question round** standardmäßig bis zu drei
    Rückfragen. Eine Frage schriftlich beantworten → **Compare with sources**.
-   Keine Punktzahl oder Note.
+   Keine Punktzahl oder Note. Transkript, passende Auszüge und Antworten gehen
+   dabei an Gemini (Google) bzw. den konfigurierten LLM-Anbieter. Der separate
+   ElevenLabs-Dialog ist in `docs/07-review-and-agent.md` beschrieben.
 7. Quellen unter `/sources` löschen. Ergebnisberichte haben derzeit noch keine
    Löschfunktion im UI oder automatische Ablaufzeit; nur synthetische Inhalte
    für die Demo verwenden.
 
 **Manage sources (new tab)** erhält die laufende Aufnahme im bisherigen Tab;
 anschließend **Refresh status** drücken. Browser-Video und Review-Zustand leben nur
-im Speicher. Seiten-Reload/Verlassen verliert sie, löscht aber keine Serverdaten.
+im Speicher. Reload oder Schließen des Tabs verliert sie, löscht aber keine Serverdaten.
 Während einer Modellprüfung im Review bleiben; Navigation bricht das Polling ab.
 
 ## Welche Modelle und warum?

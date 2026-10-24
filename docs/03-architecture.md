@@ -177,7 +177,7 @@ sequenceDiagram
     BE-->>FE: Bereit, oder Abbruch vor Aufnahme mit Retry-Hinweis
     FE->>FE: FeatureFlags im Take festhalten (Lite/Heavy, VIDEO/IMAGE)
     FE->>FE: Pose-Worker GPU-first/CPU-Fallback, Fingertracking separat bis 5 Hz
-    Note over FE,BE: Jede Web-Aufnahme mit Mikrofon, Live-Feedback und vollständigem Upload; kein Modus-Schalter
+    Note over FE,BE: Jede Web-Aufnahme mit Mikrofon, Live-Feedback und vollständigem Upload, kein Modus-Schalter
 
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>BE: WS /speech/feedback: start, PCM nach ready
