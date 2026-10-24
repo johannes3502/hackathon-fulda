@@ -250,24 +250,35 @@ test("every recording uses microphone, live backend feedback and a full upload w
   await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
 });
 
-test("full-size view is the default and options preserve an active recording", async ({
+test("camera setup keeps workflow navigation and full-size recording preserves the camera", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
   await syntheticPose(page);
   await enable(page);
+  await expect(page.getByRole("banner")).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Presentation workflow" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Back to sources", exact: true }),
+  ).toHaveAttribute("href", "/sources");
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
   await page
     .getByRole("button", { name: "Start recording", exact: true })
     .click();
+  await expect(page.getByRole("banner")).toBeHidden();
+  await expect(
+    page.getByRole("navigation", { name: "Presentation workflow" }),
+  ).toBeHidden();
+  await expect(
+    page.getByRole("link", { name: "Back to sources", exact: true }),
+  ).toHaveCount(0);
   const cue = page.locator(".cue-message");
   await expect(
     page.getByRole("button", { name: /^(Large|Standard) view$/ }),
   ).toHaveCount(0);
-  expect(
-    await cue.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
-  ).toBeGreaterThanOrEqual(info.project.name === "desktop" ? 52 : 40);
   if (info.project.name === "desktop") {
     const camera = (await page.locator(".live-camera-stage").boundingBox())!;
     const feedback = (await page.locator(".cue-panel").boundingBox())!;
@@ -288,11 +299,17 @@ test("full-size view is the default and options preserve an active recording", a
     "data-feedback",
     "positive",
   );
-  await expect(cue).toHaveCSS("color", "rgb(37, 101, 68)");
+  await expect(page.locator(".live-cue-label")).toHaveCSS(
+    "color",
+    "rgb(37, 101, 68)",
+  );
   await startPoseSequence(page);
   await expect(cue).toHaveText("Hand above shoulder", {
     timeout: 12000,
   });
+  expect(
+    await cue.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+  ).toBeGreaterThanOrEqual(info.project.name === "desktop" ? 52 : 40);
   await expect(page.locator(".cue-panel")).toHaveAttribute(
     "data-feedback",
     "neutral",

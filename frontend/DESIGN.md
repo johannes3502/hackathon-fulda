@@ -38,16 +38,20 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   recordings in the current workspace, with an empty state before the first take.
   No synthetic percentages, monthly histories or performance scores appear.
   `AppShell` provides both the header navigation (`Main navigation`) and a
-  slide-over navigation drawer (`Menü`) outside the full-size live studio. The active destination
+  slide-over navigation drawer (`Menü`) outside an active recording. The active destination
   is identified visually and with `aria-current`. The drawer is a modal Radix
   dialog with focus containment, Escape dismissal and focus restoration. A shared
   Prepare / Record / Review strip connects sources, studio and reviews; its Review
   link uses the current or latest take, or explicitly offers an example when no
-  take exists. The full-size live studio hides this strip to preserve camera space.
+  take exists. The studio keeps this strip during camera setup and hides it only
+  while connecting, recording or finishing a take to preserve camera space.
 
 ## Screens
 
-- **Studio:** the full-size camera and feedback layout is the only view. The
+- **Studio:** camera setup shares the sources page's header, workflow steps,
+  content width and heading layout. “Back to sources” returns directly to the
+  upload library, retaining the selected collection and its documents. Starting
+  a take switches to the full-size camera and feedback layout. The
   camera fills the available width before feedback exists; during preview and
   recording it sits beside an equally wide feedback panel. Below 1001px they
   stack. Shared controls, speech choice and recording timer sit

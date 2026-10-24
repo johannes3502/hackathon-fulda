@@ -10,6 +10,26 @@ test.beforeEach(async ({ page }) => {
 test("presentation introduction leads into preparation and recording", async ({
   page,
 }, info) => {
+  let uploaded = false;
+  const material = {
+    id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    collection_id: "",
+    filename: "presentation-notes.txt",
+    status: "ready",
+    size_bytes: 100,
+    chunk_count: 1,
+    error: null,
+  };
+  await page.route("**/sources?collection_id=*", (route) =>
+    route.fulfill({ json: uploaded ? [material] : [] }),
+  );
+  await page.route("**/api/sources", async (route) => {
+    material.collection_id = /name="collection_id"\r\n\r\n([^\r]+)/.exec(
+      route.request().postData()!,
+    )![1];
+    uploaded = true;
+    await route.fulfill({ status: 202, json: { source: material } });
+  });
   await page.goto("/");
   const intro = page.getByRole("region", {
     name: "Deine Idee verdient einen starken Auftritt.",
@@ -34,6 +54,21 @@ test("presentation introduction leads into preparation and recording", async ({
     page.getByRole("heading", { name: "Your sources", exact: true }),
   ).toBeVisible();
   await expect(page.locator('input[type="file"]')).toBeEnabled();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: material.filename,
+    mimeType: "text/plain",
+    buffer: Buffer.from("Synthetic presentation notes"),
+  });
+  await expect(
+    page.getByText(material.filename, { exact: true }),
+  ).toBeVisible();
+  const sourceBounds = (await page
+    .locator(".sources-workspace")
+    .boundingBox())!;
+  await page.screenshot({
+    path: info.outputPath("sources-light.png"),
+    fullPage: true,
+  });
   const journey = page.getByRole("navigation", {
     name: "Presentation workflow",
   });
@@ -41,18 +76,46 @@ test("presentation introduction leads into preparation and recording", async ({
     "aria-current",
     "step",
   );
-  await journey.getByRole("link", { name: /Record/ }).click();
+  await page
+    .getByRole("link", { name: "Continue to recording", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/live$/);
-  await expect(journey).toBeHidden();
+  await expect(journey).toBeVisible();
+  await expect(journey.getByRole("link", { name: /Record/ })).toHaveAttribute(
+    "aria-current",
+    "step",
+  );
+  await expect(page.getByRole("banner")).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Record your presentation",
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Enable camera", exact: true }),
   ).toBeVisible();
+  const studioBounds = (await page.locator(".live-workspace").boundingBox())!;
+  expect(studioBounds.x).toBeCloseTo(sourceBounds.x, 0);
+  expect(studioBounds.width).toBeCloseTo(sourceBounds.width, 0);
   await page.screenshot({
     path: info.outputPath("studio-light.png"),
     fullPage: true,
   });
+  await page
+    .getByRole("link", { name: "Back to sources", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/sources$/);
+  await expect(
+    page.getByText(material.filename, { exact: true }),
+  ).toBeVisible();
+  await journey.getByRole("link", { name: /Record/ }).click();
+  await expect(page).toHaveURL(/\/live$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/sources$/);
+  await expect(
+    page.getByText(material.filename, { exact: true }),
+  ).toBeVisible();
   await journey.getByRole("link", { name: /Review example/ }).click();
   await expect(page).toHaveURL(/\/review-preview$/);
   await expect(journey.getByRole("link", { name: /Review/ })).toHaveAttribute(
@@ -78,7 +141,7 @@ test("saved appearance overrides the system across routes and reloads", async ({
   await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
   for (const path of ["/sources", "/live", "/demo", "/review-preview"]) {
     await page.goto(path);
-    if (path !== "/live") await expect(appearance).toHaveValue("light");
+    await expect(appearance).toHaveValue("light");
     await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
     expect(
       await page.evaluate(

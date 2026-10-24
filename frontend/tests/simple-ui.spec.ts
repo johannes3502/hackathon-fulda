@@ -27,9 +27,9 @@ test("home shows an empty recording overview without demo statistics and keeps n
   await expect(page.locator(".stats418-kpi-grid")).toContainText("0:00");
   await expect(page.locator("main")).not.toContainText("%");
   await expect(page.locator("main")).not.toContainText("Mai 2026");
-  await expect(page.getByRole("status")).toContainText(
-    "Hier erscheinen deine aufgenommenen Präsentationen.",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Hier erscheinen" }),
+  ).toContainText("Hier erscheinen deine aufgenommenen Präsentationen.");
 
   await page.getByRole("button", { name: "Menü", exact: true }).click();
   const drawer = page.getByRole("navigation", { name: "App-Navigation" });
@@ -112,7 +112,7 @@ test("home shows an empty recording overview without demo statistics and keeps n
   });
   await expect(
     page.getByRole("button", { name: "Menü", exact: true }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await page.goto("/demo");
   await expect(page).toHaveURL(/\/demo$/);
   await expect(
@@ -129,11 +129,10 @@ test("home shows an empty recording overview without demo statistics and keeps n
 
   for (const path of ["/", "/live", "/sources", "/review-preview"]) {
     await page.goto(path);
-    if (path !== "/live")
-      await expect(page.getByRole("link", { name: "418 home" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "418 home" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Menü", exact: true }),
-    ).toHaveCount(path === "/live" ? 0 : 1);
+    ).toHaveCount(1);
     await expect(page.locator("main")).toHaveCount(1);
     expect(
       await page.evaluate(

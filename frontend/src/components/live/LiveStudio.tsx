@@ -438,10 +438,26 @@ export function LiveStudio() {
   return (
     <AppShell experience="live">
       <div
-        className="workspace live-workspace live-workspace-large"
+        className={`workspace live-workspace${progress ? " live-workspace-large" : ""}`}
         data-feedback={appearance.tone}
       >
-        <h1 className="sr-only">Record your presentation</h1>
+        {!progress && (
+          <div className="workspace-back">
+            <Link href="/sources">
+              <ArrowLeft size={16} aria-hidden /> Back to sources
+            </Link>
+          </div>
+        )}
+        <div className={progress ? "sr-only" : "workspace-heading"}>
+          <div>
+            <h1>Record your presentation</h1>
+            {!progress && (
+              <p>
+                Check your camera and microphone, then start when you’re ready.
+              </p>
+            )}
+          </div>
+        </div>
         {error && (
           <p className="status-error" role="alert">
             {error}
@@ -450,13 +466,6 @@ export function LiveStudio() {
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <div className="live-control-bar">
-              {/* Hidden while recording so a stray click cannot drop the take. */}
-              {!progress && (
-                <Link href="/" className="live-back-link">
-                  <ArrowLeft size={16} aria-hidden />
-                  Back
-                </Link>
-              )}
               <p className="field-hint live-audio-hint">
                 Microphone audio is sent to your server for live feedback. The
                 full take is uploaded after stopping.
