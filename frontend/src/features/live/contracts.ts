@@ -1,0 +1,69 @@
+export type FeedbackKind = "positive" | "suggestion" | "attention";
+export type LiveFeedback = {
+  id: string;
+  category: string;
+  kind: FeedbackKind;
+  startMs: number;
+  endMs: number;
+  title: string;
+  detail: string;
+  action: string;
+};
+export type LiveMetric = {
+  id: string;
+  label: string;
+  value: string | number | null;
+  unit?: string;
+};
+export type LiveConfig = {
+  title: string;
+  targetMs: number;
+  mode: "demo" | "backend";
+  endpoint: string;
+};
+export type VideoChunkMeta = {
+  type: "video.chunk";
+  sessionId: string;
+  seq: number;
+  startMs: number;
+  endMs: number;
+  byteLength: number;
+};
+export type LiveMessage =
+  | { type: "session.ready" | "session.complete"; sessionId: string }
+  | { type: "feedback"; sessionId: string; feedback: LiveFeedback }
+  | { type: "metrics"; sessionId: string; atMs: number; metrics: LiveMetric[] }
+  | { type: "error"; sessionId: string; message: string };
+export type LiveProgress = {
+  phase: "connecting" | "recording" | "finishing";
+  elapsedMs: number;
+  chunksSent: number;
+  bytesSent: number;
+  feedback: LiveFeedback[];
+  metrics: LiveMetric[];
+  notice: string | null;
+};
+export type LiveRecording = {
+  id: string;
+  config: LiveConfig;
+  createdAt: string;
+  durationMs: number;
+  video: Blob;
+  videoUrl: string;
+  mimeType: string;
+  feedback: LiveFeedback[];
+  metrics: LiveMetric[];
+  chunksSent: number;
+  bytesSent: number;
+  completion: "complete" | "interrupted";
+  notice: string | null;
+};
+export interface VideoTransport {
+  connect(
+    session: { sessionId: string; title: string; mimeType: string },
+    receive: (message: LiveMessage) => void,
+  ): Promise<void>;
+  send(chunk: Blob, meta: VideoChunkMeta): Promise<void>;
+  finish(durationMs: number): Promise<void>;
+  close(): void;
+}

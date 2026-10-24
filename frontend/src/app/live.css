@@ -1,0 +1,564 @@
+.live-entry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 22px;
+}
+.live-entry > span {
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 34ch;
+}
+.live-tabs {
+  display: flex;
+  gap: 26px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+.live-tabs a {
+  padding: 12px 0;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  color: var(--muted);
+}
+.live-tabs a[aria-current="page"] {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+.backend-badge {
+  color: var(--primary);
+  background: var(--soft-blue);
+}
+.live-workspace .workspace-heading {
+  margin-bottom: 28px;
+}
+.live-camera-stage {
+  aspect-ratio: 16 / 10;
+}
+.live-camera-stage .stage-top,
+.live-camera-stage .stage-bottom {
+  background: #111827d9;
+}
+.live-control-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0 10px;
+}
+.live-workspace .camera-message {
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.live-settings {
+  padding: 24px;
+  margin-top: 23px;
+}
+.live-settings h2 {
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+.live-settings fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.local-recording-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 18px;
+}
+.local-recording-note svg {
+  margin-top: 2px;
+}
+.live-cue-detail {
+  font-size: 13px;
+  margin-top: 12px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+.live-events {
+  padding: 22px;
+}
+.live-empty {
+  padding: 32px 0 20px;
+  color: var(--muted);
+}
+.live-empty svg {
+  color: var(--primary);
+}
+.live-empty p {
+  margin: 12px 0 6px;
+  font-size: 14px;
+}
+.live-empty span {
+  font-size: 12px;
+  line-height: 1.6;
+  display: block;
+}
+.event-feed {
+  max-height: 390px;
+  overflow: auto;
+  margin-top: 10px;
+}
+.event-feed > div {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+.event-feed > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.event-feed strong {
+  display: block;
+  font-size: 14px;
+  margin: 7px 0;
+}
+.event-feed p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.feedback-kind {
+  font-size: 11px;
+  color: var(--muted);
+}
+.feedback-kind.positive {
+  color: oklch(0.43 0.08 170);
+}
+.feedback-kind.attention {
+  color: var(--warning);
+}
+.feedback-kind.suggestion {
+  color: var(--primary);
+}
+.stream-summary {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 3px;
+}
+.backend-metrics {
+  margin: 15px 0 0;
+}
+.backend-metrics > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.backend-metrics dt {
+  color: var(--muted);
+}
+.backend-metrics dd {
+  text-align: right;
+  margin: 0;
+}
+.recent-recordings {
+  margin-top: 32px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+.recent-recordings h2 {
+  font-size: 17px;
+  margin-bottom: 12px;
+}
+.recent-recordings a {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.recent-recordings a span:last-child {
+  color: var(--muted);
+  font-size: 12px;
+}
+.live-demo-notice {
+  padding: 14px 18px;
+  background: var(--soft-blue);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 20px 0;
+  line-height: 1.6;
+}
+.live-demo-notice strong {
+  color: var(--foreground);
+}
+.recording-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 26px 0;
+  padding: 22px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  gap: 24px;
+}
+.recording-stats > div {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 4px 10px;
+  align-items: center;
+}
+.recording-stats svg {
+  color: var(--muted);
+}
+.recording-stats strong {
+  font-size: 25px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.recording-stats small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.recording-stats span {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--muted);
+}
+.live-review-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 24px;
+  align-items: start;
+}
+.playback-panel {
+  overflow: hidden;
+}
+.playback-panel > video {
+  display: block;
+  background: var(--stage);
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: contain;
+}
+.playback-body {
+  padding: 20px;
+}
+.video-timeline {
+  position: relative;
+  margin-top: 22px;
+  height: 22px;
+  background: var(--background);
+  border-radius: 4px;
+}
+.timeline-marker {
+  position: absolute;
+  top: 0;
+  height: 22px;
+  min-width: 8px;
+  max-width: 100%;
+  border: 0;
+  background: var(--primary);
+  border-radius: 3px;
+}
+.timeline-marker.positive {
+  background: oklch(0.45 0.1 170);
+}
+.timeline-marker.attention {
+  background: var(--warning);
+}
+.timeline-marker.selected {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+.playback-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.loop-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 16px;
+}
+.recording-retention {
+  display: flex;
+  gap: 9px;
+  margin: 18px 2px;
+  color: var(--muted);
+}
+.recording-retention svg {
+  margin-top: 2px;
+}
+.recording-retention p {
+  font-size: 12px;
+  line-height: 1.65;
+}
+.recording-breakdown {
+  padding: 22px;
+}
+.recording-breakdown h2 {
+  margin-bottom: 7px;
+  font-size: 17px;
+}
+.recording-breakdown h3 {
+  font-size: 14px;
+  margin-top: 23px;
+}
+.category-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 25px 0;
+}
+.category-bars > div > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+.category-bars strong {
+  font-weight: 500;
+}
+.category-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--background);
+  overflow: hidden;
+}
+.category-bar span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+.next-review-step {
+  padding: 25px 3px;
+}
+.next-review-step h2 {
+  font-size: 18px;
+}
+.next-review-step p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.65;
+  margin: 12px 0 18px;
+}
+.next-review-step .button {
+  font-size: 12px;
+}
+.review-moments {
+  margin-top: 34px;
+}
+.review-moments > .panel-title-row h2 {
+  font-size: 19px;
+}
+.moment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+.feedback-moment {
+  text-align: left;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  width: 100%;
+}
+.feedback-moment:hover,
+.feedback-moment.selected {
+  border-color: var(--primary);
+  background: var(--soft-blue);
+}
+.feedback-moment strong {
+  display: block;
+  font-size: 15px;
+  margin: 10px 0 8px;
+}
+.feedback-moment p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.moment-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--primary);
+  margin-top: 14px;
+}
+.selected-feedback {
+  padding: 22px;
+  margin-top: 20px;
+}
+.selected-feedback h2 {
+  font-size: 18px;
+  margin-top: 8px;
+}
+.selected-feedback p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 10px 0;
+}
+.selected-feedback > strong {
+  font-size: 12px;
+  display: block;
+  margin-top: 20px;
+}
+.feedback-replay-grid {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 26px;
+}
+.moment-browser {
+  padding: 20px;
+}
+.moment-browser label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 22px 0 7px;
+}
+.moment-browser-list {
+  margin-top: 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 620px;
+  overflow: auto;
+}
+.moment-browser-list .feedback-moment {
+  border-radius: 7px;
+  padding: 14px 10px;
+}
+.moment-browser-list .feedback-moment .finding-top {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.replay-detail {
+  margin-top: 20px;
+  padding: 24px;
+}
+.replay-detail h2 {
+  font-size: 22px;
+  margin: 14px 0 10px;
+}
+.replay-detail p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.replay-action {
+  margin: 20px 0;
+  padding: 17px;
+  border-radius: 8px;
+  background: var(--soft-blue);
+}
+.replay-action > strong {
+  font-size: 12px;
+  color: var(--primary);
+}
+.replay-action p {
+  margin-top: 6px;
+}
+.moment-navigation {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+@media (max-width: 1000px) {
+  .live-review-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+  .feedback-replay-grid {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+  .moment-grid {
+    grid-template-columns: 1fr;
+  }
+  .live-control-bar {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 760px) {
+  .live-entry {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .live-camera-stage {
+    aspect-ratio: auto;
+  }
+  .live-control-bar {
+    flex-direction: column;
+  }
+  .live-control-bar .button {
+    width: 100%;
+  }
+  .live-settings {
+    padding: 20px;
+  }
+  .live-review-grid,
+  .feedback-replay-grid {
+    grid-template-columns: 1fr;
+  }
+  .recording-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px 16px;
+  }
+  .recording-stats span {
+    font-size: 11px;
+  }
+  .recording-stats strong {
+    font-size: 23px;
+  }
+  .live-review .workspace-heading {
+    flex-direction: column;
+  }
+  .live-review .workspace-heading h1 {
+    font-size: 27px;
+  }
+  .playback-body {
+    padding: 17px;
+  }
+  .playback-controls {
+    gap: 6px;
+  }
+  .playback-controls .button {
+    min-height: 40px;
+  }
+  .feedback-replay-grid > aside {
+    order: 2;
+  }
+  .feedback-replay-grid > div {
+    order: 1;
+  }
+  .moment-browser-list {
+    max-height: none;
+  }
+  .replay-detail {
+    padding: 20px;
+  }
+  .replay-detail h2 {
+    font-size: 20px;
+  }
+  .replay-detail .panel-title-row {
+    flex-wrap: wrap;
+  }
+  .recent-recordings a {
+    flex-direction: column;
+    gap: 5px;
+  }
+  .backend-metrics {
+    overflow-wrap: anywhere;
+  }
+}
