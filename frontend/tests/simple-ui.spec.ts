@@ -8,6 +8,38 @@ test("home opens monitoring directly and keeps the sample optional", async ({
   );
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
+  for (const [selector, color] of [
+    ["body", "oklch(0.976 0.004 260)"],
+    [".stage-placeholder .button", "oklch(0.49 0.2 264)"],
+    [".live-camera-stage", "oklch(0.205 0.029 264)"],
+  ]) {
+    const matches = await page
+      .locator(selector)
+      .evaluate((element, expected) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext("2d")!;
+        const pixel = (value: string) => {
+          context.fillStyle = value;
+          context.fillRect(0, 0, 1, 1);
+          return [...context.getImageData(0, 0, 1, 1).data];
+        };
+        const reference = pixel(expected);
+        return pixel(getComputedStyle(element).backgroundColor).every(
+          (channel, index) => Math.abs(channel - reference[index]) <= 1,
+        );
+      }, color);
+    expect(matches, `${selector} uses the original palette`).toBe(true);
+  }
+  await expect(
+    page.getByRole("button", { name: "Enable camera", exact: true }),
+  ).toHaveCSS("color", "rgb(255, 255, 255)");
+  await expect(
+    page.getByRole("heading", {
+      name: "Practice your presentation.",
+      exact: true,
+    }),
+  ).toHaveCSS("font-family", "Arial, Helvetica, sans-serif");
   await expect(
     page.getByRole("button", { name: "Standard view", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");

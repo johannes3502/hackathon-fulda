@@ -2,12 +2,12 @@
 
 ## Shared web interface (2026-10-24)
 
-The home, sample practice, recording, sources and review screens now share the
-418 wordmark and a restrained white/green palette. Shared tokens live in
-`src/app/globals.css`: #42ff8c for primary buttons with dark text, #23613a for
-links and selected states, #526158 for secondary copy. Product headings and
-controls use one sans family; the serif is reserved for the 418 mark and existing
-specialized data previews. The common AppShell also wraps the analysis view.
+The shared web interface restores the original Pitch Coach blue palette and
+Arial/Helvetica sans-serif type. Tokens in `src/app/globals.css` use the original
+OKLCH blue primary (0.49 0.2 264), cool neutral background, and dark slate camera
+stage. Primary buttons use white text. The 418 name remains; its shared wordmark
+now also uses sans-serif. Specialized loading and stats previews retain their
+separate historical 418 artwork. The current layout and startup flow are unchanged.
 
 Both `/` and `/live` render the recording studio directly. Large view is the
 default; Standard view reveals settings and navigation. The monitoring preview
@@ -26,7 +26,7 @@ Desktop and mobile use the same buttons, fields and spacing. The sample setup
 moved to `/demo`; scoring logic, recording defaults and service dependencies
 are unchanged.
 The sections below record earlier component directions; this shared interface
-supersedes the former blue workspace palette and separate analysis header.
+supersedes the shared green theme while retaining the common analysis header.
 
 ## 418 review analysis (2026-10-24)
 

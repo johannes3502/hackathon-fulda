@@ -198,7 +198,7 @@ body:has(.live-workspace-large) .app-footer,
   transform: translateX(-50%);
 }
 .live-pose-cue small {
-  color: oklch(0.8 0.02 155);
+  color: oklch(0.8 0.02 264);
   font-size: 10px;
 }
 .live-pose-debug {
@@ -233,10 +233,10 @@ body:has(.live-workspace-large) .app-footer,
   color: #fca5a5;
 }
 .live-pose-debug .missing {
-  color: oklch(0.7 0.02 155);
+  color: oklch(0.7 0.02 264);
 }
 .live-pose-debug small {
-  color: oklch(0.8 0.02 155);
+  color: oklch(0.8 0.02 264);
   font-size: 10px;
 }
 .live-camera-stage .stage-top,

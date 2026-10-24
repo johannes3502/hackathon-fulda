@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f9f7;
-  --surface: #fff;
-  --foreground: #142019;
-  --muted: #526158;
-  --primary: #23613a;
-  --primary-hover: #194c2c;
-  --accent: #42ff8c;
-  --accent-hover: #32e97a;
-  --border: #dce4de;
-  --soft-accent: #effaf2;
-  --stage: #18231c;
+  --background: oklch(0.976 0.004 260);
+  --surface: oklch(1 0 0);
+  --foreground: oklch(0.25 0.027 258);
+  --muted: oklch(0.48 0.025 258);
+  --primary: oklch(0.49 0.2 264);
+  --primary-hover: oklch(0.43 0.19 264);
+  --accent: var(--primary);
+  --accent-hover: var(--primary-hover);
+  --border: oklch(0.9 0.009 258);
+  --soft-accent: oklch(0.96 0.018 264);
+  --stage: oklch(0.205 0.029 264);
   --warning: oklch(0.48 0.12 62);
   --error: oklch(0.48 0.17 27);
   --radius: 12px;
@@ -104,7 +104,7 @@ svg {
   outline-offset: 4px;
 }
 ::selection {
-  background: oklch(0.88 0.05 155);
+  background: oklch(0.88 0.05 264);
 }
 .muted {
   color: var(--muted);
@@ -133,7 +133,7 @@ small {
 }
 .button-primary {
   background: var(--accent);
-  color: var(--foreground);
+  color: white;
 }
 .button-primary:hover:not(:disabled) {
   background: var(--accent-hover);
@@ -145,14 +145,14 @@ small {
 }
 .button-outline:hover:not(:disabled) {
   background: var(--background);
-  border-color: oklch(0.75 0.02 155);
+  border-color: oklch(0.75 0.02 258);
 }
 .button-ghost {
   background: transparent;
   color: var(--muted);
 }
 .button-ghost:hover:not(:disabled) {
-  background: oklch(0.93 0.01 155);
+  background: oklch(0.93 0.01 258);
   color: var(--foreground);
 }
 .button-danger {
@@ -172,7 +172,7 @@ small {
 .input {
   width: 100%;
   display: block;
-  border: 1px solid oklch(0.85 0.012 155);
+  border: 1px solid oklch(0.85 0.012 258);
   border-radius: 8px;
   background: white;
   padding: 11px 13px;
@@ -213,11 +213,11 @@ small {
   height: 42px;
   border-radius: 50%;
   background: var(--accent);
-  color: var(--foreground);
+  color: white;
   font:
-    400 34px/1 "Noto Serif Display",
-    Georgia,
-    serif;
+    400 34px/1 Arial,
+    Helvetica,
+    sans-serif;
   letter-spacing: -0.04em;
 }
 .brand-caption {
@@ -672,10 +672,10 @@ input[type="checkbox"] {
   gap: 7px;
 }
 .stage-status {
-  color: oklch(0.83 0.06 155);
+  color: oklch(0.83 0.06 264);
 }
 .stage-demo {
-  color: oklch(0.8 0.02 155);
+  color: oklch(0.8 0.02 264);
 }
 .stage-placeholder {
   text-align: center;
@@ -686,18 +686,18 @@ input[type="checkbox"] {
   place-items: center;
   width: 76px;
   height: 76px;
-  border: 1px solid oklch(0.38 0.03 155);
-  background: oklch(0.25 0.03 155);
+  border: 1px solid oklch(0.38 0.03 264);
+  background: oklch(0.25 0.03 264);
   border-radius: 50%;
   margin: 0 auto 16px;
-  color: oklch(0.72 0.03 155);
+  color: oklch(0.72 0.03 264);
 }
 .stage-placeholder h2 {
   font-size: 24px;
   font-weight: 500;
 }
 .stage-placeholder p {
-  color: oklch(0.78 0.02 155);
+  color: oklch(0.78 0.02 264);
   font-size: 12px;
   margin-top: 8px;
 }
@@ -707,7 +707,7 @@ input[type="checkbox"] {
   align-items: center;
   padding: 7px 16px;
   font-size: 10px;
-  color: oklch(0.8 0.02 155);
+  color: oklch(0.8 0.02 264);
   z-index: 1;
 }
 .stage-bottom > span {
@@ -716,10 +716,10 @@ input[type="checkbox"] {
   gap: 5px;
 }
 .stage-bottom .button {
-  color: oklch(0.8 0.02 155);
+  color: oklch(0.8 0.02 264);
 }
 .stage-bottom .button:hover {
-  background: oklch(0.35 0.02 155);
+  background: oklch(0.35 0.02 264);
 }
 .camera-video {
   position: absolute;
@@ -750,7 +750,7 @@ input[type="checkbox"] {
 }
 .countdown-overlay > p {
   font-size: 14px;
-  color: oklch(0.8 0.02 155);
+  color: oklch(0.8 0.02 264);
 }
 .preflight {
   margin-top: 14px;
@@ -806,7 +806,7 @@ input[type="checkbox"] {
   gap: 16px;
 }
 .cue-panel {
-  border: 1px solid oklch(0.85 0.06 155);
+  border: 1px solid oklch(0.85 0.06 264);
   background: var(--soft-accent);
   border-radius: 12px;
   padding: 19px 20px;
@@ -980,7 +980,7 @@ input[type="checkbox"] {
 .transcript-row:hover:not(:disabled),
 .transcript-row.selected {
   background: var(--soft-accent);
-  border-color: oklch(0.88 0.04 155);
+  border-color: oklch(0.88 0.04 264);
 }
 .transcript-row:disabled {
   opacity: 1;
@@ -1257,7 +1257,7 @@ input[type="checkbox"] {
 }
 .skeleton {
   height: 320px;
-  background: oklch(0.92 0.01 155);
+  background: oklch(0.92 0.01 258);
   border-radius: 12px;
   margin-top: 25px;
   animation: pulse 1.5s infinite;
@@ -1314,7 +1314,7 @@ input[type="checkbox"] {
 }
 .next-step {
   background: var(--soft-accent);
-  border: 1px solid oklch(0.87 0.045 155);
+  border: 1px solid oklch(0.87 0.045 264);
   border-radius: 12px;
   padding: 24px;
   margin: 26px 0;

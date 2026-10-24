@@ -297,7 +297,7 @@
 .review418-plot-moment.positive {
   background: var(--accent);
   border-color: var(--accent);
-  color: #102b1b;
+  color: white;
 }
 .review418-plot-moment.attention {
   background: #22372b;
@@ -342,7 +342,7 @@
 .review418-legend i.positive {
   background: var(--accent);
   border-color: var(--accent);
-  color: #142019;
+  color: white;
 }
 .review418-legend i.attention {
   background: #22372b;
@@ -467,7 +467,7 @@
   border: 1px solid var(--accent);
   border-radius: 7px;
   padding: 12px 8px;
-  color: #10371f;
+  color: white;
   font-size: 11px;
 }
 .review418-play-section > span {
@@ -555,6 +555,7 @@
   font-size: 10px;
 }
 .review418-moment.positive .review418-kind-icon {
+  color: white;
   background: var(--accent);
   border-color: var(--accent);
 }
