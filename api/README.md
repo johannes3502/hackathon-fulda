@@ -6,10 +6,12 @@ edit them by hand.
 
 ## Generate
 
-Install Node.js 22+ and the backend Python dependencies (see
-[`backend/README.md`](../backend/README.md)). From the repository root:
+Install Node.js 22+ and Python 3.12. Prepare tooling once from the repository
+root (on Windows use `py -3.12` and `backend/.venv/Scripts/python.exe`):
 
 ```sh
+python3.12 -m venv backend/.venv
+backend/.venv/bin/python -m pip install -r backend/requirements.txt
 npm ci
 npm run api:generate
 ```
@@ -40,7 +42,7 @@ To generate only TypeScript from the committed schema, without Python:
 npm run api:types
 ```
 
-## Use in the future frontend
+## Use in the frontend
 
 Import types using the relative path from your TypeScript file:
 
@@ -54,7 +56,7 @@ type AnalyzeResponse = paths["/transcription/analyze-words"]["post"]["responses"
 ```
 
 These are compile-time definitions, not runtime validation or an HTTP
-client. A future frontend can use `openapi-fetch` with the generated `paths`
+client. Callers can use `openapi-fetch` with the generated `paths`
 type for typed requests and responses.
 
 The schema reflects the current endpoints, including their limitations:

@@ -1,6 +1,6 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Archiv (`archive/`) ist nicht Scope.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`.
 
 ## 1. Projekt
 
@@ -129,7 +129,7 @@ backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
 frontend/                          # Next.js-App, eigener Entwicklungscontainer
 .run/                              # geteilte IntelliJ-Run-Konfigurationen
 .vscode/                           # geteilte VS-Code-Tasks für Docker Compose
-Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
+specifications/                    # offizielle Challenge (deutsch/englisch)
 docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
   01-product.md                    # Features und offene Punkte
@@ -160,7 +160,7 @@ ist eine separate Implementierungsaufgabe.
 Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
 sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
 Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`
-abgeglichen werden; dort ist noch das bisherige Grundgerüst dokumentiert.
+abgeglichen werden; dort stehen die Features und offenen Entscheidungen.
 
 ## 7. Git-Workflow
 

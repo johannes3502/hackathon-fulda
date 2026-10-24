@@ -20,7 +20,7 @@ node_modules/
 .pnpm-store/
 
 # Build output
-.next/
+.next*/
 out/
 dist/
 build/
