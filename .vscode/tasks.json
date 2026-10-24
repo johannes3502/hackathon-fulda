@@ -25,15 +25,6 @@
       "args": ["compose", "logs", "--follow", "backend"],
       "options": {"cwd": "${workspaceFolder}"},
       "problemMatcher": []
-    },
-    {
-      "label": "Backend: smoke (Docker)",
-      "type": "process",
-      "command": "docker",
-      "args": ["compose", "exec", "-T", "backend", "python", "-m", "scripts.smoke"],
-      "options": {"cwd": "${workspaceFolder}"},
-      "group": "test",
-      "problemMatcher": []
     }
   ]
 }

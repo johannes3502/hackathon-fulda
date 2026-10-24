@@ -18,54 +18,20 @@ Open the **repository root** in either IDE. Docker must be running and `.env`
 must exist as described above. Shared IntelliJ configurations are in `.run/`;
 VS Code configuration is in `.vscode/`. Personal `.idea/` state stays ignored.
 
-| Action | IntelliJ run configuration | VS Code task |
-|---|---|---|
-| Build/start the full stack | `Compose - up` | `Compose: up` (default build task) |
-| Stop containers, keep data | `Compose - stop` | `Compose: stop` |
-| Follow API logs | `Compose - backend logs` | `Compose: backend logs` |
-| Check the running Docker backend | `Backend - smoke (Docker)` | `Backend: smoke (Docker)` |
+- **IntelliJ IDEA:** enable the **Docker** plugin, select **Docker Compose**
+  in the run selector and click **Run**. It builds images and starts every
+  service in `compose.yaml`: backend, PostgreSQL and S3 storage. The
+  configuration uses the local Docker connection named `Docker`; select your
+  local connection in its **Server** field if it has a different name.
+  View logs and stop containers in the **Services** tool window.
+- **VS Code:** run **Tasks: Run Build Task** (`Cmd+Shift+B` on macOS,
+  `Ctrl+Shift+B` on Windows/Linux). The default **Compose: up** task builds
+  and starts the full stack, then waits for the health checks. **Tasks: Run
+  Task** also offers **Compose: stop** and **Compose: backend logs**.
 
-In IntelliJ, enable the **Shell scripts** plugin for these Docker commands.
-They use the Docker CLI and your current Docker context. In VS Code, use
-**Tasks: Run Task**. Run the full stack before invoking its smoke check.
-
-For Python editing and local breakpoint debugging, create a Python 3.12
-environment once. From the repository root on macOS/Linux:
-
-```sh
-python3.12 -m venv backend/.venv
-backend/.venv/bin/python -m pip install -r backend/requirements.txt
-```
-
-On Windows:
-
-```powershell
-py -3.12 -m venv backend/.venv
-backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
-```
-
-- **IntelliJ IDEA:** enable the Python plugin. Add `backend/.venv` as the
-  Python SDK for the `hackathon-fulda` module (or select that interpreter in
-  the run configuration). Mark `backend/` as a Sources Root for imports.
-  Select **Backend - local FastAPI** and click **Debug**.
-- **VS Code:** install the workspace's recommended Python extensions. Select
-  `backend/.venv` with **Python: Select Interpreter** if it is not selected
-  automatically. Choose **Backend: local FastAPI** under Run and Debug and
-  press **F5**.
-
-Both launch `scripts.dev`, which reads the root `.env`, starts PostgreSQL
-and S3, stops the Docker backend to free the API port, and runs FastAPI on
-localhost with the same credentials and configured ports. No secrets are
-copied into IDE files. Set breakpoints in `backend/app/`; open
-<http://localhost:8000/health/ready> to exercise the request path (or use your
-configured `API_PORT`). The local debugger uses one process without reload;
-restart it after edits.
-
-Stopping the debugger leaves PostgreSQL/S3 running and the Docker backend
-stopped. Stop the local debugger **before** running `Compose: up` / `Compose - up`
-to return to the full Docker stack. The Docker smoke check requires that
-backend container. FFmpeg is provided by Docker; install it separately on the
-host if running media conversion code locally.
+No local Python SDK or virtual environment is required to start the stack.
+FastAPI runs inside Docker and reloads when `backend/app/` changes. Run the
+smoke command above to check the running containers.
 
 ## Components
 
@@ -167,5 +133,5 @@ S3 object across recreation of all containers. Test fixtures were removed.
 - [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder)
 - [Microphone/camera secure contexts](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia)
 - [IntelliJ shared run configurations](https://www.jetbrains.com/help/idea/run-debug-configuration.html)
-- [IntelliJ shell run configurations](https://www.jetbrains.com/help/idea/run-debug-configuration-shell-script.html)
-- [VS Code Python debugging](https://code.visualstudio.com/docs/python/debugging)
+- [IntelliJ Docker Compose](https://www.jetbrains.com/help/idea/docker-compose.html)
+- [VS Code tasks](https://code.visualstudio.com/docs/debugtest/tasks)

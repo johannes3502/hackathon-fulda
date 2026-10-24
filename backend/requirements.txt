@@ -4,4 +4,3 @@ mediapipe==1.1.1
 psycopg[binary]==3.3.6
 boto3==1.43.118
 python-multipart==0.0.32
-python-dotenv==1.2.4

@@ -122,7 +122,7 @@ compose.yaml                       # lokales Backend + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
 backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
 .run/                              # geteilte IntelliJ-Run-Konfigurationen
-.vscode/                           # geteilte VS-Code-Tasks und Debug-Konfiguration
+.vscode/                           # geteilte VS-Code-Tasks für Docker Compose
 Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
 docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
@@ -139,7 +139,7 @@ pgvector, das Next.js-Frontend und die Analyse-/Aufnahme-Pipeline aus der
 Zielarchitektur sind noch nicht umgesetzt. Die Umstellung des Speichers
 ist eine separate Implementierungsaufgabe; dieser Merge ändert keine Dienste.
 
-Start, Smoke-Test und IDE-Debugging: `backend/README.md`. Persistente Volumes
+Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
 sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
 Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`
 abgeglichen werden; dort ist noch das bisherige Grundgerüst dokumentiert.
