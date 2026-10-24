@@ -152,6 +152,8 @@ docs/
   04-gesture-evaluation.md         # Recherche, Messregeln und Grenzen der Gestenheuristiken
   05-jury-demo.md                  # Lokale Vorführung und dokumentierte Geräte-Abnahme
   04-pose-tracking-requirements.md # Pose-Research-Ziele und Integrationsstand
+  12-long-term-progress-data-design.md # Backend-Data-Design, Research, DDL, API
+  13-long-term-progress-frontend-contract.md # progress.v1 und UI-Vertrag
 templates/
   ai-decision-log.md               # Vorlage für die AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
@@ -165,6 +167,21 @@ Take-Review-API (`backend/app/review/`) speichert Sessions, Takes, Events, Revie
 Jobs und Wort-/Sprechdaten in Postgres. Sie bietet Template-/LLM-Review,
 Coverage, Fact-Check-/Frage-Anbindung und explizite Löschung ohne Server-Clips.
 Browser-Integration dieser neuen API ist ein separater Frontend-Change.
+Das optionale Long-Term-Progress-Backend ist umgesetzt
+(`backend/app/progress/`): pseudonyme Profile mit Token-Hash, additive
+`profile_id`/`presentation_mode`/`recorded_at`/`device_key`-Felder,
+`take_quality`/`take_metrics`, `progress_snapshots`/`progress_change_points`,
+optionale Ziele, `progress.v1`, Export und Löschung. Es gibt keinen
+Gesamtscore. Profil-Löschung entkoppelt Sessions/Takes und entfernt nur die
+abgeleiteten Progress-Daten; Session-Löschung bleibt separat. Details:
+`docs/12-long-term-progress-data-design.md`; Frontend-Vertrag:
+`docs/13-long-term-progress-frontend-contract.md`; die Web-Anbindung ist offen.
+Progress-Reads aktualisieren nur geänderte Takes (Review-Revision und
+Berechnungsversion). Explizites Recompute läuft als Celery-Job:
+`POST /profiles/{id}/progress/recompute` → `202 {runId,statusUrl}`,
+Status unter `GET /profiles/{id}/progress/runs/{runId}`. Auch verknüpfte
+Session-/Take-/Job-Routen verlangen den Profil-Token; anonyme Sessions bleiben
+kompatibel. Abgelaufene Profile liefern `410`, Löschen bleibt erlaubt.
 Quellen-Upload und Retrieval (RAG) sind umgesetzt
 (`backend/app/sources/`, Frontend-Seite `/sources`): PDF/PPTX/DOCX/TXT/MD →
 Chunks mit Seite/Folie → lokale Embeddings (`jina-embeddings-v2-base-de`) →

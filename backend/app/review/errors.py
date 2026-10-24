@@ -11,7 +11,7 @@ class ReviewError(Exception):
 
 
 async def handle_review_error(request: Request, error: ReviewError):
-    return JSONResponse(status_code=error.status, content={"error": {
+    return JSONResponse(status_code=error.status, headers={"Cache-Control": "private, no-store"}, content={"error": {
         "code": error.code, "message": error.message, "details": error.details,
         "requestId": getattr(request.state, "request_id", str(uuid4())),
     }})

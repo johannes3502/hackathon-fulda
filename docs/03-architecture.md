@@ -29,9 +29,10 @@ flowchart TB
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
         FC["Factcheck-Router<br/>POST /factcheck<br/>GET /factcheck/jobs/id, /settings"]
         QR["Questions-Router<br/>POST /questions, /questions/answers,<br/>/questions/answers/voice<br/>GET /questions/jobs/id, /questions/answers/id"]
-        RV["Review-Router (additiv)<br/>/sessions, /takes, /jobs<br/>Idempotency-Key, camelCase"]
+        RV["Review-Router (additiv)<br/>/sessions, /takes, /jobs<br/>Idempotency-Key, camelCase<br/>verknüpft: X-Profile-Token"]
+        PR["Progress-Router (additiv)<br/>/profiles, /progress, /goals<br/>X-Profile-Token, Idempotency-Key"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job, recompute_progress"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -42,10 +43,11 @@ flowchart TB
         FACT["Fact-Check<br/>Aussagen extrahieren, RAG zuerst,<br/>Web optional (Standard aus), Zitat-Check"]
         QUEST["Frage-Simulator / Voice-Agent<br/>Rolle: Student oder Professor/Tutor,<br/>Fragen aus Funden + Quellen,<br/>gesprochene Antwort -> ASR,<br/>Antwort-Abgleich mit Zitat-Check"]
         REVIEW["Take-Review<br/>Probe + Timestamp-Offset, Merge,<br/>Coverage, Evidence Cards,<br/>Template oder LLM + Code-Verifier<br/>Beobachtung, Erklärung, Übung + belegte Stärken"]
+        PROG["Progress-Projektion<br/>take_quality -> take_metrics<br/>-> snapshots/change-points<br/>Theil-Sen, Mann-Kendall, CUSUM"]
     end
 
     subgraph Infra["Infrastruktur (Docker Compose)"]
-        PG[("PostgreSQL 18<br/>+ pgvector<br/>Port 5432")]
+        PG[("PostgreSQL 18<br/>+ pgvector<br/>Sessions, Progress-Profile,<br/>Metriken, Chunks")]
         RD[("Redis 8<br/>Broker DB0 / Results DB1")]
         S3[("SeaweedFS<br/>S3-kompatibel<br/>Port 8333")]
     end
@@ -72,7 +74,7 @@ flowchart TB
     MP_W --> RULES["PoseEvaluator: Neutralstellung, Geometrie, Mindestdauer<br/>posture/gesture-Events; lokale Evidenz"]
     MOB -- "Kamera" --> MP_M
 
-    WEB -- "fetch: /speech, /sources,<br/>/transcription, /factcheck,<br/>/questions, /health" --> MAIN
+    WEB -- "fetch: /speech, /sources,<br/>/transcription, /factcheck,<br/>/questions, /profiles, /health" --> MAIN
     MOB -- "Upload + Job-Polling" --> MAIN
     WEB -. "Typen" .-> OAS
     OAS -. "Quelle der Wahrheit" .-> MAIN
@@ -83,9 +85,14 @@ flowchart TB
     MAIN --> FC
     MAIN --> QR
     MAIN --> RV
+    MAIN --> PR
     RV -- "Session/Take/Event/Review/Job" --> PG
     RV -- "nur temporärer Analyse-Upload" --> S3
     RV -- "enqueue: nur Job-ID" --> CEL
+    PR -- "Profil, Qualität, Metriken, Ziele" --> PG
+    PR -- "deterministische Projektion" --> PROG
+    PR -- "Recompute: nur Run-ID, 202 + Status-URL" --> CEL
+    PROG -- "Snapshots + Change-Points" --> PG
 
     SP -- "S3-Upload, Enqueue" --> S3
     SP -- "enqueue" --> CEL
@@ -104,6 +111,7 @@ flowchart TB
     TASKS --> FACT
     TASKS --> QUEST
     TASKS --> REVIEW
+    TASKS -- "progress_runs: persistent, wiederholbar" --> PROG
     REVIEW --> PG
     REVIEW -- "Audio laden und löschen; keine Wiedergabe-Medien" --> S3
     REVIEW -. "nur geprüfte Karten, keine Tools" .-> LLM
@@ -424,7 +432,7 @@ kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
 
 ```mermaid
 flowchart TD
-    DRAWER["AppShell: modaler Drawer + Header außerhalb des Live-Studio<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>verbindet /, /live, /sources, /review-preview, /gestures, /demo, /admin"]
+    DRAWER["AppShell: modaler Drawer + Header außerhalb des Live-Studio<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>verbindet /, /live, /sources, /review-preview, /gestures, /demo, /admin<br/>geplant: /progress"]
     THEME["Root-Layout: gespeicherte Darstellung vor First Paint<br/>localStorage, CSS-Tokens, OS-Fallback"] -.-> DRAWER
     JOURNEY["Gemeinsamer Ablauf: Prepare / Record / Review<br/>aktuelle oder letzte Aufnahme, sonst markiertes Beispiel"] --> SRC
     JOURNEY --> LIVE
@@ -454,6 +462,8 @@ flowchart TD
     LIVE --> WALK["/gestures: synthetischer 22-s-Rundgang<br/>gleiche Regeln, keine Genauigkeitsvalidierung"]
     WALK --> LIVE
     ADMIN["/admin (Navbar, ohne Login)<br/>AdminPanel: Pose-Haltezeit,<br/>Hinweis-Mindestdauer + Lücke,<br/>Pose feedback: On/Review/Off je Regel,<br/>Analysis features: Modell/Modus/Feedback"] -->|"localStorage, ab nächster<br/>Kalibrierung/Aufnahme"| LIVE
+    PROGRESSFE["/progress (geplant)<br/>Small Multiples, Rohpunkte, Lücken,<br/>Qualitätsmarker, Ziele<br/>kein Gesamtscore/Radar"] -. "progress.v1" .-> PAPI["GET/PUT /profiles/id/progress|goals"]
+    DRAWER -. "geplant" .-> PROGRESSFE
 
     PRAC --> STATE{"Phasen"}
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]
@@ -498,24 +508,49 @@ flowchart LR
 ```mermaid
 erDiagram
     SOURCES ||--o{ SOURCE_CHUNKS : "hat Chunks"
+    SPEAKER_PROFILES ||--o{ PROFILE_TOKENS : "Token"
+    SPEAKER_PROFILES ||--o{ PROFILE_GOALS : "Ziele"
+    SPEAKER_PROFILES ||--o{ SESSIONS : "optional verknüpft"
     SESSIONS ||--o{ TAKES : "hat Takes"
     SESSIONS ||--o{ REVIEW_IDEMPOTENCY : "24 h, bei Zugriff bereinigt"
     TAKES ||--o{ EVENTS : "Cascade"
     TAKES ||--o| REVIEWS : "Cascade"
     TAKES ||--o{ JOBS : "Cascade"
+    TAKES ||--o| TAKE_QUALITY : "Qualität"
+    TAKES ||--o{ TAKE_METRICS : "Metriken"
+    METRIC_DEFINITIONS ||--o{ TAKE_METRICS : "definiert"
+    SPEAKER_PROFILES ||--o{ PROGRESS_SNAPSHOTS : "Trend"
+    SPEAKER_PROFILES ||--o{ PROGRESS_CHANGE_POINTS : "Change-Points"
+    SPEAKER_PROFILES ||--o{ PROGRESS_RUNS : "Neuberechnung, Cascade"
 
+    SPEAKER_PROFILES {
+        uuid id PK
+        text display_name
+        text locale
+        jsonb consent "long-term-progress"
+        timestamptz retention_until
+    }
+    PROFILE_TOKENS {
+        uuid id PK
+        uuid profile_id FK
+        text token_hash "UNIQUE, SHA-256"
+        timestamptz revoked_at
+    }
     SESSIONS {
         uuid id PK
+        uuid profile_id FK "nullable, ON DELETE SET NULL"
         uuid collection_id "gleiche Collection wie Sources"
+        text presentation_mode "startup/thesis/school/nonprofit"
         text title
         text status
         jsonb consent
-        jsonb capture
+        jsonb capture "inkl. deviceKey"
         timestamptz created_at
     }
     TAKES {
         uuid id PK
         uuid session_id FK
+        uuid profile_id FK "denormalisiert, nullable"
         text status
         int duration_ms
         text mime_type
@@ -523,7 +558,80 @@ erDiagram
         jsonb audio_probe
         jsonb coverage
         jsonb analysis "Wörter, Summaries, Fact-Check, Fragen"
+        timestamptz recorded_at "Client oder Server"
+        text recorded_at_source "client/server"
+        uuid device_key
         int revision
+    }
+    TAKE_QUALITY {
+        uuid take_id PK,FK
+        text status "ok/partial/poor"
+        text global_exclusion_reasons "Array"
+        double pose_coverage_ratio
+        double pose_valid_ratio
+        double audio_active_ratio
+        int word_count
+        int claim_count
+        bool synthetic_demo
+        text quality_version
+    }
+    METRIC_DEFINITIONS {
+        text metric_id PK
+        int version PK
+        text unit
+        text suggested_direction
+        bool is_primary
+        bool device_sensitive
+    }
+    TAKE_METRICS {
+        uuid take_id PK,FK
+        text metric_id PK,FK
+        int metric_version PK,FK
+        double value "nullable = unbekannt"
+        text unit
+        text rule_version
+        text computation_version
+        jsonb quality "eligible + exclusionReasons + sourceRevision"
+    }
+    PROGRESS_SNAPSHOTS {
+        uuid id PK
+        uuid profile_id FK
+        text metric_id
+        int metric_version
+        text window_kind
+        uuid window_end_take_id FK
+        text trend_status
+        text goal_status
+        double slope_per_10_takes
+        double noise_band
+        text algorithm_version
+        text input_hash
+    }
+    PROGRESS_CHANGE_POINTS {
+        uuid id PK
+        uuid profile_id FK
+        text metric_id
+        uuid take_id FK
+        text kind "step/regression/recovery"
+        double magnitude
+        text confidence
+    }
+    PROGRESS_RUNS {
+        uuid id PK
+        uuid profile_id FK
+        text status "queued/running/completed/failed"
+        text error "nur Fehlercode"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    PROFILE_GOALS {
+        uuid profile_id PK,FK
+        text metric_id PK
+        int metric_version PK
+        text direction
+        double target_value
+        double target_min
+        double target_max
     }
     EVENTS {
         uuid take_id PK,FK
@@ -611,7 +719,7 @@ Zusätzlich (außerhalb Postgres):
 | SeaweedFS `agent-context-jobs/{job_id}/` | Vorbereiteter Prompt mit gekürztem Transkript und Quellenauszügen; Request wird gelöscht, Ergebnis bleibt wie andere Jobs gespeichert, noch kein TTL-Cleanup |
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
-| Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), auch vom Fact-Check genutzt |
+| Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), optional Profil-ID/Token (`pp_…`) und zufälliger `deviceKey`; Token ist XSS-exponiert |
 | Browser-Speicher (Live-Workspace) | FeatureFlags, presentationMode und sourceCollectionId pro Take, ElevenLabs-Gespräch, Wörter, Pose-Events mit runtime, Fact-Check-Ergebnis, Fragen und Antworten; nur bis zum Neuladen |
 
 ## 9. Event-Modell: gemeinsame Timeline
@@ -688,16 +796,39 @@ flowchart LR
         V4["POST /takes/id/review<br/>GET /takes/id/review<br/>GET /takes/id/timeline"]
         V5["GET /jobs/id<br/>GET /takes/id/evaluation"]
         V6["POST /takes/id/factcheck<br/>POST / GET /takes/id/questions<br/>POST /takes/id/questions/answers"]
+        P1["POST /profiles<br/>GET/PATCH/DELETE /profiles/id<br/>POST /profiles/id/rotate-token"]
+        P2["GET /profiles/id/progress<br/>GET /profiles/id/progress/metricId<br/>POST /profiles/id/progress/recompute: 202<br/>GET /profiles/id/progress/runs/runId"]
+        P3["GET/PUT/DELETE /profiles/id/goals/metricId<br/>GET /profiles/id/takes<br/>GET /profiles/id/export"]
     end
 
     WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5 & Q6 & Q7 & Q8 & Q9
     MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
     CLIENT["Neuer Take-Client-Vertrag<br/>Frontend-Integration separat"] -.-> V1 & V2 & V3 & V4 & V5 & V6
+    PROGRESS["Progress-Client<br/>X-Profile-Token"] -.-> P1 & P2 & P3
 ```
 
 Der Vertrag wird über `npm run api:generate` aus dem FastAPI-Code generiert (`api/openapi.json` -> `api/schema.d.ts`) und ist damit immer synchron zum Backend.
 
+Die Progress-Endpunkte sind serverseitig implementiert (`backend/app/progress/`),
+aber noch nicht in der Web-Navigation verdrahtet. `POST /sessions` akzeptiert
+optional `profileId` und verlangt dann `X-Profile-Token`;
+alle verknüpften Session-/Take-/Job-Routen prüfen diesen Token, auch beim Lesen,
+Upload, Löschen und bei Idempotenz-Retries. Abgelaufene Profile liefern `410`,
+Löschen bleibt erlaubt. Sessions ohne Profil bleiben unverändert.
+Explizites Recompute läuft über Celery und `progress_runs`; normale Reads
+extrahieren nur geänderte Takes und schreiben das tatsächlich angefragte Fenster.
+Die Profil-Löschung entkoppelt
+Sessions/Takes (`ON DELETE SET NULL`) und entfernt nur die abgeleiteten
+Progress-Daten; die Session-Löschung bleibt separat.
+
 ## Deep Research (24.10.2026)
+
+Die Progress-Auswertung ist zusätzlich in
+`docs/12-long-term-progress-data-design.md` §2.3 gegen NIST/USGS,
+Theil–Sen, RCI/MDC, Regression-to-the-Mean, Benjamini–Hochberg und die
+PostgreSQL-Partitionierungsdokumentation geprüft. Wichtig: p-Werte sind
+diagnostisch, CUSUM liefert separate Change-Points, und mehrere Takes derselben
+Session werden als abhängig markiert (Confidence `low`).
 
 Die geplante inkrementelle LLM-/TTS-Pipeline ist in
 `docs/11-deep-research-validation.md` gegen Forschung und offizielle

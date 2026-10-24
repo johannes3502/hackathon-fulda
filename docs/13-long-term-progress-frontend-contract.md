@@ -46,8 +46,8 @@ muss daher gelten:
 
 - [ ] Beim Start einer Aufnahme wird eine Session mit `profileId` und
       `presentationMode` angelegt.
-- [ ] Beim Stoppen wird ein Take mit `recordedAt` und `capture.deviceKey`
-      angelegt.
+- [ ] Die Session speichert `capture.deviceKey`; beim Stoppen wird ein Take
+      mit `recordedAt` angelegt und übernimmt den Geräteschlüssel.
 - [ ] Die lokale Aufnahme speichert die zurückgegebene `takeId` (z. B. im
       `LiveRecording`-Objekt oder in einer Map `localRecordingId -> takeId`).
       Ohne diese Zuordnung kann die Progress-UI nicht auf das lokale Video
@@ -281,9 +281,23 @@ Content-Type: application/json
 | `GET` | `/api/profiles/{id}/goals` | `X-Profile-Token` | Ziele lesen |
 | `PUT` | `/api/profiles/{id}/goals/{metricId}` | `X-Profile-Token` | Ziel setzen/aktualisieren |
 | `DELETE` | `/api/profiles/{id}/goals/{metricId}` | `X-Profile-Token` | Ziel löschen |
-| `POST` | `/api/profiles/{id}/progress/recompute` | `X-Profile-Token` | Neuberechnung |
+| `POST` | `/api/profiles/{id}/progress/recompute` | `X-Profile-Token` | `202 {runId,statusUrl}` |
+| `GET` | `/api/profiles/{id}/progress/runs/{runId}` | `X-Profile-Token` | Laufstatus |
 | `GET` | `/api/profiles/{id}/export?format=json|csv` | `X-Profile-Token` | Export |
 | `GET` | `/api/profiles/{id}/takes` | `X-Profile-Token` | Take-Tabelle |
+
+Recompute läuft über Celery. `statusUrl` mit Token pollen, bis `status` den Wert
+`completed` oder `failed` hat; bei `completed` Progress erneut laden. Bei `503`
+denselben Idempotency-Key wiederverwenden; ein zweiter aktiver Lauf liefert
+`409`. Auch verknüpfte Session-/Take-/Job-Routen verlangen `X-Profile-Token`,
+anonyme Sessions bleiben kompatibel. Abgelaufene Profile liefern `410`,
+Löschen bleibt erlaubt. Antworten tragen `Cache-Control: private, no-store`.
+
+`includeExcluded=false` ändert nur die sichtbaren Punkte, keine Qualitätszähler
+oder Trends. `sequence` behält Lücken; `versionBreak` unterdrückt die numerische
+Vergleichsaussage. `latest.changeVsBaseline` bezieht sich auf `latest.value`,
+`trend.relativeChange` auf den Median der letzten drei eligible Werte.
+
 
 Beispiel:
 
@@ -863,11 +877,11 @@ usw. sind für die direkte Darstellung dupliziert; bei Widerspruch gilt
 | `exclusionReasons` | Warum nicht vergleichbar | In Tooltip/Detail als verständlichen Text zeigen, nicht als Code. |
 | `value: null` | Metrik nicht berechenbar | Lücke, kein 0-Punkt. |
 | `latest` | letzter **eligible** Punkt | `null`, wenn kein eligible Punkt existiert; nicht den letzten ausgeschlossenen Punkt als „aktuell“ zeigen. |
-| `latest.reliableChange` | RCI-Analogon außerhalb der üblichen Schwankung | Nicht als „signifikant“ oder „klinisch relevant“ formulieren. |
+| `latest.reliableChange` | letzter eligible Einzelwert außerhalb der heuristischen MDC, ab 5 Punkten | Nicht als „signifikant“ oder „klinisch relevant“ formulieren. |
 | `baseline` | Referenz (Median der ersten eligible Takes) | Gestrichelte Linie + „Startphase (3 Aufnahmen)“; nicht als „Ziel“ bezeichnen. `null` bei < 3 eligible Punkten. |
 | `noiseBand` | normale Schwankung | Als unauffälliges Band um die Baseline/das Trendmodell zeigen; nicht als Konfidenzintervall der Wahrheit. |
 | `minimumDetectableChange` | kleinste darstellbare Änderung | In „Warum sichtbar?“ erklären; nicht als Note. |
-| `slopeCi95` | Unsicherheit der Steigung | Nur in Detail/„Warum sichtbar?“; nicht als p-Wert-Badge. |
+| `slopeCi95` | Sen-Rangintervall der Steigung (Normalapproximation) | Nur in Detail/„Warum sichtbar?“; nicht als p-Wert-Badge. |
 | `mannKendallP` / `adjustedP` | statistischer Test | Nicht als Hauptzahl in der UI; höchstens in Details. |
 | `trend.status` | statistischer Zustand | `insufficient`, `early_signal`, `stable`, `trend_up`, `trend_down`, `unclear` klar unterscheiden. |
 | `trend.n` | Anzahl **eligible** Punkte in der Trendrechnung | Nicht mit `quality.totalPoints` gleichsetzen; im Detail „n=14 vergleichbar“ zeigen. |
