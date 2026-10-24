@@ -160,10 +160,9 @@ sichtbar (Hüfthöhe). Das kann eine Tasche, eine Jacke oder eine verdeckte Hand
 sein – keine Bewertung.“
 
 **MUSS:** Der Hand Landmarker läuft nur lokal und nur für den Dev-Check
-„Hand in pocket“ (FR-POSE-20). Er nutzt Handgelenk und Fingerspitzen
-(8/12/16/20) und erzeugt keine Events, Clips oder Backend-Payloads. Eine
-vollständig verdeckte Hand sieht er nicht; der `hidden`-Zweig bleibt eine
-Sichtbarkeits-Heuristik.
+„Hand in pocket“ (FR-POSE-20). Er nutzt das Handgelenk (Punkt 0) und den
+Abstand zur Pose-Hüfte; eine verdeckte Hand erkennt er nicht. Er erzeugt keine
+Events, Clips oder Backend-Payloads.
 
 ### FR-POSE-09 — Füße und Stand
 
@@ -334,7 +333,7 @@ Events, keine Scores und keine Backend-Aufrufe.
 | T08 | Hände über Schulter | beide `wristHeight > 0.20 × Schulterbreite` | sofort |
 | T09 | Hüften außerhalb | Schultern sichtbar, `trunkLean` nicht auswertbar | sofort |
 | T10 | Hände verdeckt | beide Handgelenkhöhen nicht messbar | sofort |
-| T11 | Hand in der Hosentasche | Fingerspitzen komprimiert + Ellbogen ≤ 120° (FR-POSE-20) | sofort |
+| T11 | Hand in der Hosentasche | Handgelenk ≤ 0,45 Schulterbreiten zur Hüfte und keine erkannte Hand daran (FR-POSE-20) | sofort |
 | T12 | Beine gekreuzt | Unterschenkel schneiden sich (Knie + Knöchel sichtbar) | sofort |
 
 **MUSS:** T10 ist ein **Sichtbarkeitstest**, kein Taschenbeweis. T07 ist ein
@@ -349,27 +348,29 @@ Heuristiken und wird nicht als Event, Clip oder Backend-Payload gespeichert.
 ### FR-POSE-20 — Pocket-Check (Dev-Heuristik)
 
 **MUSS:** Der MediaPipe Hand Landmarker läuft lokal im selben Worker wie Pose
-(CPU, `IMAGE`, max. 2 Hände, 21 Landmarks pro Hand, Confidence 0,3). Er läuft
-ca. 5 Hz, unabhängig von der Pose-Handgelenk-Position, damit eine Hand in der
-Tasche auch bei verdecktem Pose-Wrist erkannt wird. Hand-Landmarks werden
-nicht in das JSONL-Log geschrieben, aber im Pose-Lab-Overlay als pinke Punkte
-und Linien gezeigt.
+(CPU, `IMAGE`, max. 2 Hände, 21 Landmarks pro Hand, Confidence 0,5 für
+Detection und Presence). Er läuft auf jedem Pose-Frame, unabhängig von der
+Pose-Handgelenk-Position, damit eine Hand in der Tasche auch bei verdecktem
+Pose-Wrist erkannt wird. Hand-Landmarks werden nicht in das JSONL-Log
+geschrieben, aber im Pose-Lab-Overlay als pinke Punkte und Linien gezeigt.
 
-**MUSS:** `handAtPocket` prüft zwei Fälle:
-1. **Fingers:** Eine erkannte Hand hat das Handgelenk in der Hüftzone, der
-   Ellbogen ist ≤ 120° gebeugt und die Fingerspitzen 8/12/16/20 bleiben
-   komprimiert: maximale Wrist→Tip-Distanz ≤ 0,24 Schulterbreiten.
-2. **Hidden:** Ein Pose-Handgelenk liegt in der Hüftzone, der Ellbogen ist
-   ≤ 120° gebeugt und keine erkannte Hand liegt innerhalb von 0,35
-   Schulterbreiten (Proxy für eine verdeckte Hand).
+**MUSS:** `pocketCheck` prüft pro Seite:
+1. `wrist_hip_dist <= 0.45` Schulterbreiten (2D-Abstand des Pose-Handgelenks
+   zur eigenen Hüfte; das Handgelenk muss nur im Bild liegen, nicht sichtbar
+   sein), und
+2. `hand_found == false`: Der Hand Landmarker findet an diesem Handgelenk
+   keine Hand.
 
-Eine locker hängende, offene Hand (max. Reach > 0,24) zählt nicht als Tasche.
-Ein gerader Arm an der Hüfte (Ellbogen > 120°) zählt nicht, weil er auch in
-der neutralen Pose auftritt. Die Hüftzone ist |x − hip.x| ≤ 0,24 und
-−0,02 ≤ (y − hip.y) ≤ 0,45 in Schulterbreiten.
+Jede erkannte Hand wird dem näheren Pose-Handgelenk (15/16) zugeordnet,
+höchstens 0,5 Schulterbreiten entfernt; bei zwei Händen am selben Handgelenk
+gewinnt die nähere. Eine gefundene Hand ist nie „in der Tasche“. `null`
+(unentschieden), wenn das Hand-Modell nicht läuft, die Hüfte nicht nutzbar ist
+oder die groben Pose-Handpunkte außerhalb des Bildes liegen. Gesamt: `true`,
+sobald eine Seite `true` ist; `false` nur, wenn beide Seiten entschieden und
+`false` sind.
 
-**MUSS:** UI-Text „Hand in pocket“ nur zusammen mit dem Detail
-(`fingers` oder `hidden at hip`). Keine Sicherheit, keine Event-Erzeugung.
+**MUSS:** UI-Text „Hand in pocket“ nur zusammen mit dem Detail (z. B.
+`in pocket (L)`). Keine Sicherheit, keine Event-Erzeugung.
 
 **SOLL:** Der Pocket-Check bleibt im Dev-Modus, bis ein gelabeltes Demo-Set
 einen Precision-Nachweis liefert. Er ist kein Produktions-Event.
@@ -835,9 +836,9 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
    `evaluable=false`.
 3. **Hände:** In Produktions-Events kein String „Tasche“; optional
    `hand-hidden-near-torso` mit `confidence: low`. Im Dev-Modus erkennt T11
-   komprimierte Fingerspitzen an der Hüfte mit gebeugtem Ellbogen oder eine
-   verdeckte Hand als Heuristik; ein gerader Arm an der Hüfte zählt nicht.
-   T11 erzeugt kein Event.
+   ein Handgelenk nahe der eigenen Hüfte (≤ 0,45 Schulterbreiten), an dem der
+   Hand Landmarker keine Hand findet; eine gefundene Hand zählt nicht als
+   Tasche. T11 erzeugt kein Event.
 4. **Füße:** Im `upper-body`-Modus keine Fußmetrik; im `full-body`-Modus ohne
    sichtbare Füße `evaluable=false`.
 5. **Kopf:** `camera`-Modus liefert CFR/OffRatio/ReturnRate; `room`-Modus
@@ -863,7 +864,7 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 |---|---|---|---|
 | OD-1 | Face Landmarker + Iris für echtes Gaze? | Nein im MVP; nur als separates Feature mit Consent, Kalibrierung und „Kamera-Blick“, nie „Eye Contact“ | offen |
 | OD-2 | `full-body` standardmäßig? | Nein, opt-in und experimentell | entschieden |
-| OD-3 | Hand Landmarker für Gesten? | Für Produktions-Gesten nein; im Dev-Modus für den Pocket-Check aktiviert (24.10.2026), 5 Hz, Confidence 0,3 | entschieden |
+| OD-3 | Hand Landmarker für Gesten? | Für Produktions-Gesten nein; im Dev-Modus für den Pocket-Check aktiviert (24.10.2026), auf jedem Pose-Frame, Confidence 0,5 | entschieden |
 | OD-4 | Live-Gestenhinweise? | Nein, nur Review | entschieden |
 | OD-5 | Kalibrierungs-Set | 10–20 Personen, 0,5/1/2 m, Brille, Licht, Hauttöne; Precision/Recall berichten | offen |
 | OD-6 | Default `audienceMode` | Kein stiller Default; Demo `camera` | entschieden |
@@ -879,10 +880,11 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 - **Kopforientierung:** Pose-only liefert einen Kopfrichtungs-Proxy, keinen
   Blickkontakt. Face/Iris wäre ein Scope- und Datenschutzwechsel. `camera` und
   `room` sind getrennte Modi; „Scanning“ ist keine validierte Wirkung.
-- **Hände:** Der Hand Landmarker lädt lokal (5 Hz, Confidence 0,3) und
-  zeichnet die 21 Landmarks im Pose-Lab-Overlay. Fingertracking erkennt
-  sichtbare, komprimierte Finger am Taschenrand; eine vollständig verdeckte
-  Hand sieht er nicht. Der Dev-Pocket-Check kombiniert beides als Heuristik;
+- **Hände:** Der Hand Landmarker lädt lokal (auf jedem Pose-Frame, Confidence
+  0,5) und zeichnet die 21 Landmarks im Pose-Lab-Overlay. Der Dev-Pocket-Check
+  kombiniert einen Handgelenk-Hüft-Abstand ≤ 0,45 Schulterbreiten mit „keine
+  Hand an diesem Handgelenk gefunden“. Eine vollständig verdeckte Hand erkennt
+  das Modell nicht, deshalb bleibt `hand_found=false` der Proxy;
   Produktions-Events bleiben bei `hand-hidden-near-torso` (post-hoc, low
   confidence).
 - **Füße:** Frontale Fuß-Landmarks sind ungenau und oft verdeckt. Nur
@@ -924,3 +926,4 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 | 24.10.2026 | Pose-Lab auf ein Output-Feld umgestellt; Pocket-Check per Hand-Landmarker | Nutzerentscheidung: falsche Pose live rot aus der Ferne erkennbar; Hosentaschen-Erkennung über Fingertracking. |
 | 24.10.2026 | Hassan-Crossed-Logik übernommen; Coach-/Status-Umschalter; Fingerspitzen-Pocket | Handgelenke an der Mittellinie und Unterarmwinkel ≤ 40°; Coach-Sprechblase als Standard, großes Statusfeld umschaltbar; Pocket prüft Fingerspitzen 8/12/16/20 und Ellbogen ≤ 120°. |
 | 24.10.2026 | Hand-Landmarks sichtbar, 5 Hz, einheitliches Check-Muster, T12 | Hand-Modell lädt nachweislich mit Confidence 0,3; pinke Hand-Landmarks im Pose-Lab-Overlay; alle Posen liefern `values`/`failing`; T12 erkennt gekreuzte Unterschenkel. |
+| 24.10.2026 | Hassans Hand-Modell und Pocket-Logik übernommen | Hand-Modell läuft auf jedem Pose-Frame mit Confidence 0,5; Pocket = Handgelenk ≤ 0,45 Schulterbreiten zur eigenen Hüfte und keine erkannte Hand an diesem Handgelenk; Hand-Landmarks bleiben im Browser. |

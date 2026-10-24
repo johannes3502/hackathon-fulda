@@ -2,7 +2,6 @@
 globalThis.importScripts("/pose/runtime/vision_bundle.js");
 let landmarker;
 let handLandmarker;
-let frame = 0;
 
 globalThis.onmessage = async ({ data }) => {
   try {
@@ -38,9 +37,8 @@ globalThis.onmessage = async ({ data }) => {
             },
             runningMode: "IMAGE",
             numHands: 2,
-            minHandDetectionConfidence: 0.3,
-            minHandPresenceConfidence: 0.3,
-            minTrackingConfidence: 0.3,
+            minHandDetectionConfidence: 0.5,
+            minHandPresenceConfidence: 0.5,
           });
         hands = true;
       } catch (error) {
@@ -51,12 +49,8 @@ globalThis.onmessage = async ({ data }) => {
     } else if (data.type === "frame") {
       const result = landmarker.detect(data.frame);
       const points = result.landmarks[0] ?? [];
-      // Hands move in and out of frame; run the lighter hand model at ~5 Hz
-      // instead of gating on a pose wrist that may be hidden in a pocket.
-      const shouldDetectHands = !!handLandmarker && frame % 2 === 0;
-      frame += 1;
       let hands = null;
-      if (shouldDetectHands) {
+      if (handLandmarker) {
         const found = handLandmarker.detect(data.frame);
         hands = (found.landmarks ?? []).map((landmarks, i) => ({
           label: found.handednesses?.[i]?.[0]?.categoryName ?? "",

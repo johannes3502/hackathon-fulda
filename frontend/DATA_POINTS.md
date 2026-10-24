@@ -15,9 +15,10 @@ Iris/Pupille, keine Finger im JSONL-Log.
 **MediaPipe Pose Landmarker** (33 Punkte) für das Logging.
 
 **MediaPipe Hand Landmarker** (21 Punkte pro Hand) läuft zusätzlich live im
-selben Worker, ca. 5 Hz und mit Confidence 0,3, nur für den Dev-Pocket-Check.
-Seine Landmarks werden nicht geloggt und nicht an das Backend geschickt; im
-Pose-Lab-Overlay erscheinen sie als pinke Punkte und Linien.
+selben Worker auf jedem Pose-Frame, mit Confidence 0,5, nur für den
+Dev-Pocket-Check. Seine Landmarks werden nicht geloggt und nicht an das
+Backend geschickt; im Pose-Lab-Overlay erscheinen sie als pinke Punkte und
+Linien.
 
 - Augen kommen aus den Pose-Punkten.
 - Kopfwinkel kommen aus Nase, Augen und Ohren.
@@ -93,7 +94,11 @@ Diese Werte werden aus den geloggten Punkten berechnet, nicht zusätzlich getrac
 | `left_wrist_height`, `right_wrist_height` | relativ zur Schulterbreite |
 | `left_wrist_cross`, `right_wrist_cross` | Handgelenk entlang der Schulterlinie, ab Körpermitte, in Schulterbreiten; positiv = über die Mitte auf die Gegenseite |
 | `left_forearm_deg`, `right_forearm_deg` | Unterarm ↔ Schulterlinie, 0–90°, 0 = parallel |
+| `left_wrist_hip_dist`, `right_wrist_hip_dist` | Handgelenk ↔ eigene Hüfte, 2D, in Schulterbreiten; das Handgelenk muss nur im Bild liegen |
+| `left_hand_visibility`, `right_hand_visibility` | höchste Sichtbarkeit von Pinky/Zeigefinger/Daumen (17–22); `null`, wenn ein Punkt außerhalb des Bildes liegt |
+| `left_hand_found`, `right_hand_found` | Hand Landmarker hat eine Hand an diesem Handgelenk gefunden; `null` ohne Hand-Modell oder wenn die Hand außerhalb des Bildes liegt |
 | `legs_visible` | Knie und Knöchel ausreichend sichtbar |
+| `hips_visible` (unter `quality`) | beide Hüftpunkte nutzbar |
 
 ## Log-Schema
 
@@ -122,6 +127,7 @@ Ein JSON-Objekt pro Sample, JSONL:
   },
   "quality": {
     "pose_present": true,
+    "hips_visible": true,
     "legs_visible": false
   }
 }
@@ -147,21 +153,25 @@ Regeln:
 ## Pocket-Check (Dev, live-only)
 
 Der Pose Lab im `/live`-Workspace nutzt den Hand Landmarker für eine
-Heuristik „Hand in pocket“. Verwendet werden Handgelenk (0) und die
-Fingerspitzen (8, 12, 16, 20); die Landmarks bleiben im Browser und
-erscheinen nicht im JSONL.
+Heuristik „Hand in pocket“. Die Landmarks bleiben im Browser und erscheinen
+nicht im JSONL; geloggt werden nur die abgeleiteten Werte aus der Tabelle
+oben (`*_wrist_hip_dist`, `*_hand_found`, `*_hand_visibility`).
 
-- Handgelenk in der Hüftzone, Ellbogen ≤ 120° (Arm nicht locker gerade)
-  und die Fingerspitzen bleiben komprimiert: maximale Wrist→Tip-Distanz
-  ≤ 0,24 Schulterbreiten → `fingers`.
-- Pose-Handgelenk in der Hüftzone, Ellbogen ≤ 120° und keine erkannte
-  Hand innerhalb von 0,35 Schulterbreiten → `hidden` (Proxy für eine
-  vollständig verdeckte Hand).
-- Eine locker hängende, offene Hand (max. Reach > 0,24) zählt nicht.
-- Ein gerader Arm an der Hüfte (Ellbogen > 120°) zählt nicht als Tasche.
-- Im Pose-Lab-Overlay werden alle 21 Hand-Landmarks pink gezeichnet; das
-  hilft beim Prüfen, ob das Hand-Modell die Hand überhaupt sieht.
-- Keine Sicherheit, kein Event, kein Backend-Payload.
+Pro Seite gilt „in der Tasche“, wenn
+
+- `*_wrist_hip_dist <= 0.45` (Handgelenk-Schätzung nahe der eigenen Hüfte;
+  das Handgelenk muss nur im Bild liegen, nicht sichtbar sein), und
+- `*_hand_found == false` (Hand Landmarker findet an diesem Handgelenk keine
+  Hand).
+
+Eine gefundene Hand ist nie „in der Tasche“. `null` (unentschieden), wenn das
+Hand-Modell nicht läuft, die Hüfte nicht nutzbar ist oder die groben
+Pose-Handpunkte außerhalb des Bildes liegen (abgeschnitten, nicht verdeckt).
+Gesamt: `true`, sobald eine Seite `true` ist; `false` nur, wenn beide Seiten
+entschieden und `false` sind. Bekannte Grenzen: Hände hinter dem Rücken;
+sehr kleine Hände (weit von der Kamera) oder Bewegungsunschärfe, bei denen der
+Hand Landmarker eine sichtbare Hand übersieht. Keine Sicherheit, kein Event,
+kein Backend-Payload.
 
 ## Crossed legs (Dev, live-only)
 
@@ -193,8 +203,9 @@ Aufnahme-Logs ausgegeben.
   installierten JS-/WASM-Dateien nach `public/pose/runtime` (generiert, gitignored).
   Im Browser sind keine CDN-/Modell-Downloads von Drittanbietern nötig.
 - `IMAGE`-Modus pro Frame vermeidet das zeitliche Smoothing des VIDEO-Graphen.
-  Keine zusätzliche Glättung im Log. Einziger Live-Hinweis bisher: „Arme
-  verschränkt“ (siehe unten); noch keine Pose-Events in Review/Timeline.
+  Keine zusätzliche Glättung im Log. Live-Hinweis bisher: „Arme verschränkt“
+  (siehe unten); der Pocket-Check läuft nur im Pose Lab. Noch keine
+  Pose-Events in Review/Timeline.
 - Jeder Log-Eintrag enthält alle 21 Schlüssel aus der Indexliste. Tupel sind
   `[x,y,z,visibility,presence]`; fehlende Konfidenzwerte sind `null`, nicht erfunden.
   Ungültige Koordinaten sind `null`. Für Beine gelten zusätzlich die Sichtbarkeitsregeln.
@@ -232,6 +243,14 @@ sind technische Prototyp-Konfiguration, keine validierte Genauigkeit.
   positiv „auf der Gegenseite“ heißt; unabhängig von Spiegelung und Bildseite.
 - Forearm: Winkel Ellbogen → Handgelenk zur Schulterlinie in der Bildebene,
   auf `[0,90]` gefaltet; 0 = parallel zur Schulterlinie.
+- Wrist-Hip-Distance: 2D-Abstand Handgelenk → eigene Hüfte in Pixeln, geteilt
+  durch die Schulterbreite. Das Handgelenk muss nur im Bild liegen; seine
+  `visibility` darf niedrig sein, weil eine Tasche es verdeckt.
+- Hand-Zuordnung: Hand-Punkt 0 (Handgelenk) wird dem näheren Pose-Handgelenk
+  (15/16) zugeordnet, höchstens 0,5 Schulterbreiten entfernt; bei zwei Händen
+  am selben Handgelenk gewinnt die nähere. `*_hand_found` ist `true`, wenn eine
+  Hand zugeordnet wurde; `null` ohne Hand-Modell oder wenn die groben
+  Pose-Handpunkte außerhalb des Bildes liegen; sonst `false`.
 - `eyes_forward`: Alle Augenpunkte 1–6 müssen nutzbar sein. Die kleinere/größere
   Augenbreite (innerer–äußerer Punkt in X/Y/Z) muss mindestens 0,65 sein und die
   Tiefendifferenz der Augenmitten höchstens 0,35 ihres 2D-Abstands. Kein Yaw und

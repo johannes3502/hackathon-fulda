@@ -43,12 +43,17 @@ function base(): Landmark[] {
   return p;
 }
 
-const sample = (points = base()) => poseSample(points, 800, 400, 0)!;
+const sample = (points = base(), hands: HandSample[] | null = []) =>
+  poseSample(points, 800, 400, 0, hands)!;
 const evaluate = (
   id: PoseTestId,
   points = base(),
-  hands: HandSample[] = [],
-) => POSE_TESTS.find((test) => test.id === id)!.check(sample(points), hands);
+  hands: HandSample[] | null = [],
+) =>
+  POSE_TESTS.find((test) => test.id === id)!.check(
+    sample(points, hands),
+    hands ?? [],
+  );
 
 function lean(): Landmark[] {
   const p = base();
@@ -218,20 +223,23 @@ it("marks missing data as not evaluable after the unknown grace period", () => {
   expect(at(hipsOut(), 900).state).toBe("not-evaluable");
 });
 
-it("distinguishes a tucked hand from a relaxed open hand", () => {
-  expect(
-    evaluate("pocket", pocketPose(), [hand(0.25, 0.72, 0.1)]).pass,
-  ).toBe(true);
-  // A compressed hand at the hip with a straight arm is a relaxed hand.
-  expect(evaluate("pocket", base(), [hand(0.25, 0.75, 0.1)]).pass).toBe(false);
+it("uses the hand model to tell a pocketed hand from a detected hand", () => {
+  // No hand near the hip while the wrist sits at it: pocket heuristic.
+  expect(evaluate("pocket", pocketPose(), []).pass).toBe(true);
+  // The hand model sees both hands at the wrists: not a pocket.
   expect(
     evaluate("pocket", pocketPose(), [
-      hand(0.25, 0.72, 0.35),
-      hand(0.75, 0.72, 0.35),
+      hand(0.25, 0.72, 0.1),
+      hand(0.75, 0.75, 0.1),
     ]).pass,
   ).toBe(false);
-  // A bent arm at the hip with no detected hand is the hidden-pocket proxy.
-  expect(evaluate("pocket", pocketPose(), []).pass).toBe(true);
+  // Without the hand model the pocket check stays undecided.
+  expect(evaluate("pocket", pocketPose(), null).pass).toBeNull();
+  // Without hips there is no distance and no decision.
+  const noHips = pocketPose();
+  noHips[23].visibility = 0;
+  noHips[24].visibility = 0;
+  expect(evaluate("pocket", noHips, []).pass).toBeNull();
 });
 
 it("does not call hands hidden while the hand model sees a hand", () => {
@@ -243,8 +251,12 @@ it("does not call hands hidden while the hand model sees a hand", () => {
 
 it("shows exactly one prioritized output for the pose lab", () => {
   const tracker = new PoseTestTracker();
-  tracker.update(sample(), 0);
-  expect(poseFeedback(tracker.update(sample(), 800))).toMatchObject({
+  // Both hands are seen at the wrists, so the pocket heuristic stays off.
+  const detected = [hand(0.25, 0.75, 0.05), hand(0.75, 0.75, 0.05)];
+  tracker.update(sample(base(), detected), 0, detected);
+  expect(
+    poseFeedback(tracker.update(sample(base(), detected), 800, detected)),
+  ).toMatchObject({
     state: "ok",
     label: "OK",
   });

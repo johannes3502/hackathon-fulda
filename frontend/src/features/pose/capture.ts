@@ -23,7 +23,7 @@ export class PoseCapture {
   private armsCrossed = false;
   private handModel: boolean | null = null;
   private handError: string | null = null;
-  private hands: HandSample[] = [];
+  private hands: HandSample[] | null = [];
   private tests = new PoseTestTracker();
   private testResults: PoseTestResult[] = [];
   private worker: Worker | null = null;
@@ -46,14 +46,14 @@ export class PoseCapture {
       armsCrossed: this.armsCrossed,
       handModel: this.handModel,
       handError: this.handError,
-      hands: this.hands,
+      hands: this.hands ?? [],
       tests: this.testResults,
     });
   }
   start() {
     this.publish("loading", "Loading the local pose model…");
     try {
-      const worker = (this.worker = new Worker("/pose/worker.js?v=3"));
+      const worker = (this.worker = new Worker("/pose/worker.js?v=4"));
       this.timeout = setTimeout(
         () => this.fail("Pose model loading timed out. Try again."),
         30000,
@@ -69,6 +69,7 @@ export class PoseCapture {
           this.handModel = data.hands === true;
           this.handError =
             typeof data.handError === "string" ? data.handError : null;
+          this.hands = this.handModel ? [] : null;
           this.publish(
             "running",
             this.handModel
@@ -82,18 +83,25 @@ export class PoseCapture {
           );
         } else if (data.type === "sample") {
           this.pending = false;
+          // null = hand model unavailable; [] = it ran and found no hands.
+          this.hands = Array.isArray(data.hands) ? data.hands : null;
           // A frame captured before the recording anchor must not enter its log.
           const sample = this.log.full
-            ? poseSample(data.points, data.width, data.height, 0)
+            ? poseSample(
+                data.points,
+                data.width,
+                data.height,
+                0,
+                this.hands,
+              )
             : this.log.add(
                 data.points,
                 data.width,
                 data.height,
                 data.timestamp,
+                this.hands,
               );
           this.latest = sample;
-          // Hands arrive less often than pose frames; keep the last usable set.
-          if (Array.isArray(data.hands)) this.hands = data.hands;
           // Uses the frame clock, so preview and recording share one episode.
           this.armsCrossed = this.crossArms.update(
             armsCrossed(sample),
@@ -102,7 +110,7 @@ export class PoseCapture {
           this.testResults = this.tests.update(
             sample,
             data.timestamp,
-            this.hands,
+            this.hands ?? [],
           );
           this.publish(
             "running",
@@ -182,7 +190,7 @@ export class PoseCapture {
   beginRecording(timestamp: number) {
     this.log.reset(timestamp);
     this.latest = null;
-    this.hands = [];
+    this.hands = this.handModel ? [] : null;
     this.tests.reset();
     this.testResults = [];
   }

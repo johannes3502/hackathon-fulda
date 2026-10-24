@@ -161,9 +161,11 @@ Cockatoo-Avatar (Handgelenke an/nahe der Körpermitte, Unterarm ≤ 40° zur
 Schulterlinie, sofort). Im `/live`-Workspace zeigt der Dev-Toggle „Pose lab“
 zwölf Testposen in zwei umschaltbaren Darstellungen: Coach-Sprechblase
 (Standard) oder großes Statusfeld (grün/rot/grau) mit Pose, Messwert und
-fehlgeschlagenen Bedingungen. Der Hand Landmarker läuft mit 5 Hz und zeichnet
-die Hand-Landmarks pink ins Overlay; für die Pocket-Heuristik prüft er
-Fingerspitzen (8/12/16/20) und Ellbogen. T12 erkennt gekreuzte Unterschenkel.
+fehlgeschlagenen Bedingungen. Der Hand Landmarker läuft auf jedem Pose-Frame
+mit Confidence 0,5 und zeichnet die Hand-Landmarks pink ins Overlay; die
+Pocket-Heuristik prüft den Abstand des Handgelenks zur eigenen Hüfte
+(≤ 0,45 Schulterbreiten) und ob das Hand-Modell dort eine Hand findet. T12
+erkennt gekreuzte Unterschenkel.
 Treffer bleiben Dev-only, ohne Event. Die finalen Pose-/Feedback-Regeln stehen
 in `docs/04-pose-tracking-requirements.md`; die Umsetzung ist noch offen
 (`frontend/DATA_POINTS.md` beschreibt das Roh-Logging).

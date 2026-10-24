@@ -1,7 +1,6 @@
-import { crossArmsCheck, passes } from "./cues";
+import { POCKET, crossArmsCheck, passes, pocketCheck } from "./cues";
 import {
   HEURISTICS,
-  type HandLandmark,
   type HandSample,
   type PoseSample,
 } from "./sample";
@@ -122,256 +121,6 @@ export type PoseTestDefinition = {
   unknownReleaseMs: number;
   check: (sample: PoseSample | null, hands: HandSample[]) => PoseCheck;
 };
-
-const HAND = {
-  wrist: 0,
-  thumbTip: 4,
-  indexTip: 8,
-  middleTip: 12,
-  ringTip: 16,
-  pinkyTip: 20,
-} as const;
-
-const FINGER_TIPS = [
-  HAND.indexTip,
-  HAND.middleTip,
-  HAND.ringTip,
-  HAND.pinkyTip,
-] as const;
-
-export const POCKET = {
-  // Visible fingertips of a pocketed hand stay compressed near the wrist.
-  maxReach: 0.24,
-  // A hanging arm is almost straight; a hand in a pocket usually bends it.
-  // Only the weak "hand hidden" branch needs this; visible fingertips are
-  // stronger evidence and also catch a straight arm at a side pocket.
-  maxElbowDeg: 120,
-  minDownTips: 2,
-  minTipsInZone: 2,
-  // A detected hand within this distance is not "hidden".
-  hiddenRadius: 0.35,
-} as const;
-
-export type PocketCheck = {
-  evaluable: boolean;
-  kind: "fingers" | "hidden" | null;
-  display: string;
-  values: Record<string, PoseValue>;
-  failing: string[];
-};
-
-const inPocket = (
-  x: number,
-  y: number,
-  hip: { x: number; y: number },
-  span: number,
-) => {
-  const dx = (x - hip.x) / span;
-  const dy = (y - hip.y) / span;
-  return Math.abs(dx) <= 0.24 && dy >= -0.02 && dy <= 0.45;
-};
-
-/**
- * Fingertracking heuristic. A hand tucked into a pocket is either partly
- * visible and compressed, or not found near a wrist that sits at the hip.
- * A relaxed open hand hangs long below the wrist and must not match. The
- * elbow angle separates a hanging arm (nearly straight) from a pocket.
- */
-export function handAtPocket(
-  sample: PoseSample | null,
-  hands: HandSample[],
-): PocketCheck {
-  if (!sample)
-    return {
-      evaluable: false,
-      kind: null,
-      display: "no pose",
-      values: {},
-      failing: ["pose"],
-    };
-  const { image, pose } = sample;
-  if (
-    !usable(pose.left_shoulder) ||
-    !usable(pose.right_shoulder) ||
-    (!usable(pose.left_wrist) && !usable(pose.right_wrist))
-  )
-    return {
-      evaluable: false,
-      kind: null,
-      display: "no hips/hands",
-      values: {},
-      failing: ["hips/hands"],
-    };
-  const left = px(pose.left_shoulder, image);
-  const right = px(pose.right_shoulder, image);
-  const span = Math.hypot(left.x - right.x, left.y - right.y);
-  if (span < 1e-6)
-    return {
-      evaluable: false,
-      kind: null,
-      display: "no shoulders",
-      values: {},
-      failing: ["shoulders"],
-    };
-  const hips = [pose.left_hip, pose.right_hip]
-    .filter(usable)
-    .map((hip) => px(hip, image));
-  const wrists = [
-    { point: pose.left_wrist, elbow: sample.derived.left_elbow_deg },
-    { point: pose.right_wrist, elbow: sample.derived.right_elbow_deg },
-  ]
-    .filter(
-      (wrist): wrist is { point: RawPoint; elbow: number | null } =>
-        usable(wrist.point),
-    )
-    .map(({ point, elbow }) => ({ ...px(point, image), elbow }));
-  if (!hips.length || !wrists.length)
-    return {
-      evaluable: false,
-      kind: null,
-      display: "no hips",
-      values: {},
-      failing: ["hips"],
-    };
-  const inZone = (p: { x: number; y: number }) =>
-    hips.some((hip) => inPocket(p.x, p.y, hip, span));
-  const elbowFor = (p: { x: number; y: number }) =>
-    wrists.reduce(
-      (best, wrist) => {
-        const distance = Math.hypot(wrist.x - p.x, wrist.y - p.y);
-        return distance < best.distance
-          ? { distance, elbow: wrist.elbow }
-          : best;
-      },
-      { distance: Infinity, elbow: null as number | null },
-    ).elbow;
-
-  let fallback: PocketCheck | null = null;
-  for (const hand of hands) {
-    if (hand.score < HEURISTICS.handConfidence) continue;
-    const wrist = hand.landmarks[HAND.wrist];
-    if (!wrist) continue;
-    const w = { x: wrist[0] * image.width, y: wrist[1] * image.height };
-    if (!inZone(w)) continue;
-    const elbow = elbowFor(w);
-    const tips = FINGER_TIPS.map((index) => hand.landmarks[index])
-      .filter((tip): tip is HandLandmark => !!tip)
-      .map((tip) => ({
-        x: tip[0] * image.width,
-        y: tip[1] * image.height,
-      }));
-    if (!tips.length) continue;
-    const reach =
-      Math.max(
-        ...tips.map((tip) => Math.hypot(tip.x - w.x, tip.y - w.y)),
-      ) / span;
-    const down = tips.filter((tip) => tip.y > w.y).length;
-    const tipsInZone = tips.filter((tip) => inZone(tip)).length;
-    const values = {
-      hand_score: hand.score,
-      wrist_in_zone: true,
-      elbow,
-      reach,
-      down_tips: down,
-      tips_in_zone: tipsInZone,
-    };
-    // A straight arm at the hip is a relaxed hand, not a pocket.
-    if (elbow === null || elbow > POCKET.maxElbowDeg) {
-      fallback ??= {
-        evaluable: true,
-        kind: null,
-        display: "arm straight",
-        values,
-        failing: ["elbow"],
-      };
-      continue;
-    }
-    if (reach > POCKET.maxReach) {
-      fallback ??= {
-        evaluable: true,
-        kind: null,
-        display: "hand open",
-        values,
-        failing: ["fingertips"],
-      };
-      continue;
-    }
-    if (
-      down < POCKET.minDownTips &&
-      tipsInZone < POCKET.minTipsInZone
-    ) {
-      fallback ??= {
-        evaluable: true,
-        kind: null,
-        display: "fingers up",
-        values,
-        failing: ["tips"],
-      };
-      continue;
-    }
-    return {
-      evaluable: true,
-      kind: "fingers",
-      display: `${reach.toFixed(2)}×SW`,
-      values,
-      failing: [],
-    };
-  }
-  if (fallback) return fallback;
-
-  let hiddenFallback: PocketCheck | null = null;
-  for (const wrist of wrists) {
-    if (!inZone(wrist)) continue;
-    const values = { wrist_in_zone: true, elbow: wrist.elbow };
-    // Straight arms hang at the hip in the neutral pose; do not call that a pocket.
-    if (wrist.elbow === null || wrist.elbow > POCKET.maxElbowDeg) {
-      hiddenFallback ??= {
-        evaluable: true,
-        kind: null,
-        display: "arm straight",
-        values,
-        failing: ["elbow"],
-      };
-      continue;
-    }
-    const covered = hands.every((hand) => {
-      if (hand.score < HEURISTICS.handConfidence) return true;
-      const p = hand.landmarks[HAND.wrist];
-      if (!p) return true;
-      const h = { x: p[0] * image.width, y: p[1] * image.height };
-      return (
-        Math.hypot(h.x - wrist.x, h.y - wrist.y) >
-        POCKET.hiddenRadius * span
-      );
-    });
-    if (!covered) {
-      hiddenFallback ??= {
-        evaluable: true,
-        kind: null,
-        display: "hand visible",
-        values,
-        failing: ["hand"],
-      };
-      continue;
-    }
-    return {
-      evaluable: true,
-      kind: "hidden",
-      display: "hand hidden at hip",
-      values,
-      failing: [],
-    };
-  }
-  return (
-    hiddenFallback ?? {
-      evaluable: true,
-      kind: null,
-      display: "visible",
-      values: {},
-      failing: ["no pocket"],
-    }
-  );
-}
 
 const orientation = (a: Point, b: Point, c: Point) =>
   (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
@@ -631,16 +380,37 @@ function handsHiddenCheck(
   );
 }
 
-function pocketPoseCheck(
-  sample: PoseSample | null,
-  hands: HandSample[],
-): PoseCheck {
-  const result = handAtPocket(sample, hands);
+function pocketPoseCheck(sample: PoseSample | null): PoseCheck {
+  if (!sample) return missing("no pose", ["pose"]);
+  const result = pocketCheck(sample);
+  const sides = (["L", "R"] as const).filter((_, i) => result.side[i]);
+  const values = {
+    left_wrist_hip_dist: result.hipDist[0],
+    right_wrist_hip_dist: result.hipDist[1],
+    left_hand_found: result.found[0],
+    right_hand_found: result.found[1],
+    left_in_pocket: result.side[0],
+    right_in_pocket: result.side[1],
+    max_hip_dist: POCKET.maxHipDist,
+  };
+  const failing: string[] = [];
+  (["left", "right"] as const).forEach((side, i) => {
+    if (result.side[i] === true) return;
+    if (result.hipDist[i] === null) failing.push(`${side} hip`);
+    else if (!passes.hipDist(result.hipDist[i] as number))
+      failing.push(`${side} wrist`);
+    if (result.found[i] === null) failing.push(`${side} hand model`);
+    else if (result.found[i]) failing.push(`${side} hand found`);
+  });
   return check(
-    result.evaluable ? result.kind !== null : null,
-    result.display,
-    result.values,
-    result.failing,
+    result.inPocket,
+    result.inPocket === null
+      ? "not visible"
+      : result.inPocket
+        ? `in pocket (${sides.join("+")})`
+        : "no",
+    values,
+    result.inPocket ? [] : failing,
   );
 }
 
