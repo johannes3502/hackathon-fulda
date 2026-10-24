@@ -722,3 +722,31 @@ wurde bei der Bereinigung hier zusammengeführt.
 - 18 alte Task-Logs, generierte Diagramm-Ausgaben und das alte Overflow-Bild
   aus dem ignorierten Arbeitsbereich entfernt. Keine neuen Tests für die
   rein strukturelle Bereinigung; bestehende Funktionsprüfungen bleiben erhalten.
+
+## Deepgram EU live und Wiederverwendung im Review (24.10.2026)
+
+- Nutzerauftrag: Transkription am Ende beschleunigen; Cloud-Streaming gewünscht,
+  Deepgram nach Preis-/Integrationsvergleich bestätigt. Bestehender EU-Batchadapter
+  und 16-kHz-PCM-WebSocket waren der Integrationsgrund.
+- Implementiert: `provider=deepgram` auf `/speech/live`, Nova-3 Deutsch über
+  EU-Endpunkt; Schlüssel nur im Backend. Browser verbindet vor Aufnahmestart,
+  zeigt vorläufigen Text und flush't den Audio-Rest vor Stop.
+- Nur vollständige, bestätigte Abschlusswörter gelangen als `live_transcript`
+  mit dem Upload zum Worker. Signal- und Wortanalyse bleiben erhalten; eine
+  zweite Batch-ASR entfällt. Bei Streamfehlern lokaler Whisper-Ersatzweg; keine
+  automatischen bezahlten Cloud-Retries. Audio-Cloudversand im UI benannt und
+  abschaltbar; `local_only=true` lehnt Cloud-Wörter weiterhin ab.
+- Grenzen: Upload, Signal-Analyse und Queue bleiben nach Stop. Kein API-Schlüssel
+  eingerichtet, daher kein echter Deepgram-Aufruf oder Latenz-/Qualitätsvergleich.
+  Füllwortqualität und echtes Mikrofon/Safari müssen gesondert geprüft werden.
+- Prüfung: synthetische PCM-/Provider-Tests für Zwischenstände, letzten Abschnitt,
+  leere Transkripte, Disconnect, Fehlkonfiguration, Limits und geheime Fehlertexte;
+  Job-Roundtrip und Nachweis, dass finale Wörter keine zweite ASR auslösen.
+  Frontend-Tests prüfen PCM-Flush-Reihenfolge, Finalisierung, Timeout und Ersatzweg.
+- Quellen: [Live-Protokoll](https://developers.deepgram.com/reference/speech-to-text/listen-streaming),
+  [CloseStream](https://developers.deepgram.com/docs/close-stream).
+
+Prüfergebnis: 106 Backend-Tests bestanden, zwei lokale Modell-/Datenbanktests
+übersprungen; nach Integration von Team-main 174 Frontend-Tests bestanden;
+Typecheck und ESLint bestanden; OpenAPI und
+TypeScript-Vertrag regeneriert und auf Aktualität geprüft.

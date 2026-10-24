@@ -13,8 +13,8 @@ Client protocol: JSON text frames for control, binary frames for audio.
 6. Server → client: final `words`/`text` frames, then `{"type": "done"}`.
 
 Errors answer with `{"type": "error", "message": "..."}` and close the socket.
-Only the local whisper provider runs here; tests inject a fake
-`StreamingTranscriber` instead of loading a real model.
+The default is local Whisper; start with provider="deepgram" for hosted streaming.
+Tests inject a fake `StreamingTranscriber` or upstream instead of paid services.
 """
 
 import asyncio
@@ -174,7 +174,13 @@ async def _run_session(ws: WebSocket) -> None:
     await ws.accept()
     session = _Session()
     try:
-        await _await_start(ws)
+        start = await asyncio.wait_for(_await_start(ws), timeout=10)
+        if start.get("provider") == "deepgram":
+            from app.transcription.deepgram_live import stream_deepgram
+            await stream_deepgram(ws, _receive, max_seconds=_MAX_SECONDS)
+            return
+        if start.get("provider", "whisper") != "whisper":
+            raise ValueError("Unsupported live transcription provider")
         transcriber = await run_in_threadpool(configured_streaming_transcriber)
         await _send(ws, LiveReadyMessage(sample_rate=SAMPLE_RATE))
         while True:
@@ -200,7 +206,7 @@ async def _run_session(ws: WebSocket) -> None:
             pass  # The client left first; the disconnect above is the truth.
 
 
-async def _await_start(ws: WebSocket) -> None:
+async def _await_start(ws: WebSocket) -> dict[str, Any]:
     while True:
         message = await ws.receive()
         if "text" not in message:
@@ -210,7 +216,7 @@ async def _await_start(ws: WebSocket) -> None:
             raise ValueError('First message must be {"type": "start", "sample_rate": 16000}')
         if payload.get("sample_rate") != SAMPLE_RATE:
             raise ValueError("Only 16 kHz mono Int16 PCM is supported")
-        return
+        return payload
 
 
 def _parse_control(text: str) -> dict[str, Any]:
@@ -228,6 +234,8 @@ async def _receive(ws: WebSocket) -> str | bytes:
         message = await asyncio.wait_for(ws.receive(), timeout=_MAX_IDLE_SECONDS)
     except TimeoutError:
         return _STOP  # Silence finalizes like an explicit stop.
+    if message["type"] == "websocket.disconnect":
+        raise WebSocketDisconnect(message.get("code", 1000))
     if "text" in message:
         payload = _parse_control(message["text"])
         if payload.get("type") != "stop":

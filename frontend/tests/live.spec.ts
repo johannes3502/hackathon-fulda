@@ -455,9 +455,9 @@ async function backend(
   await expect(
     page.getByText("analysis results remain stored", { exact: false }),
   ).toBeVisible();
-  await page
-    .getByLabel("Create a transcript with local Whisper")
-    .setChecked(transcribe);
+  await page.getByLabel("Create a transcript").setChecked(transcribe);
+  if (transcribe)
+    await page.getByLabel("Stream transcription with Deepgram (EU)").uncheck();
   await configure?.();
   await page.getByRole("button", { name: "Enable camera" }).click();
   await page.getByRole("button", { name: "Start recording" }).click();
@@ -1161,8 +1161,15 @@ test("live captions send PCM only during recording and a disconnect keeps the ta
         expect(JSON.parse(message)).toEqual({
           type: "start",
           sample_rate: 16000,
+          provider: "deepgram",
         });
-        socket.send(JSON.stringify({ type: "ready", sample_rate: 16000 }));
+        socket.send(
+          JSON.stringify({
+            type: "ready",
+            sample_rate: 16000,
+            provider: "deepgram",
+          }),
+        );
       } else {
         expect(message.byteLength).toBe(3200);
         frames++;
@@ -1184,7 +1191,7 @@ test("live captions send PCM only during recording and a disconnect keeps the ta
     .getByRole("button", { name: "Standard view", exact: true })
     .click();
   await page.getByText("Recording options", { exact: true }).click();
-  await page.getByLabel("Show live captions (preview)").check();
+  await page.getByLabel("Stream transcription with Deepgram (EU)").check();
   await expect(page.locator(".recording-consent")).toContainText(
     "during recording",
   );
@@ -1333,4 +1340,102 @@ test("unavailable backend never starts recording and offers a working local retr
         .evaluate((video: HTMLVideoElement) => video.readyState),
     )
     .toBeGreaterThanOrEqual(2);
+});
+
+test("Deepgram streaming waits for the last word and reuses the final transcript in review", async ({
+  page,
+}) => {
+  await syntheticPose(page);
+  let frames = 0;
+  let stopped = false;
+  let uploaded = false;
+  const words = [
+    { word: "Hallo,", start_ms: 0, end_ms: 150 },
+    { word: "Fulda.", start_ms: 500, end_ms: 650 },
+  ];
+  await page.routeWebSocket("**/api/speech/live", (socket) => {
+    socket.onMessage((message) => {
+      if (typeof message === "string") {
+        const control = JSON.parse(message);
+        if (control.type === "start") {
+          expect(control.provider).toBe("deepgram");
+          expect(frames).toBe(0);
+          socket.send(
+            JSON.stringify({
+              type: "ready",
+              sample_rate: 16000,
+              provider: "deepgram",
+            }),
+          );
+        } else {
+          expect(control.type).toBe("stop");
+          expect(frames).toBeGreaterThan(0);
+          stopped = true;
+          socket.send(JSON.stringify({ type: "words", final: true, words }));
+          socket.send(
+            JSON.stringify({
+              type: "text",
+              final: true,
+              text: "Hallo, Fulda.",
+            }),
+          );
+          socket.send(JSON.stringify({ type: "done" }));
+        }
+      } else {
+        expect(stopped).toBe(false);
+        expect(message.byteLength).toBeLessThanOrEqual(3200);
+        expect(message.byteLength % 2).toBe(0);
+        frames++;
+        socket.send(
+          JSON.stringify({ type: "text", text: "Hallo,", final: false }),
+        );
+      }
+    });
+  });
+  const job = "12345678-1234-1234-1234-123456789abc";
+  await page.route("**/api/speech/analyze", async (route) => {
+    expect(stopped).toBe(true);
+    const body = route.request().postDataBuffer()!.toString();
+    const transcript = body.match(/name="live_transcript"\r\n\r\n([^\r]+)\r\n/);
+    expect(transcript).not.toBeNull();
+    expect(JSON.parse(transcript![1])).toEqual({ provider: "deepgram", words });
+    expect(body).toContain('name="local_only"\r\n\r\nfalse');
+    uploaded = true;
+    await route.fulfill({
+      status: 202,
+      json: { job_id: job, status_url: `/speech/jobs/${job}` },
+    });
+  });
+  await page.route(`**/api/speech/jobs/${job}`, (route) =>
+    route.fulfill({
+      json: {
+        job_id: job,
+        status: "completed",
+        result: {
+          audio: { summary: {}, events: [] },
+          events: [],
+          words,
+          asr_provider: "deepgram",
+          synthetic_demo: false,
+          notices: [],
+          transcription: { summary: { word_count: 2 }, events: [] },
+        },
+      },
+    }),
+  );
+  await backend(page, true, () =>
+    page.getByLabel("Stream transcription with Deepgram (EU)").check(),
+  );
+  await expect(page.getByLabel("Live captions", { exact: true })).toContainText(
+    "Hallo,",
+  );
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  expect(uploaded).toBe(true);
+  await expect(page.locator(".recorded-transcript")).toContainText("deepgram");
+  await expect(
+    page
+      .locator(".recorded-transcript")
+      .getByRole("button", { name: "Fulda." }),
+  ).toBeVisible();
 });

@@ -273,3 +273,52 @@ it.each([500, 503, "network"] as const)(
     transport.close();
   },
 );
+
+it.each([true, false])(
+  "reuses only a complete live transcript and preserves local fallback: complete=%s",
+  async (complete) => {
+    const words = [{ word: "Hallo.", start_ms: 0, end_ms: 150 }];
+    const streamed = complete
+      ? { words, provider: "deepgram", synthetic: false, notices: [] }
+      : null;
+    const finish = vi.fn().mockResolvedValue(streamed);
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ status: "ok" }))
+      .mockResolvedValueOnce(Response.json(accepted))
+      .mockResolvedValueOnce(
+        Response.json({
+          job_id: jobId,
+          status: "completed",
+          result: {
+            audio: { summary: {}, events: [] },
+            events: [],
+            words,
+            asr_provider: complete ? "deepgram" : "whisper",
+            synthetic_demo: false,
+            notices: [],
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    const transport = new AnalysisTransport(
+      "http://localhost:8000",
+      true,
+      undefined,
+      finish,
+    );
+    const receive = vi.fn();
+    await transport.connect({ sessionId: "test" }, receive);
+    await transport.finish(1000, new Blob(["take"]));
+    expect(finish).toHaveBeenCalledWith(1000);
+    const body = fetcher.mock.calls[1][1].body as FormData;
+    expect(body.get("local_only")).toBe(complete ? "false" : "true");
+    expect(body.get("live_transcript")).toBe(
+      complete ? JSON.stringify({ provider: "deepgram", words }) : null,
+    );
+    expect(receive.mock.calls[0][0].transcript.provider).toBe(
+      complete ? "deepgram" : "whisper",
+    );
+    transport.close();
+  },
+);

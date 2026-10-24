@@ -102,7 +102,7 @@ export function LiveStudio() {
   } | null>(null);
   const voiceStream = cameraStatus === "active" ? getStream() : null;
   const [transcribe, setTranscribe] = useState(true);
-  const [liveCaptions, setLiveCaptions] = useState(false);
+  const [liveCaptions, setLiveCaptions] = useState(true);
   const [caption, setCaption] = useState({ text: "", status: "" });
   const captions = useRef<LiveCaptions | null>(null);
   const [endpoint, setEndpoint] = useState(
@@ -124,8 +124,10 @@ export function LiveStudio() {
     labFeedback(pose.state.tests).state === "alert";
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
+  const startGeneration = useRef(0);
   useEffect(
     () => () => {
+      startGeneration.current++;
       owner.current?.dispose();
       captions.current?.stop();
       voice.current?.stop();
@@ -204,6 +206,7 @@ export function LiveStudio() {
       return;
     }
     busy.current = true;
+    const generation = ++startGeneration.current;
     const config = {
       title: title.trim(),
       targetMs,
@@ -212,14 +215,44 @@ export function LiveStudio() {
       transcribe: mode === "backend" && transcribe,
       featureFlags: { ...featureFlags },
     };
+    const liveTranscript =
+      mode === "backend" && transcribe && liveCaptions
+        ? new LiveCaptions(
+            (text, status) => setCaption({ text, status }),
+            undefined,
+            true,
+          )
+        : null;
+    captions.current = liveTranscript;
+    if (liveTranscript) {
+      setProgress({
+        phase: "connecting",
+        elapsedMs: 0,
+        chunksSent: 0,
+        bytesSent: 0,
+        feedback: [],
+        metrics: [],
+        notice: "Connecting live transcription…",
+      });
+      await liveTranscript.start(stream, destination, performance.now(), true);
+      await liveTranscript.ready(); // An unavailable stream falls back to local batch ASR.
+      if (
+        generation !== startGeneration.current ||
+        captions.current !== liveTranscript
+      )
+        return; // Cancelled during connection setup.
+    }
     const recorder = new LiveRecorder(
       stream,
       config,
-      createVideoTransport(config),
+      createVideoTransport(
+        config,
+        (durationMs) =>
+          liveTranscript?.finish(durationMs) ?? Promise.resolve(null),
+      ),
       (next) => {
         if (next.phase === "finishing") {
           pose.stop();
-          captions.current?.stop();
           voice.current?.stop();
           serverSpeech.current?.stop();
         }
@@ -289,12 +322,7 @@ export function LiveStudio() {
           );
           void serverSpeech.current.start(stream, destination, timestamp);
         }
-        if (mode === "backend" && transcribe && liveCaptions) {
-          captions.current = new LiveCaptions((text, status) =>
-            setCaption({ text, status }),
-          );
-          void captions.current.start(stream, destination, timestamp);
-        }
+        liveTranscript?.beginRecording();
       },
     );
     owner.current = recorder;
@@ -313,11 +341,13 @@ export function LiveStudio() {
     }
   };
   const cancel = () => {
+    startGeneration.current++;
     owner.current?.dispose();
     captions.current?.stop();
     voice.current?.stop();
     serverSpeech.current?.stop();
     owner.current = null;
+    captions.current = null;
     busy.current = false;
     stopCamera();
     setProgress(null);
@@ -632,9 +662,9 @@ export function LiveStudio() {
                   when enabled.
                   {transcribe &&
                     liveCaptions &&
-                    " Live captions also send microphone audio to this server during recording."}
+                    " Live transcription streams microphone audio through this server to Deepgram’s EU endpoint during recording."}
                   {transcribe &&
-                    " Whisper transcribes locally; no audio is sent to a cloud provider."}{" "}
+                    " If live transcription is off or fails, Whisper transcribes locally after stopping."}{" "}
                   The original is removed after processing; analysis results
                   remain stored.
                 </span>
@@ -692,7 +722,7 @@ export function LiveStudio() {
                         checked={transcribe}
                         onChange={(e) => setTranscribe(e.target.checked)}
                       />
-                      Create a transcript with local Whisper
+                      Create a transcript
                     </label>
                     {transcribe && (
                       <label className="live-transcribe">
@@ -701,12 +731,12 @@ export function LiveStudio() {
                           checked={liveCaptions}
                           onChange={(e) => setLiveCaptions(e.target.checked)}
                         />
-                        Show live captions (preview)
+                        Stream transcription with Deepgram (EU)
                       </label>
                     )}
                     <p className="field-hint">
                       {transcribe
-                        ? "Whisper transcribes on the backend. Review the transcript before checking claims against your sources."
+                        ? "A completed live transcript is reused in your review. Local Whisper is the fallback. Review recognition errors before checking claims against your sources."
                         : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
                     </p>
                   </div>

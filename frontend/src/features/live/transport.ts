@@ -1,4 +1,9 @@
-import type { LiveConfig, LiveMessage, VideoTransport } from "./contracts";
+import type {
+  LiveConfig,
+  LiveMessage,
+  LiveTranscript,
+  VideoTransport,
+} from "./contracts";
 import type { FeatureFlags } from "./feature-flags";
 import {
   analysisResult,
@@ -15,6 +20,9 @@ export class AnalysisTransport implements VideoTransport {
     private endpoint: string,
     private transcribe = false,
     private flags?: FeatureFlags,
+    private finishTranscript?: (
+      durationMs: number,
+    ) => Promise<LiveTranscript | null>,
   ) {}
   async connect(
     session: { sessionId: string },
@@ -39,6 +47,10 @@ export class AnalysisTransport implements VideoTransport {
   async send() {} // Full MediaRecorder output is uploaded only after stopping.
   async finish(durationMs: number, recording?: Blob) {
     if (!recording?.size) throw new Error("No recording was captured.");
+    const liveTranscript = this.transcribe
+      ? await this.finishTranscript?.(durationMs)
+      : null;
+    this.controller.signal.throwIfAborted();
     const body = new FormData();
     body.append(
       "recording",
@@ -46,7 +58,15 @@ export class AnalysisTransport implements VideoTransport {
       recording.type.includes("mp4") ? "take.mp4" : "take.webm",
     );
     body.append("transcribe", String(this.transcribe));
-    body.append("local_only", "true");
+    body.append("local_only", liveTranscript ? "false" : "true");
+    if (liveTranscript)
+      body.append(
+        "live_transcript",
+        JSON.stringify({
+          provider: liveTranscript.provider,
+          words: liveTranscript.words,
+        }),
+      );
     const accepted = await request(
       this.endpoint,
       "/speech/analyze",
@@ -100,12 +120,16 @@ export class LocalVideoTransport implements VideoTransport {
   async finish() {}
   close() {}
 }
-export function createVideoTransport(config: LiveConfig): VideoTransport {
+export function createVideoTransport(
+  config: LiveConfig,
+  finishTranscript?: (durationMs: number) => Promise<LiveTranscript | null>,
+): VideoTransport {
   return config.mode === "local"
     ? new LocalVideoTransport()
     : new AnalysisTransport(
         config.endpoint,
         config.transcribe,
         config.featureFlags,
+        finishTranscript,
       );
 }

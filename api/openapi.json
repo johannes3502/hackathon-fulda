@@ -454,6 +454,18 @@
             "description": "AudioConfig JSON; first 3000 ms are calibration",
             "title": "Config"
           },
+          "live_transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Final Deepgram live transcript JSON with recording-relative word timestamps; skips repeat ASR",
+            "title": "Live Transcript"
+          },
           "local_only": {
             "default": false,
             "description": "Require local Whisper; reject hosted or synthetic ASR before storing the recording",

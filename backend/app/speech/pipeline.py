@@ -6,6 +6,7 @@ from pathlib import Path
 from app.events import merge_timeline
 from app.speech.analysis import analyze_recording
 from app.speech.job_models import AnalysisOptions, RecordingAnalysis
+from app.transcription.analysis import analyze_words
 from app.transcription.pipeline import run_transcription_pipeline
 from app.transcription.text import transcript_text
 from app.transcription.transcriber import configured_transcriber
@@ -22,8 +23,16 @@ def run_analysis(recording: Path, options: AnalysisOptions) -> RecordingAnalysis
                    for t, active in zip(audio.series.t_ms, audio.series.active)):
             notices.append("Keine Sprache in der Kalibrierung erkannt; Lautstärke- und Tempovergleich nicht verfügbar.")
     if options.transcribe:
-        provider = os.getenv("ASR_PROVIDER", "whisper").strip().lower() or "whisper"
-        words, transcription = run_transcription_pipeline(recording, configured_transcriber(), options.words)
+        if options.live_transcript is not None:
+            provider = options.live_transcript.provider
+            words = options.live_transcript.words
+            if any(word.end_ms > audio.summary.duration_ms + 100 for word in words):
+                raise ValueError("Live transcript extends beyond the recording")
+            transcription = analyze_words(words, options.words)
+            notices.append("Deepgram EU: finales Live-Transkript übernommen; keine erneute ASR-Anfrage.")
+        else:
+            provider = os.getenv("ASR_PROVIDER", "whisper").strip().lower() or "whisper"
+            words, transcription = run_transcription_pipeline(recording, configured_transcriber(), options.words)
         notices.append("Füllwortanzahl zählt nur im Transkript enthaltene Wörter; deutsche äh/ähm-Erkennung ist ungeprüft.")
         if provider == "json":
             notices.append("Synthetische Demo: Wort-Timestamps sind vorberechnet, keine ASR-Erkennung.")

@@ -1,7 +1,7 @@
-import { analysisResult } from "./analysis";
-import type { LiveFeedback } from "./contracts";
+import { analysisResult, parseWords } from "./analysis";
+import type { LiveFeedback, LiveTranscript } from "./contracts";
 
-// Previews only: full review analysis still comes from the complete recording.
+// Signal preview and optional Deepgram streaming; reuse only an acknowledged final transcript.
 export class LiveCaptions {
   private socket?: WebSocket;
   private context?: AudioContext;
@@ -11,15 +11,31 @@ export class LiveCaptions {
   private disposed = false;
   private sentMs = 0;
   private checkedMs = 0;
+  private offsetMs = 0;
+  private capturing = false;
+  private finishing = false;
+  private durationMs = 0;
+  private cloudReady = false;
+  private finalWords?: unknown[];
+  private resolveReady!: (ready: boolean) => void;
+  private readyResult = new Promise<boolean>((resolve) => {
+    this.resolveReady = resolve;
+  });
+  private resolveResult!: (result: LiveTranscript | null) => void;
+  private result = new Promise<LiveTranscript | null>((resolve) => {
+    this.resolveResult = resolve;
+  });
   constructor(
     private update: (text: string, status: string) => void,
     private feedback?: (events: LiveFeedback[]) => void,
+    private cloud = false,
   ) {}
 
   async start(
     stream: MediaStream,
     endpoint: string,
     recordingStart = performance.now(),
+    deferCapture = false,
   ) {
     this.update(
       "",
@@ -41,8 +57,13 @@ export class LiveCaptions {
       const socket = (this.socket = new WebSocket(url));
       this.timeout = setTimeout(() => this.fail(), 20000);
       socket.onopen = () =>
-        socket.send(JSON.stringify({ type: "start", sample_rate: 16000 }));
-      let offsetMs = 0;
+        socket.send(
+          JSON.stringify({
+            type: "start",
+            sample_rate: 16000,
+            ...(this.cloud ? { provider: "deepgram" } : {}),
+          }),
+        );
       socket.onmessage = ({ data }) => {
         if (this.disposed) return;
         try {
@@ -53,7 +74,13 @@ export class LiveCaptions {
             if (!("sample_rate" in message) || message.sample_rate !== 16000)
               throw new Error("Unsupported sample rate");
             clearTimeout(this.timeout);
-            offsetMs = Math.max(
+            this.cloudReady =
+              this.cloud &&
+              "provider" in message &&
+              message.provider === "deepgram";
+            if (this.cloud && !this.cloudReady)
+              throw new Error("Unexpected transcription provider");
+            this.offsetMs = Math.max(
               0,
               Math.round(performance.now() - recordingStart),
             );
@@ -63,8 +90,19 @@ export class LiveCaptions {
             });
             this.processor.port.onmessage = ({
               data,
-            }: MessageEvent<ArrayBuffer>) => {
+            }: MessageEvent<ArrayBuffer | { type: string }>) => {
               if (this.disposed || socket.readyState !== WebSocket.OPEN) return;
+              if (!(data instanceof ArrayBuffer)) {
+                if (data.type === "flushed" && this.finishing) {
+                  if (Math.abs(this.sentMs - this.durationMs) > 250) {
+                    this.fail(); // Missing audio or a suspended worklet requires full local ASR.
+                    return;
+                  }
+                  socket.send(JSON.stringify({ type: "stop" }));
+                  this.releaseAudio();
+                }
+                return;
+              }
               // Stop the preview instead of silently dropping audio and shifting its clock.
               this.sentMs += data.byteLength / 32;
               if (
@@ -77,7 +115,11 @@ export class LiveCaptions {
               socket.send(data);
             };
             this.input = context.createMediaStreamSource(stream);
-            this.input.connect(this.processor);
+            if (!deferCapture) {
+              this.input.connect(this.processor);
+              this.capturing = true;
+            }
+            this.resolveReady(true);
             this.processor.connect(context.destination); // Worklet outputs silence.
             this.update(
               "",
@@ -106,14 +148,24 @@ export class LiveCaptions {
             this.feedback(
               result.feedback.map((event) => ({
                 ...event,
-                startMs: event.startMs + offsetMs,
-                endMs: event.endMs + offsetMs,
+                startMs: event.startMs + this.offsetMs,
+                endMs: event.endMs + this.offsetMs,
               })),
             );
             this.update(
               "",
               "Live speech feedback · heuristic · updates every 5 seconds",
             );
+          } else if (message.type === "words" && this.cloud) {
+            if (
+              !("final" in message) ||
+              message.final !== true ||
+              !("words" in message) ||
+              !Array.isArray(message.words) ||
+              message.words.length > 50000
+            )
+              throw new Error("Invalid final transcript");
+            this.finalWords = message.words;
           } else if (message.type === "text") {
             if (
               !("text" in message) ||
@@ -121,7 +173,37 @@ export class LiveCaptions {
               message.text.length > 100000
             )
               throw new Error("Invalid caption text");
-            this.update(message.text, "Live captions · preview");
+            this.update(
+              message.text,
+              this.cloud
+                ? "Live transcript · Deepgram EU"
+                : "Live captions · preview",
+            );
+          } else if (
+            message.type === "done" &&
+            this.finishing &&
+            this.cloudReady &&
+            this.finalWords !== undefined
+          ) {
+            const words = this.finalWords.length
+              ? parseWords(this.finalWords, this.durationMs + 250)
+              : [];
+            this.resolveResult({
+              words: words.map((word) => ({
+                ...word,
+                start_ms: Math.min(
+                  this.durationMs,
+                  word.start_ms + this.offsetMs,
+                ),
+                end_ms: Math.min(this.durationMs, word.end_ms + this.offsetMs),
+              })),
+              provider: "deepgram",
+              synthetic: false,
+              notices: [
+                "Deepgram EU live transcript. Check recognition errors before using it.",
+              ],
+            });
+            this.stop();
           } else if (message.type === "error" || message.type === "done") {
             this.fail();
           }
@@ -136,6 +218,35 @@ export class LiveCaptions {
     }
   }
 
+  /** Preconnect before MediaRecorder starts so the beginning isn't lost to connection setup. */
+  ready() {
+    return this.readyResult;
+  }
+
+  beginRecording() {
+    if (this.disposed || this.capturing || !this.input || !this.processor)
+      return;
+    this.offsetMs = 0;
+    this.input.connect(this.processor);
+    this.capturing = true;
+  }
+
+  finish(durationMs: number): Promise<LiveTranscript | null> {
+    if (this.finishing || this.disposed) return this.result;
+    if (!this.cloudReady || !this.processor || !this.capturing) {
+      this.stop();
+      return this.result;
+    }
+    this.finishing = true;
+    this.durationMs = Math.max(0, Math.floor(durationMs));
+    this.input?.disconnect();
+    clearTimeout(this.timeout);
+    this.timeout = setTimeout(() => this.fail(), 12000);
+    // The worklet posts its final partial frame before acknowledging this flush.
+    this.processor.port.postMessage({ type: "flush" });
+    return this.result;
+  }
+
   private fail() {
     if (this.disposed) return;
     this.update(
@@ -147,22 +258,32 @@ export class LiveCaptions {
     this.stop();
   }
 
+  private releaseAudio() {
+    this.input?.disconnect();
+    this.input = undefined;
+    this.processor?.disconnect();
+    if (this.processor) this.processor.port.onmessage = null;
+    this.processor = undefined;
+    const context = this.context;
+    this.context = undefined;
+    if (context && context.state !== "closed")
+      void context.close().catch(() => {});
+  }
+
   stop() {
     if (this.disposed) return;
     this.disposed = true;
+    this.resolveReady(false);
+    this.resolveResult(null);
     clearTimeout(this.timeout);
-    this.input?.disconnect();
-    this.processor?.disconnect();
-    if (this.processor) this.processor.port.onmessage = null;
-    if (this.context && this.context.state !== "closed")
-      void this.context.close().catch(() => {});
+    this.releaseAudio();
     if (this.socket) {
       this.socket.onopen =
         this.socket.onmessage =
         this.socket.onerror =
         this.socket.onclose =
           null;
-      if (this.socket.readyState === WebSocket.OPEN)
+      if (!this.finishing && this.socket.readyState === WebSocket.OPEN)
         this.socket.send(JSON.stringify({ type: "stop" }));
       this.socket.close();
     }
