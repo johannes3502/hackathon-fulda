@@ -65,6 +65,9 @@ Produktentscheidung.
   Docker-Volumes, ausschließlich für synthetische Entwicklungsdaten.
   Kein Aufnahme-/Upload-Endpunkt und keine automatische Aufzeichnung.
   Der Smoke-Test entfernt seine synthetischen Audiodaten wieder.
+- Redis hält Hintergrundjobs und kleine Status-/Referenzwerte in einem
+  persistenten Docker-Volume. Task-Ergebnisse verfallen nach einer Stunde;
+  dies legt keine Aufbewahrungsdauer für Medien oder Transkripte fest.
 - Werden Audio, Video und Transkript gespeichert? Wie lange?
 - Einwilligung, Löschung, lokale Verarbeitung?
 - Keine echten personenbezogenen Daten in der Demo.
@@ -72,7 +75,10 @@ Produktentscheidung.
 ### Technik
 - Lokaler Stack (24.10.2026): FastAPI, MediaPipe, PostgreSQL,
   MediaRecorder im Browser und SeaweedFS als S3-Dateispeicher;
-  FFmpeg im Backend. Setup und Speicherverhalten: `backend/README.md`.
+  FFmpeg im Backend. Celery führt lange Arbeiten in einem separaten Worker
+  aus, Redis dient als Queue und temporärer Ergebnisspeicher. Die
+  Transkriptions-Implementierung bleibt offen. Setup und Speicherverhalten:
+  `backend/README.md`.
 - Hosting, konkrete Analysemodelle und externe Anbieter bleiben offen.
 - Latenz, Ausfall-Fallback, Kosten.
 - Browser- und Geräte-Support (Laptop und Smartphone).
@@ -103,3 +109,4 @@ einbauen**:
 |---|---|---|
 | 24.10.2026 | Produkt angelegt | Thema auf Live-Präsentationstrainer festgelegt; fünf erste Features genannt. |
 | 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
+| 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |

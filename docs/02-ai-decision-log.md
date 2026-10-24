@@ -14,6 +14,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 6 | Infrastruktur tatsächlich prüfen | Compose-Build, Smoke-Test und Ausfall-/Wiederanlaufprüfung ausgeführt | Ein erfolgreicher Build allein belegt weder S3-Zugriff noch Persistenz; Inferenz und Browser-Aufnahme bleiben ungeprüft | Codex ergänzte reale Verbindungs-, Datei- und Lebenszyklusprüfungen mit synthetischen Daten | Prüfprotokoll unten |
 | 7 | IntelliJ IDEA und VS Code einrichten | Geteilte Compose-Aktionen und Python-Debug-Konfigurationen angelegt | Container-Hostnamen funktionieren nicht für eine lokale Python-Instanz; gleichzeitig gestartete APIs belegen denselben Port | Nutzerauftrag; gemeinsamer lokaler Launcher liest `.env`, verwendet localhost und stoppt den Docker-Backend-Container vor dem lokalen Start | `.run/`, `.vscode/`, `backend/scripts/dev.py`; lokaler Readiness-Check mit PostgreSQL/S3 bestanden |
 | 8 | IDE-Start auf Docker Compose vereinfachen | Native IntelliJ-Konfiguration für alle Dienste angelegt; lokalen FastAPI-Launcher und Python-Debug-Konfigurationen entfernt | Der Python-Start verlangte einen gültigen Modul-SDK; der Nutzer möchte ausschließlich den vollständigen Container-Stack starten | Ausdrückliche Korrektur des Nutzers; VS Code startet weiterhin über den Compose-Build-Task | `.run/Docker Compose.run.xml`, `.vscode/tasks.json`, `backend/README.md` |
+| 9 | Lange Jobs vom API-Prozess trennen | Celery-Worker und Redis in Compose ergänzt; gemeinsames Image, Async-Publish-Helfer, Healthchecks und synthetischer Queue-Test | Celery-Publishing ist synchron und wird deshalb in einem Thread ausgeführt. Der Redis-Ausfalltest zeigte zusätzliche Result-Backend-Retries; diese wurden begrenzt. Queue-Wiederzustellung erfordert idempotente Tasks | Ausdrücklicher Nutzerauftrag für Celery/Redis; noch keine ASR-Anbieterentscheidung oder Transkriptions-Implementierung | `compose.yaml`, `backend/app/celery_app.py`, `backend/app/jobs.py`, `backend/scripts/smoke.py` |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -63,3 +64,23 @@ Infrastrukturauftrags. Der lokale Stack bleibt gestartet.
 - `pip check`, der synthetische Smoke-Test und `/health/ready` bestanden.
 - JSON/XML geparst; keine lokale Python-Run-Konfiguration mehr vorhanden.
   VS Code verwendet den bestehenden Standard-Build-Task **Compose: up**.
+
+## Celery und Redis (24.10.2026)
+
+- `docker compose up --build -d --wait`: alle fünf Dienste gesund;
+  `pip check` ohne Konflikte. Bestehende IDE-Konfigurationen starten weiterhin
+  alle Compose-Dienste; kein zusätzlicher Python-Run nötig.
+- Erweiterter Smoke-Test bestanden: synthetischer Fünf-Sekunden-Job läuft im
+  separaten Worker, während beide API-Health-Endpunkte antworten. Ergebnis
+  stimmt mit dem Test-Token überein und wird danach gelöscht.
+- Worker gestoppt: Job angenommen, API weiter bereit. Redis anschließend
+  gestoppt: Liveness 200, Readiness 503. Nach Begrenzung der
+  Result-Backend-Retries scheitert Publizieren im lokalen Test nach 0,03 s
+  mit `QueueUnavailable`; keine garantierte Produktionslatenz.
+- Redis-Container neu erstellt: wartender Job aus dem AOF-Volume weiter
+  vorhanden. Nach Worker-Start erfolgreich ausgeführt und Ergebnis gelöscht.
+- Separater Wiederanlauftest: derselbe Producer-Prozess und der laufende
+  Worker verarbeiten nach Redis-Neustart wieder einen Job, ohne selbst neu
+  gestartet zu werden.
+- Nur synthetische Testdaten; keine Transkription, externen Anbieter oder
+  Aufnahme-/Job-Endpunkte implementiert. Der lokale Stack bleibt gestartet.

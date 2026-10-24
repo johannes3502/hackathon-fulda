@@ -6,6 +6,7 @@ from functools import lru_cache
 import boto3
 import psycopg
 from botocore.config import Config
+from redis import Redis
 
 
 def connect_db() -> psycopg.Connection:
@@ -17,6 +18,15 @@ def connect_db() -> psycopg.Connection:
         password=os.environ["POSTGRES_PASSWORD"],
         connect_timeout=3,
         options="-c statement_timeout=3000",
+    )
+
+
+@lru_cache(maxsize=1)
+def redis_client() -> Redis:
+    return Redis.from_url(
+        os.environ["CELERY_BROKER_URL"],
+        socket_connect_timeout=3,
+        socket_timeout=3,
     )
 
 

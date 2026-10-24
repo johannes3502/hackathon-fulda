@@ -33,6 +33,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 |---|---|
 | Frontend | Next.js (App Router) + TypeScript; Kamera, MediaPipe und `MediaRecorder` laufen ausschließlich client-seitig |
 | Backend | Python 3.12 + FastAPI |
+| Hintergrundjobs | Celery-Worker; Redis als Broker und temporäres Result-Backend (Docker Compose) |
 | Datenbank | Postgres mit `pgvector` (Docker Compose): Sessions, Events, Transkript, Quellen-Chunks + Embeddings |
 | Objektspeicher | MinIO, S3-kompatibel (Docker Compose): Uploads, Event-Clips, Snapshots; Browser lädt per Presigned URL direkt hoch |
 | Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker, FaceLandmarker (Iris, Kopfausrichtung), HandLandmarker |
@@ -62,6 +63,8 @@ Browser (Next.js, TS)
  Quellen-Upload (PDF/PPTX) ──────────────────────────┤
                                                      ▼
                                           FastAPI (Python 3.12)
+                                                     │
+                                          Redis → Celery-Worker
      ┌──────────────┬─────────────────┬──────────────┴───┬─────────────────┐
      ▼              ▼                 ▼                  ▼                 ▼
  Ingest/RAG    Transkription    Sprechanalyse        Fact-Check        Frage-Agent
@@ -105,6 +108,7 @@ Event {
 - **Fallback:** Fällt Modell, API oder Kamera aus, spielt die App eine vorberechnete Beispiel-Session deterministisch ab. Sie ist zugleich der Standard-Einstieg für den Produktreview (Wert in unter 3 Minuten), Live-Aufnahme ist der zweite Pfad (30–60 s reichen).
 - **Datenschutz:** Demo-Daten synthetisch. Live-Aufnahmen der Jury sind echte personenbezogene Daten: Einwilligungshinweis, Originalaufnahme nach der Verarbeitung löschen, Drittanbieter-APIs benennen (relevant für die KI-Reflection).
 - **Daten und Secrets:** Ziel sind Postgres mit pgvector und MinIO; der vorhandene Compose-Stack ist in Abschnitt 6 beschrieben. Secrets nur in `.env`, nicht committen.
+- **Hintergrundjobs:** Lange Backend-Arbeiten (z. B. Transkription, Ingest, Clips) als Celery-Tasks ausführen. Async-API-Routen publizieren über `app.jobs.enqueue_task` und geben eine Job-ID zurück; im Request nicht auf das Ergebnis warten. Nur IDs/Object-Keys in Redis, Medien in S3. Tasks müssen bei erneuter Zustellung sicher wiederholbar sein.
 - **Layout (Ziel):** `frontend/` (Next.js), `backend/` (FastAPI); die vorhandene Compose-Datei heißt `compose.yaml`.
 
 ## 5. Priorität
@@ -119,7 +123,7 @@ Event {
 
 ```
 AGENTS.md                          # Einstiegspunkt und Zielarchitektur
-compose.yaml                       # lokales Backend + PostgreSQL + S3
+compose.yaml                       # Backend + Celery + Redis + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
 backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
 .run/                              # geteilte IntelliJ-Run-Konfigurationen
@@ -135,12 +139,21 @@ templates/
 ```
 
 Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
-PostgreSQL **ohne pgvector** und **SeaweedFS als S3-Speicher**. MinIO,
+einen separaten Celery-Worker, Redis, PostgreSQL **ohne pgvector** und
+**SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job
+geprüft; Produkt-Tasks und Job-API-Endpunkte sind noch nicht implementiert. MinIO,
 pgvector, das Next.js-Frontend und die Analyse-/Aufnahme-Pipeline aus der
 Zielarchitektur sind noch nicht umgesetzt. Die Umstellung des Speichers
-ist eine separate Implementierungsaufgabe; dieser Merge ändert keine Dienste.
+ist eine separate Implementierungsaufgabe.
 
 Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
 sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
 Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`
 abgeglichen werden; dort ist noch das bisherige Grundgerüst dokumentiert.
+
+## 7. Git-Workflow
+
+Nach abgeschlossenen Änderungen die relevanten Prüfungen ausführen, die
+Änderungen committen und zum zugehörigen Remote-Branch pushen. Das ist die
+ausdrückliche Arbeitspräferenz des Nutzers. Neue Remote-Änderungen integrieren
+und dabei auftretende Merge-Konflikte lösen; bestehende Teamarbeit erhalten.

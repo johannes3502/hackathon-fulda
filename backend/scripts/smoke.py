@@ -1,9 +1,12 @@
 """Run against Compose: python -m scripts.smoke. Uses only synthetic data."""
 
+import asyncio
 import io
 import json
 import os
+import socket
 import subprocess
+import time
 import urllib.request
 import uuid
 import wave
@@ -15,11 +18,38 @@ from botocore.exceptions import ClientError
 from mediapipe.tasks.python import vision
 
 from app.connections import connect_db, s3_client
+from app.celery_app import celery_app
+from app.jobs import enqueue_task
+from app.tasks import worker_probe
+
+
+def check_worker() -> None:
+    token = str(uuid.uuid4())
+    task_id = asyncio.run(enqueue_task(worker_probe, token, delay_seconds=5))
+    result = celery_app.AsyncResult(task_id)
+    try:
+        deadline = time.monotonic() + 30
+        while result.state != "STARTED":
+            assert not result.ready(), f"Probe ended before the running check: {result.state}"
+            assert time.monotonic() < deadline, "Celery worker did not start the probe"
+            time.sleep(0.1)
+
+        # The worker is deliberately blocked; both API routes must still respond.
+        for path in ("live", "ready"):
+            with urllib.request.urlopen(f"http://127.0.0.1:8000/health/{path}", timeout=2) as response:
+                assert json.load(response)["status"] == "ok"
+        assert not result.ready(), "Expected API responses while the probe was still running"
+        value = result.get(timeout=30)
+        assert value["token"] == token
+        assert value["worker"] != f"celery@{socket.gethostname()}", "Job ran in the API container"
+        print("PASS Celery job runs in a separate worker; API responds during the job")
+    finally:
+        result.forget()
 
 
 def main() -> None:
     with urllib.request.urlopen("http://127.0.0.1:8000/health/ready", timeout=15) as response:
-        assert json.load(response) == {"status": "ok", "postgres": "ok", "storage": "ok"}
+        assert json.load(response) == {"status": "ok", "postgres": "ok", "storage": "ok", "redis": "ok"}
     assert vision.PoseLandmarker and vision.HandLandmarker and vision.FaceLandmarker
     subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.DEVNULL)
     print(f"PASS API readiness, MediaPipe {mediapipe.__version__} Tasks imports, FFmpeg")
@@ -71,6 +101,7 @@ def main() -> None:
     else:
         raise AssertionError("Synthetic audio was not deleted")
     print("PASS cleanup; no synthetic test object or table retained")
+    check_worker()
 
 
 if __name__ == "__main__":
