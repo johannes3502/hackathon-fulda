@@ -272,6 +272,14 @@ export function LiveStudio() {
                         : "Loading landmarks…"}
                 </span>
               )}
+              {cameraStatus === "active" &&
+                pose.state?.phase === "running" &&
+                pose.state.armsCrossed && (
+                  <span className="live-pose-cue" role="status">
+                    Arms crossed. Try an open stance.
+                    <small>Heuristic</small>
+                  </span>
+                )}
               {cameraStatus !== "active" && (
                 <div className="stage-placeholder">
                   <span className="stage-camera">
