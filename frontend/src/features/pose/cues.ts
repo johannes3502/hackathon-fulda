@@ -15,32 +15,42 @@ export const CROSS_ARMS = {
   cooldownMs: 20000,
 };
 
-/** true/false from one sample; null when the needed points are not usable. */
-export function armsCrossed(sample: PoseSample | null) {
-  if (!sample) return null;
-  const d = sample.derived;
-  const values = [
-    d.left_wrist_cross,
-    d.right_wrist_cross,
-    d.left_wrist_height,
-    d.right_wrist_height,
-    d.left_elbow_deg,
-    d.right_elbow_deg,
-  ];
-  if (values.some((v) => v === null)) return null;
-  const [leftCross, rightCross, leftHeight, rightHeight, leftElbow, rightElbow] =
-    values as number[];
-  const inBand = (h: number) =>
-    h >= CROSS_ARMS.minWristHeight && h <= CROSS_ARMS.maxWristHeight;
-  return (
-    leftCross >= CROSS_ARMS.minCross &&
-    rightCross >= CROSS_ARMS.minCross &&
-    inBand(leftHeight) &&
-    inBand(rightHeight) &&
-    leftElbow <= CROSS_ARMS.maxElbowDeg &&
-    rightElbow <= CROSS_ARMS.maxElbowDeg
-  );
+type Pair = [left: number | null, right: number | null];
+export type CrossArmsCheck = {
+  crossed: boolean | null;
+  cross: Pair;
+  height: Pair;
+  elbow: Pair;
+};
+export const passes = {
+  cross: (v: number) => v >= CROSS_ARMS.minCross,
+  height: (v: number) =>
+    v >= CROSS_ARMS.minWristHeight && v <= CROSS_ARMS.maxWristHeight,
+  elbow: (v: number) => v <= CROSS_ARMS.maxElbowDeg,
+};
+
+/** Per-sample inputs and result; crossed is null when points are not usable. */
+export function crossArmsCheck(sample: PoseSample | null): CrossArmsCheck {
+  const d = sample?.derived;
+  const check = {
+    cross: [d?.left_wrist_cross ?? null, d?.right_wrist_cross ?? null] as Pair,
+    height: [
+      d?.left_wrist_height ?? null,
+      d?.right_wrist_height ?? null,
+    ] as Pair,
+    elbow: [d?.left_elbow_deg ?? null, d?.right_elbow_deg ?? null] as Pair,
+  };
+  const entries = Object.entries(check) as [keyof typeof passes, Pair][];
+  const crossed = entries.some(([, pair]) => pair.includes(null))
+    ? null
+    : entries.every(([key, pair]) =>
+        pair.every((v) => passes[key](v as number)),
+      );
+  return { crossed, ...check };
 }
+
+export const armsCrossed = (sample: PoseSample | null) =>
+  crossArmsCheck(sample).crossed;
 
 /**
  * Turns per-sample results into one hint per episode: active once arms stay
