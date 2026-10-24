@@ -1,6 +1,8 @@
 import type { PoseEvent } from "../pose/evaluation";
-import type { CoachingState } from "../coaching/api";
+import type { QuestionAnswer, QuestionResult } from "../questions/api";
 import type { components } from "../../../../api/schema";
+export type Word = components["schemas"]["Word"];
+export type FactCheckResult = components["schemas"]["FactCheckResult"];
 export type TranscriptWord = components["schemas"]["Word"];
 export type LiveTranscript = {
   words: TranscriptWord[];
@@ -57,7 +59,10 @@ export type LiveProgress = {
   notice: string | null;
 };
 export type LiveRecording = {
-  coaching?: CoachingState;
+  words?: Word[];
+  factCheck?: FactCheckResult;
+  questions?: QuestionResult;
+  answers?: Record<string, QuestionAnswer>;
   transcript?: LiveTranscript;
   poseEvents?: PoseEvent[];
   poseLog?: Blob;

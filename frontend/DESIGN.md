@@ -1,5 +1,28 @@
 # Pitch Coach design
 
+## 418 review analysis (2026-10-24)
+
+White analysis workspace, Noto Serif Display headings, #42ff8c accents. Four
+criterion summaries sit above the video. An SVG performance graph below it uses
+a shared video clock, an advancing cursor, timestamps and selectable moments.
+Green checkmarks denote strengths, dark exclamation marks practice moments,
+outlined information marks annotations. Text and symbols accompany color.
+The side panel combines the observation, optional source quote and next action.
+The preview uses a generated, silent illustrated video and synthetic scores;
+live recordings expose existing events without inventing per-time performance.
+On narrow screens the chart scrolls horizontally and annotation/list stack.
+
+## 418 stats card (2026-10-24)
+
+Explicit user request: a simplified player-card layout with an overall circle
+above Gestik, Fachwissen, Flow and Struktur (1–100%). Reuse white, #42ff8c and
+Noto Serif Display. The aggregate is interpreted as an equally weighted mean,
+not a digit sum. Three.js draws the ring; HTML values and SVG provide a readable
+fallback. Count-up runs once on entering the viewport, pointer movement adds a
+subtle card tilt, and reduced motion uses the final static state.
+This is a design prototype with labeled synthetic values, not a validated
+assessment. Actual criterion scoring remains undefined.
+
 ## 418 loading screen (2026-10-24)
 
 User-provided brand direction takes precedence for the loading screen: pure white,

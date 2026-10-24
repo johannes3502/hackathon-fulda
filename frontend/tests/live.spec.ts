@@ -116,6 +116,43 @@ async function enable(page: Page) {
     page.getByRole("button", { name: "Turn camera off" }),
   ).toBeVisible();
 }
+test("speech analysis is visible above the camera and in large view", async ({
+  page,
+}, info) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  await page.route("http://localhost:8000/health/**", (route) =>
+    route.fulfill({ json: { status: "ok" } }),
+  );
+  await enable(page);
+  const speech = page.getByLabel("Speech analysis", { exact: true });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(speech).toBeInViewport();
+  await page.getByRole("button", { name: "Large view", exact: true }).click();
+  await expect(speech).toBeInViewport();
+  await speech.selectOption("backend");
+  await expect(
+    page.getByRole("button", { name: "Enable camera preview" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Enable camera preview" }).click();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as unknown as { mediaConstraints: MediaStreamConstraints })
+          .mediaConstraints.audio,
+    ),
+  ).toBeTruthy();
+  await expect(
+    page.getByRole("button", { name: "Record & analyze audio" }),
+  ).toBeEnabled();
+  await noOverflow(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: info.outputPath("speech-analysis-visible.png"),
+    fullPage: true,
+  });
+});
+
 test("large view scales feedback and preserves an active recording", async ({
   page,
 }, info) => {
@@ -327,7 +364,9 @@ async function backend(page: Page, transcribe = false) {
     route.fulfill({ json: { status: "ok" } }),
   );
   await page.goto("/live");
-  await page.getByLabel("Feedback source").selectOption("backend");
+  await page
+    .getByLabel("Speech analysis", { exact: true })
+    .selectOption("backend");
   await page
     .getByLabel("Create a transcript with local Whisper")
     .setChecked(transcribe);
@@ -444,182 +483,6 @@ test("analysis failure preserves playable recording", async ({ page }) => {
         .evaluate((el: HTMLVideoElement) => el.readyState),
     )
     .toBeGreaterThanOrEqual(2);
-});
-
-test("local transcript, cited source review, answer and deletion stay connected", async ({
-  page,
-}, info) => {
-  const audioId = "12345678-1234-1234-1234-123456789abc";
-  const reportId = "22345678-1234-1234-1234-123456789abc";
-  const answerId = "32345678-1234-1234-1234-123456789abc";
-  const collection = "42345678-1234-1234-1234-123456789abc";
-  const words = [
-    { word: "Acht", start_ms: 100, end_ms: 300 },
-    { word: "Uhr.", start_ms: 300, end_ms: 500 },
-  ];
-  const citation = {
-    chunk_id: 42,
-    source_id: collection,
-    filename: "Synthetic notes.txt",
-    location: { kind: "line", start: 1, end: 1 },
-    quote: "Das Lernlabor öffnet um neun Uhr.",
-  };
-  const report = {
-    collection_id: collection,
-    model: "synthetic-test-model",
-    notices: ["Synthetic API fixture; not model accuracy evidence."],
-    events: [],
-    checks: [
-      {
-        id: "claim-1",
-        statement: "Acht Uhr.",
-        t_ms: 100,
-        duration_ms: 400,
-        verdict: "contradicts",
-        explanation: "Die Quelle nennt neun Uhr.",
-        citations: [citation],
-        issue: null,
-      },
-    ],
-    questions: [
-      {
-        id: "question-1",
-        claim_id: "claim-1",
-        text: "Wann öffnet das Lernlabor?",
-        reason: "Die Uhrzeit weicht ab.",
-        t_ms: 100,
-      },
-    ],
-  };
-  const deleted: string[] = [];
-  await page.route("**/coaching/capabilities", (route) =>
-    route.fulfill({
-      json: { configured: true, model: "synthetic-test-model" },
-    }),
-  );
-  await page.route("**/sources?collection_id=*", (route) =>
-    route.fulfill({
-      json: [
-        { id: collection, status: "ready", filename: "Synthetic notes.txt" },
-      ],
-    }),
-  );
-  await page.route("**/speech/analyze", async (route) => {
-    expect(route.request().postDataBuffer()!.toString()).toContain(
-      'name="local_only"\r\n\r\ntrue',
-    );
-    await route.fulfill({ status: 202, json: { job_id: audioId } });
-  });
-  await page.route(`**/speech/jobs/${audioId}`, (route) =>
-    route.fulfill({
-      json: {
-        job_id: audioId,
-        status: "completed",
-        result: {
-          audio: { summary: { pause_count: 0 } },
-          transcription: { summary: { filler_count: 0 } },
-          events: [],
-          words,
-          asr_provider: "whisper",
-          synthetic_demo: false,
-          notices: [],
-        },
-      },
-    }),
-  );
-  await page.route("**/coaching/analyze", async (route) => {
-    expect(route.request().postDataJSON().words).toEqual(words);
-    await route.fulfill({ status: 202, json: { job_id: reportId } });
-  });
-  await page.route(`**/coaching/jobs/${reportId}`, (route) => {
-    if (route.request().method() === "DELETE") {
-      deleted.push(reportId);
-      return route.fulfill({ status: 204 });
-    }
-    return route.fulfill({
-      json: { job_id: reportId, status: "completed", report },
-    });
-  });
-  await page.route(`**/coaching/jobs/${reportId}/answers`, async (route) => {
-    expect(route.request().postDataJSON()).toEqual({
-      question_id: "question-1",
-      answer: "Um neun Uhr.",
-    });
-    await route.fulfill({ status: 202, json: { job_id: answerId } });
-  });
-  let answerReady = false;
-  await page.route(`**/coaching/jobs/${answerId}`, (route) => {
-    if (route.request().method() === "DELETE") {
-      deleted.push(answerId);
-      return route.fulfill({ status: 204 });
-    }
-    return route.fulfill({
-      json: {
-        job_id: answerId,
-        status: answerReady ? "completed" : "running",
-        answer: answerReady
-          ? {
-              question_id: "question-1",
-              answer: "Um neun Uhr.",
-              verdict: "supports",
-              explanation:
-                "Die korrigierte Uhrzeit stimmt mit der Quelle überein.",
-              citations: [citation],
-              follow_up: null,
-              issue: null,
-              model: "synthetic-test-model",
-            }
-          : null,
-      },
-    });
-  });
-  await backend(page, true);
-  await page.getByRole("button", { name: "Finish & review" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Your transcript" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Acht", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Selected feedback section" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Compare with my sources" }).click();
-  await expect(
-    page.locator(".coaching-checks").getByText("Conflicts with sources"),
-  ).toBeVisible();
-  await expect(
-    page.locator(".source-citation").getByText("Synthetic notes.txt · Line 1"),
-  ).toBeVisible();
-  await page.getByLabel("Your answer", { exact: true }).fill("Um neun Uhr.");
-  await page
-    .getByRole("button", { name: "Compare answer with sources" })
-    .click();
-  await expect(page.getByText("Checking this answer locally…")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Delete source review and answers" }),
-  ).toBeDisabled();
-  await page
-    .getByRole("link", { name: "Feedback moments", exact: true })
-    .click();
-  answerReady = true;
-  await page
-    .getByRole("link", { name: "Stats & playback", exact: true })
-    .click();
-  await expect(
-    page.locator(".coaching-answer").getByText("Supported by sources"),
-  ).toBeVisible();
-  await noOverflow(page);
-  await page
-    .locator(".source-coaching")
-    .screenshot({ path: info.outputPath("local-source-coaching.png") });
-  await page
-    .getByRole("button", { name: "Delete source review and answers" })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Compare with my sources" }),
-  ).toBeVisible();
-  expect(deleted).toEqual([answerId, reportId]);
-  await expect(page.locator(".coaching-checks")).toHaveCount(0);
-  await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
 });
 
 test("local pose worker loads real assets and runs on synthetic camera frames", async ({
@@ -877,4 +740,238 @@ test("sideways motion and crossed arms reach review while live hints can be mute
   await expect(page.locator(".replay-detail h2")).toHaveText(
     "Arms crossed in front of torso",
   );
+});
+
+test("transcribed take is fact-checked against sources and links back to the video", async ({
+  page,
+}, info) => {
+  const jobId = "12345678-1234-1234-1234-123456789abc";
+  const factJob = "87654321-4321-4321-4321-cba987654321";
+  const questionJob = "77654321-4321-4321-4321-cba987654321";
+  const answerJob = "67654321-4321-4321-4321-cba987654321";
+  const question = {
+    id: "q1",
+    kind: "contradiction",
+    question: "Wie viele Studierende sind es laut Quelle?",
+    reason: "Die Zahlen weichen ab.",
+    t_ms: 200,
+    duration_ms: 900,
+    transcript: "Wir haben 9000 Studierende.",
+    claim: "9000 Studierende",
+    evidence: null,
+    query: "Studierende",
+  };
+  await page.route("http://localhost:8000/questions", (route) =>
+    route.fulfill({ status: 202, json: { job_id: questionJob } }),
+  );
+  await page.route(
+    `http://localhost:8000/questions/jobs/${questionJob}`,
+    (route) =>
+      route.fulfill({
+        json: {
+          job_id: questionJob,
+          status: "completed",
+          result: {
+            questions: [question],
+            events: [],
+            notices: [],
+            model: "synthetic-model",
+            sources_used: true,
+          },
+        },
+      }),
+  );
+  await page.route("http://localhost:8000/questions/answers", async (route) => {
+    expect(route.request().postDataJSON().answer).toBe("9500 Studierende.");
+    await route.fulfill({ status: 202, json: { job_id: answerJob } });
+  });
+  await page.route(
+    `http://localhost:8000/questions/answers/${answerJob}`,
+    (route) =>
+      route.fulfill({
+        json: {
+          job_id: answerJob,
+          status: "completed",
+          result: {
+            verdict: "supports",
+            explanation: "Die korrigierte Zahl steht in der Quelle.",
+            evidence: {
+              kind: "upload",
+              label: "Synthetische Folie 2",
+              quote: "9500 Studierende",
+              passage: "9500 Studierende",
+            },
+            checked: ["upload"],
+            follow_up: null,
+            model: "synthetic-model",
+            notes: [],
+          },
+        },
+      }),
+  );
+  const words = [
+    { word: "Wir", start_ms: 200, end_ms: 400 },
+    { word: "haben", start_ms: 450, end_ms: 700 },
+    { word: "9000", start_ms: 750, end_ms: 1000 },
+    { word: "Studierende.", start_ms: 1050, end_ms: 1150 },
+  ];
+  await page.route("http://localhost:8000/speech/analyze", async (route) => {
+    expect(route.request().postData()).toContain(
+      'name="transcribe"\r\n\r\ntrue',
+    );
+    await route.fulfill({
+      status: 202,
+      json: { job_id: jobId, status_url: `/speech/jobs/${jobId}` },
+    });
+  });
+  await page.route("http://localhost:8000/speech/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        job_id: jobId,
+        status: "completed",
+        result: {
+          audio: { summary: { pause_count: 0 } },
+          events: [],
+          words,
+          asr_provider: "whisper",
+          synthetic_demo: false,
+          notices: [],
+          transcription: { summary: { word_count: 4 }, events: [] },
+        },
+      },
+    }),
+  );
+  await page.route("http://localhost:8000/factcheck/settings", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        model: "synthetic-model",
+        llm_host: "llm.example",
+        web_provider: "wikipedia",
+      },
+    }),
+  );
+  await page.route("http://localhost:8000/sources?*", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "00000000-0000-4000-8000-000000000001",
+          collection_id: "00000000-0000-4000-8000-000000000002",
+          filename: "folien.pdf",
+          content_type: "application/pdf",
+          size_bytes: 10,
+          status: "ready",
+          chunk_count: 3,
+          created_at: "2026-10-24T12:00:00Z",
+        },
+      ],
+    }),
+  );
+  let request: Record<string, unknown> | null = null;
+  await page.route("http://localhost:8000/factcheck", async (route) => {
+    request = route.request().postDataJSON();
+    await route.fulfill({
+      status: 202,
+      json: { job_id: factJob, status_url: `/factcheck/jobs/${factJob}` },
+    });
+  });
+  await page.route(`http://localhost:8000/factcheck/jobs/${factJob}`, (route) =>
+    route.fulfill({
+      json: {
+        job_id: factJob,
+        status: "completed",
+        result: {
+          claims: [
+            {
+              claim: "Die Hochschule hat 9000 Studierende.",
+              transcript: "Wir haben 9000 Studierende.",
+              t_ms: 200,
+              duration_ms: 1200,
+              verdict: "contradicts",
+              explanation: "Die Folie nennt rund 9.500 Studierende.",
+              evidence: {
+                kind: "upload",
+                label: "folien.pdf, Seite 2",
+                quote: "rund 9.500 Studierende in acht Fachbereichen",
+                passage:
+                  "Die Hochschule hat rund 9.500 Studierende in acht Fachbereichen.",
+                filename: "folien.pdf",
+                location: { kind: "page", start: 2, end: 2 },
+              },
+              checked: ["upload"],
+              notes: [],
+            },
+          ],
+          events: [],
+          model: "synthetic-model",
+          web_provider: "wikipedia",
+          sources_checked: true,
+          config: {
+            max_claims: 12,
+            min_quote_chars: 12,
+            top_k: 5,
+            web_results: 4,
+          },
+          notices: ["Synthetic notice."],
+        },
+      },
+    }),
+  );
+  await backend(page, true);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  const inputs = page.locator(".fact-check-inputs").first();
+  await expect(inputs).toContainText("4 words");
+  await expect(inputs).toContainText("1 ready");
+  await expect(
+    page.getByText("llm.example", { exact: false }).first(),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Check facts" }).click();
+  await expect(page.locator(".fact-verdict")).toHaveText(
+    "Source says otherwise",
+  );
+  await expect(page.locator(".review-moments")).toContainText(
+    "Source says otherwise",
+  );
+  await expect(page.locator(".fact-claim blockquote")).toContainText(
+    "“rund 9.500 Studierende in acht Fachbereichen”folien.pdf, Page 2",
+  );
+  expect(request).toMatchObject({ words, use_web: false });
+  expect(request!.collection_id).toMatch(/^[0-9a-f-]{36}$/);
+  await page.locator(".fact-claim-head button").click();
+  await expect(page.locator(".selected-feedback")).toContainText(
+    "Source says otherwise",
+  );
+  await noOverflow(page);
+  await page
+    .locator(".fact-check")
+    .first()
+    .screenshot({
+      path: `test-results/fact-check-${info.project.name}.png`,
+    });
+  await page.getByRole("link", { name: "Feedback moments" }).click();
+  await page.getByLabel("Filter by category").selectOption("fact");
+  await expect(
+    page.getByText("Source says otherwise", { exact: false }).first(),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Stats & playback", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Start question round" }).click();
+  await expect(
+    page.getByText(question.question, { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Your answer", { exact: true })
+    .fill("9500 Studierende.");
+  await page
+    .getByRole("button", { name: "Compare with sources", exact: true })
+    .click();
+  await expect(
+    page.getByText("Your answer matches the source", { exact: true }),
+  ).toBeVisible();
+  await noOverflow(page);
+  await page
+    .locator(".questions")
+    .screenshot({ path: info.outputPath("local-question-answer.png") });
 });

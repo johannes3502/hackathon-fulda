@@ -15,7 +15,6 @@ export function TranscriptAnalysis({
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
   async function analyze(file: File) {
-    if (recording.coaching) return;
     const active = new AbortController();
     controller.current?.abort();
     controller.current = active;
@@ -44,29 +43,34 @@ export function TranscriptAnalysis({
         recording.durationMs,
       );
       if (active.signal.aborted) return;
-      update(recording.id, (take) =>
-        take.coaching
-          ? take
-          : {
-              ...take,
-              transcript: {
-                words,
-                provider: "imported",
-                synthetic: false,
-                notices: [
-                  "Imported word timestamps; verify they match this recording.",
-                ],
-              },
-              feedback: [
-                ...take.feedback.filter((f) => !f.id.startsWith("words-")),
-                ...result.feedback,
-              ].sort((a, b) => a.startMs - b.startMs),
-              metrics: [
-                ...take.metrics.filter((m) => !m.id.startsWith("words-")),
-                ...result.metrics,
-              ],
-            },
-      );
+      update(recording.id, (take) => ({
+        ...take,
+        words,
+        factCheck: undefined,
+        questions: undefined,
+        answers: undefined,
+        transcript: {
+          words,
+          provider: "imported",
+          synthetic: false,
+          notices: [
+            "Imported word timestamps; verify they match this recording.",
+          ],
+        },
+        feedback: [
+          ...take.feedback.filter(
+            (f) =>
+              !f.id.startsWith("words-") &&
+              !f.id.startsWith("fact-") &&
+              !f.id.startsWith("question-"),
+          ),
+          ...result.feedback,
+        ].sort((a, b) => a.startMs - b.startMs),
+        metrics: [
+          ...take.metrics.filter((m) => !m.id.startsWith("words-")),
+          ...result.metrics,
+        ],
+      }));
       setNotice("Transcript analysis added to this take.");
     } catch (error) {
       if (!active.signal.aborted)
@@ -91,7 +95,7 @@ export function TranscriptAnalysis({
         id="transcript-file"
         type="file"
         accept="application/json,.json"
-        disabled={busy || !!recording.coaching}
+        disabled={busy}
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = "";
@@ -103,9 +107,6 @@ export function TranscriptAnalysis({
         are relative to recording start. This sends the transcript to the same
         backend.
       </p>
-      {recording.coaching && (
-        <p>Delete the source review before replacing its transcript.</p>
-      )}
       <p role="status">{busy ? "Analyzing transcript…" : notice}</p>
     </section>
   );

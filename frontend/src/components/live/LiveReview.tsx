@@ -14,26 +14,27 @@ import { Button } from "@/components/ui/button";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import type { LiveFeedback } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
+import { FactCheckPanel } from "./FactCheckPanel";
 import { FeedbackMoment, LiveNav, MissingRecording } from "./shared";
-import { PoseDownload } from "./PoseDownload";
-import { TranscriptAnalysis } from "./TranscriptAnalysis";
-import { VideoPlayback } from "./VideoPlayback";
+import { RecordedTranscript } from "./RecordedTranscript";
 import { PoseEvidence } from "./PoseEvidence";
 import { PoseEventDownload } from "./PoseEventDownload";
-import { RecordedTranscript } from "./RecordedTranscript";
-import { SourceCoaching } from "./SourceCoaching";
+import { PoseDownload } from "./PoseDownload";
+import { QuestionSimulator } from "./QuestionSimulator";
+import { TranscriptAnalysis } from "./TranscriptAnalysis";
+import { VideoPlayback } from "./VideoPlayback";
 
 export function LiveReview({ sessionId }: { sessionId: string }) {
   const { recordings } = useLiveSessions();
   const recording = recordings[sessionId];
   const [selected, setSelected] = useState<LiveFeedback | null>(null);
-  function replay(item: LiveFeedback) {
+  if (!recording) return <MissingRecording />;
+  const jump = (item: LiveFeedback) => {
     setSelected({ ...item });
     document
-      .getElementById("review-video")
+      .querySelector(".playback-panel")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-  if (!recording) return <MissingRecording />;
+  };
   const groups = [
     ...new Set(recording.feedback.map((item) => item.category)),
   ].map((category) => ({
@@ -73,10 +74,13 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             {recording.notice}
           </p>
         )}
-        <p className="live-demo-notice">
-          Camera observations are prototype heuristics. Replay them in context;
-          their frequency does not measure presentation quality.
-        </p>
+        {recording.config.mode === "local" && (
+          <p className="live-demo-notice">
+            <strong>Demo feedback, real recording.</strong> These markers are
+            scripted examples, not detections or an assessment of how you
+            performed.
+          </p>
+        )}
         <div className="recording-stats">
           <div>
             <Clock3 size={19} />
@@ -86,14 +90,25 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
           <div>
             <MessageSquare size={19} />
             <strong>{recording.feedback.length}</strong>
-            <span>Feedback moments</span>
+            <span>
+              {recording.config.mode === "local"
+                ? "Demo markers"
+                : "Feedback moments"}
+            </span>
           </div>
           <div>
             <CheckCircle2 size={19} />
             <strong>
-              {recording.feedback.filter((item) => !!item.evidence).length}
+              {
+                recording.feedback.filter((item) => item.kind === "positive")
+                  .length
+              }
             </strong>
-            <span>Camera observations</span>
+            <span>
+              {recording.config.mode === "local"
+                ? "Positive examples"
+                : "Positive observations"}
+            </span>
           </div>
           <div>
             <Video size={19} />
@@ -105,7 +120,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
           </div>
         </div>
         <div className="live-review-grid">
-          <div id="review-video">
+          <div>
             <VideoPlayback
               recording={recording}
               selected={selected}
@@ -186,7 +201,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
               <p className="field-hint">
                 {recording.chunksSent} recording uploads/parts{" "}
                 {recording.config.mode === "local"
-                  ? "kept in this browser"
+                  ? "processed by the local demo"
                   : "sent to the backend"}
                 . {(recording.bytesSent / 1024 / 1024).toFixed(1)} MB{" "}
                 {recording.config.mode === "local" ? "kept local" : "sent"}.
@@ -208,14 +223,15 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             </section>
           </aside>
         </div>
-        <RecordedTranscript recording={recording} onSelect={replay} />
+        <RecordedTranscript recording={recording} onSelect={jump} />
         {recording.config.mode === "backend" && (
           <>
-            <SourceCoaching recording={recording} onSelect={replay} />
             <details className="transcript-import">
               <summary>Import or replace word timestamps</summary>
               <TranscriptAnalysis recording={recording} />
             </details>
+            <FactCheckPanel recording={recording} onSelect={jump} />
+            <QuestionSimulator recording={recording} onSelect={jump} />
           </>
         )}
         <section className="review-moments">

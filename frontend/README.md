@@ -6,6 +6,26 @@ rebuild after changing dependencies or configuration.
 
 ## Use
 
+- **418 review analysis** (`/review-preview`): synthetic 90-second video, four
+  criteria and an interactive performance graph with timestamped positive,
+  practice and factual notes. Click a marker or the graph to seek; the slider
+  supports keyboard seeking. Play a selected section with ±2 seconds of context,
+  optionally looping. Criterion buttons filter moments, not the overall curve.
+  The stats-card demo links here. A matching view at `/live/[sessionId]/analysis`
+  is linked from live review and uses the actual recording and feedback events.
+  Completed fact-check results also supply transcript quotes and source excerpts
+  to its annotation panel (including links for web evidence).
+  Live scores/curves stay unavailable until a scoring pipeline exists; scripted
+  feedback on real recordings is explicitly disclosed. Video remains in memory.
+
+- **418 stats card**: on the start page and at `/stats-preview` (with replay).
+  Animated Three.js ring, 2×2 criteria, count-up and subtle pointer tilt.
+  `StatsCard` accepts `gesture`, `knowledge`, `flow`, `structure` values from
+  1–100; the overall value is their rounded arithmetic mean. Invalid or missing
+  values produce an unavailable overall value. The homepage currently passes
+  explicitly labeled synthetic demo values; no backend scoring is implemented.
+  Reduced motion shows final values immediately; SVG supports unavailable WebGL.
+
 - **418 loading preview** (`/loading-preview`): white background, #42ff8c rotating
   Three.js disc and locally hosted Noto Serif Display. The reusable
   `LoadingScreen` also supplies the App Router loading fallback (`app/loading.tsx`).
@@ -20,22 +40,22 @@ rebuild after changing dependencies or configuration.
   feedback**. Hold a neutral position for 3 seconds, then follow the movement guide.
   Real local observations appear live and become replay markers. No scripted
   findings are attached to your recording.
-- **Local server · speech analysis and transcript:** enable camera and microphone,
+- **Speech analysis → On · local speech analysis** (above the camera, including Large view): enable camera and microphone,
   then **Record & analyze audio**. Speak normally for the first three seconds
   of calibration. After stopping, local Silero/RMS/YIN analysis runs in Celery;
   feedback and measurements appear in review. Local Whisper transcription is on
   by default; turn it off for signal analysis only. `local_only=true` prevents
   a hosted or synthetic ASR provider from silently replacing local Whisper.
 - **Source review and questions:** upload sources under `/sources`, then in a
-  recorded take choose **Compare with my sources**. Local Ollama selects claims,
-  compares retrieved passages and asks follow-up questions. Enter a text answer
-  to compare it with the sources. Quotes are verified against retrieved text.
+  recorded take choose **Check facts**. Local Ollama selects claims,
+  compares retrieved passages. **Start question round** asks follow-up questions;
+  enter a text answer to compare it with the sources. Quotes are verified against retrieved text.
   [Setup, evaluation and limits](../docs/06-local-coaching.md).
 - **Rewatch feedback sections:** seek to a marker, loop the surrounding section,
   or play the full take. Backend review also accepts word-timestamp JSON from
   the same take for `/transcription/analyze-words`; this import does not run ASR.
-  Automatic words are clickable for replay. Delete a source review before
-  replacing its transcript so old verdicts cannot attach to new words.
+  Automatic words are clickable for replay. Replacing the transcript clears
+  stale fact findings, questions and answers from the browser review.
 
 Recordings stay in browser memory for replay; download before refreshing or
 leaving the workspace. Backend mode uploads the complete take after stopping

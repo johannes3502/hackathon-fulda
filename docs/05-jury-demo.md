@@ -39,11 +39,11 @@ Ollama vorab starten, Modell laden und Smoke ausführen:
 mit erfundenem Inhalt hochladen: „Synthetische Beispieldaten: Das Lernlabor hat
 zwanzig Plätze. Es öffnet um neun Uhr.“ Auf **Ready** warten.
 
-Unter `/live` **Local server · speech analysis and transcript** wählen. Mikro
+Unter `/live` oberhalb der Kamera **Speech analysis → On · local speech analysis** wählen. Mikro
 und Kamera einschalten, normal sprechen und neutral stehen. Als synthetischen
 Vortrag z. B. sagen: „Das Lernlabor hat zwanzig Plätze. Es öffnet um acht Uhr.
 Das Lernlabor hat einen Swimmingpool.“ Nach Stop das echte Whisper-Transkript
-prüfen, dann **Compare with my sources**. Zitate ansehen, **Replay** ausprobieren
+prüfen, dann **Check facts**, danach **Start question round**. Zitate ansehen, Zeitknopf ausprobieren
 und eine Rückfrage beantworten. Modellfehler offen ansprechen; fehlende Evidenz
 ist kein Falschheitsbeweis. Bei Ausfall die vorbereitete Sample-Session zeigen.
 

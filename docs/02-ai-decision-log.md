@@ -23,6 +23,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 15 | README und Altbestand aufräumen | Haupt-README auf 17 Zeilen gekürzt; alten Frontend-Plan, doppelte Produktnotiz und überholte Video-WebSocket-Dokumentation entfernt; ungenutzte Validatoren und Handshake-Typen gestrichen | Referenzen vor dem Löschen geprüft; aktuelle HTTP-Upload-/Job-Grenze im Handoff dokumentiert, API-Tooling-Anleitung zentralisiert. Zwei Tests entfernten ausschließlich die gelöschten WebSocket-Helfer; Replay- und HTTP-Tests bleiben aktiv | Ausdrücklicher Nutzerauftrag für Vereinfachung und Cleanup | Compose-Start, Typecheck, Lint, 25 Frontend-Tests, Backend-Smoke-Test und lokale Markdown-Links bestanden |
 | 16 | Quellen-Upload und RAG-Retrieval (Feature 2, Vorbereitung für Fact-Check und Frage-Agent) | Claude Code: `app/sources/` mit Extraktion (PDF pro Seite, PPTX pro Folie inkl. Notizen/Tabellen, DOCX, TXT/MD), Chunking mit Seiten-/Folienangabe, lokalem Embedding-Modell hinter `Embedder`-Interface, pgvector + deutscher Volltextsuche mit Reciprocal Rank Fusion, Celery-Ingest, REST-API und Frontend-Seite `/sources`; Postgres-Image auf `pgvector/pgvector:0.8.6-pg18-trixie` umgestellt | Embedding-Anbieter war offen; lokales Modell gewählt, damit keine Dokumente an Dritte gehen (≈0,6 GB RAM pro Prozess). Erste Keyword-Suche zerlegte „260.000“ anders als PostgreSQL und fand die Zahl nicht; korrigiert, indem PostgreSQL die Suchanfrage selbst tokenisiert. Gemessener CPU-Durchsatz des Modells auf einem 12-Kern-Linux-Laptop nur ≈3 Abschnitte/s (1 MB Text ≈ 6 min); Test auf Mac M5 Pro steht aus, schnellere Alternativen gemessen (MiniLM-L12 ≈12/s, potion-multilingual ≈800/s). Next-Proxy puffert Uploads standardmäßig nur bis 10 MB; `proxyClientMaxBodySize` auf 100 MB gesetzt (betraf auch Aufnahmen). Kein OCR. Suche liefert immer Top-k, auch wenn nichts passt. Retrieval-Qualität nur mit synthetischen Mini-Dokumenten geprüft, keine Genauigkeitsaussage | Nutzerauftrag (Quellen hochladen, später für Fact-Check/Fragerunde nutzen); Modell-, Chunking- und Ranking-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_sources.py` (inkl. DB-Roundtrip gegen pgvector), `backend/scripts/smoke_sources.py` im Compose-Stack bestanden; Frontend-Unit-Tests, Typecheck, Lint; Browser-Check Desktop/375 px ohne Konsolenfehler |
 | 17 | Lokale Whisper-Transkription als Standard | Codex: faster-whisper hinter dem bestehenden `Transcriber`-Protokoll, lokales Modell im Image, Deepgram nur noch optional; `RecordingAnalysis.text` und regeneriertes API-Schema | Modellqualität, deutsche Füllwörter und Wortgrenzen nicht bewertet. Docker-Build mit Modelldownload nicht geprüft. PyAV 15.1.0 nötig, da 19.0.2 den faster-whisper-Dekoder bricht. Kein Cloud-Zwang, aber auch kein Nachweis besserer Erkennung | Nutzerauftrag: Speech-to-Text mit lokalem Modell, Review vor Push | Nach dem Merge mit main: 46 Backend-Tests bestanden, zwei übersprungen; echter `tiny`-Lauf über `run_analysis` mit synthetischer deutscher Sprache; API-Aktualitätscheck bestanden; Details unten |
+| 17 | Fact-Check (Feature 2) mit RAG zuerst und Web als Zweitquelle | Claude Code: `app/factcheck/` mit OpenAI-kompatiblem Chat-Client (httpx, keine neue Abhängigkeit), Aussagen-Extraktion über nummerierte Sätze (Timestamps aus den Wort-Timestamps, nicht vom Modell), Hybrid-Retrieval je Aussage in der Quellen-Collection, LLM-Urteil mit wörtlichem Zitat, Zitat-Prüfung per `quote_in_text`, danach Websuche (Wikipedia-API ohne Schlüssel oder Tavily) nur für nicht belegte Aussagen; Celery-Task `fact_check`, `POST /factcheck`, Status-Polling, `fact`-Events; Frontend: Transkription im Live-Studio als Opt-in, Fact-Check-Panel in der Review mit Sprung zur Videostelle | Nutzer legte nur „OpenAI-kompatibel“ fest; URL und Modell bleiben Teamentscheidung, daher Konfiguration über `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` und `/factcheck` antwortet ohne Konfiguration mit 503. `temperature` wird standardmäßig nicht gesendet, weil manche Modelle nur den Standardwert akzeptieren; JSON-Modus abschaltbar. Ein vom Modell erfundenes Zitat wird verworfen (Ergebnis „nicht gefunden“ statt Scheinbeleg); technische Fehler heißen „unchecked“, nicht „falsch“. Wikipedia lehnte den ersten User-Agent mit HTTP 403 ab (Wikimedia-Policy verlangt Kontaktangabe); Repo-URL ergänzt. Websuche mit unpräziser Suchanfrage liefert themenfremde Artikel; das Urteil hängt dann am Modell. Qualität von Extraktion und Urteil mit echtem Modell nicht gemessen; Transkript-Sätze gehen an den LLM-Anbieter, Suchanfragen an Wikipedia/Tavily (im UI vor dem Start benannt) | Nutzerauftrag (Fact-Check mit RAG über hochgeladene Quellen wie Vorlesungsfolien, Web-Fallback, eigener Branch, danach nach main); Prompt-, Grenzwert- und Wikipedia-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_factcheck.py` (10 Tests), Backend-Suite 51 bestanden; Frontend: Typecheck, Lint, 49 Unit-Tests, 18 Playwright-Tests Desktop/375 px; End-to-End im isolierten Compose-Stack, siehe unten |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -286,7 +287,7 @@ machen und das Wie/Warum der Auswertung dokumentieren.
   Latenz und Speicherbedarf des `small`-Modells pro Worker. Keine Aussage zur
   Erkennungsgenauigkeit.
 
-## Lokale Alternative statt OpenAI API (24.10.2026)
+## Lokale Alternative statt OpenAI API: Zwischenstand (24.10.2026)
 
 - Der Nutzer wählte zunächst OpenAI API, fragte dann ausdrücklich nach einer
   freien/lokalen Alternative. Umsetzung ohne API-Key: native Ollama-Inferenz
@@ -310,3 +311,97 @@ machen und das Wie/Warum der Auswertung dokumentieren.
   einschließlich Transkription, Fehlererhalt, Zitatansicht, Wiederaufnahme des
   Antwort-Pollings und Löschung bestanden. Reales Mikrofon und Safari bleiben
   separate Gerätechecks. Setup, Begründung, Grenzen: `docs/06-local-coaching.md`.
+
+### Konsolidierung mit aktueller Teamarbeit
+
+- `origin/main` brachte parallel Fact-Check, Web-Zweitquelle, Frage-Simulator
+  und eine Analyseansicht mit. Die separate neue `/coaching`-Implementierung
+  wurde deshalb wieder entfernt: ein gemeinsamer Pfad über `/factcheck`,
+  `/questions` und `/questions/answers` nutzt nun die Team-Module.
+- Standard ist native Ollama-Inferenz, wenn `LLM_BASE_URL` und `LLM_MODEL` leer
+  sind. Der kompatible Adapter bleibt explizit konfigurierbar. Websuche und
+  deren Checkbox sind standardmäßig aus; keine unbeabsichtigten Suchanfragen.
+- JSON-Schemas für Aussagen, Urteile und Fragen ergänzen die Team-Verweis- und
+  Zitatprüfung. Ein ungültiges Zitat ist technisch `unchecked`, nicht die
+  Behauptung „keine Evidenz gefunden“. Bei einer ungültigen Antwortbewertung
+  wird keine darauf beruhende Nachfrage übernommen.
+- Im ersten realen integrierten Lauf waren Frage-Verweise fehlerhaft. Mit
+  JSON-Schema war die Ausgabe strukturell korrekt, doch eine korrigierte Antwort
+  erhielt trotz passender Erklärung noch `contradicts`. Der Antwort-Prompt
+  trennt jetzt ausdrücklich neue Antwort und frühere Behauptung. Das zeigt:
+  gültiges JSON und gültiges Zitat beweisen kein richtiges Urteil.
+- Danach echter Smoke auf demselben synthetischen Lernlabor-Fall bestanden:
+  Quellenvergleich 10,1 s (stützt/widerspricht/nicht gefunden), passende Frage
+  6,1 s, korrigierte Antwort als gestützt mit Zitat 4,1 s. Einzelner Lauf auf M2
+  Pro/32 GB, kein Qualitätsbenchmark. Alle synthetischen Jobs/Quellen entfernt.
+- Die Team-Job-Pipeline löscht Requests nach Abschluss. Ergebnisse bleiben
+  in S3; die zuvor beschriebene separate Lösch-UI ist nicht mehr vorhanden.
+  Setup und Speichergrenzen in `docs/06-local-coaching.md` entsprechen dem
+  konsolidierten Stand. Kein OpenAI-Schlüssel oder gehosteter Modellaufruf nötig.
+## Fact-Check End-to-End (24.10.2026)
+
+Umgebung: Linux-Laptop, Docker. Isolierter Compose-Stack (`-p factcheck-e2e`,
+eigene Ports und Volumes, vorhandenes Backend-Image, Code gemountet), danach
+mit `down -v` entfernt. Kein echtes LLM verfügbar: ein deterministischer
+OpenAI-kompatibler Stand-in (Container im selben Netz) beantwortete Extraktion
+und Urteile per Regel. Damit ist der technische Ablauf geprüft, nicht die
+Urteilsqualität eines echten Modells.
+
+- Synthetische TXT-Quelle über `POST /sources` hochgeladen, vom Worker
+  verarbeitet (`ready`), synthetisches Transkript über `POST /factcheck`
+  geprüft, Ergebnis per Polling abgeholt, Quelle wieder gelöscht.
+- Aussage mit Beleg in der Quelle: `supports`, Zitat aus `zahlen.txt` und
+  nur gegen die Quelle geprüft (keine Websuche).
+- Aussage ohne Beleg in der Quelle: echte Wikipedia-API abgefragt, Zitat aus
+  dem Artikel „Mond“ wörtlich verifiziert, URL im Ergebnis.
+- Erster Lauf: Wikipedia antwortete 403 (User-Agent ohne Kontakt); die Aussage
+  wurde korrekt als „nicht gefunden“ mit Hinweis „Websuche fehlgeschlagen“
+  gemeldet. Nach der Korrektur erfolgreich.
+- Absturz des Stand-in-Modells führte zu Job-Status `failed` mit neutraler
+  Fehlermeldung, ohne Transkript im Log.
+- Events lagen auf den Satz-Timestamps des Transkripts (3000/7000/11000 ms).
+
+## Frage-Simulator (24.10.2026)
+
+Entscheidung (Nutzerauftrag „Fragesimulator vollständig einbauen“): Feature 5
+nutzt dasselbe OpenAI-kompatible Modell wie der Fact-Check. Antworten nur als
+Text, damit kein weiterer Drittanbieter (Browser-Spracherkennung) Audio erhält;
+Spracheingabe bleibt offen.
+
+- Fragen verweisen auf Befund-, Satz- und Auszugsnummern; Timestamps und
+  Evidenz setzt der Code aus diesen Verweisen. Ein „Widerspruch“ ohne
+  passenden Befund wird zur Klärungsfrage herabgestuft, eine „Lücke“ ohne
+  wörtliches Zitat aus dem Auszug ebenso; Fragen ohne Bezug werden verworfen.
+- Antwort-Abgleich wie im Fact-Check: Urteil nur mit wörtlich verifiziertem
+  Zitat, sonst „nicht gefunden“. Keine Punkte oder Noten.
+- Geprüft: `tests/test_questions.py` mit geskripteten Modellantworten
+  (Verweisprüfung, Reihenfolge, Events, Antwort-Abgleich, API, Task-Wiederholung),
+  Frontend-Unit-Tests für Client und Timeline-Momente. Qualität der Fragen mit
+  einem echten Modell ist nicht gemessen.
+
+
+## Lokaler integrierter Abnahmestand (24.10.2026, M2 Pro)
+
+Aktueller Stand nach Zusammenführung mit `origin/main` (`9ab7a6f`):
+Fact-Check und Frage-Simulator verwenden standardmäßig das oben beschriebene
+lokale Ollama-Modell, nicht den optionalen OpenAI-kompatiblen Cloudadapter.
+Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
+
+- 67 Backend-Tests, 85 Frontend- und 18 Mobile-Unit-Tests bestanden.
+- Vollständiger Browserlauf: 44 Tests bestanden. Danach erweiterter
+  Quellen-/Frage-/Antwort-Flow: 2 Tests bestanden (Desktop und mobile Breite).
+- Nutzer fand die Audio-Option nicht: Sie stand unterhalb der Kamera und war
+  in Large view ausgeblendet. Jetzt steht **Speech analysis** direkt oberhalb
+  der Kamera und bleibt in beiden Ansichten sichtbar. Nach dieser Änderung
+  8 gezielte Browserprüfungen bestanden (Sichtbarkeit, Wechsel mit Mikrofon,
+  große Ansicht, Audio-Upload, Transkript, Quellenvergleich und Fragerunde).
+  Screenshots auf Desktop und mobiler Breite visuell geprüft.
+- Typecheck und Lint beider Workspaces sowie finaler Next.js-Produktionsbuild
+  bestanden. OpenAPI-Export mit laufender API identisch, TypeScript-Vertrag
+  daraus aktualisiert. Alle sechs Compose-Dienste healthy; lokales Modell
+  über `/api/factcheck/settings` verfügbar.
+- Reale lokale Modellaufrufe und Whisper-Fixture wie oben erfolgreich;
+  automatisierte Browserprüfungen verwenden synthetische Kamera/Audio-Daten
+  und deterministische API-Antworten. Das ist keine Safari-/Mikrofon- oder
+  allgemeine Modellqualitätsvalidierung. Nutzerprüfung mit echtem Mikrofon
+  nach der Korrektur erneut angefragt; Ergebnis steht noch aus.

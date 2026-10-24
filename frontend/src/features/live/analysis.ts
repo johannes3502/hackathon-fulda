@@ -80,6 +80,7 @@ export async function waitForAudioJob(
         throw new Error("The backend returned an invalid analysis.");
       return {
         ...job.result,
+        words: job.result.words,
         summary: job.result.audio.summary,
         events: job.result.events,
         transcription: job.result.transcription,

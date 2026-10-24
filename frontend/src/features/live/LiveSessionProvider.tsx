@@ -12,6 +12,7 @@ import type { LiveRecording } from "./contracts";
 type LiveContext = {
   recordings: Record<string, LiveRecording>;
   save: (recording: LiveRecording) => void;
+  /** Apply `change` to the newest stored version; for async results. */
   update: (
     id: string,
     change: (recording: LiveRecording) => LiveRecording,
@@ -29,11 +30,10 @@ export function LiveSessionProvider({ children }: { children: ReactNode }) {
     setRecordings((prior) => ({ ...prior, [recording.id]: recording }));
   }, []);
   const update = useCallback(
-    (id: string, change: (recording: LiveRecording) => LiveRecording) => {
+    (id: string, change: (recording: LiveRecording) => LiveRecording) =>
       setRecordings((prior) =>
         prior[id] ? { ...prior, [id]: change(prior[id]) } : prior,
-      );
-    },
+      ),
     [],
   );
   useEffect(() => {

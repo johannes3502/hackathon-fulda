@@ -148,6 +148,44 @@ it("uploads a complete recording only after stopping and maps real feedback", as
   expect(receive.mock.calls[1][0].metrics[1].value).toBeNull();
   transport.close();
 });
+it("requests transcription only when opted in and forwards the words", async () => {
+  const words = [{ word: "Hallo.", start_ms: 100, end_ms: 400 }];
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ status: "ok" }))
+    .mockResolvedValueOnce(Response.json(accepted, { status: 202 }))
+    .mockResolvedValueOnce(
+      Response.json({
+        job_id: jobId,
+        status: "completed",
+        result: {
+          audio: result,
+          events: result.events,
+          words,
+          transcription: { summary: { word_count: 1 }, events: [] },
+          asr_provider: "whisper",
+          synthetic_demo: false,
+          notices: [],
+        },
+      }),
+    );
+  vi.stubGlobal("fetch", fetcher);
+  const transport = new AnalysisTransport("http://localhost:8000", true);
+  const receive = vi.fn();
+  await transport.connect({ sessionId: "test" }, receive);
+  await transport.finish(1000, new Blob(["take"], { type: "video/webm" }));
+  expect(fetcher.mock.calls[1][1].body.get("transcribe")).toBe("true");
+  const messages = receive.mock.calls.map((call) => call[0]);
+  expect(
+    messages.find((m) => m.type === "transcript").transcript.words,
+  ).toEqual(words);
+  expect(
+    messages
+      .find((m) => m.type === "metrics")
+      .metrics.map((m: { id: string }) => m.id),
+  ).toContain("words-word_count");
+  transport.close();
+});
 it("reports failed jobs and cancels polling when the transport closes", async () => {
   const fetcher = vi
     .fn()

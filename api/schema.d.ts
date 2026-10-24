@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/coaching/analyze": {
+    "/factcheck": {
         parameters: {
             query?: never;
             header?: never;
@@ -13,32 +13,22 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Analyze */
-        post: operations["analyze_coaching_analyze_post"];
+        /**
+         * Start Fact Check
+         * @description Check claims of a transcript against the collection's uploads, then the web.
+         *
+         *     Sends transcript sentences to the configured OpenAI-compatible model and,
+         *     for claims not settled by the uploads, search queries to the web provider.
+         *     Poll status_url for the result; events use `t_ms` of the recording.
+         */
+        post: operations["start_fact_check_factcheck_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/coaching/capabilities": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Capabilities */
-        get: operations["capabilities_coaching_capabilities_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/coaching/jobs/{job_id}": {
+    "/factcheck/jobs/{job_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -46,27 +36,29 @@ export interface paths {
             cookie?: never;
         };
         /** Job Status */
-        get: operations["job_status_coaching_jobs__job_id__get"];
+        get: operations["job_status_factcheck_jobs__job_id__get"];
         put?: never;
         post?: never;
-        /** Delete Job */
-        delete: operations["delete_job_coaching_jobs__job_id__delete"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/coaching/jobs/{job_id}/answers": {
+    "/factcheck/settings": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Settings
+         * @description Whether the fact-check is configured and which third parties receive text.
+         */
+        get: operations["settings_factcheck_settings_get"];
         put?: never;
-        /** Answer */
-        post: operations["answer_coaching_jobs__job_id__answers_post"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -99,6 +91,87 @@ export interface paths {
         };
         /** Ready */
         get: operations["ready_health_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Questions
+         * @description Generate follow-up questions from transcript, fact-check findings and uploads.
+         *
+         *     Sends transcript sentences, findings and upload passages to the configured
+         *     OpenAI-compatible model (same as the fact-check). Questions with a spoken
+         *     passage carry `t_ms` of the recording and appear as `question` events.
+         */
+        post: operations["start_questions_questions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Answer Review
+         * @description Compare a typed answer with the question's evidence and upload passages.
+         *
+         *     Result is a verdict with a verbatim quote and an optional follow-up
+         *     question; no points or grades.
+         */
+        post: operations["start_answer_review_questions_answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/answers/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Answer Status */
+        get: operations["answer_status_questions_answers__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Question Status */
+        get: operations["question_status_questions_jobs__job_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -236,16 +309,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** AcceptedCoaching */
-        AcceptedCoaching: {
-            /**
-             * Job Id
-             * Format: uuid
-             */
-            job_id: string;
-            /** Status Url */
-            status_url: string;
-        };
         /** AcceptedJob */
         AcceptedJob: {
             /** Job Id */
@@ -278,31 +341,49 @@ export interface components {
             /** Words */
             words: components["schemas"]["Word"][];
         };
+        /** AnswerJob */
+        AnswerJob: {
+            /** Error */
+            error?: string | null;
+            /** Job Id */
+            job_id: string;
+            result?: components["schemas"]["AnswerReview"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+        };
         /** AnswerRequest */
         AnswerRequest: {
             /** Answer */
             answer: string;
-            /** Question Id */
-            question_id: string;
+            /** Collection Id */
+            collection_id?: string | null;
+            config?: components["schemas"]["QuestionConfig"];
+            question: components["schemas"]["Question"];
         };
         /** AnswerReview */
         AnswerReview: {
-            /** Answer */
-            answer: string;
-            /** Citations */
-            citations: components["schemas"]["Citation"][];
+            /**
+             * Checked
+             * @description Where the answer was compared
+             */
+            checked: ("upload" | "web")[];
+            evidence?: components["schemas"]["Evidence"] | null;
             /** Explanation */
             explanation: string;
-            /** Follow Up */
-            follow_up: string | null;
-            /** Issue */
-            issue?: string | null;
+            follow_up?: components["schemas"]["Question"] | null;
             /** Model */
             model: string;
-            /** Question Id */
-            question_id: string;
-            /** Verdict */
-            verdict: ("supports" | "contradicts" | "not_found") | null;
+            /** Notes */
+            notes?: string[];
+            /**
+             * Verdict
+             * @description `unchecked`: no passage to compare with or the check failed
+             * @enum {string}
+             */
+            verdict: "supports" | "contradicts" | "not_found" | "unchecked";
         };
         /** AudioAnalysis */
         AudioAnalysis: {
@@ -393,80 +474,34 @@ export interface components {
              */
             file: string;
         };
-        /** Citation */
-        Citation: {
-            /** Chunk Id */
-            chunk_id: number;
-            /** Filename */
-            filename: string;
-            location: components["schemas"]["Location"];
-            /** Quote */
-            quote: string;
+        /** ClaimResult */
+        ClaimResult: {
             /**
-             * Source Id
-             * Format: uuid
+             * Checked
+             * @description Where the claim was looked up
              */
-            source_id: string;
-        };
-        /** CoachingJob */
-        CoachingJob: {
-            answer?: components["schemas"]["AnswerReview"] | null;
-            /** Error */
-            error?: string | null;
-            /**
-             * Job Id
-             * Format: uuid
-             */
-            job_id: string;
-            report?: components["schemas"]["CoachingReport"] | null;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "queued" | "running" | "completed" | "failed";
-        };
-        /** CoachingQuestion */
-        CoachingQuestion: {
-            /** Claim Id */
-            claim_id: string | null;
-            /** Id */
-            id: string;
-            /** Reason */
-            reason: string;
-            /** T Ms */
-            t_ms: number;
-            /** Text */
-            text: string;
-        };
-        /** CoachingReport */
-        CoachingReport: {
-            /** Checks */
-            checks: components["schemas"]["FactCheck"][];
-            /**
-             * Collection Id
-             * Format: uuid
-             */
-            collection_id: string;
-            /** Events */
-            events: components["schemas"]["Event"][];
-            /** Model */
-            model: string;
-            /** Notices */
-            notices: string[];
-            /** Questions */
-            questions: components["schemas"]["CoachingQuestion"][];
-        };
-        /** CoachingRequest */
-        CoachingRequest: {
-            /**
-             * Collection Id
-             * Format: uuid
-             */
-            collection_id: string;
+            checked: ("upload" | "web")[];
+            /** Claim */
+            claim: string;
             /** Duration Ms */
             duration_ms: number;
-            /** Words */
-            words: components["schemas"]["Word"][];
+            evidence?: components["schemas"]["Evidence"] | null;
+            /** Explanation */
+            explanation: string;
+            /** Notes */
+            notes?: string[];
+            /** T Ms */
+            t_ms: number;
+            /**
+             * Transcript
+             * @description Spoken sentence(s) the claim was extracted from
+             */
+            transcript: string;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "supports" | "contradicts" | "not_found" | "unchecked";
         };
         /** Event */
         Event: {
@@ -494,24 +529,124 @@ export interface components {
              */
             type: "posture" | "gesture" | "gaze" | "filler" | "pause" | "pace" | "volume" | "pitch" | "fact" | "question";
         };
-        /** FactCheck */
-        FactCheck: {
-            /** Citations */
-            citations: components["schemas"]["Citation"][];
-            /** Duration Ms */
-            duration_ms: number;
-            /** Explanation */
-            explanation: string;
-            /** Id */
-            id: string;
-            /** Issue */
-            issue?: string | null;
-            /** Statement */
-            statement: string;
-            /** T Ms */
-            t_ms: number;
-            /** Verdict */
-            verdict: ("supports" | "contradicts" | "not_found") | null;
+        /** Evidence */
+        Evidence: {
+            /** Filename */
+            filename?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "upload" | "web";
+            /**
+             * Label
+             * @description e.g. `folien.pdf, Seite 3` or the web page title
+             */
+            label: string;
+            location?: components["schemas"]["Location"] | null;
+            /** Passage */
+            passage: string;
+            /**
+             * Quote
+             * @description Verbatim passage, verified by string match
+             */
+            quote: string;
+            /** Source Id */
+            source_id?: string | null;
+            /** Url */
+            url?: string | null;
+        };
+        /**
+         * FactCheckConfig
+         * @description Prototype limits, not tuned. Returned with every result.
+         */
+        FactCheckConfig: {
+            /**
+             * Max Claims
+             * @default 6
+             */
+            max_claims: number;
+            /**
+             * Min Quote Chars
+             * @description Shorter quotes are not accepted as evidence
+             * @default 12
+             */
+            min_quote_chars: number;
+            /**
+             * Top K
+             * @description Uploaded passages per claim
+             * @default 5
+             */
+            top_k: number;
+            /**
+             * Web Results
+             * @description Web passages per claim
+             * @default 4
+             */
+            web_results: number;
+        };
+        /** FactCheckJob */
+        FactCheckJob: {
+            /** Error */
+            error?: string | null;
+            /** Job Id */
+            job_id: string;
+            result?: components["schemas"]["FactCheckResult"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+        };
+        /** FactCheckRequest */
+        FactCheckRequest: {
+            /**
+             * Collection Id
+             * @description Uploaded sources to check against first
+             */
+            collection_id?: string | null;
+            config?: components["schemas"]["FactCheckConfig"];
+            /**
+             * Use Web
+             * @description Search the configured web provider if uploads do not settle a claim
+             * @default true
+             */
+            use_web: boolean;
+            /**
+             * Words
+             * @description Word timestamps relative to recording start
+             */
+            words: components["schemas"]["Word"][];
+        };
+        /** FactCheckResult */
+        FactCheckResult: {
+            /** Claims */
+            claims: components["schemas"]["ClaimResult"][];
+            config: components["schemas"]["FactCheckConfig"];
+            /** Events */
+            events: components["schemas"]["Event"][];
+            /** Model */
+            model: string;
+            /** Notices */
+            notices: string[];
+            /** Sources Checked */
+            sources_checked: boolean;
+            /** Web Provider */
+            web_provider: string | null;
+        };
+        /** FactCheckSettings */
+        FactCheckSettings: {
+            /** Available */
+            available: boolean;
+            /**
+             * Llm Host
+             * @description Host receiving transcript text; name it in consent notices
+             */
+            llm_host: string | null;
+            /** Model */
+            model: string | null;
+            /** Web Provider */
+            web_provider: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -532,6 +667,125 @@ export interface components {
             kind: "page" | "slide" | "paragraph" | "line";
             /** Start */
             start: number;
+        };
+        /** Question */
+        Question: {
+            /**
+             * Claim
+             * @description Fact-check claim the question comes from
+             */
+            claim?: string | null;
+            /**
+             * Duration Ms
+             * @default 0
+             */
+            duration_ms: number;
+            /** @description Verified source passage behind the question */
+            evidence?: components["schemas"]["Evidence"] | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "contradiction" | "unsupported" | "gap" | "clarification" | "follow_up";
+            /**
+             * Query
+             * @description Search query used to compare the answer with the sources
+             */
+            query: string;
+            /** Question */
+            question: string;
+            /**
+             * Reason
+             * @description Why this question is asked, one sentence
+             */
+            reason: string;
+            /**
+             * T Ms
+             * @description Start of the spoken passage; null if it concerns the whole talk
+             */
+            t_ms: number | null;
+            /**
+             * Transcript
+             * @description Spoken sentence(s) the question refers to
+             */
+            transcript?: string | null;
+        };
+        /**
+         * QuestionConfig
+         * @description Prototype limits, not tuned. Returned with every result.
+         */
+        QuestionConfig: {
+            /**
+             * Max Questions
+             * @default 3
+             */
+            max_questions: number;
+            /**
+             * Min Quote Chars
+             * @description Shorter quotes are not accepted as evidence
+             * @default 12
+             */
+            min_quote_chars: number;
+            /**
+             * Source Passages
+             * @description Upload passages shown to the model to find gaps
+             * @default 6
+             */
+            source_passages: number;
+            /**
+             * Top K
+             * @description Upload passages per answer review
+             * @default 5
+             */
+            top_k: number;
+        };
+        /** QuestionJob */
+        QuestionJob: {
+            /** Error */
+            error?: string | null;
+            /** Job Id */
+            job_id: string;
+            result?: components["schemas"]["QuestionResult"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+        };
+        /** QuestionRequest */
+        QuestionRequest: {
+            /**
+             * Claims
+             * @description Fact-check findings of the same transcript
+             */
+            claims?: components["schemas"]["ClaimResult"][];
+            /**
+             * Collection Id
+             * @description Uploaded sources for gaps and answer reviews
+             */
+            collection_id?: string | null;
+            config?: components["schemas"]["QuestionConfig"];
+            /**
+             * Words
+             * @description Word timestamps relative to recording start
+             */
+            words: components["schemas"]["Word"][];
+        };
+        /** QuestionResult */
+        QuestionResult: {
+            config: components["schemas"]["QuestionConfig"];
+            /** Events */
+            events: components["schemas"]["Event"][];
+            /** Model */
+            model: string;
+            /** Notices */
+            notices: string[];
+            /** Questions */
+            questions: components["schemas"]["Question"][];
+            /** Sources Used */
+            sources_used: boolean;
         };
         /** RecordingAnalysis */
         RecordingAnalysis: {
@@ -724,7 +978,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    analyze_coaching_analyze_post: {
+    start_fact_check_factcheck_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -733,7 +987,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CoachingRequest"];
+                "application/json": components["schemas"]["FactCheckRequest"];
             };
         };
         responses: {
@@ -743,7 +997,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AcceptedCoaching"];
+                    "application/json": components["schemas"]["AcceptedJob"];
                 };
             };
             /** @description Validation Error */
@@ -757,29 +1011,7 @@ export interface operations {
             };
         };
     };
-    capabilities_coaching_capabilities_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    job_status_coaching_jobs__job_id__get: {
+    job_status_factcheck_jobs__job_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -796,7 +1028,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CoachingJob"];
+                    "application/json": components["schemas"]["FactCheckJob"];
                 };
             };
             /** @description Validation Error */
@@ -810,66 +1042,22 @@ export interface operations {
             };
         };
     };
-    delete_job_coaching_jobs__job_id__delete: {
+    settings_factcheck_settings_get: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                job_id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    answer_coaching_jobs__job_id__answers_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                job_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AnswerRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AcceptedCoaching"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["FactCheckSettings"];
                 };
             };
         };
@@ -914,6 +1102,134 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    start_questions_questions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_answer_review_questions_answers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_status_questions_answers__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnswerJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    question_status_questions_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

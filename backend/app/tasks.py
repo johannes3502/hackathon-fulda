@@ -74,3 +74,80 @@ def analyze_speech(self, job_id: str) -> dict[str, str]:
         return {"job_id": job_id, "status_key": storage.key(job_id, "status.json")}
     finally:
         lock.release()
+
+
+PREFIX = "factcheck-jobs"
+QUESTION_PREFIX = "question-jobs"
+ANSWER_PREFIX = "answer-jobs"
+
+
+def _model_job(task, job_id: str, prefix: str, job_model, run, error: str) -> dict[str, str]:
+    """Shared body of LLM jobs: lock, reuse terminal results, delete the stored request.
+
+    `run(request)` maps the stored request JSON to the result model.
+    """
+    from app.connections import redis_client
+
+    # Lease exceeds hard task timeout. Prevent concurrent duplicate paid requests.
+    lock = redis_client().lock(f"{prefix}-lock:{job_id}", timeout=660, blocking=False)
+    if not lock.acquire(blocking=False):
+        raise task.retry(countdown=30)
+    try:
+        previous = storage.read_json(job_id, "status.json", prefix)
+        if not (previous and previous["status"] in ("completed", "failed")):
+            request = storage.read_json(job_id, "request.json", prefix)
+            if request is None:
+                raise ValueError("Missing job request")
+            storage.write_json(job_id, "status.json", job_model(job_id=job_id, status="running").model_dump(), prefix)
+            try:
+                status = job_model(job_id=job_id, status="completed", result=run(request))
+            except (Exception, SoftTimeLimitExceeded) as failure:
+                # Never put model answers, transcripts or credentials into logs or Redis.
+                logging.getLogger(__name__).warning("%s job %s failed (%s)", prefix, job_id, type(failure).__name__)
+                status = job_model(job_id=job_id, status="failed", error=error)
+            storage.write_json(job_id, "status.json", status.model_dump(mode="json"), prefix)
+        s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=storage.key(job_id, "request.json", prefix))
+        return {"job_id": job_id, "status_key": storage.key(job_id, "status.json", prefix)}
+    finally:
+        lock.release()
+
+
+@celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
+def fact_check(self, job_id: str) -> dict[str, str]:
+    """Reuse terminal results on redelivery; delete the stored transcript afterwards."""
+    from app.factcheck.llm import configured_llm
+    from app.factcheck.models import FactCheckJob, FactCheckRequest
+    from app.factcheck.pipeline import run_fact_check
+    from app.factcheck.web import configured_web_searcher
+
+    def run(request: dict):
+        parsed = FactCheckRequest.model_validate(request)
+        return run_fact_check(parsed, configured_llm(), configured_web_searcher() if parsed.use_web else None,
+                              workers=int(os.getenv("LLM_CONCURRENCY", "4")))
+
+    return _model_job(self, job_id, PREFIX, FactCheckJob, run,
+                      "Faktencheck fehlgeschlagen. LLM-Konfiguration und Erreichbarkeit prüfen.")
+
+
+@celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
+def generate_questions(self, job_id: str) -> dict[str, str]:
+    """Follow-up questions; same redelivery and deletion rules as the fact-check."""
+    from app.factcheck.llm import configured_llm
+    from app.questions import pipeline
+    from app.questions.models import QuestionJob, QuestionRequest
+
+    return _model_job(self, job_id, QUESTION_PREFIX, QuestionJob,
+                      lambda request: pipeline.generate_questions(QuestionRequest.model_validate(request), configured_llm()),
+                      "Fragen konnten nicht erzeugt werden. LLM-Konfiguration und Erreichbarkeit prüfen.")
+
+
+@celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
+def review_answer(self, job_id: str) -> dict[str, str]:
+    """Compare one typed answer with the sources; the answer text is deleted afterwards."""
+    from app.factcheck.llm import configured_llm
+    from app.questions import pipeline
+    from app.questions.models import AnswerJob, AnswerRequest
+
+    return _model_job(self, job_id, ANSWER_PREFIX, AnswerJob,
+                      lambda request: pipeline.review_answer(AnswerRequest.model_validate(request), configured_llm()),
+                      "Antwort konnte nicht verglichen werden. LLM-Konfiguration und Erreichbarkeit prüfen.")

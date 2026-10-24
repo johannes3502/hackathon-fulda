@@ -54,6 +54,7 @@ smoke command above to check the running containers.
 | MediaPipe | Python Tasks library in the shared backend/worker image | No separate service |
 | PostgreSQL + pgvector | Source metadata, text chunks and embeddings; later transcripts and timestamps | `localhost:5432` |
 | SeaweedFS | S3-compatible object storage for audio/video and uploaded files | `http://localhost:8333` |
+| OpenAI-compatible LLM (external or local) | Fact-check: claim extraction and judgments; optional | `LLM_BASE_URL` in `.env` |
 | MediaRecorder | Browser API that produces audio/video blobs | Frontend; no container or Python dependency |
 | FFmpeg | Available for converting browser recording formats when needed | Backend and worker containers |
 
@@ -201,27 +202,16 @@ paid ASR API.
 
 ## Local source comparison and questions
 
-Start native Ollama and download **`qwen3.5:4b-q4_K_M`** as described in
-[the local AI guide](../docs/06-local-coaching.md). Compose uses
-`OLLAMA_URL=http://host.docker.internal:11434`, so Apple Silicon inference uses
-the host GPU. There is no cloud fallback or API key. The explicit GGUF tag is
-required: the default macOS MLX variant returned HTTP 501 for structured output
-in the tested Ollama version.
+The fact-check and question modules below default to native Ollama with
+`qwen3.5:4b-q4_K_M` when `LLM_BASE_URL` and `LLM_MODEL` are empty.
+Compose reaches the host at `OLLAMA_URL=http://host.docker.internal:11434`.
+No API key or cloud fallback. Web search is off by default.
+[Setup, evaluation and limits](../docs/06-local-coaching.md).
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /coaching/capabilities` | Local model installed/reachable; not a quality or inference-health guarantee |
-| `POST /coaching/analyze` | `{collection_id, words, duration_ms}` → 202 + job ID |
-| `GET /coaching/jobs/{id}` | queued/running/completed/failed + report or answer |
-| `POST /coaching/jobs/{id}/answers` | `{question_id, answer}` → separate asynchronous job |
-| `DELETE /coaching/jobs/{id}` | Delete terminal job input and result; active jobs return 409 |
-
-`analyze_coaching` receives only a job ID through Redis. Inputs and outputs live
-under `coaching-jobs/{id}/` in S3. Completed/failed redeliveries reuse their result;
-interrupted jobs fail visibly instead of restarting unnoticed. No automatic
-expiry exists. The web review deletes its answer jobs and parent report together;
-source uploads and speech-analysis results have separate lifetimes. Refreshing
-the page loses browser state and does not delete server objects.
+The explicit GGUF tag works with structured output in tested Ollama 0.40.10;
+the default macOS MLX variant returned HTTP 501. Native local requests use
+JSON schemas plus code validation of references and quotes. Invalid evidence
+is `unchecked`, rather than a finding that evidence is absent.
 
 Synthetic real-model integration check (Ollama must be running):
 
@@ -229,9 +219,8 @@ Synthetic real-model integration check (Ollama must be running):
 docker compose exec -T backend python - < backend/scripts/smoke_coaching.py
 ```
 
-This uploads an invented source, checks support/contradiction/missing evidence,
-answers one question, then deletes its sources and coaching jobs. It does not
-measure general model accuracy or human speech recognition.
+This checks `/factcheck`, `/questions` and `/questions/answers` and removes
+its synthetic source and result objects. No general accuracy claim follows.
 
 For local inference outside Docker, from `backend/`:
 
@@ -326,6 +315,104 @@ The Postgres image is now `pgvector/pgvector` (PostgreSQL 18, Debian) instead
 of `postgres:18.6-alpine`. Existing local volumes keep working; the schema and
 extension are created on first use. `tests/test_sources.py` contains a
 database round trip that runs when `POSTGRES_HOST` is set.
+
+For native source-pipeline timings, run `python -u -m scripts.benchmark_vectors`
+with `EMBEDDING_MODEL_PATH` pointing to the downloaded pinned model. It uses
+synthetic PPTX decks and checks vector shape/normalization. `POSTGRES_*` enables
+storage and retrieval timings against an isolated test database; otherwise these
+stages are explicitly skipped. See the [M5 Pro measurements and limitations](../docs/benchmarks/2026-10-24-m5-pro-vectors.md).
+
+### Fact-check (`app/factcheck/`, `/factcheck`)
+
+Checks factual statements of a transcript against the uploaded sources of a
+collection first (RAG), then, only for statements the uploads do not settle,
+against a web search. Data flow:
+
+```
+POST /factcheck {words, collection_id?, use_web} → S3 factcheck-jobs/{id}/request.json
+  → Celery fact_check:
+      words → numbered sentences (timestamps from code, not from the model)
+      LLM: extract checkable claims + search query, referencing sentence numbers
+      per claim: retrieval.search(collection) → LLM judges with verbatim quote
+                 → quote_in_text() verifies the quote, otherwise discarded
+                 not settled? → web search (Wikipedia/Tavily) → same judge + check
+  → S3 factcheck-jobs/{id}/status.json (request.json deleted afterwards)
+GET /factcheck/jobs/{id}   queued | running | completed | failed
+GET /factcheck/settings    configured model, LLM host and web provider (for consent text)
+```
+
+- Verdicts: `supports`, `contradicts`, `not_found` ("not in the checked
+  sources", never "false") and `unchecked` (model or search failed for this
+  claim). Every result is also a `fact` event (`source="factcheck"`) on the
+  shared timeline: `contradicts` → `warning`, `not_found` → `hint`, otherwise
+  `info`. No scores.
+- Evidence is accepted only if the quoted text appears verbatim in the passage
+  (whitespace, case and quote style ignored) and has at least
+  `min_quote_chars` characters. Upload evidence names file and page/slide;
+  web evidence names title and URL.
+- Default model: native local Ollama. Optional adapter: `POST {LLM_BASE_URL}/chat/completions`
+  (OpenAI, hosted open models, Ollama, vLLM, LM Studio). Configure
+  `LLM_BASE_URL`, `LLM_MODEL` and, if needed, `LLM_API_KEY` in `.env` only to
+  explicitly use this optional adapter. Empty URL/model selects local Ollama. `LLM_JSON_MODE=false` for servers without
+  `response_format=json_object`; `LLM_TEMPERATURE` stays unset unless the model
+  accepts it. A local server on the host is reachable from the containers as
+  `http://host.docker.internal:<port>/v1`. Calls are not retried (they may be
+  billed); `LLM_CONCURRENCY` claims are judged in parallel.
+- Web search (`WEB_SEARCH_PROVIDER`): `wikipedia` (optional, MediaWiki API, no
+  key, `WEB_SEARCH_LANGUAGE=de`), `tavily` (`TAVILY_API_KEY`) or `none` (default). Only
+  search APIs, no HTML scraping. The client can switch it off per request
+  (`use_web=false`).
+- Third parties: transcript sentences go to the LLM host; short search queries
+  go to the web provider. The review UI names both before the check starts.
+- Limits (`FactCheckConfig`, returned with every result): 6 claims, 5 upload
+  passages and 4 web passages per claim. Not tuned; quality of claim
+  extraction and judgments depends on the chosen model and is not measured.
+
+Tests: `tests/test_factcheck.py` (scripted model answers, HTTP contracts for
+the OpenAI-compatible API and Wikipedia, task redelivery). A full run through
+the Compose stack needs a configured model; see the AI decision log entry for
+the end-to-end check with a deterministic stand-in model.
+
+### Question simulator (`app/questions/`, `/questions`)
+
+Asks follow-up questions after the talk and compares typed answers with the
+sources. Input is the transcript plus the fact-check findings of the same
+recording; it uses the same local model (or explicit compatible adapter) as the fact-check.
+
+```
+POST /questions {words, collection_id?, claims[]} → S3 question-jobs/{id}/request.json
+  → Celery generate_questions:
+      words → numbered sentences; findings and related upload passages numbered
+      LLM: questions referencing finding, sentence and passage numbers
+      code: t_ms/evidence from the references; `contradiction`/`unsupported`
+            only with a matching finding, `gap` only with a verbatim quote
+  → status.json (questions + `question` events), request.json deleted
+GET /questions/jobs/{id}
+POST /questions/answers {question, answer, collection_id?} → S3 answer-jobs/{id}/
+  → Celery review_answer: question evidence + hybrid search (query + answer)
+      → LLM verdict with verbatim quote (quote_in_text) + optional follow-up
+GET /questions/answers/{id}
+```
+
+- Kinds, asked in this order: `contradiction`, `unsupported`, `gap`,
+  `clarification`; `follow_up` comes from an answer review. Questions without
+  a source or spoken passage behind them are dropped.
+- Questions with a spoken passage are `question` events (`source="agent"`):
+  `contradiction` → `warning`, `unsupported` → `hint`, otherwise `info`.
+  `gap` questions concern the whole talk (`t_ms: null`) and are no events.
+- Answer verdicts reuse the fact-check ones (`supports`, `contradicts`,
+  `not_found`, `unchecked`). No points, scores or grades.
+- Answers are typed text only (no speech input); the review UI hides the
+  source passage until an answer was compared, so the question does not give
+  the answer away.
+- Third parties: transcript sentences, findings, upload passages and the typed
+  answer go to the LLM host. Stored requests (transcript, answer text) are
+  deleted after the job finishes.
+- Limits (`QuestionConfig`): 3 questions, 6 upload passages for gaps, 5 per
+  answer review. Not tuned; question quality depends on the model.
+
+Tests: `tests/test_questions.py` (scripted model answers, reference checks,
+API and task redelivery).
 
 ## MediaRecorder integration
 

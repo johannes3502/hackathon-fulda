@@ -255,6 +255,7 @@ export class LiveRecorder {
       mimeType: video.type,
       feedback: this.progress.feedback,
       metrics: this.progress.metrics,
+      words: this.transcript?.words,
       chunksSent: this.progress.chunksSent,
       bytesSent: this.progress.bytesSent,
       completion: this.failed ? "interrupted" : "complete",

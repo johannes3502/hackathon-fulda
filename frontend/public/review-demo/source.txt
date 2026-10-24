@@ -1,0 +1,13 @@
+SYNTHETISCHES DEMO-KONZEPT — KEINE ECHTEN PROJEKTDATEN
+
+1. Idee
+Die fiktive Lernplattform verbindet eine Lernfrage mit einer gemeinsamen Übung
+und einer kurzen Reflexion. Dieses Dokument dient nur als UI-Beispielquelle.
+
+2. Pilot
+Für den ersten Demo-Pilot sind 12 Teilnehmende vorgesehen.
+Die im synthetischen Beispielvideo genannten 20 Teilnehmenden sind ein
+absichtlich eingebauter Widerspruch, um eine fachliche Anmerkung zu zeigen.
+
+3. Auswertung
+Eine konkrete Lernaufgabe zur Auswertung des Piloten ist noch nicht festgelegt.

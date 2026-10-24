@@ -232,6 +232,30 @@ export function LiveStudio() {
             {error}
           </p>
         )}
+        <fieldset className="panel live-analysis-choice" disabled={!!progress}>
+          <div className="field">
+            <label htmlFor="live-source">Speech analysis</label>
+            <NativeSelect
+              id="live-source"
+              value={mode}
+              aria-describedby="live-analysis-hint"
+              onChange={(e) => {
+                stopCamera();
+                setMode(e.target.value as LiveConfig["mode"]);
+              }}
+            >
+              <option value="local">Off · gestures only</option>
+              <option value="backend">On · local speech analysis</option>
+            </NativeSelect>
+          </div>
+          <p id="live-analysis-hint" className="field-hint">
+            {mode === "local"
+              ? "Turn on to record your microphone and get a local transcript, pace, pauses and voice feedback after stopping."
+              : transcribe
+                ? "Microphone recording is on. Your local transcript and voice feedback will appear after you finish recording."
+                : "Microphone recording is on. Voice feedback will appear after recording; transcription is off in the take settings."}
+          </p>
+        </fieldset>
         <div className="live-view-toolbar">
           <Button
             variant="outline"
@@ -495,24 +519,6 @@ export function LiveStudio() {
                       <option value={300000}>5 minutes</option>
                     </NativeSelect>
                   </div>
-                </div>
-                <div className="field">
-                  <label htmlFor="live-source">Feedback source</label>
-                  <NativeSelect
-                    id="live-source"
-                    value={mode}
-                    onChange={(e) => {
-                      stopCamera();
-                      setMode(e.target.value as LiveConfig["mode"]);
-                    }}
-                  >
-                    <option value="local">
-                      Local · gesture and posture observations
-                    </option>
-                    <option value="backend">
-                      Local server · speech analysis and transcript
-                    </option>
-                  </NativeSelect>
                 </div>
                 {mode === "backend" && (
                   <div className="field">

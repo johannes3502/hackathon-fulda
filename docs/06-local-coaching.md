@@ -17,10 +17,10 @@ In einem zweiten Terminal, aus dem Repository:
 ```sh
 ollama pull qwen3.5:4b-q4_K_M
 docker compose up --build -d --wait
-curl http://localhost:3000/api/coaching/capabilities
+curl http://localhost:3000/api/factcheck/settings
 ```
 
-`configured: true` bestätigt Erreichbarkeit und vorhandenes Modell. Der erste
+`available: true` bestätigt Erreichbarkeit und vorhandenes Modell. Der erste
 Aufruf lädt es in den Speicher. Der Quellen-Smoke unten prüft echte Inferenz.
 Kein Login und kein API-Key. Modell-Downloads benötigen einmalig Internet;
 danach laufen die beschriebenen Modelle lokal. Ollama nutzt auf diesem Mac
@@ -40,7 +40,8 @@ Der Adapter akzeptiert nur lokale Hostnamen und keinen Cloud-Modelltag.
 
 1. Unter `/sources` eine synthetische PDF/PPTX/TXT-Quelle hochladen und **Ready**
    abwarten. Es wird die Quellen-Collection dieses Browsers verwendet.
-2. Unter `/live` **Local server · speech analysis and transcript** wählen.
+2. Unter `/live` direkt **oberhalb der Kamera** bei **Speech analysis**
+   **On · local speech analysis** wählen (auch in **Large view** sichtbar).
    **Create a transcript with local Whisper** eingeschaltet lassen.
 3. Kamera und Mikro erlauben. Für die ersten drei Sekunden neutral stehen und
    normal sprechen: Pose und Stimme brauchen ihre jeweilige Baseline.
@@ -48,16 +49,19 @@ Der Adapter akzeptiert nur lokale Hostnamen und keinen Cloud-Modelltag.
    geht an den lokalen Server; ASR-Ergebnisse kommen nach der Aufnahme.
 5. Transkript prüfen. Ein Wort anklicken spielt die Umgebung im Video ab.
    Fehlerhafte Wörter können über den Import korrigierter Wort-Timestamps
-   ersetzt werden. Bei bestehendem Quellenbericht diesen zuerst löschen.
-6. **Compare with my sources** → Aussage, Quellenort und Zitat ansehen. **Replay**
-   springt zum zugehörigen Moment. Eine generierte Frage schriftlich beantworten
-   → **Compare answer with sources**. Keine Punktzahl oder Note.
-7. **Delete source review and answers** entfernt die zugehörigen Coaching-Jobs
-   vom Server. Quellen lassen sich separat unter `/sources` löschen.
+   ersetzt werden. Dabei werden veraltete Quellenbefunde und Fragen im Browser verworfen.
+6. **Check facts** → Aussage, Quellenort und Zitat ansehen. Der Zeitknopf
+   springt zum zugehörigen Moment. **Start question round** erzeugt bis zu drei
+   Rückfragen. Eine Frage schriftlich beantworten → **Compare with sources**.
+   Keine Punktzahl oder Note.
+7. Quellen unter `/sources` löschen. Ergebnisberichte haben derzeit noch keine
+   Löschfunktion im UI oder automatische Ablaufzeit; nur synthetische Inhalte
+   für die Demo verwenden.
 
 **Manage sources (new tab)** erhält die laufende Aufnahme im bisherigen Tab;
-anschließend **Refresh status** drücken. Browser-Video und Job-IDs leben nur
+anschließend **Refresh status** drücken. Browser-Video und Review-Zustand leben nur
 im Speicher. Seiten-Reload/Verlassen verliert sie, löscht aber keine Serverdaten.
+Während einer Modellprüfung im Review bleiben; Navigation bricht das Polling ab.
 
 ## Welche Modelle und warum?
 
@@ -74,9 +78,10 @@ begründet Datenweg und fehlende API-Gebühren, keine Genauigkeitsbehauptung.
 
 ## Wie entsteht ein Quellenvergleich?
 
-1. Das Modell wählt höchstens sechs überprüfbare Aussagen als **Wortspannen**.
-   Code prüft die Indizes und übernimmt Text und Zeiten aus dem tatsächlichen
-   Transkript. Das Modell darf keine eigene Zeit erfinden.
+1. Das Modell wählt höchstens sechs überprüfbare Aussagen mit **Satzverweisen**.
+   Code segmentiert die Wortliste und übernimmt Zeiten aus den referenzierten
+   Sätzen. Der extrahierte Claim und der originale Satz sind getrennt sichtbar;
+   das Modell darf keine eigene Zeit erfinden.
 2. Für jede Aussage werden bis zu fünf Passagen derselben Collection gesucht.
    Quelle und Seite/Folie/Absatz/Zeile bleiben erhalten.
 3. Das Modell gibt eine strukturierte Interpretation zurück:
@@ -84,17 +89,19 @@ begründet Datenweg und fehlende API-Gebühren, keine Genauigkeitsbehauptung.
    Fehlende oder unzureichende Evidenz bedeutet nicht „falsch“.
 4. Code prüft jedes Zitat gegen den tatsächlich abgerufenen Chunk. Der Vergleich
    normalisiert Großschreibung, Leerraum und typografische Zeichen; es bleibt
-   eine zusammenhängende Textstelle erforderlich. Erfundene Chunk-ID, fehlendes
-   Pflichtzitat oder abweichendes Zitat: **kein Urteil anzeigen**.
+   eine zusammenhängende Textstelle von mindestens zwölf normalisierten Zeichen
+   erforderlich (konfigurierbarer Prototyp-Filter, keine Qualitätsgarantie).
+   Ungültiges Urteil/Zitat: **unchecked**, also technisch nicht geprüft.
 5. Bis zu drei Rückfragen entstehen aus Transkript und Vergleichen mit gültigen
-   Zitaten bzw. fehlender Evidenz. Neue Antworten lösen erneut Retrieval und
+   Zitaten bzw. fehlender Evidenz. Fragen referenzieren Befunde, Sätze oder
+   Quellenpassagen; ungültige Verweise werden entfernt/herabgestuft. Neue Antworten lösen erneut Retrieval und
    Zitatprüfung aus. Ein Zitatfehler unterdrückt auch die weitere Rückfrage.
 
 Ein passendes Zitat beweist nur, dass der Text in der Quelle steht. Ob es die
 Aussage tatsächlich trägt, bleibt eine Modellinterpretation. Quellen können
 selbst falsch sein. Die Auswahl ist nicht vollständig; ein langer Vortrag kann
-mehr Behauptungen enthalten als der Prototyp prüft. Kein Web-Fetch im aktuellen
-Pfad. Endliche Kontext-/Job-Grenzen können einen langen Auftrag scheitern lassen.
+mehr Behauptungen enthalten als der Prototyp prüft. Web-Zweitquellen sind über die Team-API vorhanden, aber lokal standardmäßig
+ausgeschaltet (`WEB_SEARCH_PROVIDER=none`, Checkbox aus). Endliche Kontext-/Job-Grenzen können einen langen Auftrag scheitern lassen.
 
 Transkript, Quellen und Antworten werden als Daten im Prompt markiert; darin
 enthaltene Anweisungen sollen ignoriert werden. Schema-, Index- und Zitatprüfung
@@ -106,8 +113,9 @@ reduzieren definierte Fehler, garantieren aber keine Prompt-Injection-Sicherheit
   Replay nutzt dieses Video; dauerhafte geschnittene Server-Clips fehlen noch.
 - Audiojob: Original wird nach terminaler Verarbeitung gelöscht, ASR-/Signal-
   Ergebnis bleibt in S3. Es gibt noch keinen automatischen Ablauf/Cleanup.
-- Quellen und Coaching-Jobs: lokale persistente Volumes. Coaching-Input und
-  -Ergebnis werden über den Löschknopf entfernt; aktive Jobs zuerst beenden lassen.
+- Quellen und Modelljobs: lokale persistente Volumes. Die Requests mit dem
+  ganzen Transkript bzw. der Antwort werden nach Jobabschluss gelöscht.
+  Ergebnisse behalten zitierte Transkript-/Quellenstellen; kein automatischer TTL.
 - Redis transportiert nur IDs, keine Transkripte oder Videodaten. Längere Arbeit
   läuft in Celery, die API antwortet sofort mit einer Job-ID.
 - Modell/Quelle/Queue nicht verfügbar: sichtbarer Fehler, Video bleibt vorhanden.
@@ -123,12 +131,16 @@ docker compose cp backend/tests/fixtures/speech-de.wav backend:/tmp/speech-de.wa
 docker compose exec -T backend python -m scripts.smoke_audio /tmp/speech-de.wav --transcribe
 ```
 
-Geprüft am M2 Pro mit 32 GB: echtes Qwen-Modell erkannte in einer erfundenen
-Lernlabor-Quelle „zwanzig Plätze“ als gestützt, „acht Uhr“ bei Quelle „neun Uhr“
-als Widerspruch und „Swimmingpool“ als nicht gefunden. Bericht mit drei Fragen:
-18,3 s; korrigierte Antwort: 5,1 s. `ollama ps`: 100 % GPU, 16.384 Kontext,
-3,5 GB belegter Modellspeicher. Ein einzelner gemessener Lauf, keine allgemeine
-Latenz- oder Qualitätszusage. Der Smoke löscht seine Quellen und Berichte.
+Die endgültige integrierte Pipeline wird mit dem Smoke oben auf dem M2 Pro
+mit 32 GB geprüft: gestützte Aussage, Widerspruch, fehlende Evidenz, passende
+Rückfrage und belegte Antwort. Konkrete Laufzeiten stehen im
+[Entscheidungsprotokoll](02-ai-decision-log.md). Einzelne synthetische Durchläufe
+sind keine allgemeine Qualitäts- oder Latenzzusage. `ollama ps` bestätigt lokale
+GPU-Nutzung. Der Smoke entfernt seine Quellen und Ergebnisobjekte.
+Letzter integrierter Lauf: Quellenvergleich 10,1 s, Frage 6,1 s,
+Antwortvergleich 4,1 s. Ein früherer Lauf ordnete eine korrigierte Antwort trotz
+passendem Zitat falsch ein; die Prompt-Korrektur und der bestandene Wiederholungslauf
+sind im Protokoll beschrieben. Modelle können weiterhin falsch urteilen.
 
 Whisper `small` transkribierte die 6,845-s-eSpeak-Fixture mit 13 Wort-Timestamps:
 „In unserem Prototyp üben wir Präsentationen. Wir sprechen deutlich und erklären
