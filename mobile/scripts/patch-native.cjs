@@ -1,9 +1,14 @@
 // Narrow, version-guarded bridge fixes for unsmoothed frame samples and capture timestamps.
 const fs = require("node:fs");
 const path = require("node:path");
-const root = path.dirname(
-  require.resolve("react-native-mediapipe/package.json"),
-);
+let root;
+try {
+  root = path.dirname(require.resolve("react-native-mediapipe/package.json"));
+} catch {
+  // Workspace-filtered installs (e.g. `npm i` inside frontend/) skip mobile deps.
+  console.log("react-native-mediapipe not installed; skipping native pose patches.");
+  return;
+}
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json")));
 if (pkg.version !== "0.6.0")
   throw new Error(

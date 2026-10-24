@@ -19,28 +19,28 @@ export const DEFAULT_LIVE_HINT_SETTINGS: Readonly<LiveHintSettings> =
 export const LIVE_HINT_FIELDS = [
   {
     key: "stabilizeHoldMs",
-    label: "Pose stabilize hold ms",
+    label: "Hold before a pose hint",
     hint: "Duration a pose must hold before it becomes an event and a hint.",
     min: 0,
     max: 10000,
   },
   {
     key: "minDisplayMs",
-    label: "Pose min display ms",
+    label: "Minimum hint display",
     hint: "Minimum display time for a live hint, pose or voice.",
     min: 0,
     max: 15000,
   },
   {
     key: "minDisplayGapMs",
-    label: "Pose min display gap ms",
-    hint: "Blank gap enforced between two consecutive hints. Set 0 to disable (back-to-back swap).",
+    label: "Gap between hints",
+    hint: "Blank gap between two consecutive hints. 0 swaps hints back to back.",
     min: 0,
     max: 15000,
   },
   {
     key: "praiseAfterMs",
-    label: "Pose positive feedback after ms",
+    label: "Praise after calm period",
     hint: "Time without any corrective hint before a positive message such as “Nice, open posture.” appears once.",
     min: 1000,
     max: 60000,

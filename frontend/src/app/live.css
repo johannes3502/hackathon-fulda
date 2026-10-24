@@ -520,6 +520,24 @@ body:has(.live-workspace-large) .app-footer {
   gap: 12px;
   margin: 0 0 16px;
 }
+.live-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.live-back-link:hover,
+.live-back-link:focus-visible {
+  background: var(--soft-accent);
+  border-color: var(--control-border);
+}
 .live-workspace .camera-message {
   font-size: 0.8125rem;
   line-height: 1.6;

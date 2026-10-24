@@ -153,28 +153,3 @@
     padding: 28px 16px;
   }
 }
-.admin-panel {
-  max-width: 720px;
-  padding: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.admin-panel h2 {
-  font-size: 1.125rem;
-}
-.admin-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-.admin-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.admin-rule-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 14px 20px;
-}
