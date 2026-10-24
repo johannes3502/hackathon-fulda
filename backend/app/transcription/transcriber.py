@@ -64,7 +64,7 @@ class DeepgramTranscriber:
 
 
 @lru_cache(maxsize=2)
-def _load_whisper_model(
+def load_whisper_model(
     model: str, device: str, compute_type: str, model_dir: str | None
 ) -> Any:
     from faster_whisper import WhisperModel
@@ -138,7 +138,7 @@ class WhisperTranscriber:
         model = (
             self._loaded_model
             if self._loaded_model is not None
-            else _load_whisper_model(source, self.device, self.compute_type, download_root)
+            else load_whisper_model(source, self.device, self.compute_type, download_root)
         )
         segments, _info = model.transcribe(
             str(audio_path),

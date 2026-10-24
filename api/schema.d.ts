@@ -159,7 +159,7 @@ export interface paths {
          * Start Voice Answer Review
          * @description Transcribe a spoken answer with the configured ASR, then compare it with the sources.
          *
-         *     Audio goes to the ASR provider (default: Deepgram EU), the transcript to
+         *     Audio goes to the ASR provider (default: local Whisper), the transcript to
          *     the configured language model. Audio and request are deleted after
          *     processing. The result has the transcript in `answer` and the persona's
          *     reply to read aloud; poll `/questions/answers/{job_id}`.

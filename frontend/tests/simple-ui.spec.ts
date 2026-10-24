@@ -52,7 +52,7 @@ test("home opens monitoring directly and keeps the sample optional", async ({
   await expect(
     page.getByRole("button", { name: "Start recording", exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByLabel("Feedback source")).toBeHidden();
+  await expect(page.getByLabel("Speech analysis")).toBeVisible();
   await expect(
     page
       .locator(".stage-placeholder")
@@ -123,12 +123,12 @@ test("recording consent stays visible while diagnostics and server details are o
     page.getByRole("button", { name: "Pose debug", exact: true }),
   ).toBeHidden();
   await page.getByText("Recording options", { exact: true }).click();
-  await page.getByLabel("Feedback source").selectOption("backend");
+  await page.getByLabel("Speech analysis").selectOption("backend");
   await expect(
     page.getByText("By starting, you agree", { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByLabel("Transcribe speech for word analysis and fact-check"),
+    page.getByLabel("Create a transcript with local Whisper"),
   ).toBeVisible();
   await expect(page.getByLabel("Backend API URL")).toBeHidden();
   await page.getByText("Server connection", { exact: true }).click();

@@ -84,7 +84,7 @@ async def start_voice_answer_review(
 ) -> AcceptedJob:
     """Transcribe a spoken answer with the configured ASR, then compare it with the sources.
 
-    Audio goes to the ASR provider (default: Deepgram EU), the transcript to
+    Audio goes to the ASR provider (default: local Whisper), the transcript to
     the configured language model. Audio and request are deleted after
     processing. The result has the transcript in `answer` and the persona's
     reply to read aloud; poll `/questions/answers/{job_id}`.
@@ -96,7 +96,7 @@ async def start_voice_answer_review(
     try:
         configured_transcriber()
     except (ValueError, KeyError) as error:
-        raise HTTPException(503, "ASR is not configured; spoken answers need provider credentials") from error
+        raise HTTPException(503, "ASR is not configured; check the local model or provider settings") from error
     return await _accept(parsed, ANSWER_PREFIX, AnswerJob, review_voice_answer, "/questions/answers",
                          recording.file)
 

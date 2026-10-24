@@ -1854,3 +1854,27 @@ input[type="checkbox"] {
     scroll-behavior: auto !important;
   }
 }
+
+.live-captions {
+  position: absolute;
+  bottom: 58px;
+  left: 5%;
+  right: 5%;
+  z-index: 5;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgb(15 23 42 / 88%);
+  color: white;
+  pointer-events: none;
+}
+.live-captions small {
+  color: #cbd5e1;
+}
+.live-captions p {
+  margin: 6px 0 0;
+  max-height: 4.5em;
+  overflow: hidden;
+  font-size: clamp(16px, 2vw, 23px);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}

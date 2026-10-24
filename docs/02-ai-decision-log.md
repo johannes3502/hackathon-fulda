@@ -24,6 +24,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 16 | Quellen-Upload und RAG-Retrieval (Feature 2, Vorbereitung für Fact-Check und Frage-Agent) | Claude Code: `app/sources/` mit Extraktion (PDF pro Seite, PPTX pro Folie inkl. Notizen/Tabellen, DOCX, TXT/MD), Chunking mit Seiten-/Folienangabe, lokalem Embedding-Modell hinter `Embedder`-Interface, pgvector + deutscher Volltextsuche mit Reciprocal Rank Fusion, Celery-Ingest, REST-API und Frontend-Seite `/sources`; Postgres-Image auf `pgvector/pgvector:0.8.6-pg18-trixie` umgestellt | Embedding-Anbieter war offen; lokales Modell gewählt, damit keine Dokumente an Dritte gehen (≈0,6 GB RAM pro Prozess). Erste Keyword-Suche zerlegte „260.000“ anders als PostgreSQL und fand die Zahl nicht; korrigiert, indem PostgreSQL die Suchanfrage selbst tokenisiert. Gemessener CPU-Durchsatz des Modells auf einem 12-Kern-Linux-Laptop nur ≈3 Abschnitte/s (1 MB Text ≈ 6 min); Test auf Mac M5 Pro steht aus, schnellere Alternativen gemessen (MiniLM-L12 ≈12/s, potion-multilingual ≈800/s). Next-Proxy puffert Uploads standardmäßig nur bis 10 MB; `proxyClientMaxBodySize` auf 100 MB gesetzt (betraf auch Aufnahmen). Kein OCR. Suche liefert immer Top-k, auch wenn nichts passt. Retrieval-Qualität nur mit synthetischen Mini-Dokumenten geprüft, keine Genauigkeitsaussage | Nutzerauftrag (Quellen hochladen, später für Fact-Check/Fragerunde nutzen); Modell-, Chunking- und Ranking-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_sources.py` (inkl. DB-Roundtrip gegen pgvector), `backend/scripts/smoke_sources.py` im Compose-Stack bestanden; Frontend-Unit-Tests, Typecheck, Lint; Browser-Check Desktop/375 px ohne Konsolenfehler |
 | 17 | Lokale Whisper-Transkription als Standard | Codex: faster-whisper hinter dem bestehenden `Transcriber`-Protokoll, lokales Modell im Image, Deepgram nur noch optional; `RecordingAnalysis.text` und regeneriertes API-Schema | Modellqualität, deutsche Füllwörter und Wortgrenzen nicht bewertet. Docker-Build mit Modelldownload nicht geprüft. PyAV 15.1.0 nötig, da 19.0.2 den faster-whisper-Dekoder bricht. Kein Cloud-Zwang, aber auch kein Nachweis besserer Erkennung | Nutzerauftrag: Speech-to-Text mit lokalem Modell, Review vor Push | Nach dem Merge mit main: 46 Backend-Tests bestanden, zwei übersprungen; echter `tiny`-Lauf über `run_analysis` mit synthetischer deutscher Sprache; API-Aktualitätscheck bestanden; Details unten |
 | 17 | Fact-Check (Feature 2) mit RAG zuerst und Web als Zweitquelle | Claude Code: `app/factcheck/` mit OpenAI-kompatiblem Chat-Client (httpx, keine neue Abhängigkeit), Aussagen-Extraktion über nummerierte Sätze (Timestamps aus den Wort-Timestamps, nicht vom Modell), Hybrid-Retrieval je Aussage in der Quellen-Collection, LLM-Urteil mit wörtlichem Zitat, Zitat-Prüfung per `quote_in_text`, danach Websuche (Wikipedia-API ohne Schlüssel oder Tavily) nur für nicht belegte Aussagen; Celery-Task `fact_check`, `POST /factcheck`, Status-Polling, `fact`-Events; Frontend: Transkription im Live-Studio als Opt-in, Fact-Check-Panel in der Review mit Sprung zur Videostelle | Nutzer legte nur „OpenAI-kompatibel“ fest; URL und Modell bleiben Teamentscheidung, daher Konfiguration über `LLM_BASE_URL`/`LLM_MODEL`/`LLM_API_KEY` und `/factcheck` antwortet ohne Konfiguration mit 503. `temperature` wird standardmäßig nicht gesendet, weil manche Modelle nur den Standardwert akzeptieren; JSON-Modus abschaltbar. Ein vom Modell erfundenes Zitat wird verworfen (Ergebnis „nicht gefunden“ statt Scheinbeleg); technische Fehler heißen „unchecked“, nicht „falsch“. Wikipedia lehnte den ersten User-Agent mit HTTP 403 ab (Wikimedia-Policy verlangt Kontaktangabe); Repo-URL ergänzt. Websuche mit unpräziser Suchanfrage liefert themenfremde Artikel; das Urteil hängt dann am Modell. Qualität von Extraktion und Urteil mit echtem Modell nicht gemessen; Transkript-Sätze gehen an den LLM-Anbieter, Suchanfragen an Wikipedia/Tavily (im UI vor dem Start benannt) | Nutzerauftrag (Fact-Check mit RAG über hochgeladene Quellen wie Vorlesungsfolien, Web-Fallback, eigener Branch, danach nach main); Prompt-, Grenzwert- und Wikipedia-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_factcheck.py` (10 Tests), Backend-Suite 51 bestanden; Frontend: Typecheck, Lint, 49 Unit-Tests, 18 Playwright-Tests Desktop/375 px; End-to-End im isolierten Compose-Stack, siehe unten |
+| 18 | Live-Transkription nahezu in Echtzeit, Backend-Prototyp (Stufe B) | Claude: `WS /speech/live` in `app/speech/live.py`: PCM-Int16-Frames über WebSocket, Start/Stop-Steuerung, 10-s-Rollfenster (alle ≥ 2 s neu transkribiert), Wort-Cursor dedupliziert die Fensterüberlappung, kumulativer Text, Abschluss durch `stop`, 30 s Stille oder 600 s Audio; ein Live-Slot pro Prozess (`asyncio.Semaphore(1)`, Überlastungsverweigerung 1013). `StreamingTranscriber`-Protokoll + `WhisperStreamingTranscriber` in `app/transcription/streaming.py`; Modellcache der Batch-ASR geteilt (`_load_whisper_model` → `load_whisper_model`). Latenz-/Smoke-Skript `scripts/smoke_live.py`; `WHISPER_LIVE_*`-Konfiguration in `.env.example`/`compose.yaml` | Deduplizierung verschiebt Fenstergrenzwörter leicht (sie erscheinen im nächsten Fenster); kein „echter" Streaming-Decoder, Laufzeitverhalten fremder Hosts unbewiesen. Browser-Sender fehlt, OpenAPI sagt nichts über WebSocket-Routen. `medium` auf einer 7,7-GB-VM OOM → schwache Hosts müssen `WHISPER_LIVE_MODEL=tiny` + `WHISPER_LIVE_BEAM_SIZE=1` setzen. Smoke-Live gegen ein echtes Modell noch nicht gemessen (Docker in dieser VM nicht verfügbar) | Team-Auftrag „near-realtime"-Wortlieferung als Teilprogramm; Chunk-/Fenster-/Timeout-Limits selbst gewählt, Team kann überschreiben | 12 neue WebSocket-Tests (Fake-Transcriber mit ton-codierten Wörtern, Protokoll-/Beschäftigungs-/Zeitüberschreitungspfade) bestanden; 58 Backend-Tests gesamt; API-Aktualitätscheck; Details unten |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -436,3 +437,60 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
   nach der Korrektur bestätigt: funktioniert, Verarbeitung als langsam
   empfunden, vom Nutzer für diesen Stand ausdrücklich akzeptiert. Keine
   gemessene Laufzeit oder Wortfehlerrate aus diesem informellen Versuch.
+## Live-Transkription als Backend-Prototyp (24.10.2026)
+
+- Nutzerauftrag: das Near-Realtime-Deliverable (`WS /speech/live` +
+  `StreamingTranscriber`) umsetzen, testen, pushen. Der Browser-Sender ist
+  ausdrücklich nicht Teil dieses Auftrags.
+- Architektur: `app/speech/live.py` hält Puffer, Rollfenster und einen
+  Live-Slot pro Prozess; `app/transcription/streaming.py` kapselt
+  `faster-whisper` hinter `StreamingTranscriber.transcribe_window()` und
+  liefert fensterrelative Wörter. Der Handler verschiebt sie auf die
+  Sessionzeitachse, dedupliziert über einen Cursor (Ende des zuletzt
+  gesendeten Wortes) und sendet kumulative Text-Meldungen (`transcript_text`
+  aus `app/transcription/text.py`).
+- Protokoll: `start`/`ready`/Binär-PCM/`stop` → `words`/`text` (final-Flag),
+  `done`; Fehler als `error` + Close 1011; Überlastung als Close 1013; nur
+  16 kHz Eingang. Endgültige Zeiten sind absolut; Video-Alignment rechnet der
+  Browser selbst.
+- Konfiguration: `WHISPER_LIVE_MODEL`, `WHISPER_LIVE_BEAM_SIZE`
+  (Fallbacks auf `WHISPER_MODEL`/`WHISPER_BEAM_SIZE`), `WHISPER_LIVE_CHUNK_MS`
+  (2000), `WHISPER_LIVE_MAX_WINDOW_MS` (10000),
+  `WHISPER_LIVE_MAX_SECONDS` (600), `WHISPER_LIVE_MAX_IDLE_SECONDS` (30).
+- Messwerte aus Eintrag 17 (gleiche 2,5-Kern-VM): `tiny` warm ≈ 1,0 s für
+  6,8 s Sprachclip → sollte Echtzeit halten; `small`/beam 5 ≈ 4,8 s → für den
+  Live-Einsatz Beam 1 (≈ 3,3 s) oder `tiny` wählen. `medium` OOM.
+
+## Web-Integration der lokalen Backend-Pipelines (24.10.2026)
+
+- `origin/goal` und `origin/feat/local-whisper-asr` zusammengeführt. Das Studio
+  bleibt direkt unter `/` und `/live`, groß als Standard, mit ursprünglicher
+  blauer Palette und Sans-Serif. Lokale Gesten bleiben ohne Backend nutzbar;
+  Speech analysis ist oberhalb der Kamera zuschaltbar.
+- Analyse-Upload mit `local_only=true`, vollständige Whisper-Wörter und
+  Anbieterhinweise im Review, Quellenvergleich, Fragen und getippte/gesprochene
+  Antworten verbunden. Bestehende Student-/Tutor-Rollen erhalten.
+- Optionale Live captions senden AudioWorklet-PCM (16 kHz, mono, Int16 LE,
+  100-ms-Frames) erst während der Aufnahme und nach Server-ready. Kumulativer
+  Text ist Vorschau; vollständige Aufnahme-ASR bleibt die Review-Zeitbasis.
+  Verbindungstimeout, Überlast und Abbruch beenden nur die Vorschau. Stop und
+  Unmount schließen AudioContext und WebSocket, ohne zusätzliche Mikrofonfreigabe.
+- Studio und Quellenbibliothek verwenden standardmäßig denselben `/api`-Proxy.
+  Die Quellenbibliothek hatte noch `localhost:8000` als Fallback; korrigiert und
+  mit einem Browsertest auf gleiche Origin und `/api/sources` abgesichert.
+- Prüfungen: 94 Frontend-Unit-Tests; Typecheck, Lint, Produktionsbuild,
+  Compose-Konfiguration und API-Schema-Aktualität bestanden. 82 Backend-Tests
+  bestanden, Silero-Modell- und PostgreSQL-Roundtrip-Tests mangels Ressourcen
+  übersprungen. Defektes Homebrew-FFmpeg durch separat extrahierte lokale
+  Test-Binary ersetzt, keine Systeminstallation verändert.
+- Browser: Desktop und 375 px, synthetische Kamera/Audio-/Pose-Eingaben und
+  deterministische Backend-Antworten. Aufnahmesicherung bei Analysefehler,
+  Live-PCM und Vorschau-Abbruch, Transcript → Fact-Check → Antwortprüfung,
+  ursprüngliche Palette, direkter Einstieg und Quellen-Proxy geprüft.
+  Veraltete Selektoren nach dem Merge korrigiert und betroffene Fälle erneut geprüft.
+- Zusätzlich echter WebSocket-Upgrade durch den Produktions-Next-Proxy gegen
+  den FastAPI-Live-Router: ready → PCM → text → stop/done bestanden, mit einem
+  ausdrücklich synthetischen Transcriber. Keine Aussage zur Modellqualität.
+- Lokaler Docker-Engine-Zugriff bleibt nicht verfügbar, auch nach Startversuch
+  von Docker Desktop. Vollständiger Compose-/Whisper-/Ollama-Lauf sowie echtes
+  Mikrofon und Safari wurden in dieser Integration nicht verifiziert.

@@ -2,27 +2,26 @@
 
 ## Camera and audio review
 
-The `/live` workspace uses HTTP endpoints through the same-origin `/api` proxy
-in Compose. `frontend/src/features/live/transport.ts` implements the local capture transport
+The `/` and `/live` workspace uses HTTP and WebSocket endpoints through the same-origin `/api` proxy in local development and Compose. `frontend/src/features/live/transport.ts` implements the local capture transport
 and `AnalysisTransport`; `contracts.ts` defines their shared interface.
 
 | Backend endpoint | Frontend use |
 | --- | --- |
 | `GET /health/ready` | Display dependency readiness |
 | `GET /health/live` | Check API availability before capture |
-| `POST /speech/analyze` | Upload the complete camera/microphone recording after stop, with `transcribe=false`; returns 202 and a job ID |
+| `POST /speech/analyze` | Upload the complete camera/microphone recording after stop, with the transcript checkbox (default on in speech mode) and `local_only=true`; returns 202 and a job ID |
 | `GET /speech/jobs/{job_id}` | Poll queued/running jobs until completed or failed; use returned audio measurements and timeline events |
+| `WS /speech/live` | Optional live-caption preview: 16 kHz mono Int16 PCM from AudioWorklet; connection failure leaves recording active |
 | `POST /transcription/analyze-words` | Analyze an optional JSON import of `{word,start_ms,end_ms}` from the same take |
 
 No individual MediaRecorder chunks are uploaded. All feedback times are relative
 to recording start; HTTP responses are validated in `analysis.ts` before display.
 Each request has a two-minute timeout; job polling stops after eleven minutes or
 on exit. Failed analysis preserves the local recording and reports an error.
-It does not substitute sample findings. Backend ASR is optional through the API
-and is not selected by this UI. [Backend details](../backend/README.md).
+It does not substitute sample findings. Speech analysis is selected above the camera; local Whisper transcription is enabled by default within that mode. The recorded words, provider, synthetic-data flag and notices reach the review. [Backend details](../backend/README.md).
 
 Replay uses the full take held in browser memory, with two seconds of context
-around a selected marker. Download before refresh or leaving `/live`. The
+around a selected marker. Download before refreshing or closing the tab. The
 backend stores queued uploads and results in S3 and deletes originals after
 terminal processing; there are no event clips or persistent session history yet.
 
@@ -31,8 +30,8 @@ sending landmarks to the backend. Preview and recording logs use separate time
 anchors; a take resets the preview log. The recording log remains downloadable
 in review. [Data points and heuristics](../frontend/DATA_POINTS.md).
 
-The old video WebSocket prototype has been removed. A separate live audio
-transcription design remains [planned, not implemented](../backend/app/transcription/README.md).
+Live captions use `features/live/captions.ts` and `public/audio/pcm-worklet.js`, enabled explicitly under Recording options. Caption text is a provisional preview; complete-recording ASR supplies review timestamps. Stop, cancellation and unmount close audio resources and the socket. The backend supports one live session per API process.
+[Quickstart for integration](./04-integration.md).
 
 ## Sample transcript and judge flow
 
@@ -54,8 +53,7 @@ the sample controls and validate external input before dispatching events.
 Real local gesture/posture rules now feed live hints, evidence export and review
 markers (`features/pose/evaluation.ts`). The separate `/gestures` walkthrough
 runs these rules on explicitly synthetic landmarks. Eye contact is not inferred.
-Source upload and hybrid retrieval are implemented at `/sources`. Fact-check,
-judge questions and answer evaluation still use sample data. Session persistence, presigned uploads
+Source upload and hybrid retrieval are implemented at `/sources`. The live review connects transcript-backed fact-checks, source-based questions, typed answers and spoken answers to the backend. Ollama is the default language-model provider; the separate `/demo` flow remains explicitly synthetic. Session persistence, presigned uploads
 and event-clip retrieval are also pending. Keep these boundaries visible when
 connecting new services; no fabricated scores or model results.
 

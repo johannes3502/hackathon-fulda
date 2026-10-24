@@ -1980,7 +1980,7 @@
     },
     "/questions/answers/voice": {
       "post": {
-        "description": "Transcribe a spoken answer with the configured ASR, then compare it with the sources.\n\nAudio goes to the ASR provider (default: Deepgram EU), the transcript to\nthe configured language model. Audio and request are deleted after\nprocessing. The result has the transcript in `answer` and the persona's\nreply to read aloud; poll `/questions/answers/{job_id}`.",
+        "description": "Transcribe a spoken answer with the configured ASR, then compare it with the sources.\n\nAudio goes to the ASR provider (default: local Whisper), the transcript to\nthe configured language model. Audio and request are deleted after\nprocessing. The result has the transcript in `answer` and the persona's\nreply to read aloud; poll `/questions/answers/{job_id}`.",
         "operationId": "start_voice_answer_review_questions_answers_voice_post",
         "requestBody": {
           "content": {

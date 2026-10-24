@@ -5,9 +5,10 @@ test("opening a native collection persists it and reopening keeps loaded sources
 }) => {
   const id = "11111111-2222-3333-4444-555555555555";
   await page.route("**/sources?collection_id=*", async (route) => {
-    const collection = new URL(route.request().url()).searchParams.get(
-      "collection_id",
-    );
+    const requestUrl = new URL(route.request().url());
+    expect(requestUrl.origin).toBe(new URL(page.url()).origin);
+    expect(requestUrl.pathname).toBe("/api/sources");
+    const collection = requestUrl.searchParams.get("collection_id");
     await route.fulfill({
       json:
         collection === id

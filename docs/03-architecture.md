@@ -24,7 +24,7 @@ flowchart TB
 
     subgraph Backend["backend/ - FastAPI (Python 3.12) Port 8000"]
         MAIN["FastAPI App<br/>Health, CORS, Router"]
-        SP["Speech-Router<br/>POST /speech/analyze<br/>GET /speech/jobs/id"]
+        SP["Speech-Router<br/>POST /speech/analyze<br/>GET /speech/jobs/id<br/>WS /speech/live"]
         TR["Transcription-Router<br/>POST /transcription/analyze-words"]
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
         FC["Factcheck-Router<br/>POST /factcheck<br/>GET /factcheck/jobs/id, /settings"]
@@ -54,6 +54,9 @@ flowchart TB
 
     WEB -- "Kamera/Mikro" --> MP_W
     WEB -- "Aufnahme" --> MR
+    WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>optional während der Aufnahme"]
+    PCM -- "WS /api/speech/live: PCM" --> SP
+    SP -- "kumulativer Vorschautext" --> WEB
     MP_W --> RULES["PoseEvaluator: Neutralstellung, Geometrie, Mindestdauer<br/>posture/gesture-Events; lokale Evidenz"]
     MOB -- "Kamera" --> MP_M
 
@@ -142,7 +145,13 @@ sequenceDiagram
 
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
     FE->>FE: MediaPipe Pose lokal (Web Worker)
+    opt Live captions aktiviert
+        FE->>BE: WS /speech/live: start, PCM nach ready
+        BE-->>FE: Kumulativer Text als Vorschau (kein Review-Transkript)
+        Note over FE,BE: Abbruch oder Überlast: Aufnahme läuft weiter
+    end
     U->>FE: Stop
+    FE->>BE: WS stop, AudioWorklet schließen
     FE->>BE: POST /speech/analyze (recording, transcribe = Checkbox, standardmäßig an; local_only=true)
     BE->>S3: Original speichern
     BE->>R: Task analyze_speech einreihen
@@ -422,6 +431,7 @@ flowchart LR
         H2["GET /health/ready"]
         S1["POST /speech/analyze"]
         S2["GET /speech/jobs/{job_id}"]
+        S3LIVE["WS /speech/live: start, PCM, stop<br/>ready, words, text, done/error"]
         T1["POST /transcription/analyze-words"]
         R1["POST /sources"]
         R2["GET /sources?collection_id"]
@@ -438,7 +448,7 @@ flowchart LR
         Q5["POST /questions/answers/voice"]
     end
 
-    WEBF["Web-Frontend"] --> H2 & S1 & S2 & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5
+    WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5
     MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
 ```
 

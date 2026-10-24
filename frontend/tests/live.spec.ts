@@ -124,7 +124,7 @@ test("speech analysis is visible above the camera and in large view", async ({
 }, info) => {
   await syntheticCamera(page);
   await syntheticPose(page);
-  await page.route("http://localhost:8000/health/**", (route) =>
+  await page.route("**/api/health/**", (route) =>
     route.fulfill({ json: { status: "ok" } }),
   );
   await enable(page);
@@ -359,7 +359,7 @@ test("raw camera recording, stats, filtered video sections, download and refresh
 
 async function backend(page: Page, transcribe = false) {
   await syntheticCamera(page);
-  await page.route("http://localhost:8000/health/**", (route) =>
+  await page.route("**/api/health/**", (route) =>
     route.fulfill({ json: { status: "ok" } }),
   );
   await page.goto("/live");
@@ -386,7 +386,7 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
   page,
 }) => {
   let uploads = 0;
-  await page.route("http://localhost:8000/speech/analyze", async (route) => {
+  await page.route("**/api/speech/analyze", async (route) => {
     uploads++;
     expect(route.request().headers()["content-type"]).toContain(
       "multipart/form-data",
@@ -401,7 +401,7 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
     });
   });
   let polls = 0;
-  await page.route("http://localhost:8000/speech/jobs/*", async (route) => {
+  await page.route("**/api/speech/jobs/*", async (route) => {
     polls++;
     await route.fulfill({
       json: {
@@ -425,28 +425,25 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
       },
     });
   });
-  await page.route(
-    "http://localhost:8000/transcription/analyze-words",
-    async (route) => {
-      expect(route.request().postDataJSON()).toEqual({
-        words: [{ word: "um", start_ms: 100, end_ms: 300 }],
-      });
-      await route.fulfill({
-        json: {
-          summary: { filler_count: 1 },
-          events: [
-            {
-              t_ms: 100,
-              duration_ms: 200,
-              type: "filler",
-              severity: "hint",
-              payload: { word: "um" },
-            },
-          ],
-        },
-      });
-    },
-  );
+  await page.route("**/api/transcription/analyze-words", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      words: [{ word: "um", start_ms: 100, end_ms: 300 }],
+    });
+    await route.fulfill({
+      json: {
+        summary: { filler_count: 1 },
+        events: [
+          {
+            t_ms: 100,
+            duration_ms: 200,
+            type: "filler",
+            severity: "hint",
+            payload: { word: "um" },
+          },
+        ],
+      },
+    });
+  });
   await backend(page);
   expect(uploads).toBe(0);
   await page.getByRole("button", { name: "Finish & review" }).click();
@@ -470,7 +467,7 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
 });
 
 test("analysis failure preserves playable recording", async ({ page }) => {
-  await page.route("http://localhost:8000/speech/analyze", (route) =>
+  await page.route("**/api/speech/analyze", (route) =>
     route.fulfill({ status: 503 }),
   );
   await backend(page);
@@ -708,6 +705,7 @@ test("sideways motion and crossed arms reach review while live hints can be mute
     "Sideways position change",
     { timeout: 12000 },
   );
+  await page.getByText("Camera diagnostics", { exact: true }).click();
   await page.getByRole("button", { name: "Pose debug" }).click();
   await expect(page.getByLabel("Pose debug readout")).toContainText(
     "Sideways shift: 0.50",
@@ -761,53 +759,49 @@ test("transcribed take is fact-checked against sources and links back to the vid
     evidence: null,
     query: "Studierende",
   };
-  await page.route("http://localhost:8000/questions", (route) =>
+  await page.route("**/api/questions", (route) =>
     route.fulfill({ status: 202, json: { job_id: questionJob } }),
   );
-  await page.route(
-    `http://localhost:8000/questions/jobs/${questionJob}`,
-    (route) =>
-      route.fulfill({
-        json: {
-          job_id: questionJob,
-          status: "completed",
-          result: {
-            questions: [question],
-            events: [],
-            notices: [],
-            model: "synthetic-model",
-            sources_used: true,
-          },
+  await page.route(`**/api/questions/jobs/${questionJob}`, (route) =>
+    route.fulfill({
+      json: {
+        job_id: questionJob,
+        status: "completed",
+        result: {
+          questions: [question],
+          events: [],
+          notices: [],
+          model: "synthetic-model",
+          sources_used: true,
         },
-      }),
+      },
+    }),
   );
-  await page.route("http://localhost:8000/questions/answers", async (route) => {
+  await page.route("**/api/questions/answers", async (route) => {
     expect(route.request().postDataJSON().answer).toBe("9500 Studierende.");
     await route.fulfill({ status: 202, json: { job_id: answerJob } });
   });
-  await page.route(
-    `http://localhost:8000/questions/answers/${answerJob}`,
-    (route) =>
-      route.fulfill({
-        json: {
-          job_id: answerJob,
-          status: "completed",
-          result: {
-            verdict: "supports",
-            explanation: "Die korrigierte Zahl steht in der Quelle.",
-            evidence: {
-              kind: "upload",
-              label: "Synthetische Folie 2",
-              quote: "9500 Studierende",
-              passage: "9500 Studierende",
-            },
-            checked: ["upload"],
-            follow_up: null,
-            model: "synthetic-model",
-            notes: [],
+  await page.route(`**/api/questions/answers/${answerJob}`, (route) =>
+    route.fulfill({
+      json: {
+        job_id: answerJob,
+        status: "completed",
+        result: {
+          verdict: "supports",
+          explanation: "Die korrigierte Zahl steht in der Quelle.",
+          evidence: {
+            kind: "upload",
+            label: "Synthetische Folie 2",
+            quote: "9500 Studierende",
+            passage: "9500 Studierende",
           },
+          checked: ["upload"],
+          follow_up: null,
+          model: "synthetic-model",
+          notes: [],
         },
-      }),
+      },
+    }),
   );
   const words = [
     { word: "Wir", start_ms: 200, end_ms: 400 },
@@ -815,7 +809,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
     { word: "9000", start_ms: 750, end_ms: 1000 },
     { word: "Studierende.", start_ms: 1050, end_ms: 1150 },
   ];
-  await page.route("http://localhost:8000/speech/analyze", async (route) => {
+  await page.route("**/api/speech/analyze", async (route) => {
     expect(route.request().postData()).toContain(
       'name="transcribe"\r\n\r\ntrue',
     );
@@ -824,7 +818,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
       json: { job_id: jobId, status_url: `/speech/jobs/${jobId}` },
     });
   });
-  await page.route("http://localhost:8000/speech/jobs/*", (route) =>
+  await page.route("**/api/speech/jobs/*", (route) =>
     route.fulfill({
       json: {
         job_id: jobId,
@@ -841,7 +835,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
       },
     }),
   );
-  await page.route("http://localhost:8000/factcheck/settings", (route) =>
+  await page.route("**/api/factcheck/settings", (route) =>
     route.fulfill({
       json: {
         available: true,
@@ -851,7 +845,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
       },
     }),
   );
-  await page.route("http://localhost:8000/sources?*", (route) =>
+  await page.route("**/api/sources?*", (route) =>
     route.fulfill({
       json: [
         {
@@ -868,14 +862,14 @@ test("transcribed take is fact-checked against sources and links back to the vid
     }),
   );
   let request: Record<string, unknown> | null = null;
-  await page.route("http://localhost:8000/factcheck", async (route) => {
+  await page.route("**/api/factcheck", async (route) => {
     request = route.request().postDataJSON();
     await route.fulfill({
       status: 202,
       json: { job_id: factJob, status_url: `/factcheck/jobs/${factJob}` },
     });
   });
-  await page.route(`http://localhost:8000/factcheck/jobs/${factJob}`, (route) =>
+  await page.route(`**/api/factcheck/jobs/${factJob}`, (route) =>
     route.fulfill({
       json: {
         job_id: factJob,
@@ -972,4 +966,75 @@ test("transcribed take is fact-checked against sources and links back to the vid
   await page
     .locator(".questions")
     .screenshot({ path: info.outputPath("local-question-answer.png") });
+});
+
+test("live captions send PCM only during recording and a disconnect keeps the take usable", async ({
+  page,
+}) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  await page.route("**/api/health/**", (route) =>
+    route.fulfill({ json: { status: "ok" } }),
+  );
+  await page.route("**/api/speech/analyze", (route) =>
+    route.fulfill({ status: 503 }),
+  );
+  let frames = 0;
+  await page.routeWebSocket("**/api/speech/live", (socket) => {
+    socket.onMessage((message) => {
+      if (typeof message === "string") {
+        expect(JSON.parse(message)).toEqual({
+          type: "start",
+          sample_rate: 16000,
+        });
+        socket.send(JSON.stringify({ type: "ready", sample_rate: 16000 }));
+      } else {
+        expect(message.byteLength).toBe(3200);
+        frames++;
+        socket.send(
+          JSON.stringify({
+            type: "text",
+            text: "Synthetic live caption",
+            final: false,
+          }),
+        );
+        if (frames === 3)
+          socket.close({ code: 1013, reason: "Synthetic capacity failure" });
+      }
+    });
+  });
+  await page.goto("/");
+  await page.getByLabel("Speech analysis").selectOption("backend");
+  await page
+    .getByRole("button", { name: "Standard view", exact: true })
+    .click();
+  await page.getByText("Recording options", { exact: true }).click();
+  await page.getByLabel("Show live captions (preview)").check();
+  await expect(page.locator(".recording-consent")).toContainText(
+    "during recording",
+  );
+  await page
+    .getByRole("button", { name: "Enable camera", exact: true })
+    .click();
+  expect(frames).toBe(0);
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  await expect(page.getByLabel("Live captions", { exact: true })).toContainText(
+    "Recording continues",
+  );
+  expect(frames).toBe(3);
+  await expect(
+    page.getByRole("button", { name: "Finish & review" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect
+    .poll(() =>
+      page
+        .getByLabel("Recorded pitch video")
+        .evaluate((video: HTMLVideoElement) => video.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+  expect(frames).toBe(3);
 });

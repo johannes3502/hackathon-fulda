@@ -6,7 +6,13 @@ test("jury walkthrough runs the real rules with explicit synthetic labels, evide
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await page.getByRole("link", { name: "See gestures in 22 seconds" }).click();
+  await page
+    .getByRole("button", { name: "Standard view", exact: true })
+    .click();
+  await page
+    .getByText("Gesture guide and calibration", { exact: true })
+    .click();
+  await page.getByRole("link", { name: "Try synthetic walkthrough" }).click();
   await expect(page.getByText("Synthetic example · no camera")).toBeVisible();
   await page.clock.install({ time: new Date("2026-10-24T12:00:00Z") });
   await page.clock.pauseAt(new Date("2026-10-24T12:00:01Z"));
@@ -47,8 +53,14 @@ test("jury walkthrough runs the real rules with explicit synthetic labels, evide
   await expect(page.locator(".gesture-example-event")).toHaveCount(0);
   await page.getByRole("link", { name: "Try with your camera" }).click();
   await expect(
-    page.getByRole("button", { name: "Enable camera preview" }),
+    page.getByRole("button", { name: "Enable camera" }),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Standard view", exact: true })
+    .click();
+  await page
+    .getByText("Gesture guide and calibration", { exact: true })
+    .click();
   await expect(page.getByLabel("Gesture setup and guide")).toBeVisible();
   expect(errors).toEqual([]);
 });

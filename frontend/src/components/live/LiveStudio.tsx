@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { useCameraPreview } from "@/hooks/useCameraPreview";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
+import { LiveCaptions } from "@/features/live/captions";
 import { LiveRecorder } from "@/features/live/recorder";
 import { createVideoTransport } from "@/features/live/transport";
 import { apiEndpoint, request } from "@/features/live/analysis";
@@ -63,8 +64,11 @@ export function LiveStudio() {
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("local");
   const [transcribe, setTranscribe] = useState(true);
+  const [liveCaptions, setLiveCaptions] = useState(false);
+  const [caption, setCaption] = useState({ text: "", status: "" });
+  const captions = useRef<LiveCaptions | null>(null);
   const [endpoint, setEndpoint] = useState(
-    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
+    process.env.NEXT_PUBLIC_API_URL ?? "/api",
   );
   const [progress, setProgress] = useState<LiveProgress | null>(null);
   const [health, setHealth] = useState<string | null>(null);
@@ -74,7 +78,13 @@ export function LiveStudio() {
   const [poseDebug, setPoseDebug] = useState(false);
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
-  useEffect(() => () => owner.current?.dispose(), []);
+  useEffect(
+    () => () => {
+      owner.current?.dispose();
+      captions.current?.stop();
+    },
+    [],
+  );
   useEffect(() => {
     if (!largeView) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -142,7 +152,10 @@ export function LiveStudio() {
       config,
       createVideoTransport(config),
       (next) => {
-        if (next.phase === "finishing") pose.stop();
+        if (next.phase === "finishing") {
+          pose.stop();
+          captions.current?.stop();
+        }
         setProgress(next);
       },
       (recording) => {
@@ -167,7 +180,15 @@ export function LiveStudio() {
         });
         router.push(`/live/${recording.id}/review`);
       },
-      (timestamp) => pose.beginRecording(timestamp, recorder.id),
+      (timestamp) => {
+        pose.beginRecording(timestamp, recorder.id);
+        if (mode === "backend" && transcribe && liveCaptions) {
+          captions.current = new LiveCaptions((text, status) =>
+            setCaption({ text, status }),
+          );
+          void captions.current.start(stream, destination);
+        }
+      },
     );
     owner.current = recorder;
     try {
@@ -184,6 +205,7 @@ export function LiveStudio() {
   };
   const cancel = () => {
     owner.current?.dispose();
+    captions.current?.stop();
     owner.current = null;
     busy.current = false;
     stopCamera();
@@ -398,6 +420,15 @@ export function LiveStudio() {
                   <p>Nothing is recorded until you press Start recording.</p>
                 </div>
               )}
+              {progress?.phase === "recording" &&
+                liveCaptions &&
+                mode === "backend" &&
+                transcribe && (
+                  <div className="live-captions" aria-label="Live captions">
+                    <small role="status">{caption.status}</small>
+                    {caption.text && <p>{caption.text.slice(-500)}</p>}
+                  </div>
+                )}
               <div className="stage-bottom">
                 <span>
                   <Video size={14} />
@@ -409,7 +440,9 @@ export function LiveStudio() {
                   {mode === "local"
                     ? "Local gesture observations"
                     : progress?.phase === "recording"
-                      ? "Audio analysis after stopping"
+                      ? liveCaptions && transcribe
+                        ? "Live captions · audio sent to server"
+                        : "Audio analysis after stopping"
                       : "Backend mode"}
                 </span>
               </div>
@@ -425,6 +458,9 @@ export function LiveStudio() {
                 <span className="recording-consent">
                   By starting, you agree to send your video and microphone audio
                   to <strong>{endpoint}</strong> after stopping.
+                  {transcribe &&
+                    liveCaptions &&
+                    " Live captions also send microphone audio to this server during recording."}
                   {transcribe &&
                     " Whisper transcribes locally; no audio is sent to a cloud provider."}{" "}
                   The original is removed after processing; analysis results
@@ -486,6 +522,16 @@ export function LiveStudio() {
                       />
                       Create a transcript with local Whisper
                     </label>
+                    {transcribe && (
+                      <label className="live-transcribe">
+                        <input
+                          type="checkbox"
+                          checked={liveCaptions}
+                          onChange={(e) => setLiveCaptions(e.target.checked)}
+                        />
+                        Show live captions (preview)
+                      </label>
+                    )}
                     <p className="field-hint">
                       {transcribe
                         ? "Whisper transcribes on the backend. Review the transcript before checking claims against your sources."

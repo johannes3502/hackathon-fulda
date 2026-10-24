@@ -66,7 +66,7 @@ export function AppShell({
               <ol className="help-list">
                 <li>
                   Enable your camera and check that your upper body is visible.
-                  Recording options let you switch to audio analysis. Hold a
+                  Use Speech analysis above the camera to include audio. Hold a
                   neutral position for 3 seconds to calibrate gesture feedback.
                 </li>
                 <li>Start recording when you are ready.</li>
@@ -80,11 +80,12 @@ export function AppShell({
               </ol>
               <p>
                 Local mode keeps video and gesture observations in this browser,
-                without microphone audio. Optional backend mode records audio
-                too and uploads the complete take after stopping for audio
-                analysis. Camera observations are prototype heuristics, not
-                quality scores. The synthetic walkthrough is separately labelled
-                and needs no camera.
+                without microphone audio. Optional speech analysis captures
+                video and microphone audio, then uploads the complete take after
+                stopping. Live captions additionally send audio during recording
+                when enabled in Recording options. Camera observations are
+                prototype heuristics, not quality scores. The synthetic
+                walkthrough is separately labelled and needs no camera.
               </p>
               <p>
                 Recordings live in browser memory only. Download before

@@ -85,7 +85,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             <strong>{recording.feedback.length}</strong>
             <span>
               {recording.config.mode === "local"
-                ? "Demo markers"
+                ? "Gesture observations"
                 : "Feedback moments"}
             </span>
           </div>
@@ -172,7 +172,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
               <p className="field-hint">
                 {recording.chunksSent} recording uploads/parts{" "}
                 {recording.config.mode === "local"
-                  ? "processed by the local demo"
+                  ? "captured locally"
                   : "sent to the backend"}
                 . {(recording.bytesSent / 1024 / 1024).toFixed(1)} MB{" "}
                 {recording.config.mode === "local" ? "kept local" : "sent"}.

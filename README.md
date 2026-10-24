@@ -18,7 +18,7 @@ locally with Whisper in Compose. [Local AI setup and use](docs/06-local-coaching
 (`Cmd/Ctrl+Shift+B`). Stop: `docker compose stop`.
 
 Details: [Frontend](frontend/README.md) · [Backend](backend/README.md) ·
-[API types](api/README.md).
+[API types](api/README.md) · [Integration & Quickstart](docs/04-integration.md).
 
 **Jury:** [22-second gesture example](http://localhost:3000/gestures) ·
 [Demo guide](docs/05-jury-demo.md) · [What we measure and why](docs/04-gesture-evaluation.md).

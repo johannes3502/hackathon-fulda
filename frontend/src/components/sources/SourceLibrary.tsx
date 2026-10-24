@@ -62,7 +62,7 @@ function clientConfig(): Config {
     try {
       cachedConfig = {
         api: apiEndpoint(
-          process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
+          process.env.NEXT_PUBLIC_API_URL ?? "/api",
           window.location.protocol === "https:",
         ),
         collection: collectionId(),
