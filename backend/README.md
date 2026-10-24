@@ -276,6 +276,12 @@ of `postgres:18.6-alpine`. Existing local volumes keep working; the schema and
 extension are created on first use. `tests/test_sources.py` contains a
 database round trip that runs when `POSTGRES_HOST` is set.
 
+For native source-pipeline timings, run `python -u -m scripts.benchmark_vectors`
+with `EMBEDDING_MODEL_PATH` pointing to the downloaded pinned model. It uses
+synthetic PPTX decks and checks vector shape/normalization. `POSTGRES_*` enables
+storage and retrieval timings against an isolated test database; otherwise these
+stages are explicitly skipped. See the [M5 Pro measurements and limitations](../docs/benchmarks/2026-10-24-m5-pro-vectors.md).
+
 ### Fact-check (`app/factcheck/`, `/factcheck`)
 
 Checks factual statements of a transcript against the uploaded sources of a
