@@ -17,6 +17,7 @@ import { time } from "@/lib/utils";
 import { FactCheckPanel } from "./FactCheckPanel";
 import { FeedbackMoment, LiveNav, MissingRecording } from "./shared";
 import { PoseDownload } from "./PoseDownload";
+import { QuestionSimulator } from "./QuestionSimulator";
 import { TranscriptAnalysis } from "./TranscriptAnalysis";
 import { VideoPlayback } from "./VideoPlayback";
 
@@ -25,6 +26,12 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
   const recording = recordings[sessionId];
   const [selected, setSelected] = useState<LiveFeedback | null>(null);
   if (!recording) return <MissingRecording />;
+  const jump = (item: LiveFeedback) => {
+    setSelected({ ...item });
+    document
+      .querySelector(".playback-panel")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   const groups = [
     ...new Set(recording.feedback.map((item) => item.category)),
   ].map((category) => ({
@@ -214,15 +221,8 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
         {recording.config.mode === "backend" && (
           <>
             <TranscriptAnalysis recording={recording} />
-            <FactCheckPanel
-              recording={recording}
-              onSelect={(item) => {
-                setSelected({ ...item });
-                document
-                  .querySelector(".playback-panel")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-            />
+            <FactCheckPanel recording={recording} onSelect={jump} />
+            <QuestionSimulator recording={recording} onSelect={jump} />
           </>
         )}
         <section className="review-moments">

@@ -201,3 +201,21 @@ Urteilsqualität eines echten Modells.
 - Absturz des Stand-in-Modells führte zu Job-Status `failed` mit neutraler
   Fehlermeldung, ohne Transkript im Log.
 - Events lagen auf den Satz-Timestamps des Transkripts (3000/7000/11000 ms).
+
+## Frage-Simulator (24.10.2026)
+
+Entscheidung (Nutzerauftrag „Fragesimulator vollständig einbauen“): Feature 5
+nutzt dasselbe OpenAI-kompatible Modell wie der Fact-Check. Antworten nur als
+Text, damit kein weiterer Drittanbieter (Browser-Spracherkennung) Audio erhält;
+Spracheingabe bleibt offen.
+
+- Fragen verweisen auf Befund-, Satz- und Auszugsnummern; Timestamps und
+  Evidenz setzt der Code aus diesen Verweisen. Ein „Widerspruch“ ohne
+  passenden Befund wird zur Klärungsfrage herabgestuft, eine „Lücke“ ohne
+  wörtliches Zitat aus dem Auszug ebenso; Fragen ohne Bezug werden verworfen.
+- Antwort-Abgleich wie im Fact-Check: Urteil nur mit wörtlich verifiziertem
+  Zitat, sonst „nicht gefunden“. Keine Punkte oder Noten.
+- Geprüft: `tests/test_questions.py` mit geskripteten Modellantworten
+  (Verweisprüfung, Reihenfolge, Events, Antwort-Abgleich, API, Task-Wiederholung),
+  Frontend-Unit-Tests für Client und Timeline-Momente. Qualität der Fragen mit
+  einem echten Modell ist nicht gemessen.

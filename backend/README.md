@@ -327,6 +327,47 @@ the OpenAI-compatible API and Wikipedia, task redelivery). A full run through
 the Compose stack needs a configured model; see the AI decision log entry for
 the end-to-end check with a deterministic stand-in model.
 
+### Question simulator (`app/questions/`, `/questions`)
+
+Asks follow-up questions after the talk and compares typed answers with the
+sources. Input is the transcript plus the fact-check findings of the same
+recording; it uses the same OpenAI-compatible model as the fact-check.
+
+```
+POST /questions {words, collection_id?, claims[]} → S3 question-jobs/{id}/request.json
+  → Celery generate_questions:
+      words → numbered sentences; findings and related upload passages numbered
+      LLM: questions referencing finding, sentence and passage numbers
+      code: t_ms/evidence from the references; `contradiction`/`unsupported`
+            only with a matching finding, `gap` only with a verbatim quote
+  → status.json (questions + `question` events), request.json deleted
+GET /questions/jobs/{id}
+POST /questions/answers {question, answer, collection_id?} → S3 answer-jobs/{id}/
+  → Celery review_answer: question evidence + hybrid search (query + answer)
+      → LLM verdict with verbatim quote (quote_in_text) + optional follow-up
+GET /questions/answers/{id}
+```
+
+- Kinds, asked in this order: `contradiction`, `unsupported`, `gap`,
+  `clarification`; `follow_up` comes from an answer review. Questions without
+  a source or spoken passage behind them are dropped.
+- Questions with a spoken passage are `question` events (`source="agent"`):
+  `contradiction` → `warning`, `unsupported` → `hint`, otherwise `info`.
+  `gap` questions concern the whole talk (`t_ms: null`) and are no events.
+- Answer verdicts reuse the fact-check ones (`supports`, `contradicts`,
+  `not_found`, `unchecked`). No points, scores or grades.
+- Answers are typed text only (no speech input); the review UI hides the
+  source passage until an answer was compared, so the question does not give
+  the answer away.
+- Third parties: transcript sentences, findings, upload passages and the typed
+  answer go to the LLM host. Stored requests (transcript, answer text) are
+  deleted after the job finishes.
+- Limits (`QuestionConfig`): 5 questions, 6 upload passages for gaps, 5 per
+  answer review. Not tuned; question quality depends on the model.
+
+Tests: `tests/test_questions.py` (scripted model answers, reference checks,
+API and task redelivery).
+
 ## MediaRecorder integration
 
 The frontend requests camera/microphone access through `getUserMedia()`

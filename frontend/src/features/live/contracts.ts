@@ -1,4 +1,5 @@
 import type { components } from "../../../../api/schema";
+import type { QuestionAnswer, QuestionResult } from "../questions/api";
 
 export type Word = components["schemas"]["Word"];
 export type FactCheckResult = components["schemas"]["FactCheckResult"];
@@ -68,6 +69,10 @@ export type LiveRecording = {
   /** Word timestamps from ASR or an imported transcript; input of the fact-check. */
   words?: Word[];
   factCheck?: FactCheckResult;
+  /** Question simulator; follow-ups are inserted into `questions.questions`. */
+  questions?: QuestionResult;
+  /** Typed answers and their source comparison, keyed by question id. */
+  answers?: Record<string, QuestionAnswer>;
 };
 export interface VideoTransport {
   connect(
