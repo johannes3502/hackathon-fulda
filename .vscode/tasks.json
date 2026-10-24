@@ -19,6 +19,14 @@
       "problemMatcher": []
     },
     {
+      "label": "Compose: frontend logs",
+      "type": "process",
+      "command": "docker",
+      "args": ["compose", "logs", "--follow", "frontend"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
       "label": "Compose: backend logs",
       "type": "process",
       "command": "docker",

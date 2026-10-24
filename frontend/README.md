@@ -4,7 +4,27 @@ Pitch rehearsal built from `../Pitch_Coach_Frontend_Plan.md`, with two connected
 
 ## Run
 
-Requires Node 22.12+ and npm. Run from the monorepo root; dependencies and the lockfile are shared.
+From the repository root, start Docker and create `.env` from `.env.example`
+once, then:
+
+```sh
+docker compose up --build -d --wait
+```
+
+This starts the frontend and backend services together. Open
+<http://localhost:3000>. Source changes in `frontend/src/` reload automatically;
+rebuild after changing dependencies or configuration. The container keeps
+dependencies in its image and Next.js output in a Docker volume.
+
+Browser requests to `/api/...` are forwarded by Next.js to
+`http://backend:8000/...` inside Compose. For example,
+<http://localhost:3000/api/health/ready> checks the backend connection.
+`API_INTERNAL_URL` is server-side configuration; local npm development defaults
+to `http://localhost:8000`. Compose sets `NEXT_PUBLIC_API_URL=/api`, so the
+browser uses its current origin and the container handles the internal hostname.
+
+Optional local frontend development requires Node 22.12+ and npm. Run from the
+monorepo root; dependencies and the lockfile are shared:
 
 ```sh
 npm ci
@@ -17,14 +37,16 @@ Open http://localhost:3000 and choose **Try sample demo**. No credentials, micro
 
 Open http://localhost:3000/live or choose **Open camera studio** from setup.
 
-1. Enable the camera preview, then **Record with demo feedback**. This records actual silent video while scripted feedback markers appear in the first ten seconds. No detection or upload runs in local demo mode.
+1. Enable the camera preview, then **Record with demo feedback**. This records actual silent video while scripted feedback markers appear in the first ten seconds. No upload runs in local demo mode; pose logging is a separate optional action.
 2. Choose **Finish & review** for recording stats, feedback frequencies, optional backend measurements and a video player.
 3. Choose **Rewatch feedback sections** to filter by category, seek to a feedback moment, loop the surrounding section, or watch the full take.
 4. Download before refreshing or leaving the live workspace. Recordings are held in browser memory only.
 
-For real audio analysis, choose **Backend · audio analysis after recording**, enable the camera and microphone, then **Record & analyze audio**. The API URL defaults to `http://localhost:8000` (`NEXT_PUBLIC_API_URL` overrides it at build time). The browser checks `/health/ready` for service status and `/health/live` before capture. After stopping it uploads the complete recording to `POST /speech/analyze`; feedback and measurements appear in review. No partial MediaRecorder chunks are uploaded. Failed analysis preserves the local recording.
+For real audio analysis, choose **Backend · audio analysis after recording**, enable the camera and microphone, then **Record & analyze audio**. The API URL is `/api` in Compose and defaults to `http://localhost:8000` for local npm development (`NEXT_PUBLIC_API_URL` overrides it). The browser checks `/health/ready` for service status and `/health/live` before capture. After stopping it uploads the complete recording to `POST /speech/analyze` with `transcribe=false`, then polls `/speech/jobs/{job_id}` until completed or failed. Feedback and measurements appear in review. No partial MediaRecorder chunks are uploaded. Failed analysis preserves the local recording.
 
-In backend review, optionally upload a JSON array of `{word,start_ms,end_ms}` from the same take to call `POST /transcription/analyze-words`. This endpoint analyzes existing words; it does not perform ASR. Imported timestamps must fall within the recording. Requests are cancellable and time out after two minutes. Use a reachable HTTPS API URL when the frontend is served over HTTPS, and configure the existing backend CORS setting for the frontend origin.
+This UI uses local Silero/RMS/YIN analysis; no paid ASR request is made. Speak normally during the first three seconds for calibration. Polling stops after eleven minutes or on exit; each HTTP request has a two-minute timeout.
+
+In backend review, optionally upload a JSON array of `{word,start_ms,end_ms}` from the same take to call `POST /transcription/analyze-words`. This endpoint analyzes existing words; it does not perform ASR. Imported timestamps must fall within the recording. When using a separate API origin, use HTTPS if the frontend is served over HTTPS and configure the backend CORS setting for the frontend origin. Compose's `/api` proxy uses the frontend origin.
 
 Missing endpoints remain mocked in the sample rehearsal. See [the integration handoff](../docs/pitch-coach-handoff.md) for pending work. No backend implementation is part of this integration.
 
@@ -88,10 +110,3 @@ All points, heuristics, null handling and limits are documented in
 static assets automatically. Deploy `public/pose` with the frontend. The official
 Lite model version 1 is included; provenance is in `public/pose/README.md`.
 
-## Queued audio analysis
-
-The camera backend mode uses the asynchronous audio API: POST `/speech/analyze`
-with `transcribe=false`, then GET `/speech/jobs/{job_id}` until completed or
-failed. It polls for at most eleven minutes and cancels on exit. This UI uses
-local Silero/RMS/YIN analysis; no paid ASR request is made. Speak normally during
-the first three seconds for calibration. Word JSON import remains separate.

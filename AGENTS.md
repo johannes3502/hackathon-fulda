@@ -123,10 +123,10 @@ Event {
 
 ```
 AGENTS.md                          # Einstiegspunkt und Zielarchitektur
-compose.yaml                       # Backend + Celery + Redis + PostgreSQL + S3
+compose.yaml                       # Frontend + Backend + Celery + Redis + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
 backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
-frontend/                          # Next.js-Demo und Live-Kamera-Client; Backend-Anbindung teilweise offen
+frontend/                          # Next.js-App, eigener Entwicklungscontainer
 .run/                              # geteilte IntelliJ-Run-Konfigurationen
 .vscode/                           # geteilte VS-Code-Tasks für Docker Compose
 Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
@@ -144,8 +144,9 @@ einen separaten Celery-Worker, Redis, PostgreSQL **ohne pgvector** und
 **SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job geprüft; Audio-/ASR-Jobs und
 Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO,
 pgvector und die vollständige Aufnahme-/Clip-/Review-Pipeline aus der
-Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend ist als separater
-Demo-/Live-Kamera-Client vorhanden; der Aufnahme-Pfad nutzt die Audio-Job-API
+Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend läuft in einem
+eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
+Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
 jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
 Analyse-Pipelines mit S3-Persistenz für kombinierte Jobs, beide mit `t_ms` ab Aufnahmestart im
