@@ -172,7 +172,7 @@
 .stats418-dashboard {
   max-width: var(--content-width);
   margin: 0 auto;
-  padding: 36px 24px 32px;
+  padding: 36px 32px 32px;
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -232,7 +232,7 @@
   font-weight: 600;
   color: var(--primary);
 }
-.stats418-hero-info h1 {
+.stats418-hero-info h2 {
   font-size: clamp(1.5rem, 3vw, 2rem);
   line-height: 1.18;
   letter-spacing: -0.03em;

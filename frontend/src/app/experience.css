@@ -1,0 +1,276 @@
+/* Shared navigation and workspace rhythm extend the start dashboard's tokens. */
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+}
+.appearance-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+}
+.appearance-select:focus-within {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+}
+.appearance-select select {
+  min-height: 42px;
+  max-width: 100%;
+  border: 0;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.appearance-select select:focus-visible {
+  outline: none;
+}
+.practice-journey {
+  max-width: var(--content-width);
+  margin: 24px auto 0;
+  padding-inline: 32px;
+}
+.practice-journey ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.practice-journey a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  height: 100%;
+  padding: 12px 18px;
+  border-radius: 11px;
+  color: var(--muted);
+}
+.practice-journey a:hover {
+  background: var(--background);
+}
+.practice-journey a[aria-current="step"] {
+  color: var(--primary);
+  background: var(--soft-accent);
+}
+.practice-journey strong,
+.practice-journey small {
+  display: block;
+}
+.practice-journey strong {
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.practice-journey small {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.journey-number {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.presentation-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  gap: 48px;
+  padding: clamp(24px, 4vw, 48px);
+  background: linear-gradient(120deg, var(--surface) 35%, var(--soft-accent));
+  border: 1px solid var(--border);
+  border-radius: 24px;
+}
+.presentation-intro h1 {
+  margin-top: 22px;
+  font-size: clamp(2rem, 3.7vw, 3.25rem);
+  line-height: 1.16;
+  letter-spacing: -0.045em;
+}
+.presentation-intro h1 > span {
+  color: var(--primary);
+}
+.presentation-intro-copy > p {
+  max-width: 52ch;
+  margin-top: 22px;
+  line-height: 1.75;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+.presentation-intro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+.presentation-intro-actions .button {
+  padding-block: 14px;
+}
+.presentation-intro-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.presentation-intro-footnote a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.presentation-steps {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+}
+.presentation-steps li {
+  display: flex;
+  gap: 16px;
+  padding-block: 22px;
+}
+.presentation-steps li + li {
+  border-top: 1px solid var(--border);
+}
+.presentation-step-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--primary);
+}
+.presentation-steps small {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--primary);
+  font-size: 0.75rem;
+}
+.presentation-steps strong {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+.presentation-steps p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+}
+.workspace-heading,
+.page-intro {
+  max-width: 100%;
+}
+.workspace-heading > div:first-child > p,
+.page-intro > p {
+  max-width: 68ch;
+}
+body:has(.live-workspace-large) .practice-journey {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .brand-caption {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .presentation-intro {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
+@media (max-width: 760px) {
+  .app-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+  .header-actions {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .app-nav {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .app-nav a {
+    white-space: normal;
+    text-align: center;
+    padding-inline: 6px;
+    font-size: 0.75rem;
+    flex: 1;
+  }
+  .practice-journey {
+    padding-inline: 20px;
+    margin-top: 12px;
+  }
+  .practice-journey a {
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .practice-journey strong {
+    font-size: 0.8125rem;
+  }
+  .practice-journey svg,
+  .practice-journey small,
+  .journey-number {
+    display: none;
+  }
+  .live-workspace:not(.live-workspace-large) .workspace-heading {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .live-workspace:not(.live-workspace-large) .live-camera-stage {
+    min-height: 20rem;
+  }
+  .live-camera-stage .stage-camera {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 12px;
+  }
+  .live-camera-stage .stage-camera svg {
+    width: 24px;
+    height: 24px;
+  }
+  .presentation-intro {
+    border-radius: 18px;
+  }
+  .presentation-intro-actions .button {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .presentation-intro-actions .button,
+  .practice-journey a,
+  .app-nav a {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease;
+  }
+}

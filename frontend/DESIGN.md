@@ -15,7 +15,10 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   at least 0.75rem. Text scales with browser preferences.
 - Use the semantic tokens in `src/app/globals.css` for backgrounds, surfaces,
   foreground, secondary text, borders, and state colors. Light appearance uses
-  neutral gray and white; dark appearance follows the system preference.
+  neutral gray and white. The shared header offers System, Light and Dark;
+  an explicit choice overrides the OS and persists in localStorage. A small
+  initializer applies the saved choice before first paint. With System selected,
+  CSS follows OS changes immediately. Both appearances share semantic tokens.
 - Retain the 418 `#3803bf` violet for primary actions and selections. Use the lighter text
   accent separately from filled buttons in dark appearance. Warning and error
   colors always accompany a label or symbol.
@@ -26,13 +29,20 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   use 1rem text. Keyboard focus, the skip link, and dialog focus restoration remain
   visible. Reduced motion disables animation; increased contrast strengthens
   separators and secondary text.
-- `/` and `/stats-preview` open the stats start dashboard with the `StatsCard` as
-  the prominent starting card, accompanied by interactive monthly progress,
+- `/` and `/stats-preview` begin with a presentation introduction: primary action
+  “Neue Präsentation” opens the existing `/live` studio, secondary action prepares
+  sources. Three steps explain preparation, recording and review. A recent take
+  links back into its review while it is available in browser memory.
+  Below, the stats dashboard with `StatsCard` and interactive monthly progress,
   criteria comparison and training activity charts (clearly labelled as synthetic
   demo data) and direct actions into `/live`, `/review-preview`, `/sources` and
   `/demo`. `AppShell` provides both the header navigation (`Main navigation`) and a
   slide-over navigation drawer (`Menü`) across all views. The active destination
-  is identified visually and with `aria-current`.
+  is identified visually and with `aria-current`. The drawer is a modal Radix
+  dialog with focus containment, Escape dismissal and focus restoration. A shared
+  Prepare / Record / Review strip connects sources, studio and reviews; its Review
+  link uses the current or latest take, or explicitly offers an example when no
+  take exists. Large view hides this strip to preserve camera space.
 
 ## Screens
 

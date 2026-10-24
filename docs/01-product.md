@@ -37,6 +37,14 @@ Grundgerüst ist festgelegt (Abschnitt 3, Technik).
 Diese Reihenfolge ist eine direkte Ableitung der fünf Features, keine zusätzliche
 Produktentscheidung.
 
+UI-Einstieg (24.10.2026, Nutzerauftrag): Die Startseite leitet mit „Neue
+Präsentation“ ins vorhandene Live-Studio und bietet Quellen-Vorbereitung als
+zweiten Weg. Die Stats-Vorschau bleibt darunter als synthetische Demo. Der
+gemeinsame Ablauf Vorbereiten → Aufnehmen → Review verbindet die Ansichten;
+ohne eigene Aufnahme ist das Review-Ziel ausdrücklich ein Beispiel. Die
+Darstellung Hell/Dunkel/System wird lokal gespeichert. Daraus entstehen keine
+neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.md`.
+
 ---
 
 ## 3. Offen — muss das Team entscheiden

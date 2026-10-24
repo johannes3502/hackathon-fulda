@@ -15,6 +15,7 @@ import {
 import "@fontsource-variable/open-sans";
 import { AppShell } from "@/components/shared/AppShell";
 import { StatsRing } from "./StatsRing";
+import { PresentationIntro } from "./PresentationIntro";
 import {
   DEMO_STATS,
   MONTHLY_STATS,
@@ -209,7 +210,8 @@ export function MonthlyProgressChart({
 
   const linePath = summary.points
     .map(
-      (point, index) => `${index === 0 ? "M" : "L"}${xAt(index)},${yAt(point.value)}`,
+      (point, index) =>
+        `${index === 0 ? "M" : "L"}${xAt(index)},${yAt(point.value)}`,
     )
     .join(" ");
   const areaPath =
@@ -236,12 +238,18 @@ export function MonthlyProgressChart({
         <div className="stats418-delta-badges">
           {summary.totalDelta !== null && (
             <span className="stats418-delta-pill positive">
-              {summary.totalDelta >= 0 ? `+${summary.totalDelta}` : summary.totalDelta} % seit Mai
+              {summary.totalDelta >= 0
+                ? `+${summary.totalDelta}`
+                : summary.totalDelta}{" "}
+              % seit Mai
             </span>
           )}
           {summary.monthDelta !== null && (
             <span className="stats418-delta-pill">
-              {summary.monthDelta >= 0 ? `+${summary.monthDelta}` : summary.monthDelta} % zum Vormonat
+              {summary.monthDelta >= 0
+                ? `+${summary.monthDelta}`
+                : summary.monthDelta}{" "}
+              % zum Vormonat
             </span>
           )}
         </div>
@@ -589,9 +597,10 @@ export function StatsPreview() {
   const summary = summarizeMonthlyProgress(MONTHLY_STATS, "overall");
 
   return (
-    <AppShell>
+    <AppShell experience="live">
       <div className="stats418-preview" lang="de">
         <div className="stats418-dashboard">
+          <PresentationIntro />
           <section
             className="stats418-hero"
             aria-label="Aktuelle Präsentations-Stats"
@@ -611,21 +620,19 @@ export function StatsPreview() {
               <span className="stats418-section-eyebrow">
                 <BarChart3 size={14} /> Startseite · Aktuelle Stats
               </span>
-              <h1>Deine Präsentations-Stats im Überblick.</h1>
+              <h2>Deine Präsentations-Stats im Überblick.</h2>
               <p>
-                Hier siehst du deinen aktuellen Stand über die vier Kriterien
-                sowie deine Entwicklung über die letzten sechs Monate. Starte
-                direkt eine neue Aufnahme im Live-Studio oder öffne über das
-                Menü oben links deine Quellen und Analysen.
+                So könnte dein Fortschritt aussehen: Entdecke die vier Kriterien
+                und den Verlauf über sechs Monate anhand synthetischer
+                Beispieldaten. Die Werte stammen nicht aus deinen eigenen
+                Aufnahmen.
               </p>
 
               <dl className="stats418-kpi-grid">
                 <div className="stats418-kpi">
                   <dt>Aktueller Gesamtstand</dt>
                   <dd>{summary.currentValue ?? 82}%</dd>
-                  <small>
-                    +{summary.monthDelta ?? 3}% gegenüber September
-                  </small>
+                  <small>+{summary.monthDelta ?? 3}% gegenüber September</small>
                 </div>
                 <div className="stats418-kpi">
                   <dt>Fortschritt (6 Monate)</dt>
@@ -658,7 +665,7 @@ export function StatsPreview() {
                 </Link>
                 <Link href="/sources" className="button button-outline">
                   <FileText size={16} />
-                  Quellen (RAG)
+                  Quellen
                 </Link>
                 <Link href="/demo" className="button button-outline">
                   <Play size={16} />
@@ -689,4 +696,3 @@ export function StatsPreview() {
     </AppShell>
   );
 }
-

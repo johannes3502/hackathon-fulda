@@ -463,6 +463,20 @@ test("raw camera recording, stats, filtered video sections, download and refresh
     path: `test-results/live-moments-${info.project.name}.png`,
     fullPage: true,
   });
+  const reviewUrl = page.url().replace(/\/moments$/, "/review");
+  await page.getByRole("link", { name: "418 home", exact: true }).click();
+  const resume = page.getByRole("link", { name: "Letzte Aufnahme ansehen" });
+  await expect(resume).toHaveAttribute("href", new URL(reviewUrl).pathname);
+  await resume.click();
+  await expect(page).toHaveURL(reviewUrl);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Presentation workflow" })
+      .getByRole("link", { name: /Review/ }),
+  ).toHaveAttribute("href", new URL(reviewUrl).pathname);
+  await expect
+    .poll(() => video.evaluate((el: HTMLVideoElement) => el.readyState))
+    .toBeGreaterThanOrEqual(2);
   await page.reload();
   await expect(
     page.getByRole("heading", {

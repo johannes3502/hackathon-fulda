@@ -394,10 +394,17 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    DRAWER["AppShell Navigations-Drawer (Menü)<br/>Open Sans + #3803bf, verbindet /, /live,<br/>/sources, /review-preview, /gestures, /demo"]
+    DRAWER["AppShell: modaler Navigations-Drawer + Header<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>verbindet /, /live, /sources, /review-preview, /gestures, /demo"]
+    THEME["Root-Layout: gespeicherte Darstellung vor First Paint<br/>localStorage, CSS-Tokens, OS-Fallback"] -.-> DRAWER
+    JOURNEY["Gemeinsamer Ablauf: Prepare / Record / Review<br/>aktuelle oder letzte Aufnahme, sonst markiertes Beispiel"] --> SRC
+    JOURNEY --> LIVE
+    JOURNEY --> LREV
     LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>Three.js, statischer Fallback"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
-    SP["/ und /stats-preview<br/>Startseite: StatsCard als Start +<br/>Monatsfortschritt, Kriterienvergleich & Sessions"] --> SC["StatsCard + Monatsdiagramme<br/>Three.js-Ring, vier Kriterien,<br/>6-Monats-Verlauf (synthetisch)"]
+    SP["/ und /stats-preview<br/>Einleitung + Neue Präsentation / Quellen vorbereiten<br/>darunter Stats und Monatsfortschritt"] --> SC["StatsCard + Monatsdiagramme<br/>SVG-Ring, vier Kriterien,<br/>6-Monats-Verlauf (synthetisch)"]
+    SP -->|"Neue Präsentation"| LIVE
+    SP -->|"Quellen vorbereiten"| SRC
+    SP -->|"Letzte Aufnahme, falls vorhanden"| LREV
     DRAWER --> SP
     DRAWER --> LIVE
     DRAWER --> SRC
@@ -407,7 +414,7 @@ flowchart TD
     SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
     SC --> LIVE
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
-    LIVE["/live - LiveStudio<br/>Large View als Standard, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE["/live - LiveStudio<br/>Standardansicht, optionale Large View, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
     LIVE --> DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]

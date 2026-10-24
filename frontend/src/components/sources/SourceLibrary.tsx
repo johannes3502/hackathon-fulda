@@ -173,11 +173,11 @@ export function SourceLibrary() {
 
   const ready = sources.filter((source) => source.status === "ready").length;
   return (
-    <AppShell>
+    <AppShell experience="live">
       <div className="workspace sources-workspace">
         <div className="workspace-back">
           <Link href="/">
-            <ArrowLeft size={15} /> Back to studio
+            <ArrowLeft size={15} /> Back to overview
           </Link>
         </div>
         <div className="workspace-heading">
