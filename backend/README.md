@@ -13,6 +13,31 @@ Keep an existing `.env` instead of overwriting it. API docs:
 restart the worker after task changes with `docker compose restart worker`.
 Changes to dependencies, scripts or the Dockerfile require a rebuild.
 
+## OpenAPI and TypeScript
+
+FastAPI exposes the API contract at <http://localhost:8000/openapi.json>.
+To export it without running the server and generate TypeScript definitions,
+create a local Python environment and install the backend dependencies once
+(on Windows use `py -3.12` and `backend/.venv/Scripts/python.exe`):
+
+```sh
+python3.12 -m venv backend/.venv
+backend/.venv/bin/python -m pip install -r backend/requirements.txt
+```
+
+Then run from the repository root:
+
+```sh
+npm ci
+npm run api:generate
+npm run api:check
+```
+
+The commands use `backend/.venv` automatically, or the interpreter selected
+by `PYTHON`. Generated artifacts and frontend usage examples are documented
+in [`api/README.md`](../api/README.md). Regenerate and commit both artifacts
+whenever API routes or models change.
+
 ## IntelliJ IDEA and VS Code
 
 Open the **repository root** in either IDE. Docker must be running and `.env`
@@ -49,7 +74,8 @@ smoke command above to check the running containers.
 
 File bytes belong in object storage; PostgreSQL can hold their object key,
 MIME type, size and relation to a presentation. No product tables, recording
-endpoints, inference models or analysis rules are implemented yet.
+endpoints or inference models are implemented yet. The analysis pipelines
+below operate without persistence.
 
 SeaweedFS `mini` runs the file store in one container and creates `S3_BUCKET`
 on startup. Credentials come from `.env`; the bucket is not public. Only the
@@ -97,6 +123,59 @@ keep the visibility timeout longer than the hard task limit.
 ```sh
 docker compose logs -f worker
 docker compose restart worker
+```
+
+## Analysis pipelines
+
+Two independent pipelines write the shared `Event` schema (`app/events.py`,
+see `AGENTS.md`). Every timestamp is in ms relative to the recording start,
+so results can be combined later (`merge_timeline`). Nothing is stored yet;
+persistence, the upload route and clip cutting are not implemented.
+
+### Audio signal (`app/speech/`, `POST /speech/analyze`)
+
+Works on the sound only, no transcript:
+
+```
+recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
+  → time series: level_db, f0_hz (YIN), active (voice activity), syllable peaks
+  → events: pause | volume | pitch | pace   (source "speech")
+```
+
+- `series` is column-oriented: `t_ms[i]` (frame centre) belongs to
+  `level_db[i]`, `f0_hz[i]` (null if no pitch) and `active[i]`;
+  `syllable_peaks_ms` lists envelope maxima.
+- Pause: no voice activity for ≥ `pause_min_ms` between speech.
+- Volume: median level per window vs. baseline (`quiet` / `loud`).
+- Pitch: spread of F0 in semitones per window; low spread → `monotone`.
+  No statement about emotion.
+- Pace: syllable rate from the level envelope vs. baseline (`fast` / `slow`).
+- Baseline: the first `baseline_ms` (calibration) or, if unset, the whole
+  recording. Adjacent windows with the same direction become one event.
+- Upload as multipart field `recording`, optional field `config` with
+  `AudioConfig` JSON. Undecodable files return 422.
+
+### Transcription (`app/transcription/`, `POST /transcription/analyze-words`)
+
+```
+recording → FFmpeg WAV → Transcriber → words {word, start_ms, end_ms}
+  → events: filler (incl. repetition) | pause | pace   (source "asr")
+```
+
+- `Transcriber` protocol keeps the ASR provider exchangeable; the provider is
+  still open, `JsonTranscriber` replays precomputed words (demo / tests).
+- Fillers use a configurable list (still open, see `docs/01-product.md`);
+  repetitions ("ich ich") are `filler` events with `payload.kind = "repetition"`.
+- Word-based pause and words-per-minute complement the signal-based values.
+
+All thresholds (`AudioConfig`, `WordConfig`) are unvalidated heuristics and
+are returned in `heuristics` so the UI can label them. No scores.
+
+Tests (synthetic tones and word lists only), from `backend/`:
+
+```sh
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pytest tests
 ```
 
 ## MediaRecorder integration

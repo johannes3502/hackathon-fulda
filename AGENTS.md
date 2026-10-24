@@ -143,7 +143,11 @@ einen separaten Celery-Worker, Redis, PostgreSQL **ohne pgvector** und
 **SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job
 geprüft; Produkt-Tasks und Job-API-Endpunkte sind noch nicht implementiert. MinIO,
 pgvector, das Next.js-Frontend und die Analyse-/Aufnahme-Pipeline aus der
-Zielarchitektur sind noch nicht umgesetzt. Die Umstellung des Speichers
+Zielarchitektur sind noch nicht umgesetzt. Umgesetzt sind zwei getrennte
+Analyse-Pipelines ohne Persistenz, beide mit `t_ms` ab Aufnahmestart im
+gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als
+Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription
+(`backend/app/transcription/`, noch ohne ASR-Anbieter). Die Umstellung des Speichers
 ist eine separate Implementierungsaufgabe.
 
 Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
