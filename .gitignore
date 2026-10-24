@@ -3,7 +3,13 @@
 .kilocode/
 .opencode/
 .idea/
-.vscode/
+
+# Share workspace configuration, but keep personal editor state out of Git.
+/.vscode/*
+!/.vscode/extensions.json
+!/.vscode/launch.json
+!/.vscode/settings.json
+!/.vscode/tasks.json
 
 # Secrets
 .env

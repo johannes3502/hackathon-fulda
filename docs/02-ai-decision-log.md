@@ -12,6 +12,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 4 | Architektur prüfen | MediaPipe-Wheels für Linux ARM64 und AMD64 geprüft | Eine pauschale AMD64-Erzwingung wäre auf diesem ARM64-Mac unnötig | Native Architektur beibehalten; keine Aussage zur Inferenzqualität | PyPI `mediapipe` 1.1.1, `backend/Dockerfile` |
 | 5 | Speicherung begrenzen | Nur synthetischen Smoke-Test und Health-Endpunkte angelegt | Persistente Volumes löschen Daten nicht beim normalen Stoppen; echte Aufnahmen benötigen eine weitere Entscheidung | Vorgabe aus `AGENTS.md`; Test-Cleanup und Reset-Befehl dokumentiert | `backend/scripts/smoke.py`, `backend/README.md` |
 | 6 | Infrastruktur tatsächlich prüfen | Compose-Build, Smoke-Test und Ausfall-/Wiederanlaufprüfung ausgeführt | Ein erfolgreicher Build allein belegt weder S3-Zugriff noch Persistenz; Inferenz und Browser-Aufnahme bleiben ungeprüft | Codex ergänzte reale Verbindungs-, Datei- und Lebenszyklusprüfungen mit synthetischen Daten | Prüfprotokoll unten |
+| 7 | IntelliJ IDEA und VS Code einrichten | Geteilte Compose-Aktionen und Python-Debug-Konfigurationen angelegt | Container-Hostnamen funktionieren nicht für eine lokale Python-Instanz; gleichzeitig gestartete APIs belegen denselben Port | Nutzerauftrag; gemeinsamer lokaler Launcher liest `.env`, verwendet localhost und stoppt den Docker-Backend-Container vor dem lokalen Start | `.run/`, `.vscode/`, `backend/scripts/dev.py`; lokaler Readiness-Check mit PostgreSQL/S3 bestanden |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -34,3 +35,20 @@ Umgebung: Docker Desktop auf ARM64. Keine Aussage zu einem Deployment.
 
 Browser-/Gerätetests und Modell-Inferenz sind nicht Bestandteil dieses
 Infrastrukturauftrags. Der lokale Stack bleibt gestartet.
+
+## IDE-Konfiguration (24.10.2026)
+
+- JSON/XML der geteilten Konfigurationen geparst; Compose-Befehle stimmen
+  zwischen IntelliJ und VS Code überein.
+- Git-Regeln geprüft: freigegebene IDE-Dateien werden erfasst; `.env`,
+  `.idea/`, `.venv/` und persönliche VS-Code-Dateien bleiben ignoriert.
+- Lokale Python-3.12-Umgebung unter `backend/.venv` installiert;
+  `pip check` ohne Konflikte.
+- Den gemeinsamen Launcher tatsächlich gestartet: Docker-Backend gestoppt,
+  lokales FastAPI erreichbar, Readiness mit PostgreSQL und S3 erfolgreich,
+  API-Dokumentation erreichbar. Lokalen Prozess danach beendet.
+- Die Befehle direkt aus den VS-Code-Tasks `Compose: up` und
+  `Backend: smoke (Docker)` ausgeführt: Rebuild und alle Smoke-Prüfungen
+  bestanden. Der vollständige Docker-Stack läuft wieder.
+- Native IDE-Breakpoint-Sitzungen wurden nicht verifiziert. Die einmalige
+  Auswahl des Python-Interpreters ist in `backend/README.md` beschrieben.

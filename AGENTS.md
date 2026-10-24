@@ -88,6 +88,8 @@ AGENTS.md                          # Einstiegspunkt
 compose.yaml                       # lokales Backend + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
 backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
+.run/                              # geteilte IntelliJ-Run-Konfigurationen
+.vscode/                           # geteilte VS-Code-Tasks und Debug-Konfiguration
 Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
 docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
