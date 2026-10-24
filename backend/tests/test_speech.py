@@ -109,16 +109,39 @@ def test_padded_final_frame_never_extends_events_past_recording(seconds):
     assert all(0 <= e.t_ms < e.t_ms + e.duration_ms <= result.summary.duration_ms for e in result.events)
 
 
-def test_silent_calibration_does_not_produce_nan():
+def test_delayed_speech_calibrates_without_false_loudness_or_nan():
     import json
 
-    samples = np.concatenate([silence(4.0), tone(4.0)])
+    samples = np.concatenate([silence(8.0), tone(12.0)])
     result = analyze_samples(samples, AudioConfig(baseline_ms=3000))
-    assert result.summary.f0_range_st is None
+    assert result.summary.f0_range_st is not None
+    assert result.heuristics["baseline_ready"] is True
     assert of_type(result, "volume") == []
     assert of_type(result, "pace") == []
     # Results must be persistable with strict JSON even when speech starts late.
     json.dumps(result.model_dump(), allow_nan=False)
+
+
+def test_initial_room_noise_does_not_make_later_normal_speech_loud():
+    noise = np.random.default_rng(42).normal(0, 0.01, SR * 8).astype(np.float32)
+    result = analyze_samples(np.concatenate([noise, tone(12.0)]), AudioConfig())
+    assert result.heuristics["baseline_ready"] is True
+    assert of_type(result, "volume") == []
+
+
+def test_adaptation_keeps_initial_volume_change_and_event_reference_evidence():
+    samples = np.concatenate([tone(6, amplitude=0.05), tone(54, amplitude=0.3)])
+    result = analyze_samples(samples, AudioConfig())
+    events = of_type(result, "volume")
+    assert events and events[0].payload["direction"] == "loud"
+    assert events[0].t_ms < 12000
+    assert events[-1].t_ms + events[-1].duration_ms < 60000
+    for event in events:
+        payload = event.payload
+        assert payload["baseline_mode"] == "adaptive"
+        assert len(payload["window_baseline_level_db"]) == len(payload["window_delta_db"])
+        assert payload["window_baseline_level_db"][0] == payload["baseline_level_db"]
+        assert payload["window_baseline_level_db"][-1] > payload["window_baseline_level_db"][0]
 
 
 def test_merge_timeline_across_pipelines():

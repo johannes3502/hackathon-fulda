@@ -124,7 +124,7 @@ export class LiveCaptions {
             this.update(
               "",
               this.feedback
-                ? "Speak normally for 3 seconds to calibrate. Feedback updates every 5 seconds."
+                ? "Start speaking normally. Calibration waits for your voice, then adjusts gradually. Feedback updates every 5 seconds."
                 : "Listening…",
             );
           } else if (message.type === "feedback" && this.feedback) {

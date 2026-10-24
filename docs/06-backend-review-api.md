@@ -339,11 +339,20 @@ Regeln für die Annahme:
 Das Backend erzeugt sie selbst. Payloads bleiben typabhängig:
 
 - `pause`: `{ gap_ms, before, after, mid_sentence }`
-- `volume`: `{ direction, delta_db_median, baseline_level_db }`
+- `volume`: `{ direction, delta_db_median, baseline_level_db }`; Signal-Pipeline alternativ mit `window_delta_db` und `window_baseline_level_db` (gleich lange Arrays).
 - `pitch`: `{ direction, std_st_median }`
 - `pace` (ASR): `{ direction, window_wpm, baseline_wpm }`
 - `pace` (Audio): `{ direction, window_syllables_per_s, baseline_syllables_per_s }`
 - `filler`: `{ kind: "filler" | "repetition", word }`
+
+Bei der adaptiven Signalreferenz trägt das Payload zusätzlich
+`baseline_mode: "adaptive"`; `window_baseline_level_db` bzw.
+`window_baseline_syllables_per_s` speichert die Referenz vor jedem Messfenster.
+Die vorhandene skalare Baseline bleibt als Referenz des ersten Fensters erhalten.
+Der Review-Text benennt eine nachgeführte Stimmreferenz und verwendet deren
+Fensterwerte. Ältere Events ohne diese Felder bleiben lesbar. Kalibrierung beginnt
+erst nach genügend stimmhafter Sprache; spätere Audioabschnitte verändern keine
+früheren Referenzen. Wortbasiertes ASR-Tempo bleibt separat.
 
 Wichtig:
 

@@ -239,8 +239,21 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
 - Pitch: spread of F0 in semitones per window; low spread → `monotone`.
   No statement about emotion.
 - Pace: syllable rate from the level envelope vs. baseline (`fast` / `slow`).
-- Baseline: the first 3000 ms by default; speak normally during calibration.
-  Explicit `baseline_ms: null` selects the whole recording. Adjacent windows with the same direction become one event.
+- Baseline: waits for 3000 ms of **voiced speech**, even after a silent start.
+  Volume calibration and comparison use voiced levels, not quiet room noise.
+  The reference then adapts in non-overlapping 1-second blocks with enough voiced
+  evidence (30% minimum). Median candidates reject short spikes; bounded exponential
+  updates have a 30-second half-life measured in voiced time. Silence/unpitched noise
+  freeze it. Level/pitch candidates are clipped to a 12 dB/semitone difference;
+  rhythm candidates to a factor of two. These are configurable prototype heuristics,
+  not validated speech-quality thresholds. Sustained changes are initially visible
+  and gradually become the reference; adaptation cannot judge absolute suitability.
+  Explicit `baseline_ms: null` preserves the whole-recording comparison.
+  `heuristics.baseline_ready` reports whether calibration completed.
+  Adjacent windows with the same direction become one event; volume/pace payloads
+  preserve `window_baseline_level_db` / `window_baseline_syllables_per_s` alongside
+  the corresponding measurements. The existing scalar baseline is the first window's
+  reference. Replay uses each timestamp's prior reference, never later audio.
 - Upload as multipart field `recording`, optional field `config` with
   `AudioConfig` JSON, and `transcribe` (default true).
 - `POST /speech/analyze` now returns **202** with `job_id` and `status_url`;
@@ -348,7 +361,8 @@ Every five seconds the server sends `{"type":"feedback","position_ms":5000,"even
 These are the existing calibrated volume, pitch, syllable-pace and pause rules;
 no Whisper or LLM is needed. Preview audio stays in RAM and is released when
 the socket ends. One signal session per API process, separately from captions.
-The prototype reanalyses the prefix, capped at five minutes (the studio's limit).
+The prototype reanalyses the prefix, capped at five minutes (the studio's limit),
+replaying the same causal adaptive reference as batch analysis.
 The browser aligns preview timestamps to recording start, shows one cue with a
 15-second per-type cooldown, and stops the preview if analysis falls over 15
 seconds behind. Hide live hints to suppress cues. Full batch review is unchanged.

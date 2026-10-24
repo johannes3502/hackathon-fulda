@@ -18,10 +18,9 @@ def run_analysis(recording: Path, options: AnalysisOptions) -> RecordingAnalysis
     provider = None
     notices = ["Schwellenwerte und signalbasierte Silbenrate sind ungeprüfte Heuristiken."]
     if options.audio.baseline_ms is not None:
-        notices.append(f"Kalibrierung: die ersten {options.audio.baseline_ms} ms normal sprechen.")
-        if not any(active and t < options.audio.baseline_ms
-                   for t, active in zip(audio.series.t_ms, audio.series.active)):
-            notices.append("Keine Sprache in der Kalibrierung erkannt; Lautstärke- und Tempovergleich nicht verfügbar.")
+        notices.append(f"Stimmreferenz: zunächst {options.audio.baseline_ms} ms erkannte stimmhafte Sprache sammeln; danach langsam nachführen. Stille zählt nicht.")
+        if not audio.heuristics.get("baseline_ready", False):
+            notices.append("Nicht genug stimmhafte Sprache für die Kalibrierung; Lautstärke- und Tempovergleich nicht verfügbar.")
     if options.transcribe:
         if options.live_transcript is not None:
             provider = options.live_transcript.provider

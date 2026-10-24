@@ -35,7 +35,7 @@ flowchart TB
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
-        SIG["Signal-Analyse<br/>FFmpeg, RMS, YIN-Pitch,<br/>Silero VAD (ONNX, lokal)"]
+        SIG["Signal-Analyse<br/>FFmpeg, RMS, YIN-Pitch, Silero VAD<br/>3 s stimmhafte Sprache, adaptive Referenz"]
         WORDS["Wort-Analyse<br/>Füller, Pausen, Tempo"]
         INGEST["RAG-Ingest<br/>Extrakt, Chunk, Embed"]
         EMB["Lokale Embeddings<br/>jina-embeddings-v2-base-de<br/>FastEmbed/ONNX"]
@@ -62,14 +62,14 @@ flowchart TB
     MP_W -. "Track fingers, bis 5 Hz" .-> HAND["Hand Landmarker: 21 Punkte pro Hand<br/>auch ohne Torso, kein Upload"]
     HAND -. "Pose Lab" .-> LAB["T1–T12, Pocket<br/>lokale Diagnose, keine Events"]
     WEB --> DSP["AudioWorklet lokal: RMS/YIN<br/>Energiehüllkurven-Tempo-Proxy"]
-    DSP --> LOCAL_SPEECH["SpeechEvaluator: 3 s normales Sprechen<br/>Pausen, Pegel, Pitch, Rhythmus<br/>ein Live-Hinweis + Review-Marker"]
+    DSP --> LOCAL_SPEECH["SpeechEvaluator: 3 s stimmhafte Sprache<br/>Referenz langsam nachführen, Stille zählt nicht<br/>Pausen, Pegel, Pitch, Rhythmus + Review-Marker"]
     LOCAL_SPEECH --> WEB
 
     SP -- "finale Wörter + Text; vorher vorläufiger Text" --> WEB
     SP -- "nur bei provider=deepgram; PCM, serverseitiger Schlüssel" --> DG["Deepgram EU Nova-3<br/>Deutsch, live + Wort-Timestamps"]
     DG -- "vorläufig/final, CloseStream-Abschluss" --> SP
     PCM -- "WS /api/speech/feedback: PCM" --> SP
-    SP --> LIVE_SIG["API-Thread: gleiche Signalregeln alle 5 s<br/>3-s-Baseline, maximal 5 min, ein Live-Slot<br/>PCM nur im RAM; unabhängig von Whisper"]
+    SP --> LIVE_SIG["API-Thread: gleiche Signalregeln alle 5 s<br/>Adaptive Referenz ab stimmhafter Sprache<br/>max. 5 min, ein Slot; PCM nur im RAM"]
     LIVE_SIG -- "feedback: position_ms + Events<br/>ein Hinweis, 15-s-Cooldown pro Typ" --> WEB
     MP_W --> RULES["PoseEvaluator: Neutralstellung, Geometrie, Mindestdauer<br/>posture/gesture-Events; lokale Evidenz"]
     MOB -- "Kamera" --> MP_M
@@ -177,7 +177,7 @@ sequenceDiagram
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>BE: WS /speech/feedback: start, PCM nach ready
     loop alle 5 Sekunden, maximal 5 Minuten
-        BE->>BE: Signalregeln auf bisherigem Audio, feste Anfangskalibrierung
+        BE->>BE: Auf Sprache warten, danach kausale adaptive Referenz aus bisherigem Audio
         BE-->>FE: feedback: position_ms, aktuelle Events (Heuristik)
         FE->>FE: Zeitoffset zu MediaRecorder.onstart, ein Hinweis, Cooldown
     end
@@ -209,6 +209,8 @@ sequenceDiagram
     W->>S3: Datei laden
     W->>W: FFmpeg -> 16kHz mono, Frames 40ms/10ms
     W->>W: RMS-Pegel, YIN-Pitch, Silero VAD, Silben-Peaks
+    W->>W: 3 s stimmhafte Sprache sammeln, Referenz nur bei Sprache langsam nachführen
+    Note over BE,W: Gleicher kausaler Referenzablauf<br/>Pausen/Rauschen trainieren nicht, Referenz je Event-Fenster speichern
     opt transcribe=true
         alt Vollständiges live_transcript vorhanden
             W->>W: Finale Wörter prüfen und wiederverwenden, keine erneute ASR
@@ -582,7 +584,7 @@ flowchart LR
     subgraph Quellen
         B["browser<br/>posture, gesture, lokale Sprachmarker<br/>(kalibrierte Heuristiken, kein Pocket/Gaze/T12)"]
         A["asr<br/>Füller, Wort-Timestamps"]
-        S["speech<br/>pause, pace, volume, pitch"]
+        S["speech<br/>pause, pace, volume, pitch<br/>volume/pace: adaptive Referenz je Fenster"]
         F["factcheck<br/>fact: stützt (info), nicht gefunden (hint),<br/>widerspricht (warning)"]
         G["agent<br/>question: Widerspruch (warning),<br/>nicht belegt (hint), sonst info;<br/>nur Fragen mit gesprochener Stelle"]
     end

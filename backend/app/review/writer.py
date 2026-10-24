@@ -117,11 +117,15 @@ def card_for(event: ReviewEvent, language: str) -> dict:
                        f"Bei {time} gab es eine Pause von {placeholder('gap')} s. Pausen sind ein normales sprachliches Mittel.")
     elif event.type == "volume":
         title, suggestion = ("Volume" if en else "Lautstärke", "volume_check_mic")
-        display.update(delta=scalar(payload, "delta_db_median", "window_delta_db"), baseline=scalar(payload, "baseline_level_db"))
+        display.update(delta=scalar(payload, "delta_db_median", "window_delta_db"), baseline=scalar(payload, "window_baseline_level_db", "baseline_level_db"))
         evidence.delta, evidence.baseline, evidence.unit = display["delta"], display["baseline"], "dB"
         if display["delta"] is not None:
-            observation = (f"From {time} to {ending}, the median level difference from calibration was {placeholder('delta')} dB." if en else
-                           f"Von {time} bis {ending} betrug die mediane Pegelabweichung zur Kalibrierung {placeholder('delta')} dB.")
+            if payload.get("baseline_mode") == "adaptive":
+                observation = (f"From {time} to {ending}, the median level difference from the adapting voice reference was {placeholder('delta')} dB." if en else
+                               f"Von {time} bis {ending} betrug die mediane Pegelabweichung zur nachgeführten Stimmreferenz {placeholder('delta')} dB.")
+            else:
+                observation = (f"From {time} to {ending}, the median level difference from calibration was {placeholder('delta')} dB." if en else
+                               f"Von {time} bis {ending} betrug die mediane Pegelabweichung zur Kalibrierung {placeholder('delta')} dB.")
     elif event.type == "pitch":
         title = "Pitch variation" if en else "Tonhöhenvariation"
         display["spread"] = scalar(payload, "std_st_median", "window_std_st")

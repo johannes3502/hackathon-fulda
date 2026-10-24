@@ -32,8 +32,10 @@ rebuild after changing dependencies or configuration.
 - **Speech analysis:** **Live · in browser** is the default, with local microphone
   hints for pauses, volume, pitch variation and speaking rhythm. **Off · gestures
   only** uses no microphone. **Live + full backend analysis** adds the server's
-  Silero/RMS/YIN signal stream and uploads the take after stopping. Speak normally
-  for three seconds to calibrate. Transcription is on by default within backend
+  Silero/RMS/YIN signal stream and uploads the take after stopping. Calibration
+  waits for about three seconds of voiced speech; startup silence and unpitched
+  room noise do not count. The voice reference then adjusts slowly while you speak
+  and stays fixed during pauses. A new recording calibrates afresh. Transcription is on by default within backend
   mode, with Deepgram EU streaming enabled (requires a server-side API key).
   Completed stream words are reused in review; otherwise local Whisper runs
   after stopping. Turn transcription off for signal analysis only. The batch

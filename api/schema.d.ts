@@ -719,7 +719,7 @@ export interface components {
         Body_analyze_speech_analyze_post: {
             /**
              * Config
-             * @description AudioConfig JSON; first 3000 ms are calibration
+             * @description AudioConfig JSON; calibrates on voiced speech, then adapts gradually; silence does not train the reference
              */
             config?: string | null;
             /**
