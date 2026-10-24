@@ -129,6 +129,22 @@ export const GlowField: React.FC<{ intensity?: number }> = ({
   const { durationInFrames } = useVideoConfig();
   const t = frame / durationInFrames;
   const breathe = 0.85 + 0.15 * Math.sin(frame / 45);
+
+  // Eased multi-stop falloff (statt linear → transparent): vermeidet
+  // sichtbare Banding-Stufen in den dunklen Glow-Verläufen.
+  const orbGradient = (color: string): string => {
+    const m = color.match(/rgba?\(([^)]+)\)/);
+    if (!m) return `radial-gradient(circle, ${color} 0%, transparent 70%)`;
+    const [r, g, b, a] = m[1].split(",").map((s) => s.trim());
+    const base = Number.parseFloat(a ?? "1");
+    const stop = (alpha: number, pct: number) =>
+      `rgba(${r},${g},${b},${(base * alpha).toFixed(4)}) ${pct}%`;
+    return `radial-gradient(circle, ${stop(1, 0)}, ${stop(0.58, 30)}, ${stop(
+      0.28,
+      52,
+    )}, ${stop(0.1, 72)}, ${stop(0.028, 88)}, rgba(0,0,0,0) 100%)`;
+  };
+
   const orb = (
     left: string,
     top: string,
@@ -143,7 +159,7 @@ export const GlowField: React.FC<{ intensity?: number }> = ({
     width: size,
     height: size,
     borderRadius: "50%",
-    background: `radial-gradient(circle, ${color} 0%, transparent 65%)`,
+    background: orbGradient(color),
     transform: `translate(${Math.sin(t * Math.PI * 2) * dx}px, ${
       Math.cos(t * Math.PI * 1.6) * dy
     }px)`,
@@ -159,6 +175,17 @@ export const GlowField: React.FC<{ intensity?: number }> = ({
       />
       <div
         style={orb("30%", "80%", 1000, "rgba(56,3,191,0.20)", 60, -50)}
+      />
+      {/* Feines Dither direkt über den Glows, unter dem Content:
+          bricht letzte Banding-Stufen, ohne Text/Mocks zu betreffen. */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: 0.05,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23d)'/%3E%3C/svg%3E")`,
+          mixBlendMode: "screen",
+        }}
       />
     </AbsoluteFill>
   );
@@ -181,7 +208,7 @@ export const FilmLayer: React.FC = () => {
         style={{
           position: "absolute",
           inset: 0,
-          opacity: 0.028,
+          opacity: 0.05,
           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
           backgroundPosition: `${grainShift}px ${grainShift}px`,
           mixBlendMode: "overlay",

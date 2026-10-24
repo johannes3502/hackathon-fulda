@@ -5,7 +5,7 @@
   "description": "Promo video for Pitch Practice (8. Hackathon Fulda 2026)",
   "scripts": {
     "studio": "remotion studio src/index.ts",
-    "render": "remotion render src/index.ts PitchPractice out/PitchPractice-Promo.mp4 --codec h264 --crf 16",
+    "render": "remotion render src/index.ts PitchPractice out/PitchPractice-Promo.mp4 --codec h264 --crf 12 --x264-preset slow",
     "still": "remotion still src/index.ts PitchPractice out/preview.png"
   },
   "dependencies": {
