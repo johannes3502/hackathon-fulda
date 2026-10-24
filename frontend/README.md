@@ -73,3 +73,17 @@ Mobbin MCP references and their specific design influence are recorded in [DESIG
 In the sample rehearsal, custom title, context, audience, mode, duration, and focus areas are retained; **they do not generate new analysis**. Its metrics and questions remain fixtures; timestamps select transcript evidence. The camera workspace instead replays actual captured video and clearly labels the source of feedback. Scripted markers are not assessments. No accounts, persistent recording history, PDF parser, live AI, deployment, or actual human-performance evaluation is included.
 
 Real camera hardware, Safari/iOS behavior, and a public deployment still require acceptance in the actual presentation environment.
+
+## Local pose data capture
+
+The camera studio has an independent **Start pose capture** action. It uses a
+local MediaPipe worker; stop to download the raw JSONL. Starting a recording
+resets the preview log and anchors it to video start; its log remains downloadable
+in review. Download preview data before starting a take if you want to keep it.
+Pose samples never go to the backend and do not replace scripted feedback.
+All points, heuristics, null handling and limits are documented in
+[DATA_POINTS.md](DATA_POINTS.md). Model/runtime failures leave recording available.
+
+`npm ci` installs the pinned runtime; `npm run dev` and `npm run build` prepare its
+static assets automatically. Deploy `public/pose` with the frontend. The official
+Lite model version 1 is included; provenance is in `public/pose/README.md`.

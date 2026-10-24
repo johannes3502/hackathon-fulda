@@ -44,6 +44,7 @@ export type LiveProgress = {
   notice: string | null;
 };
 export type LiveRecording = {
+  poseLog?: Blob;
   id: string;
   config: LiveConfig;
   createdAt: string;

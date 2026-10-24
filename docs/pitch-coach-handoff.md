@@ -12,7 +12,7 @@ The camera workspace now uses the existing REST endpoints. This section supersed
 ### Still needed — keep mocks until these services exist
 
 - Audio-to-text / ASR with word timestamps: the sample transcript stays mocked. Word analysis is not ASR.
-- Pose, gesture and gaze analysis: local demo markers stay explicitly scripted.
+- Pose capture now runs locally in the camera studio and exports JSONL (see `frontend/DATA_POINTS.md`). Pose/gesture/gaze feedback rules are still pending; local demo markers stay explicitly scripted.
 - Source upload/ingest and fact-check API: sample evidence and fact-check findings stay mocked.
 - Question simulator / answer evaluation API: sample judge and follow-up responses stay mocked.
 - Session persistence, presigned upload, asynchronous jobs/status, event-clip retrieval: local browser replay remains temporary; no backend routes are invented.

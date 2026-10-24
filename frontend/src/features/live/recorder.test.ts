@@ -19,7 +19,11 @@ class Recorder {
     this.onstop?.();
   }
 }
-function setup(transport: VideoTransport, mode: LiveConfig["mode"] = "demo") {
+function setup(
+  transport: VideoTransport,
+  mode: LiveConfig["mode"] = "demo",
+  onStart?: (timestamp: number) => void,
+) {
   vi.useFakeTimers();
   vi.stubGlobal("MediaRecorder", Recorder);
   const stopTrack = vi.fn();
@@ -39,6 +43,7 @@ function setup(transport: VideoTransport, mode: LiveConfig["mode"] = "demo") {
     transport,
     vi.fn(),
     complete,
+    onStart,
   );
   return { recorder, complete, stopTrack };
 }
@@ -120,5 +125,27 @@ it("requires a microphone for backend analysis before contacting the API", async
   const { recorder } = setup(transport, "backend");
   await expect(recorder.start()).rejects.toThrow("microphone");
   expect(transport.connect).not.toHaveBeenCalled();
+  recorder.dispose();
+});
+
+it("anchors pose capture on the actual recorder start, after connection completes", async () => {
+  let connect!: () => void;
+  const onStart = vi.fn();
+  const transport = {
+    connect: () =>
+      new Promise<void>((resolve) => {
+        connect = resolve;
+      }),
+    send: async () => {},
+    finish: async () => {},
+    close: () => {},
+  };
+  const { recorder } = setup(transport, "demo", onStart);
+  const starting = recorder.start();
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(onStart).not.toHaveBeenCalled();
+  connect();
+  await starting;
+  expect(onStart).toHaveBeenCalledExactlyOnceWith(5000);
   recorder.dispose();
 });

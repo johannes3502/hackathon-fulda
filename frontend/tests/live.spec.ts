@@ -225,15 +225,13 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
   await expect(page).toHaveURL(/\/review$/);
   expect(uploads).toBe(1);
   await expect(page.getByText("Audio: pause count")).toBeVisible();
-  await page
-    .getByLabel("Word timestamps (JSON)")
-    .setInputFiles({
-      name: "words.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(
-        JSON.stringify([{ word: "um", start_ms: 100, end_ms: 300 }]),
-      ),
-    });
+  await page.getByLabel("Word timestamps (JSON)").setInputFiles({
+    name: "words.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify([{ word: "um", start_ms: 100, end_ms: 300 }]),
+    ),
+  });
   await expect(
     page.getByText("Transcript analysis added to this take."),
   ).toBeVisible();
@@ -255,4 +253,124 @@ test("analysis failure preserves playable recording", async ({ page }) => {
         .evaluate((el: HTMLVideoElement) => el.readyState),
     )
     .toBeGreaterThanOrEqual(2);
+});
+
+test("local pose worker loads real assets and runs on synthetic camera frames", async ({
+  page,
+}) => {
+  await syntheticCamera(page);
+  await enable(page);
+  await page
+    .getByRole("button", { name: "Start pose capture", exact: true })
+    .click();
+  await expect(
+    page.getByText("No usable pose. Keep your upper body in frame."),
+  ).toBeVisible({ timeout: 45000 });
+  await page
+    .getByRole("button", { name: "Stop pose capture", exact: true })
+    .click();
+  await expect(
+    page.getByText("Pose capture stopped. Your samples are ready to download."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Download pose JSONL" }),
+  ).toHaveCount(0);
+});
+
+test("pose JSONL stays local, resets for recording and survives review navigation", async ({
+  page,
+}, info) => {
+  await syntheticCamera(page);
+  const uploads: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST") uploads.push(request.url());
+  });
+  await page.route("**/pose/worker.js", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: `
+    onmessage = ({data}) => {
+      if (data.type === 'init') postMessage({type:'ready'});
+      if (data.type === 'frame') {
+        const points = Array.from({length:33}, (_,i) => ({x:.4+(i%2)*.2,y:.2+i*.01,z:-.1,visibility:i>=25?.1:.99,presence:.99}));
+        postMessage({type:'sample',timestamp:data.timestamp,width:data.frame.width,height:data.frame.height,points});
+        data.frame.close();
+      }
+    };
+  `,
+    }),
+  );
+  await enable(page);
+  await page
+    .getByRole("button", { name: "Start pose capture", exact: true })
+    .click();
+  await expect(
+    page.getByText("Pose samples stay in this browser."),
+  ).toBeVisible();
+  await page.waitForTimeout(1200);
+  await page
+    .getByLabel("Your local camera feed")
+    .evaluate((v: HTMLVideoElement) => v.pause());
+  await page.getByRole("button", { name: "Record with demo feedback" }).click();
+  await expect(page.getByLabel("Local pose capture")).toContainText(
+    /[1-9]\d* pose samples/,
+  );
+  await page.waitForTimeout(700);
+  await page.screenshot({
+    path: info.outputPath("pose-studio.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Download pose JSONL" }).click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  const buffers = [];
+  for await (const chunk of stream!) buffers.push(chunk);
+  const samples = Buffer.concat(buffers)
+    .toString()
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(samples.length).toBeGreaterThan(0);
+  expect(samples[0].t_ms).toBeLessThan(500);
+  expect(samples.at(-1).t_ms).toBeLessThan(1200);
+  expect(Object.keys(samples[0].pose)).toHaveLength(21);
+  expect(samples[0].pose.left_knee).toBeNull();
+  expect(samples[0].quality).toEqual({
+    pose_present: true,
+    legs_visible: false,
+  });
+  expect(uploads).toEqual([]);
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("pose-review.png"),
+    fullPage: true,
+  });
+});
+
+test("pose model failure preserves camera recording controls", async ({
+  page,
+}) => {
+  await syntheticCamera(page);
+  await page.route("**/pose/worker.js", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: "onmessage=()=>postMessage({type:'error'});",
+    }),
+  );
+  await enable(page);
+  await page
+    .getByRole("button", { name: "Start pose capture", exact: true })
+    .click();
+  await expect(
+    page.getByText("Pose detection failed.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Record with demo feedback" }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Start new pose log" }),
+  ).toBeEnabled();
 });
