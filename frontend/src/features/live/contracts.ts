@@ -64,6 +64,6 @@ export interface VideoTransport {
     receive: (message: LiveMessage) => void,
   ): Promise<void>;
   send(chunk: Blob, meta: VideoChunkMeta): Promise<void>;
-  finish(durationMs: number): Promise<void>;
+  finish(durationMs: number, recording?: Blob): Promise<void>;
   close(): void;
 }

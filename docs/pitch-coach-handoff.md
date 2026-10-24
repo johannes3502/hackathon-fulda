@@ -1,3 +1,26 @@
+## Current endpoint integration (2026-10-24)
+
+The camera workspace now uses the existing REST endpoints. This section supersedes any proposed WebSocket integration below; no WebSocket service exists in the backend.
+
+| Endpoint | Frontend use |
+| --- | --- |
+| `GET /health/live` | Before backend recording starts |
+| `GET /health/ready` | Backend service status; unavailable storage does not block stateless analysis |
+| `POST /speech/analyze` | Complete camera/microphone recording after stop; events and measurements in review |
+| `POST /transcription/analyze-words` | Optional timestamped transcript JSON import in backend review |
+
+### Still needed — keep mocks until these services exist
+
+- Audio-to-text / ASR with word timestamps: the sample transcript stays mocked. Word analysis is not ASR.
+- Pose, gesture and gaze analysis: local demo markers stay explicitly scripted.
+- Source upload/ingest and fact-check API: sample evidence and fact-check findings stay mocked.
+- Question simulator / answer evaluation API: sample judge and follow-up responses stay mocked.
+- Session persistence, presigned upload, asynchronous jobs/status, event-clip retrieval: local browser replay remains temporary; no backend routes are invented.
+
+Do not present mocked findings as observations about a live recording. Backend audio failures retain the user's video and show an error, without silently substituting mock results. The default sample path remains deterministic and available without any backend.
+
+---
+
 # Pitch Coach frontend handoff
 
 2026-10-24 · Source: `Pitch_Coach_Frontend_Plan.md` and the implemented TypeScript contracts.

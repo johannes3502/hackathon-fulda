@@ -15,6 +15,7 @@ import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import type { LiveFeedback } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { FeedbackMoment, LiveNav, MissingRecording } from "./shared";
+import { TranscriptAnalysis } from "./TranscriptAnalysis";
 import { VideoPlayback } from "./VideoPlayback";
 
 export function LiveReview({ sessionId }: { sessionId: string }) {
@@ -119,7 +120,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 Download this take before leaving the live workspace or
                 refreshing. The full recording is held in browser memory
                 {recording.config.mode === "backend"
-                  ? "; streamed chunks may also be retained by your backend"
+                  ? "; a copy was submitted for temporary backend analysis"
                   : " and has not been uploaded"}
                 .
               </p>
@@ -183,7 +184,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 </>
               )}
               <p className="field-hint">
-                {recording.chunksSent} video chunks{" "}
+                {recording.chunksSent} recording uploads/parts{" "}
                 {recording.config.mode === "demo"
                   ? "processed by the local demo"
                   : "sent to the backend"}
@@ -207,6 +208,9 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             </section>
           </aside>
         </div>
+        {recording.config.mode === "backend" && (
+          <TranscriptAnalysis recording={recording} />
+        )}
         <section className="review-moments">
           <div className="panel-title-row">
             <h2>Moments to revisit</h2>

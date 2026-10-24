@@ -13,7 +13,7 @@ export function recordingMimeType() {
       "This browser cannot record video. Try a current Chrome, Edge, or Safari browser.",
     );
   return (
-    ["video/webm;codecs=vp8", "video/webm", "video/mp4"].find((type) =>
+    ["video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find((type) =>
       MediaRecorder.isTypeSupported(type),
     ) ?? ""
   );
@@ -82,6 +82,13 @@ export class LiveRecorder {
       this.config.title.length > 100
     )
       throw new Error("Add a title and choose a supported recording length.");
+    if (
+      this.config.mode === "backend" &&
+      !this.stream.getAudioTracks().some((track) => track.readyState === "live")
+    )
+      throw new Error(
+        "Enable microphone access before recording for audio analysis.",
+      );
     const mimeType = recordingMimeType();
     if (
       !this.stream.getVideoTracks().some((track) => track.readyState === "live")
@@ -136,8 +143,10 @@ export class LiveRecorder {
         try {
           if (this.disposed || this.failed) return;
           await this.transport.send(event.data, meta);
-          this.progress.chunksSent++;
-          this.progress.bytesSent += event.data.size;
+          if (this.config.mode === "demo") {
+            this.progress.chunksSent++;
+            this.progress.bytesSent += event.data.size;
+          }
         } catch (error) {
           this.fail(
             error instanceof Error ? error.message : "Video streaming failed.",
@@ -210,9 +219,16 @@ export class LiveRecorder {
     }
     await this.queue;
     if (this.disposed) return;
+    const video = new Blob(this.chunks, {
+      type: this.recorder?.mimeType || "video/webm",
+    });
     if (!this.failed) {
       try {
-        await this.transport.finish(this.progress.elapsedMs);
+        await this.transport.finish(this.progress.elapsedMs, video);
+        if (this.config.mode === "backend") {
+          this.progress.chunksSent = 1;
+          this.progress.bytesSent = video.size;
+        }
       } catch (error) {
         this.failed = true;
         this.progress.notice =
@@ -223,9 +239,6 @@ export class LiveRecorder {
     }
     this.transport.close();
     if (this.disposed) return;
-    const video = new Blob(this.chunks, {
-      type: this.recorder?.mimeType || "video/webm",
-    });
     this.chunks = [];
     this.onComplete({
       id: this.id,
