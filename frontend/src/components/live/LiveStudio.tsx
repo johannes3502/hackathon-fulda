@@ -25,10 +25,15 @@ import { Input, NativeSelect } from "@/components/ui/input";
 import { useCameraPreview } from "@/hooks/useCameraPreview";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { LiveCaptions } from "@/features/live/captions";
+import { speechCue } from "@/features/live/speech-feedback";
 import { LiveRecorder } from "@/features/live/recorder";
 import { createVideoTransport } from "@/features/live/transport";
 import { apiEndpoint, request } from "@/features/live/analysis";
-import type { LiveConfig, LiveProgress } from "@/features/live/contracts";
+import type {
+  LiveConfig,
+  LiveFeedback,
+  LiveProgress,
+} from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { poseFeedback } from "@/features/pose/feedback";
@@ -67,6 +72,12 @@ export function LiveStudio() {
   const [liveCaptions, setLiveCaptions] = useState(false);
   const [caption, setCaption] = useState({ text: "", status: "" });
   const captions = useRef<LiveCaptions | null>(null);
+  const speech = useRef<LiveCaptions | null>(null);
+  const [speechStatus, setSpeechStatus] = useState("");
+  const [voiceCue, setVoiceCue] = useState<{
+    event: LiveFeedback;
+    untilMs: number;
+  } | null>(null);
   const [endpoint, setEndpoint] = useState(
     process.env.NEXT_PUBLIC_API_URL ?? "/api",
   );
@@ -82,6 +93,7 @@ export function LiveStudio() {
     () => () => {
       owner.current?.dispose();
       captions.current?.stop();
+      speech.current?.stop();
     },
     [],
   );
@@ -155,6 +167,7 @@ export function LiveStudio() {
         if (next.phase === "finishing") {
           pose.stop();
           captions.current?.stop();
+          speech.current?.stop();
         }
         setProgress(next);
       },
@@ -182,11 +195,27 @@ export function LiveStudio() {
       },
       (timestamp) => {
         pose.beginRecording(timestamp, recorder.id);
+        setVoiceCue(null);
+        if (mode === "backend") {
+          const shown = new Map<string, number>();
+          speech.current = new LiveCaptions(
+            (_, status) => {
+              setSpeechStatus(status);
+              if (status.includes("unavailable")) setVoiceCue(null);
+            },
+            (events) => {
+              const now = performance.now() - timestamp;
+              const event = speechCue(events, now, shown);
+              setVoiceCue(event ? { event, untilMs: now + 5000 } : null);
+            },
+          );
+          void speech.current.start(stream, destination, timestamp);
+        }
         if (mode === "backend" && transcribe && liveCaptions) {
           captions.current = new LiveCaptions((text, status) =>
             setCaption({ text, status }),
           );
-          void captions.current.start(stream, destination);
+          void captions.current.start(stream, destination, timestamp);
         }
       },
     );
@@ -196,6 +225,8 @@ export function LiveStudio() {
     } catch (e) {
       if (owner.current !== recorder) return;
       recorder.dispose();
+      speech.current?.stop();
+      captions.current?.stop();
       owner.current = null;
       busy.current = false;
       stopCamera();
@@ -206,6 +237,7 @@ export function LiveStudio() {
   const cancel = () => {
     owner.current?.dispose();
     captions.current?.stop();
+    speech.current?.stop();
     owner.current = null;
     busy.current = false;
     stopCamera();
@@ -221,10 +253,15 @@ export function LiveStudio() {
         ...(pose.state?.evaluation?.events ?? []).map(poseFeedback),
       ].sort((a, b) => a.startMs - b.startMs)
     : [];
-  const latest =
-    showCues && pose.state?.phase === "running" && evaluation?.cue
-      ? poseFeedback(evaluation.cue)
-      : null;
+  const latest = !showCues
+    ? null
+    : progress?.phase === "recording" &&
+        voiceCue &&
+        progress.elapsedMs < voiceCue.untilMs
+      ? voiceCue.event
+      : pose.state?.phase === "running" && evaluation?.cue
+        ? poseFeedback(evaluation.cue)
+        : null;
   return (
     <AppShell experience="live">
       <div
@@ -441,8 +478,8 @@ export function LiveStudio() {
                     ? "Local gesture observations"
                     : progress?.phase === "recording"
                       ? liveCaptions && transcribe
-                        ? "Live captions · audio sent to server"
-                        : "Audio analysis after stopping"
+                        ? "Live speech feedback + captions"
+                        : "Live speech feedback · audio sent to server"
                       : "Backend mode"}
                 </span>
               </div>
@@ -452,12 +489,14 @@ export function LiveStudio() {
                 ? (progress.notice ??
                   (mode === "local"
                     ? "Video and gesture observations stay in this browser. Start each take with 3 seconds in a neutral position."
-                    : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis.`))
+                    : `${speechStatus} Speak normally for the first 3 seconds. Full analysis follows after stopping.`))
                 : cameraCopy[cameraStatus]}
               {mode === "backend" && !progress && (
                 <span className="recording-consent">
                   By starting, you agree to send your video and microphone audio
-                  to <strong>{endpoint}</strong> after stopping.
+                  to <strong>{endpoint}</strong> after stopping. Microphone
+                  audio is also sent during recording for live volume, pitch,
+                  pace and pause feedback.
                   {transcribe &&
                     liveCaptions &&
                     " Live captions also send microphone audio to this server during recording."}
@@ -628,7 +667,7 @@ export function LiveStudio() {
               <section className="cue-panel">
                 <div className="panel-title-row">
                   <h2>
-                    <Eye size={18} /> Live gesture feedback
+                    <Eye size={18} /> Live feedback
                   </h2>
                   <span>Heuristic</span>
                 </div>

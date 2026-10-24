@@ -102,6 +102,13 @@ def test_silence_only():
     assert result.summary.active_ms == 0 and result.summary.median_f0_hz is None
 
 
+@pytest.mark.parametrize("seconds", [10, 10.005])
+def test_padded_final_frame_never_extends_events_past_recording(seconds):
+    result = analyze_samples(tone(seconds, syllables_hz=0))
+    assert result.events
+    assert all(0 <= e.t_ms < e.t_ms + e.duration_ms <= result.summary.duration_ms for e in result.events)
+
+
 def test_silent_calibration_does_not_produce_nan():
     import json
 

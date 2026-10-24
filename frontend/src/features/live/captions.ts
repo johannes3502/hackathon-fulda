@@ -1,4 +1,7 @@
-// Preview only: review timestamps always come from the complete recording.
+import { analysisResult } from "./analysis";
+import type { LiveFeedback } from "./contracts";
+
+// Previews only: full review analysis still comes from the complete recording.
 export class LiveCaptions {
   private socket?: WebSocket;
   private context?: AudioContext;
@@ -6,10 +9,24 @@ export class LiveCaptions {
   private processor?: AudioWorkletNode;
   private timeout?: ReturnType<typeof setTimeout>;
   private disposed = false;
-  constructor(private update: (text: string, status: string) => void) {}
+  private sentMs = 0;
+  private checkedMs = 0;
+  constructor(
+    private update: (text: string, status: string) => void,
+    private feedback?: (events: LiveFeedback[]) => void,
+  ) {}
 
-  async start(stream: MediaStream, endpoint: string) {
-    this.update("", "Connecting live captions…");
+  async start(
+    stream: MediaStream,
+    endpoint: string,
+    recordingStart = performance.now(),
+  ) {
+    this.update(
+      "",
+      this.feedback
+        ? "Connecting live speech feedback…"
+        : "Connecting live captions…",
+    );
     try {
       const context = (this.context = new AudioContext({ sampleRate: 16000 }));
       await context.resume();
@@ -17,12 +34,15 @@ export class LiveCaptions {
       if (this.disposed) return;
       if (context.sampleRate !== 16000 || context.state !== "running")
         throw new Error("Audio capture unavailable");
-      const url = new URL(`${endpoint}/speech/live`);
+      const url = new URL(
+        `${endpoint}/speech/${this.feedback ? "feedback" : "live"}`,
+      );
       url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
       const socket = (this.socket = new WebSocket(url));
       this.timeout = setTimeout(() => this.fail(), 20000);
       socket.onopen = () =>
         socket.send(JSON.stringify({ type: "start", sample_rate: 16000 }));
+      let offsetMs = 0;
       socket.onmessage = ({ data }) => {
         if (this.disposed) return;
         try {
@@ -33,6 +53,10 @@ export class LiveCaptions {
             if (!("sample_rate" in message) || message.sample_rate !== 16000)
               throw new Error("Unsupported sample rate");
             clearTimeout(this.timeout);
+            offsetMs = Math.max(
+              0,
+              Math.round(performance.now() - recordingStart),
+            );
             this.processor = new AudioWorkletNode(context, "caption-pcm", {
               channelCount: 1,
               channelCountMode: "explicit",
@@ -42,7 +66,11 @@ export class LiveCaptions {
             }: MessageEvent<ArrayBuffer>) => {
               if (this.disposed || socket.readyState !== WebSocket.OPEN) return;
               // Stop the preview instead of silently dropping audio and shifting its clock.
-              if (socket.bufferedAmount > 320000) {
+              this.sentMs += data.byteLength / 32;
+              if (
+                socket.bufferedAmount > 320000 ||
+                (this.feedback && this.sentMs - this.checkedMs > 15000)
+              ) {
                 this.fail();
                 return;
               }
@@ -51,7 +79,41 @@ export class LiveCaptions {
             this.input = context.createMediaStreamSource(stream);
             this.input.connect(this.processor);
             this.processor.connect(context.destination); // Worklet outputs silence.
-            this.update("", "Listening…");
+            this.update(
+              "",
+              this.feedback
+                ? "Speak normally for 3 seconds to calibrate. Feedback updates every 5 seconds."
+                : "Listening…",
+            );
+          } else if (message.type === "feedback" && this.feedback) {
+            if (
+              !("position_ms" in message) ||
+              typeof message.position_ms !== "number" ||
+              !Number.isInteger(message.position_ms) ||
+              message.position_ms < this.checkedMs ||
+              message.position_ms > this.sentMs ||
+              !("events" in message) ||
+              !Array.isArray(message.events) ||
+              message.events.length > 1000
+            )
+              throw new Error("Invalid speech feedback");
+            const result = analysisResult(
+              { summary: {}, events: message.events },
+              "speech",
+              message.position_ms,
+            );
+            this.checkedMs = message.position_ms;
+            this.feedback(
+              result.feedback.map((event) => ({
+                ...event,
+                startMs: event.startMs + offsetMs,
+                endMs: event.endMs + offsetMs,
+              })),
+            );
+            this.update(
+              "",
+              "Live speech feedback · heuristic · updates every 5 seconds",
+            );
           } else if (message.type === "text") {
             if (
               !("text" in message) ||
@@ -78,7 +140,9 @@ export class LiveCaptions {
     if (this.disposed) return;
     this.update(
       "",
-      "Live captions unavailable. Recording continues; the full transcript is created after stopping.",
+      this.feedback
+        ? "Live speech feedback unavailable or behind. Recording continues; analysis runs after stopping."
+        : "Live captions unavailable. Recording continues; the full transcript is created after stopping.",
     );
     this.stop();
   }

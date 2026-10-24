@@ -68,10 +68,14 @@ def analyze_samples(samples: np.ndarray, config: AudioConfig | None = None) -> A
         + _pace(is_peak, active, t_ms, base_rate, config),
         key=lambda e: (e.t_ms, e.type),
     )
+    duration_ms = round(len(samples) / sr * 1000)
+    events = [event for event in events if event.t_ms < duration_ms]
+    for event in events:
+        event.duration_ms = min(event.duration_ms, duration_ms - event.t_ms)
 
     voiced_st = semitones[voiced & np.isfinite(semitones)]
     summary = AudioSummary(
-        duration_ms=round(len(samples) / sr * 1000),
+        duration_ms=duration_ms,
         active_ms=int(active.sum()) * hop_ms,
         median_level_db=_round(_median(level[active])),
         median_f0_hz=_round(_median(f0[voiced])),

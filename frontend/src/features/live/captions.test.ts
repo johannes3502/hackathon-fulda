@@ -121,6 +121,65 @@ it("does not open a socket if stopped while the worklet loads", async () => {
   expect(closeAudio).toHaveBeenCalledTimes(1);
 });
 
+it("streams signal feedback without captions and aligns events to recording start", async () => {
+  const update = vi.fn(),
+    feedback = vi.fn();
+  const preview = new LiveCaptions(update, feedback);
+  const start = performance.now();
+  await preview.start({} as MediaStream, "http://localhost/api", start);
+  const socket = Socket.latest;
+  expect(String(socket.url)).toBe("ws://localhost/api/speech/feedback");
+  await vi.advanceTimersByTimeAsync(250);
+  socket.receive({ type: "ready", sample_rate: 16000 });
+  for (let i = 0; i < 50; i++)
+    port.onmessage?.({ data: new ArrayBuffer(3200) });
+  socket.receive({
+    type: "feedback",
+    position_ms: 5000,
+    events: [
+      {
+        type: "volume",
+        t_ms: 3000,
+        duration_ms: 2000,
+        source: "speech",
+        severity: "hint",
+        payload: { direction: "quiet" },
+      },
+    ],
+  });
+  expect(feedback).toHaveBeenCalledWith([
+    expect.objectContaining({ startMs: 3250, endMs: 5250 }),
+  ]);
+  expect(update).toHaveBeenLastCalledWith(
+    "",
+    expect.stringContaining("heuristic"),
+  );
+  preview.stop();
+});
+
+it("stops signal preview when the server accepts audio but stops analysing it", async () => {
+  const update = vi.fn();
+  const preview = new LiveCaptions(update, vi.fn());
+  await preview.start({} as MediaStream, "http://localhost/api");
+  Socket.latest.receive({ type: "ready", sample_rate: 16000 });
+  for (let i = 0; i < 151; i++)
+    port.onmessage?.({ data: new ArrayBuffer(3200) });
+  expect(update).toHaveBeenLastCalledWith(
+    "",
+    expect.stringContaining("behind"),
+  );
+  expect(Socket.latest.close).toHaveBeenCalledOnce();
+});
+
+it("rejects feedback claiming audio that was never sent", async () => {
+  const feedback = vi.fn();
+  const preview = new LiveCaptions(vi.fn(), feedback);
+  await preview.start({} as MediaStream, "http://localhost/api");
+  Socket.latest.receive({ type: "feedback", position_ms: 5000, events: [] });
+  expect(feedback).not.toHaveBeenCalled();
+  expect(Socket.latest.close).toHaveBeenCalledOnce();
+});
+
 it("worklet packs clipped little-endian PCM into 100 ms frames across render blocks", () => {
   const postMessage = vi.fn();
   let Processor: new () => { process: (inputs: Float32Array[][]) => boolean };

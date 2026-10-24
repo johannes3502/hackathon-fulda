@@ -195,6 +195,16 @@ Das Ergebnis enthält zusätzlich den zusammengesetzten Transkripttext. Silero V
 Sprachaktivität; RMS und YIN bleiben erhalten, Standard-Kalibrierung 3 s. Die Umstellung des Speichers
 ist eine separate Implementierungsaufgabe.
 
+Live-Sprechfeedback ist im Web-Backend-Modus umgesetzt: `WS /speech/feedback`
+analysiert Mikrofon-PCM alle 5 s mit denselben Signalregeln und 3-s-Baseline.
+Ein Live-Slot pro API-Prozess, maximal 5 min; PCM nur im RAM. Die Vorschau
+läuft unabhängig von optionalen Whisper-Captions, zeigt höchstens einen
+Hinweis mit 15-s-Cooldown pro Typ und stoppt bei mehr als 15 s Rückstand.
+Vollständige Analyse und wortbasierte Merkmale bleiben nach dem Stoppen.
+Benchmark auf dem M5 Pro/24 GB: synthetischer 30-s-Stream mit 80–182 ms
+Signal-Verarbeitungs-/Lieferzeit zusätzlich zum 5-s-Sammelintervall.
+Echtes Mikrofon/Safari und Genauigkeit sind damit nicht abgenommen.
+
 Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
 sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
 Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`

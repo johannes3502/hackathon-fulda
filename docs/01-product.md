@@ -50,7 +50,14 @@ Produktentscheidung.
 - Gesten: sichtbare Geometrie relativ zur Neutralstellung, Mindestdauer,
   Hysterese und Cooldown sind als Prototyp-Heuristiken umgesetzt; keine Scores.
   Systematische Genauigkeits-/Geräteprüfung bleibt offen.
-- Was läuft live, was erst nach der Präsentation?
+- Live-Sprechfeedback (24.10.2026, Nutzerauftrag): Im Backend-Modus laufen
+  dieselben kalibrierten Signalregeln für Lautstärke, Tonhöhe, Silben-Tempo
+  und Pausen bereits während der Aufnahme (Updates alle 5 s, maximal 5 min).
+  Ein Hinweis gleichzeitig, pro Typ 15 s Cooldown, Hinweise ausblendbar.
+  Mikrofon-PCM wird an den lokalen Server gesendet und nur im RAM gehalten.
+  Wortbasierte Füllwörter/WPM, vollständiges Review und Quellenvergleich
+  bleiben nachgelagert. Live-Whisper bleibt eine optionale Vorschau; der
+  aktuelle Docker-CPU-Pfad hielt im längeren Test nicht mit.
 - Wie werden Fehlalarme und Unsicherheit angezeigt?
 - Eye Tracking: Webcam-basiert oder zusätzliche Hardware?
 

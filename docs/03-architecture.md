@@ -24,7 +24,7 @@ flowchart TB
 
     subgraph Backend["backend/ - FastAPI (Python 3.12) Port 8000"]
         MAIN["FastAPI App<br/>Health, CORS, Router"]
-        SP["Speech-Router<br/>POST /speech/analyze<br/>GET /speech/jobs/id<br/>WS /speech/live"]
+        SP["Speech-Router<br/>POST /speech/analyze<br/>GET /speech/jobs/id<br/>WS /speech/live, /speech/feedback"]
         TR["Transcription-Router<br/>POST /transcription/analyze-words"]
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
         FC["Factcheck-Router<br/>POST /factcheck<br/>GET /factcheck/jobs/id, /settings"]
@@ -54,9 +54,12 @@ flowchart TB
 
     WEB -- "Kamera/Mikro" --> MP_W
     WEB -- "Aufnahme" --> MR
-    WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>optional während der Aufnahme"]
+    WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>Live-Sprechfeedback im Backend-Modus"]
     PCM -- "WS /api/speech/live: PCM" --> SP
     SP -- "kumulativer Vorschautext" --> WEB
+    PCM -- "WS /api/speech/feedback: PCM" --> SP
+    SP --> LIVE_SIG["API-Thread: gleiche Signalregeln alle 5 s<br/>3-s-Baseline, maximal 5 min, ein Live-Slot<br/>PCM nur im RAM; unabhängig von Whisper"]
+    LIVE_SIG -- "feedback: position_ms + Events<br/>ein Hinweis, 15-s-Cooldown pro Typ" --> WEB
     MP_W --> RULES["PoseEvaluator: Neutralstellung, Geometrie, Mindestdauer<br/>posture/gesture-Events; lokale Evidenz"]
     MOB -- "Kamera" --> MP_M
 
@@ -148,6 +151,13 @@ sequenceDiagram
     FE->>BE: GET /health/ready (10-s-Startfrist)
     BE-->>FE: Bereit, oder Abbruch vor Aufnahme mit Retry-Hinweis
     FE->>FE: MediaPipe Pose lokal (Web Worker)
+    FE->>BE: WS /speech/feedback: start, PCM nach ready
+    loop alle 5 Sekunden, maximal 5 Minuten
+        BE->>BE: Signalregeln auf bisherigem Audio, feste Anfangskalibrierung
+        BE-->>FE: feedback: position_ms, aktuelle Events (Heuristik)
+        FE->>FE: Zeitoffset zu MediaRecorder.onstart; ein Hinweis, Cooldown
+    end
+    Note over FE,BE: Mehr als 15 s Analyse-Rückstand: Vorschau stoppen, Aufnahme erhalten
     opt Live captions aktiviert
         FE->>BE: WS /speech/live: start, PCM nach ready
         BE-->>FE: Kumulativer Text als Vorschau (kein Review-Transkript)
@@ -435,6 +445,7 @@ flowchart LR
         S1["POST /speech/analyze"]
         S2["GET /speech/jobs/{job_id}"]
         S3LIVE["WS /speech/live: start, PCM, stop<br/>ready, words, text, done/error"]
+        S4LIVE["WS /speech/feedback: start, PCM, stop<br/>ready, feedback, done/error; kein Whisper"]
         T1["POST /transcription/analyze-words"]
         R1["POST /sources"]
         R2["GET /sources?collection_id"]
@@ -451,7 +462,7 @@ flowchart LR
         Q5["POST /questions/answers/voice"]
     end
 
-    WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5
+    WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5
     MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
 ```
 

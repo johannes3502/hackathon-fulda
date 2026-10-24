@@ -1039,6 +1039,80 @@ test("live captions send PCM only during recording and a disconnect keeps the ta
   expect(frames).toBe(3);
 });
 
+test("signal feedback appears during recording without captions and failure preserves the take", async ({
+  page,
+}) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  await page.route("**/api/health/**", (route) =>
+    route.fulfill({ json: { status: "ok" } }),
+  );
+  await page.route("**/api/speech/analyze", (route) =>
+    route.fulfill({ status: 503 }),
+  );
+  let frames = 0;
+  let disconnect = () => {};
+  await page.routeWebSocket("**/api/speech/feedback", (socket) => {
+    disconnect = () =>
+      socket.close({ code: 1013, reason: "Synthetic capacity failure" });
+    socket.onMessage((message) => {
+      if (typeof message === "string") {
+        if (JSON.parse(message).type === "start")
+          socket.send(JSON.stringify({ type: "ready", sample_rate: 16000 }));
+      } else if (++frames === 50) {
+        socket.send(
+          JSON.stringify({
+            type: "feedback",
+            position_ms: 5000,
+            events: [
+              {
+                t_ms: 3000,
+                duration_ms: 2000,
+                type: "volume",
+                severity: "hint",
+                source: "speech",
+                payload: { direction: "quiet" },
+              },
+            ],
+          }),
+        );
+      }
+    });
+  });
+  await page.goto("/");
+  await page.getByLabel("Speech analysis").selectOption("backend");
+  await page
+    .getByRole("button", { name: "Enable camera", exact: true })
+    .click();
+  expect(frames).toBe(0);
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  await expect(page.locator(".cue-message")).toHaveText(
+    "Your voice is quieter",
+    { timeout: 15000 },
+  );
+  await expect(page.locator(".live-cue-detail")).toHaveText(
+    "Try speaking at your starting volume.",
+  );
+  disconnect();
+  await expect(page.locator(".camera-message")).toContainText(
+    "Recording continues",
+  );
+  await expect(page.locator(".cue-message")).not.toHaveText(
+    "Your voice is quieter",
+  );
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect
+    .poll(() =>
+      page
+        .getByLabel("Recorded pitch video")
+        .evaluate((video: HTMLVideoElement) => video.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+});
+
 test("unavailable backend never starts recording and offers a working local retry", async ({
   page,
 }) => {

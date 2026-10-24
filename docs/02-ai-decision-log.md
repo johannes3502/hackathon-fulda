@@ -524,3 +524,40 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
   JSON und wurde korrekt als `unchecked` ausgegeben; der strikte Drei-Urteile-
   Smoke schlug deshalb fehl. Modellqualität und vollständige echte Fragerunde
   bleiben ungeprüft; dies ist vom behobenen Verbindungs-/Startfehler getrennt.
+
+## Live-Sprechfeedback auf dem M5 Pro testen und anschließen (24.10.2026)
+
+- Nutzer meint Analyse während des Sprechens, nicht Sprachausgabe/TTS.
+  Verifizierte Hardware: Apple M5 Pro, 15 CPU-Kerne, 24 GB RAM; Backend
+  im bestehenden Colima-Stack. Kein neues Modell oder Cloudanbieter.
+- Vorhandene Silero/RMS/YIN/Silben-Regeln wiederverwendet. Einzelmessungen
+  mit wiederholter synthetischer Sprach-Fixture: 10 s Audio in 0,105 s,
+  30 s in 0,193 s, 60 s in 0,354 s, 180 s in 1,189 s, 300 s in 2,273 s.
+  Dies ist kein fünfminütiger Live-Dauertest.
+- `WS /speech/feedback` verarbeitet alle fünf Sekunden den bisherigen
+  Aufnahmeabschnitt, damit die Anfangskalibrierung identisch zum Batch-Pfad
+  bleibt. Begrenzung auf fünf Minuten, einen Signal-Slot und reine RAM-Daten;
+  Inkremental-DSP bleibt erst bei längeren Aufnahmen erforderlich.
+  Whisper-Captions haben einen unabhängigen Slot. UI: ein Hinweis, pro Typ
+  15 s Cooldown, abschaltbare Hinweise; Aufnahme bleibt bei Ausfall erhalten.
+- Tatsächlicher 30-s-Stream in Echtzeit, mittlere zehn Sekunden absichtlich
+  leiser: sechs Updates, zwei Lautstärke-Beobachtungen; Lieferverzögerung
+  nach jeweiliger Audioposition 80–182 ms (Median 140 ms). Dazu kommen das
+  5-s-Sammelintervall und die jeweiligen Regel-/Kalibrierungsfenster.
+  Echter Next.js-Proxy auf Port 3000: ready → PCM → feedback → done,
+  gemessene Signal-Lieferverzögerung 112 ms.
+- Gleichzeitig mit Whisper blieb die Signal-Vorschau bei 78–160 ms.
+  Der Caption-Stream endete dagegen mit Keepalive-Timeout. Isolierte
+  6,845-s-Fixture: erstes Wortpaket nach 5,08 s, final erst nach 20,26 s,
+  mit falschen Wörtern. Deshalb keine Zusage für Live-WPM/Füllwörter und
+  kein standardmäßiges Aktivieren von Captions. Batch-Whisper bleibt erhalten.
+- Benchmark korrigiert: Verzögerung gegen die gelieferte Audio-/Wortposition
+  messen, nicht gegen zuletzt gesendetes Audio (das verbarg Rückstau).
+  Kurzes PCM-Endstück geht nicht mehr verloren. Zusätzlich begrenzt die
+  gemeinsame Signalanalyse Events auf die echte Aufnahmedauer statt auf
+  ein aufgefülltes Schlussfenster. Jeweils Regressionstests ergänzt.
+- Verifiziert: 102 Frontend-Unit-Tests, Typecheck/Lint, 58 relevante Backend-
+  Tests, drei Desktop-Browserfälle mit synthetischem Kamera-/Audioeingang.
+  Browserfälle prüfen Live-Hinweis vor Stop, Caption-/Signal-Ausfall und
+  weiterhin abspielbare Aufnahme. Echtes Mikrofon, Safari/iOS, parallele
+  vollständige Coaching-Last und allgemeine Heuristikqualität bleiben offen.
