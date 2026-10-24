@@ -134,6 +134,10 @@ export function LiveStudio() {
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   const startGeneration = useRef(0);
+  useEffect(() => {
+    if (cameraStatus === "active")
+      document.getElementById("live-studio")?.scrollIntoView({ block: "start" });
+  }, [cameraStatus]);
   useEffect(
     () => () => {
       startGeneration.current++;
@@ -440,23 +444,24 @@ export function LiveStudio() {
         : (evaluation?.phase ?? "framing"),
   );
   const FeedbackIcon = appearance.Icon;
+  const largeView = cameraStatus === "active" || !!progress;
   return (
     <AppShell experience="live">
       <div
-        className={`workspace live-workspace${progress ? " live-workspace-large" : ""}`}
+        className={`workspace live-workspace${largeView ? " live-workspace-large" : ""}`}
         data-feedback={appearance.tone}
       >
-        {!progress && (
+        {!largeView && (
           <div className="workspace-back">
             <Link href="/sources">
               <ArrowLeft size={16} aria-hidden /> Back to sources
             </Link>
           </div>
         )}
-        <div className={progress ? "sr-only" : "workspace-heading"}>
+        <div className={largeView ? "sr-only" : "workspace-heading"}>
           <div>
             <h1>Record your presentation</h1>
-            {!progress && (
+            {!largeView && (
               <p>
                 Check your camera and microphone, then start when you’re ready.
               </p>
@@ -471,6 +476,13 @@ export function LiveStudio() {
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <div className="live-control-bar" aria-hidden={fullscreen}>
+              {!progress && cameraStatus === "active" && (
+                <Button asChild variant="outline">
+                  <Link href="/sources">
+                    <ArrowLeft size={16} aria-hidden /> Back to sources
+                  </Link>
+                </Button>
+              )}
               <p className="field-hint live-audio-hint">
                 Microphone audio is sent to your server for live feedback. The
                 full take is uploaded after stopping.
