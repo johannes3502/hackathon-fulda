@@ -30,7 +30,7 @@ import type { LiveConfig, LiveProgress } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { PoseDownload } from "./PoseDownload";
-import { PoseDebug } from "./PoseDebug";
+import { PoseDevMode } from "./PoseDevMode";
 import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
 
@@ -65,7 +65,7 @@ export function LiveStudio() {
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [largeView, setLargeView] = useState(false);
-  const [poseDebug, setPoseDebug] = useState(false);
+  const [poseLab, setPoseLab] = useState(false);
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   useEffect(() => () => owner.current?.dispose(), []);
@@ -208,11 +208,11 @@ export function LiveStudio() {
           </Button>
           <Button
             variant="outline"
-            aria-pressed={poseDebug}
-            onClick={() => setPoseDebug(!poseDebug)}
+            aria-pressed={poseLab}
+            onClick={() => setPoseLab(!poseLab)}
           >
             <Eye size={18} />
-            Pose debug
+            Pose lab
           </Button>
           {largeView && (
             <strong className="live-view-time">
@@ -291,12 +291,9 @@ export function LiveStudio() {
                   </span>
                 )}
               {cameraStatus === "active" &&
-                poseDebug &&
+                poseLab &&
                 pose.state?.phase === "running" && (
-                  <PoseDebug
-                    sample={pose.state.latest}
-                    active={pose.state.armsCrossed}
-                  />
+                  <PoseDevMode results={pose.state.tests} />
                 )}
               {cameraStatus !== "active" && (
                 <div className="stage-placeholder">

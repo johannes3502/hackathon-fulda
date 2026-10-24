@@ -289,6 +289,36 @@ kein Modellwechsel.
 **SOLL:** 10 Minuten Aufnahme ≈ 20–30 MB Frames bei 15 Hz, 40–60 MB bei 30 Hz.
 IndexedDB-Quota und WebM-Seekbarkeit prüfen.
 
+### FR-POSE-19 — Dev mode „Pose Lab“
+
+**MUSS:** Im `/live`-Workspace gibt es einen „Pose lab“-Toggle. Bei aktiver
+Kamera zeigt er alle definierten Testposen gleichzeitig mit Name, Anweisung,
+aktuellem Messwert, Haltefortschritt und Zustand
+(`off | watching | recognized | not-evaluable`).
+
+**MUSS:** `recognized` erscheint erst nach der jeweiligen Haltezeit. Die
+Anzeige ist rein lokal, erzeugt keine Events, keine Scores und keine
+Backend-Aufrufe.
+
+| ID | Testpose | Erkennung | Haltezeit |
+|---|---|---|---|
+| T01 | Neutral / Baseline | Rumpf ±8°, Schulter ±6°, Kopf ±8°, Arme offen | 0,8 s |
+| T02 | Rumpf-Seitneigung | `|trunkLean| ≥ 20°` | 1,5 s |
+| T03 | Schultertilt | `|shoulderTilt| ≥ 10°` | 1,5 s |
+| T04 | Kopflateral | `|headRoll| ≥ 12°` | 1,5 s |
+| T05 | Arme verschränkt | bestehende `armsCrossed`-Heuristik | 2,0 s |
+| T06 | Hand im Gesicht | Hand–Gesicht-Abstand ≤ 0,60 × Schulterbreite | 1,5 s |
+| T07 | Kopf weg | `|headTurn| ≥ 0.35` (Proxy) | 1,5 s |
+| T08 | Hände über Schulter | beide `wristHeight > 0.20 × Schulterbreite` | 0,8 s |
+| T09 | Hüften außerhalb | Schultern sichtbar, `trunkLean` nicht auswertbar | 1,5 s |
+| T10 | Hände verdeckt | beide Handgelenkhöhen nicht messbar | 1,5 s |
+
+**MUSS:** T10 ist ein **Sichtbarkeitstest**, kein Taschenbeweis. T07 ist ein
+**Kopforientierungs-Proxy**, kein Gaze. Die UI muss das so benennen.
+
+**MUSS:** Der Dev mode ist nicht die Produkt-UI. Er dient nur zum Testen der
+Heuristiken und wird nicht als Event, Clip oder Backend-Payload gespeichert.
+
 ## 5. Datenmodell
 
 ```ts
@@ -823,3 +853,4 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 | Datum | Änderung | Grund |
 |---|---|---|
 | 24.10.2026 | Anforderungen angelegt | Deep Research zu Haltung, Kopforientierung, Händen, Füßen und Gesten; finale Datenmodelle und Regeln festgehalten. |
+| 24.10.2026 | Pose-Lab ergänzt | Zehn feste Testposen für den lokalen Debug-Modus; keine Events, kein Backend-Streaming, keine Scores. |

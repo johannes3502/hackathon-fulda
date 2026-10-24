@@ -1,4 +1,5 @@
 import { CrossArmsCue, armsCrossed } from "./cues";
+import { PoseTestTracker, type PoseTestResult } from "./testPoses";
 import { PoseLog, poseSample, type PoseSample } from "./sample";
 export type PoseState = {
   phase: "loading" | "running" | "stopped" | "error";
@@ -6,11 +7,14 @@ export type PoseState = {
   message: string;
   latest: PoseSample | null;
   armsCrossed: boolean;
+  tests: PoseTestResult[];
 };
 export class PoseCapture {
   readonly log = new PoseLog();
   private crossArms = new CrossArmsCue();
   private armsCrossed = false;
+  private tests = new PoseTestTracker();
+  private testResults: PoseTestResult[] = [];
   private worker: Worker | null = null;
   private frame = 0;
   private pending = false;
@@ -29,6 +33,7 @@ export class PoseCapture {
       count: this.log.count,
       latest: this.latest,
       armsCrossed: this.armsCrossed,
+      tests: this.testResults,
     });
   }
   start() {
@@ -73,6 +78,7 @@ export class PoseCapture {
             armsCrossed(sample),
             data.timestamp,
           );
+          this.testResults = this.tests.update(sample, data.timestamp);
           this.publish(
             "running",
             this.log.full
@@ -151,6 +157,8 @@ export class PoseCapture {
   beginRecording(timestamp: number) {
     this.log.reset(timestamp);
     this.latest = null;
+    this.tests.reset();
+    this.testResults = [];
   }
   private fail(message: string) {
     this.dispose();

@@ -212,6 +212,87 @@ body:has(.live-workspace-large) .app-footer,
   color: oklch(0.8 0.02 264);
   font-size: 10px;
 }
+.live-pose-lab {
+  position: absolute;
+  top: 62px;
+  right: 16px;
+  z-index: 2;
+  width: min(330px, calc(100% - 32px));
+  max-height: calc(100% - 130px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  background: #111827f2;
+  color: white;
+  font-size: 11px;
+}
+.pose-lab-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pose-lab-head span {
+  color: #fbbf24;
+  text-align: right;
+}
+.pose-lab-list {
+  display: grid;
+  gap: 4px;
+}
+.pose-test {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px;
+  border-left: 2px solid #374151;
+  border-radius: 4px;
+  background: #1f2937;
+}
+.pose-test.recognized {
+  border-left-color: #22c55e;
+  background: #14532d;
+}
+.pose-test.watching {
+  border-left-color: #fbbf24;
+}
+.pose-test.not-evaluable {
+  opacity: 0.55;
+}
+.pose-test strong {
+  display: block;
+  font-size: 11px;
+}
+.pose-test small {
+  display: block;
+  color: #9ca3af;
+  font-size: 9px;
+  line-height: 1.3;
+}
+.pose-test-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pose-test-meta span:last-child {
+  color: #9ca3af;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pose-test.recognized .pose-test-meta span:last-child {
+  color: #86efac;
+}
+.pose-lab-note {
+  display: block;
+  margin-top: 6px;
+  color: #9ca3af;
+  font-size: 9px;
+}
 .live-camera-stage .stage-top,
 .live-camera-stage .stage-bottom {
   background: #111827d9;
