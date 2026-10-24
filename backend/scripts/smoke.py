@@ -13,9 +13,7 @@ import wave
 from contextlib import closing
 from urllib.error import HTTPError
 
-import mediapipe
 from botocore.exceptions import ClientError
-from mediapipe.tasks.python import vision
 
 from app.connections import connect_db, s3_client
 from app.celery_app import celery_app
@@ -50,9 +48,8 @@ def check_worker() -> None:
 def main() -> None:
     with urllib.request.urlopen("http://127.0.0.1:8000/health/ready", timeout=15) as response:
         assert json.load(response) == {"status": "ok", "postgres": "ok", "storage": "ok", "redis": "ok"}
-    assert vision.PoseLandmarker and vision.HandLandmarker and vision.FaceLandmarker
     subprocess.run(["ffmpeg", "-version"], check=True, stdout=subprocess.DEVNULL)
-    print(f"PASS API readiness, MediaPipe {mediapipe.__version__} Tasks imports, FFmpeg")
+    print("PASS API readiness and FFmpeg")
 
     # A short silent WAV generated in memory, never a microphone recording.
     audio = io.BytesIO()

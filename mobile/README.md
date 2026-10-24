@@ -43,7 +43,7 @@ Physical iPhone installs require Developer Mode (Settings → Privacy & Security
 
 ## Still mocked / needed from the backend
 
-See the [integration handoff](../docs/pitch-coach-handoff.md) for the endpoint inventory and [`frontend/DATA_POINTS.md`](../frontend/DATA_POINTS.md) for pose fields. Native does not invent new endpoints. Source upload and retrieval are connected in both web and native clients. The Sources screens can open the same collection ID on the same server. RAG fact-check, real question generation and answer evaluation, session/report persistence, presigned uploads and server-cut clips remain unavailable to this UI. Automatic ASR is not requested by this native path; import word timestamps instead. The sample is not a fallback that silently replaces failed real analysis.
+See the [integration handoff](../docs/04-integration.md) for the endpoint inventory and [`frontend/DATA_POINTS.md`](../frontend/DATA_POINTS.md) for pose fields. Native does not invent new endpoints. Source upload and retrieval are connected in both web and native clients. The Sources screens can open the same collection ID on the same server. RAG fact-check, real question generation and answer evaluation, session/report persistence, presigned uploads and server-cut clips remain unavailable to this UI. Automatic ASR is not requested by this native path; import word timestamps instead. The sample is not a fallback that silently replaces failed real analysis.
 
 ## Verification (24 October 2026)
 

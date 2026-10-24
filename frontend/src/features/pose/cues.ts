@@ -105,9 +105,6 @@ export function pocketCheck(sample: PoseSample | null): PocketCheck {
   return { inPocket, side, hipDist, found };
 }
 
-export const handsInPockets = (sample: PoseSample | null) =>
-  pocketCheck(sample).inPocket;
-
 /**
  * Native-app compatibility adapter. Web uses PoseEvaluator for canonical events.
  * Turns per-sample results into one hint per episode: active once arms stay

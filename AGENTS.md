@@ -127,7 +127,7 @@ Event {
 AGENTS.md                          # Einstiegspunkt und Zielarchitektur
 compose.yaml                       # Frontend + Backend + Celery + Redis + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
-backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
+backend/                           # FastAPI, Audio-/Quellenanalyse, Setup und Smoke-Test
 frontend/                          # Next.js-App, eigener Entwicklungscontainer
 .run/                              # geteilte IntelliJ-Run-Konfigurationen
 .vscode/                           # geteilte VS-Code-Tasks für Docker Compose
@@ -145,7 +145,7 @@ templates/
   team-roles.md                    # Rollen, Gates, RACI
 ```
 
-Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
+Das lokale Grundgerüst startet aktuell FastAPI mit FFmpeg,
 einen separaten Celery-Worker, Redis, PostgreSQL **mit pgvector** und
 **SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job geprüft; Audio-/ASR-Jobs und
 Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO und
