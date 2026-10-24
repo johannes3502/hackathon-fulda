@@ -15,6 +15,7 @@ import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import type { LiveFeedback } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { FeedbackMoment, LiveNav, MissingRecording } from "./shared";
+import { PoseDownload } from "./PoseDownload";
 import { TranscriptAnalysis } from "./TranscriptAnalysis";
 import { VideoPlayback } from "./VideoPlayback";
 
@@ -114,6 +115,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
               selected={selected}
               onSelect={(item) => setSelected({ ...item })}
             />
+            <PoseDownload blob={recording.poseLog} />
             <div className="recording-retention">
               <Download size={16} />
               <p>

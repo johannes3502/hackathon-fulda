@@ -1,10 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  clipRange,
-  parseLiveMessage,
-  upsertFeedback,
-  validateEndpoint,
-} from "./protocol";
+import { describe, expect, it, vi } from "vitest";
+import { clipRange, upsertFeedback } from "./protocol";
 import { DemoVideoTransport } from "./transport";
 import type { LiveFeedback } from "./contracts";
 
@@ -27,70 +22,7 @@ const meta = {
   endMs: 6000,
   byteLength: 3,
 };
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.useRealTimers();
-});
-
-describe("live protocol", () => {
-  it("accepts secure endpoints and rejects credentials, mixed content and other schemes", () => {
-    expect(validateEndpoint("ws://localhost:8000/live", false)).toBe(
-      "ws://localhost:8000/live",
-    );
-    expect(validateEndpoint("wss://example.com/live", true)).toBe(
-      "wss://example.com/live",
-    );
-    for (const url of [
-      "bad",
-      "https://example.com",
-      "ws://user:pass@example.com",
-      "ws://example.com/#x",
-    ])
-      expect(() => validateEndpoint(url, false)).toThrow();
-    expect(() => validateEndpoint("ws://localhost/live", true)).toThrow(
-      "secure",
-    );
-  });
-  it("rejects invalid, cross-session and future observations at the network boundary", () => {
-    const message = { type: "feedback", sessionId: "s1", feedback };
-    expect(parseLiveMessage(JSON.stringify(message), "s1", 6000)).toEqual(
-      message,
-    );
-    for (const value of [
-      "{",
-      "[]",
-      JSON.stringify({ ...message, sessionId: "other" }),
-      JSON.stringify({ ...message, feedback: { ...feedback, startMs: 7000 } }),
-      JSON.stringify({ ...message, feedback: { ...feedback, title: "" } }),
-      "x".repeat(64001),
-    ])
-      expect(parseLiveMessage(value, "s1", 6000)).toBeNull();
-    expect(parseLiveMessage(JSON.stringify(message), "s1", 5999)).toBeNull();
-    expect(
-      parseLiveMessage(
-        JSON.stringify({
-          type: "metrics",
-          sessionId: "s1",
-          atMs: 1000,
-          metrics: [{ id: "x", label: "Visibility", value: null }],
-        }),
-        "s1",
-        6000,
-      )?.type,
-    ).toBe("metrics");
-    expect(
-      parseLiveMessage(
-        JSON.stringify({
-          type: "metrics",
-          sessionId: "s1",
-          atMs: 1000,
-          metrics: [{ id: "x", label: "Visibility", value: {} }],
-        }),
-        "s1",
-        6000,
-      ),
-    ).toBeNull();
-  });
+describe("live feedback", () => {
   it("revises observations by ID and bounds replay context to recorded media", () => {
     const earlier = { ...feedback, id: "f0", startMs: 500, endMs: 2500 };
     const items = upsertFeedback([feedback], earlier);

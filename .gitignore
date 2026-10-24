@@ -20,7 +20,8 @@ node_modules/
 .pnpm-store/
 
 # Build output
-.next/
+.next*/
+/frontend/public/pose/runtime/
 out/
 dist/
 build/

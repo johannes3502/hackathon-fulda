@@ -19,6 +19,23 @@
         "title": "AcceptedJob",
         "type": "object"
       },
+      "AcceptedSource": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          },
+          "status_url": {
+            "title": "Status Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "status_url"
+        ],
+        "title": "AcceptedSource",
+        "type": "object"
+      },
       "AnalysisJob": {
         "properties": {
           "error": {
@@ -280,6 +297,28 @@
         "title": "Body_analyze_speech_analyze_post",
         "type": "object"
       },
+      "Body_upload_source_sources_post": {
+        "properties": {
+          "collection_id": {
+            "description": "Client-generated ID grouping the sources of one presentation",
+            "format": "uuid",
+            "title": "Collection Id",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "PDF, PPTX, DOCX, TXT or MD; synthetic content only",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collection_id",
+          "file"
+        ],
+        "title": "Body_upload_source_sources_post",
+        "type": "object"
+      },
       "Event": {
         "properties": {
           "duration_ms": {
@@ -356,6 +395,36 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "Location": {
+        "description": "1-based; `start == end` unless merged paragraphs/line blocks.",
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "page",
+              "slide",
+              "paragraph",
+              "line"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "start",
+          "end"
+        ],
+        "title": "Location",
+        "type": "object"
+      },
       "RecordingAnalysis": {
         "properties": {
           "asr_provider": {
@@ -422,6 +491,170 @@
           "asr_provider"
         ],
         "title": "RecordingAnalysis",
+        "type": "object"
+      },
+      "SearchRequest": {
+        "properties": {
+          "collection_id": {
+            "format": "uuid",
+            "title": "Collection Id",
+            "type": "string"
+          },
+          "k": {
+            "default": 5,
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "K",
+            "type": "integer"
+          },
+          "query": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "collection_id",
+          "query"
+        ],
+        "title": "SearchRequest",
+        "type": "object"
+      },
+      "Source": {
+        "properties": {
+          "chunk_count": {
+            "default": 0,
+            "title": "Chunk Count",
+            "type": "integer"
+          },
+          "collection_id": {
+            "format": "uuid",
+            "title": "Collection Id",
+            "type": "string"
+          },
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "embedding_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Model"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "processing",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "collection_id",
+          "filename",
+          "content_type",
+          "size_bytes",
+          "status",
+          "created_at"
+        ],
+        "title": "Source",
+        "type": "object"
+      },
+      "SourceHit": {
+        "properties": {
+          "chunk_id": {
+            "title": "Chunk Id",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Location"
+          },
+          "matched_by": {
+            "items": {
+              "enum": [
+                "vector",
+                "keyword"
+              ],
+              "type": "string"
+            },
+            "title": "Matched By",
+            "type": "array"
+          },
+          "similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cosine similarity to the query embedding; null if matched by keywords only",
+            "title": "Similarity"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chunk_id",
+          "source_id",
+          "filename",
+          "location",
+          "text",
+          "matched_by"
+        ],
+        "title": "SourceHit",
         "type": "object"
       },
       "ValidationError": {
@@ -678,6 +911,217 @@
         "summary": "Ready",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/sources": {
+      "get": {
+        "operationId": "list_sources_sources_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "collection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Collection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Source"
+                  },
+                  "title": "Response List Sources Sources Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sources",
+        "tags": [
+          "sources"
+        ]
+      },
+      "post": {
+        "description": "Store in S3 and enqueue extraction, chunking and embedding.\n\nPoll status_url until status is `ready` or `failed`. Scanned PDFs without\na text layer are not supported (no OCR).",
+        "operationId": "upload_source_sources_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_source_sources_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedSource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Source",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/sources/search": {
+      "post": {
+        "description": "Top-k passages of ready sources, hybrid vector + keyword ranking.",
+        "operationId": "search_sources_sources_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceHit"
+                  },
+                  "title": "Response Search Sources Sources Search Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Sources",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/sources/{source_id}": {
+      "delete": {
+        "description": "Delete the file, its chunks and vectors.",
+        "operationId": "delete_source_sources__source_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Source",
+        "tags": [
+          "sources"
+        ]
+      },
+      "get": {
+        "operationId": "get_source_sources__source_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Source"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Source",
+        "tags": [
+          "sources"
         ]
       }
     },

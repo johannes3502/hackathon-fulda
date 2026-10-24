@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Pitch Coach",
+    "slug": "pitch-coach-mobile",
+    "scheme": "pitchcoach",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "de.hackathonfulda.pitchcoach",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Connect to your team's presentation analysis server."
+      }
+    },
+    "android": {
+      "package": "de.hackathonfulda.pitchcoach",
+      "predictiveBackGestureEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-dev-client",
+      "expo-video",
+      "expo-sharing",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Record your rehearsal and process pose landmarks on this device.",
+          "enableMicrophonePermission": true,
+          "microphonePermissionText": "Record your voice for presentation analysis.",
+          "enableFrameProcessors": true
+        }
+      ],
+      "./plugins/withPoseModel.cjs",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.4",
+            "enableSceneSupport": true
+          },
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ]
+    ]
+  }
+}

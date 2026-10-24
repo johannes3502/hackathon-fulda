@@ -5,6 +5,7 @@ import os
 import tempfile
 import time
 from pathlib import Path
+from uuid import UUID
 
 from celery.exceptions import SoftTimeLimitExceeded
 
@@ -22,6 +23,22 @@ def worker_probe(self, token: str, delay_seconds: float = 0) -> dict[str, str]:
         raise ValueError("Probe delay must be between 0 and 10 seconds")
     time.sleep(delay_seconds)
     return {"token": token, "worker": self.request.hostname}
+
+
+@celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
+def ingest_source(self, source_id: str) -> dict[str, str]:
+    """Extract, chunk and embed one uploaded source; status lives in PostgreSQL."""
+    from app.connections import redis_client
+    from app.sources.ingest import ingest_source as run_ingest
+
+    lock = redis_client().lock(f"source-ingest-lock:{source_id}", timeout=660, blocking=False)
+    if not lock.acquire(blocking=False):
+        raise self.retry(countdown=30)
+    try:
+        run_ingest(UUID(source_id))
+        return {"source_id": source_id}
+    finally:
+        lock.release()
 
 
 @celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)

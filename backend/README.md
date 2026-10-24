@@ -9,34 +9,17 @@ docker compose exec backend python -m scripts.smoke
 ```
 
 Keep an existing `.env` instead of overwriting it. API docs:
-<http://localhost:8000/docs>. Edit `backend/app/` for automatic API reload;
+<http://localhost:8000/docs>; frontend: <http://localhost:3000>.
+Edit `backend/app/` for automatic API reload;
 restart the worker after task changes with `docker compose restart worker`.
 Changes to dependencies, scripts or the Dockerfile require a rebuild.
 
 ## OpenAPI and TypeScript
 
 FastAPI exposes the API contract at <http://localhost:8000/openapi.json>.
-To export it without running the server and generate TypeScript definitions,
-create a local Python environment and install the backend dependencies once
-(on Windows use `py -3.12` and `backend/.venv/Scripts/python.exe`):
-
-```sh
-python3.12 -m venv backend/.venv
-backend/.venv/bin/python -m pip install -r backend/requirements.txt
-```
-
-Then run from the repository root:
-
-```sh
-npm ci
-npm run api:generate
-npm run api:check
-```
-
-The commands use `backend/.venv` automatically, or the interpreter selected
-by `PYTHON`. Generated artifacts and frontend usage examples are documented
-in [`api/README.md`](../api/README.md). Regenerate and commit both artifacts
-whenever API routes or models change.
+Local tooling setup, generation commands and frontend usage are documented
+in the [API contract guide](../api/README.md). Regenerate and commit both
+artifacts whenever API routes or models change.
 
 ## IntelliJ IDEA and VS Code
 
@@ -46,16 +29,17 @@ VS Code configuration is in `.vscode/`. Personal `.idea/` state stays ignored.
 
 - **IntelliJ IDEA:** enable the **Docker** plugin, select **Docker Compose**
   in the run selector and click **Run**. It builds images and starts every
-  service in `compose.yaml`: backend, Celery worker, Redis, PostgreSQL and S3 storage. The
+  service in `compose.yaml`: frontend, backend, Celery worker, Redis, PostgreSQL and S3 storage. The
   configuration uses the local Docker connection named `Docker`; select your
   local connection in its **Server** field if it has a different name.
   View logs and stop containers in the **Services** tool window.
 - **VS Code:** run **Tasks: Run Build Task** (`Cmd+Shift+B` on macOS,
   `Ctrl+Shift+B` on Windows/Linux). The default **Compose: up** task builds
-  and starts the full stack, then waits for the health checks. **Tasks: Run
-  Task** also offers **Compose: stop** and **Compose: backend logs**.
+  and starts all six containers, then waits for their health checks. **Tasks:
+  Run Task** also offers **Compose: stop**, **Compose: frontend logs** and
+  **Compose: backend logs**.
 
-No local Python SDK or virtual environment is required to start the stack.
+No local Node.js, Python SDK or virtual environment is required to start the stack.
 FastAPI runs inside Docker and reloads when `backend/app/` changes. Run the
 smoke command above to check the running containers.
 
@@ -63,18 +47,19 @@ smoke command above to check the running containers.
 
 | Component | Role | Local address |
 |---|---|---|
+| Next.js frontend | Browser UI; `/api/...` forwards to FastAPI inside Compose | `http://localhost:3000` |
 | FastAPI + Uvicorn | API; connection helpers and health endpoints | `http://localhost:8000` |
 | Celery worker | Background jobs in separate Python processes | Internal; no host port |
 | Redis | Celery broker (DB 0) and temporary task results (DB 1) | Internal `redis:6379`; no host port |
 | MediaPipe | Python Tasks library in the shared backend/worker image | No separate service |
-| PostgreSQL | Structured data, later transcripts, timestamps and file metadata | `localhost:5432` |
+| PostgreSQL + pgvector | Source metadata, text chunks and embeddings; later transcripts and timestamps | `localhost:5432` |
 | SeaweedFS | S3-compatible object storage for audio/video and uploaded files | `http://localhost:8333` |
 | MediaRecorder | Browser API that produces audio/video blobs | Frontend; no container or Python dependency |
 | FFmpeg | Available for converting browser recording formats when needed | Backend and worker containers |
 
 File bytes belong in object storage; PostgreSQL can hold their object key,
-MIME type, size and relation to a presentation. Audio jobs persist uploads and analysis in S3. Product database tables,
-clips and a frontend are not implemented yet.
+MIME type, size and relation to a presentation. Audio jobs persist uploads and analysis in S3. Product database tables
+and event clips are not implemented yet.
 
 SeaweedFS `mini` runs the file store in one container and creates `S3_BUCKET`
 on startup. Credentials come from `.env`; the bucket is not public. Only the
@@ -250,10 +235,67 @@ Tests (synthetic tones, computer-generated speech and word lists only), from `ba
 .venv/bin/python -m pytest tests
 ```
 
+### Sources and retrieval (`app/sources/`, `/sources`)
+
+Uploaded slides, papers and notes that fact-check, question agent and other
+features can cite. Data flow:
+
+```
+POST /sources (multipart: collection_id, file) → S3 sources/{id}/original
+  → Celery ingest_source: extract → chunk → embed → PostgreSQL (pgvector)
+POST /sources/search {collection_id, query, k} → top-k passages
+```
+
+- Formats: PDF (per page), PPTX (per slide incl. tables and speaker notes),
+  DOCX (per paragraph), TXT/MD (per block of lines). No OCR: scanned PDFs
+  without a text layer fail with a readable message. Max 25 MB
+  (`SOURCE_MAX_BYTES`).
+- `collection_id` is generated by the client (one per browser in the
+  frontend) and groups the sources of a presentation. There is no login.
+- Chunks: ~1200 characters, split at sentence boundaries with ~200 characters
+  overlap. Pages and slides are never merged, so every passage cites exactly
+  one page or slide (`location: {kind, start, end}`).
+- Embeddings: `jinaai/jina-embeddings-v2-base-de` (German/English, Apache-2.0)
+  via FastEmbed/ONNX on the CPU, inside API and worker. The pinned revision is
+  baked into the image; no text leaves the server. `Embedder` keeps the model
+  exchangeable; `EMBEDDING_PROVIDER=none` runs keyword-only search.
+  Each process loads the model on first use (~0.6 GB RAM).
+- Search: cosine similarity (pgvector) and German full-text search, merged by
+  reciprocal rank fusion. Keywords catch exact figures such as "260.000".
+  `similarity` is the raw cosine value, not a quality score. Search always
+  returns the best k passages, even when none of them is relevant.
+- Status: `queued` → `processing` → `ready` (with `chunk_count`) or `failed`
+  (with `error`), via `GET /sources/{id}` or `GET /sources?collection_id=`.
+  `DELETE /sources/{id}` removes file, chunks and vectors.
+- Originals stay in S3 until deleted (unlike recordings): they are the
+  evidence that answers cite. No automatic expiry yet.
+
+For other features, from Python:
+
+```python
+from app.sources.retrieval import format_context, quote_in_text, search
+
+hits = search(collection_id, "Wie viele Studierende nutzen die App?", k=5)
+prompt_context = format_context(hits)   # "[1] deck.pptx, Folie 3:\n…"
+quote_in_text(model_quote, hits[0].text)  # verbatim check (AGENTS.md, Fact-Check step 4)
+```
+
+End-to-end smoke (synthetic PPTX built in memory; uploads, waits for the
+worker, searches, deletes):
+
+```sh
+docker compose exec -T backend python -m scripts.smoke_sources
+```
+
+The Postgres image is now `pgvector/pgvector` (PostgreSQL 18, Debian) instead
+of `postgres:18.6-alpine`. Existing local volumes keep working; the schema and
+extension are created on first use. `tests/test_sources.py` contains a
+database round trip that runs when `POSTGRES_HOST` is set.
+
 ## MediaRecorder integration
 
-The frontend will request camera/microphone access through `getUserMedia()`
-and pass that stream to `MediaRecorder`. Select formats using
+The frontend requests camera/microphone access through `getUserMedia()`
+and passes that stream to `MediaRecorder`. Select formats using
 `MediaRecorder.isTypeSupported()`; do not assume every browser records WebM.
 Preserve the actual `recorder.mimeType` with the blob. Collect `dataavailable`
 chunks and wait for the final `stop` event before assembling a complete file;
@@ -316,7 +358,7 @@ their contents are disposable.
   for the vertical slice. Dependency failures do not produce fake feedback.
 
 Verified locally on 24.10.2026 with Docker Desktop on ARM64: image build,
-`pip check`, all five service health checks and the extended smoke check passed.
+`pip check`, all six service health checks and the extended smoke check passed.
 The API responded while the synthetic worker job was running. Redis outage
 checks confirmed readiness 503, liveness 200 and prompt `QueueUnavailable`
 errors. A queued job survived Redis recreation and completed when the worker

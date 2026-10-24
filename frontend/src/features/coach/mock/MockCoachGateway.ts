@@ -31,7 +31,10 @@ type Runtime = {
 const delay = () => new Promise<void>((resolve) => setTimeout(resolve, 350));
 export class MockCoachGateway implements CoachGateway, DemoGateway {
   private sessions = new Map<string, Runtime>();
-  constructor(private now: () => number = () => performance.now()) {}
+  constructor(
+    private now: () => number = () => performance.now(),
+    private newId: () => string = () => crypto.randomUUID(),
+  ) {}
   getDefaults() {
     return structuredClone(defaults);
   }
@@ -87,7 +90,7 @@ export class MockCoachGateway implements CoachGateway, DemoGateway {
         "Add a title and context, then choose a supported practice duration.",
       );
     await delay();
-    const ref = { sessionId: crypto.randomUUID(), attemptId: "attempt-1" };
+    const ref = { sessionId: this.newId(), attemptId: "attempt-1" };
     const state = initialState({
       ref,
       config: {

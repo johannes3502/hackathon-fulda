@@ -31,3 +31,12 @@ in later PyAV releases.
 
 Model quality, German filler preservation and word-timestamp accuracy are not
 validated by this repository.
+
+# Embedding model
+
+`jinaai/jina-embeddings-v2-base-de`, copyright Jina AI, Apache-2.0 license.
+Source: <https://huggingface.co/jinaai/jina-embeddings-v2-base-de>, revision
+`3f9eede875721714945b6a99a3198299243cf2be` (ONNX export `onnx/model.onnx`).
+The image build downloads this revision into `/app/models/embedding/`; it is
+not committed and inference does not download. Runs with FastEmbed and ONNX
+Runtime on the CPU. Retrieval quality for our documents is not measured.

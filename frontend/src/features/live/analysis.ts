@@ -8,7 +8,7 @@ const time = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v) && v >= 0;
 
 export function apiEndpoint(value: string, secure: boolean) {
-  const url = new URL(value);
+  const url = new URL(value, globalThis.location?.origin);
   if (
     !["http:", "https:"].includes(url.protocol) ||
     url.username ||

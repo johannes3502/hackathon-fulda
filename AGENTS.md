@@ -1,6 +1,6 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Archiv (`archive/`) ist nicht Scope.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`.
 
 ## 1. Projekt
 
@@ -44,7 +44,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 **Vorschläge, noch zu bestätigen** (Bestätigung im `docs/02-ai-decision-log.md` festhalten; Vorlage: `templates/ai-decision-log.md`)
 
 - **Transkription:** Stufe A (umgesetzt): Audio nach dem Stoppen hochladen, Wort-Timestamps und Text zurück. Standard ist lokales `faster-whisper` (deutsch), damit keine Audiodaten an einen Cloudanbieter gehen; Deepgram bleibt als optionaler Adapter verfügbar. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg; deutsche Füllwortqualität ist ungeprüft. Wort-Timestamps sind vorhanden.
-- **Embeddings:** mehrsprachiges Modell (Inhalte sind deutsch), z. B. Voyage, OpenAI oder lokal bge-m3 / multilingual-e5. Bei wenigen kleinen Dokumenten reicht auch Long-Context ohne Vektoren.
+- **Embeddings:** umgesetzt mit lokalem `jinaai/jina-embeddings-v2-base-de` (Deutsch/Englisch, FastEmbed/ONNX) hinter einem austauschbaren `Embedder`-Interface; Retrieval-Qualität mit echten Dokumenten noch nicht gemessen.
 - **Fact-Check und Frage-Agent:** ein LLM-Anbieter für beides. Für den Web-Fetch-Agent Anbieter-Tool für Suche/Abruf nutzen, kein eigenes Scraping.
 - **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
 - **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
@@ -123,13 +123,13 @@ Event {
 
 ```
 AGENTS.md                          # Einstiegspunkt und Zielarchitektur
-compose.yaml                       # Backend + Celery + Redis + PostgreSQL + S3
+compose.yaml                       # Frontend + Backend + Celery + Redis + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
 backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
-frontend/                          # Next.js-Demo und Live-Kamera-Client; Backend-Anbindung teilweise offen
+frontend/                          # Next.js-App, eigener Entwicklungscontainer
 .run/                              # geteilte IntelliJ-Run-Konfigurationen
 .vscode/                           # geteilte VS-Code-Tasks für Docker Compose
-Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
+specifications/                    # offizielle Challenge (deutsch/englisch)
 docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
   01-product.md                    # Features und offene Punkte
@@ -140,12 +140,20 @@ templates/
 ```
 
 Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
-einen separaten Celery-Worker, Redis, PostgreSQL **ohne pgvector** und
+einen separaten Celery-Worker, Redis, PostgreSQL **mit pgvector** und
 **SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job geprüft; Audio-/ASR-Jobs und
-Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO,
-pgvector und die vollständige Aufnahme-/Clip-/Review-Pipeline aus der
-Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend ist als separater
-Demo-/Live-Kamera-Client vorhanden; der Aufnahme-Pfad nutzt die Audio-Job-API
+Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO und
+die vollständige Aufnahme-/Clip-/Review-Pipeline aus der Zielarchitektur sind
+noch nicht umgesetzt. Quellen-Upload und Retrieval (RAG) sind umgesetzt
+(`backend/app/sources/`, Frontend-Seite `/sources`): PDF/PPTX/DOCX/TXT/MD →
+Chunks mit Seite/Folie → lokale Embeddings (`jina-embeddings-v2-base-de`) →
+Hybrid-Suche (pgvector + deutsche Volltextsuche). Fact-Check und Frage-Agent
+nutzen `app.sources.retrieval` (`search`, `format_context`, `quote_in_text`);
+beide sind noch nicht implementiert. Das Next.js-Frontend läuft in einem
+eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
+Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
+Bewertungs-/Feedback-Regeln darauf sind noch offen (`frontend/DATA_POINTS.md`).
+Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
 jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
 Analyse-Pipelines mit S3-Persistenz für kombinierte Jobs, beide mit `t_ms` ab Aufnahmestart im
@@ -160,7 +168,7 @@ ist eine separate Implementierungsaufgabe.
 Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
 sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
 Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`
-abgeglichen werden; dort ist noch das bisherige Grundgerüst dokumentiert.
+abgeglichen werden; dort stehen die Features und offenen Entscheidungen.
 
 ## 7. Git-Workflow
 

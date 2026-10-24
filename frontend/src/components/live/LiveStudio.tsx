@@ -9,8 +9,10 @@ import {
   CheckCircle2,
   Clock3,
   Eye,
+  Maximize2,
   Mic,
   MicOff,
+  Minimize2,
   Radio,
   ShieldCheck,
   Square,
@@ -26,6 +28,9 @@ import { createVideoTransport } from "@/features/live/transport";
 import { apiEndpoint, request } from "@/features/live/analysis";
 import type { LiveConfig, LiveProgress } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
+import { usePoseCapture } from "@/features/pose/usePoseCapture";
+import { PoseDownload } from "./PoseDownload";
+import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
 
 const cameraCopy = {
@@ -48,6 +53,7 @@ export function LiveStudio() {
     stop: stopCamera,
     getStream,
   } = useCameraPreview();
+  const pose = usePoseCapture(videoRef, cameraStatus === "active");
   const [title, setTitle] = useState("My pitch rehearsal");
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("demo");
@@ -57,9 +63,18 @@ export function LiveStudio() {
   const [progress, setProgress] = useState<LiveProgress | null>(null);
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [largeView, setLargeView] = useState(false);
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   useEffect(() => () => owner.current?.dispose(), []);
+  useEffect(() => {
+    if (!largeView) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLargeView(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [largeView]);
   useEffect(() => {
     if (mode !== "backend") return;
     const controller = new AbortController();
@@ -77,7 +92,7 @@ export function LiveStudio() {
       .catch(() => {
         if (!controller.signal.aborted)
           setHealth(
-            "Backend readiness check failed. Audio analysis may still work without storage services.",
+            "Backend services are not ready. If analysis fails, your recording stays available locally.",
           );
       });
     return () => controller.abort();
@@ -117,11 +132,15 @@ export function LiveStudio() {
       stream,
       config,
       createVideoTransport(config),
-      setProgress,
+      (next) => {
+        if (next.phase === "finishing") pose.stop();
+        setProgress(next);
+      },
       (recording) => {
-        save(recording);
+        save({ ...recording, poseLog: pose.recordingBlob() });
         router.push(`/live/${recording.id}/review`);
       },
+      pose.beginRecording,
     );
     owner.current = recorder;
     try {
@@ -146,7 +165,9 @@ export function LiveStudio() {
   const latest = progress?.feedback.at(-1);
   return (
     <AppShell experience="live">
-      <div className="workspace live-workspace">
+      <div
+        className={`workspace live-workspace${largeView ? " live-workspace-large" : ""}`}
+      >
         <div className="workspace-back">
           <Link href="/">
             <ArrowLeft size={15} /> Sample rehearsal
@@ -173,7 +194,23 @@ export function LiveStudio() {
             {error}
           </p>
         )}
-        <div className="studio-grid live-studio-grid">
+        <div className="live-view-toolbar">
+          <Button
+            variant="outline"
+            aria-pressed={largeView}
+            aria-controls="live-studio"
+            onClick={() => setLargeView(!largeView)}
+          >
+            {largeView ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            {largeView ? "Standard view" : "Large view"}
+          </Button>
+          {largeView && (
+            <strong className="live-view-time">
+              {time(progress?.elapsedMs ?? 0)}
+            </strong>
+          )}
+        </div>
+        <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <section
               className="media-stage live-camera-stage"
@@ -214,6 +251,27 @@ export function LiveStudio() {
                 }
                 aria-label="Your local camera feed"
               />
+              {cameraStatus === "active" &&
+                pose.state?.phase === "running" &&
+                pose.state.latest && (
+                  <PoseOverlay
+                    sample={pose.state.latest}
+                    largeView={largeView}
+                  />
+                )}
+              {cameraStatus === "active" && (
+                <span className="live-pose-status">
+                  {pose.state?.phase === "error"
+                    ? "Landmarks unavailable"
+                    : pose.state?.phase === "running"
+                      ? pose.state.latest
+                        ? "Pose landmarks · local"
+                        : "No pose in frame"
+                      : pose.state?.phase === "stopped"
+                        ? "Landmarks stopped"
+                        : "Loading landmarks…"}
+                </span>
+              )}
               {cameraStatus !== "active" && (
                 <div className="stage-placeholder">
                   <span className="stage-camera">
@@ -234,7 +292,7 @@ export function LiveStudio() {
                 </span>
                 <span>
                   {mode === "demo"
-                    ? "Demo markers · no detection"
+                    ? "Scripted feedback · local landmarks"
                     : progress?.phase === "recording"
                       ? "Audio analysis after stopping"
                       : "Backend mode"}
@@ -294,10 +352,51 @@ export function LiveStudio() {
               {progress
                 ? (progress.notice ??
                   (mode === "demo"
-                    ? "Demo feedback is scripted. Your camera video is not being analyzed or uploaded."
+                    ? "Demo feedback is scripted. No video is uploaded. Pose landmarks and logging stay local."
                     : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis.`))
                 : cameraCopy[cameraStatus]}
             </p>
+            <section
+              className="panel live-settings"
+              aria-label="Local pose capture"
+            >
+              <h2>Local pose capture</h2>
+              <p>
+                Landmarks appear automatically while the camera is on. No pose
+                data is uploaded or used to score your presentation.
+              </p>
+              <p className="field-hint">
+                Head angles and frontal-eye visibility are uncalibrated
+                heuristics, not gaze tracking. Missing measurements stay empty.
+              </p>
+              <div className="live-control-bar">
+                {pose.state?.phase === "error" && (
+                  <Button
+                    variant="outline"
+                    disabled={cameraStatus !== "active" || !!progress}
+                    onClick={pose.start}
+                  >
+                    Retry landmarks
+                  </Button>
+                )}
+                <PoseDownload blob={pose.download} />
+              </div>
+              <p role="status">
+                {pose.state?.message ?? "Enable your camera to see landmarks."}
+              </p>
+              <p>
+                {pose.state?.count ?? 0} pose samples ·{" "}
+                {pose.state?.latest?.quality.legs_visible
+                  ? "Legs visible"
+                  : "Legs not confirmed visible"}
+              </p>
+              <p className="field-hint">
+                Turn the camera off to download preview JSONL. Starting a take
+                resets the preview log and aligns timestamps to the video.
+                Download preview samples first if you need them. Logs are
+                released when you leave.
+              </p>
+            </section>
             <section className="panel live-settings">
               <h2>Set up this take</h2>
               <fieldset disabled={!!progress}>
@@ -356,9 +455,10 @@ export function LiveStudio() {
                     )}
                     <p className="field-hint">
                       By starting, you agree to send your complete video and
-                      microphone audio to this destination after stopping. This
-                      endpoint processes it temporarily without persistent
-                      storage. No ASR or LLM provider is used.
+                      microphone audio to this destination after stopping. The
+                      backend stores the upload for its analysis job and removes
+                      the original after processing; analysis results remain
+                      stored. No ASR or LLM request is made in this mode.
                     </p>
                   </div>
                 )}
@@ -386,7 +486,7 @@ export function LiveStudio() {
                   {latest?.action ??
                     (mode === "demo"
                       ? "Start a recording to try example feedback markers and video replay."
-                      : "Audio heuristics appear after you finish. Visual detection and automatic transcription are not connected yet.")}
+                      : "Audio heuristics appear after you finish. Pose logging is separate from feedback. Automatic transcription is not connected yet.")}
                 </p>
               </div>
               {latest && (

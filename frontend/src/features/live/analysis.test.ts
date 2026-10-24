@@ -2,6 +2,13 @@ import { afterEach, expect, it, vi } from "vitest";
 import { analysisResult, apiEndpoint, parseWords } from "./analysis";
 import { AnalysisTransport } from "./transport";
 afterEach(() => vi.unstubAllGlobals());
+it("resolves the Compose API path against the current browser origin", () => {
+  vi.stubGlobal("location", new URL("https://coach.example:8443/live"));
+  expect(apiEndpoint("/api", true)).toBe("https://coach.example:8443/api");
+  expect(apiEndpoint("http://localhost:8000/", false)).toBe("http://localhost:8000");
+  expect(() => apiEndpoint("http://localhost:8000", true)).toThrow();
+});
+
 const result = {
   summary: { pause_count: 1, median_f0_hz: null },
   events: [
