@@ -26,6 +26,7 @@ export type PoseTiming = {
 };
 import { poseBackend, type PoseBackend } from "./backend";
 import { PoseTestTracker, type PoseTestResult } from "./testPoses";
+import { LabEventTracker } from "./lab-events";
 import type { HandSample } from "./sample";
 import {
   DEFAULT_POSE_OPTIONS,
@@ -54,6 +55,7 @@ export class PoseCapture {
   private backend: PoseBackend | null = null;
   private tests = new PoseTestTracker(labTiming());
   private testResults: PoseTestResult[] = [];
+  private labEvents = new LabEventTracker();
   private worker: Worker | null = null;
   private frame = 0;
   private pending = false;
@@ -192,15 +194,18 @@ export class PoseCapture {
                 runtime,
               );
           this.latest = sample;
-          this.evaluation = this.evaluator.update(
-            liveSample,
-            data.timestamp - origin,
+          // Pose lab tests also feed live feedback, so they always run.
+          this.testResults = this.tests.update(
+            sample,
+            data.timestamp,
+            this.hands ?? [],
+          );
+          this.evaluation = this.withLab(
+            this.evaluator.update(liveSample, data.timestamp - origin),
+            this.labEvents.update(this.testResults, data.timestamp - origin),
           );
           for (const event of this.evaluation.events)
             event.payload.runtime ??= runtime;
-          this.testResults = this.options.devMode
-            ? this.tests.update(sample, data.timestamp, this.hands ?? [])
-            : [];
           this.publish(
             "running",
             this.log.full
@@ -230,7 +235,10 @@ export class PoseCapture {
       this.hands = null;
       this.tests.reset(labTiming());
       this.testResults = [];
-      this.evaluation = this.evaluator.update(null, timestamp - this.origin);
+      this.evaluation = this.withLab(
+        this.evaluator.update(null, timestamp - this.origin),
+        this.labEvents.update([], timestamp - this.origin),
+      );
       this.publish(
         "running",
         "Waiting for a fresh camera frame. Evaluation paused.",
@@ -307,6 +315,20 @@ export class PoseCapture {
     this.hands = this.handModel ? [] : null;
     this.tests.reset(labTiming());
     this.testResults = [];
+    this.labEvents = new LabEventTracker(sessionId);
+  }
+  // One cue at a time: a calibrated rule wins over a Pose lab rule.
+  private withLab(
+    evaluation: PoseEvaluation,
+    lab: ReturnType<LabEventTracker["update"]>,
+  ): PoseEvaluation {
+    return {
+      ...evaluation,
+      cue: evaluation.cue ?? lab.cue,
+      events: [...evaluation.events, ...lab.events].sort(
+        (a, b) => a.t_ms - b.t_ms,
+      ),
+    };
   }
   recalibrate() {
     this.evaluator = newEvaluator();

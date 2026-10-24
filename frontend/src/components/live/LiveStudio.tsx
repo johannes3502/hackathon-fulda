@@ -39,7 +39,7 @@ import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { poseFeedback } from "@/features/pose/feedback";
 import { GestureGuide } from "./GestureGuide";
 import { PoseDownload } from "./PoseDownload";
-import { PoseDevMode, type PoseView } from "./PoseDevMode";
+import { PoseDevMode } from "./PoseDevMode";
 import { poseFeedback as labFeedback } from "@/features/pose/testPoses";
 import { PoseDebug } from "./PoseDebug";
 import { PoseOverlay } from "./PoseOverlay";
@@ -101,7 +101,6 @@ export function LiveStudio() {
   const poseLab = featureFlags.devMode;
   const setPoseLab = (devMode: boolean) =>
     setFeatureFlags({ ...featureFlags, devMode });
-  const [poseView, setPoseView] = useState<PoseView>("coach");
   const poseAlert =
     poseLab &&
     pose.state?.phase === "running" &&
@@ -481,7 +480,6 @@ export function LiveStudio() {
                     handError={pose.state.handError}
                     hands={pose.state.hands.length}
                     backend={pose.state.backend}
-                    view={poseView}
                   />
                 )}
               {cameraStatus !== "active" && (
@@ -573,23 +571,29 @@ export function LiveStudio() {
                     />
                     <span className="live-cue-label">{appearance.label}</span>
                   </div>
-                  <p className="cue-message">
-                    {!showCues
-                      ? "Live hints hidden"
-                      : (latest?.title ??
-                        (pose.state?.phase === "error"
-                          ? "Landmarks unavailable"
-                          : evaluation?.phase === "ready"
-                            ? "Ready for your next gesture"
-                            : "Find your neutral position"))}
-                  </p>
-                  <p className="live-cue-detail">
-                    {!showCues
-                      ? "Observations still appear in your review."
-                      : (latest?.action ??
-                        evaluation?.message ??
-                        "Enable your camera, then keep shoulders, hips and hands visible. Recording is optional for preview.")}
-                  </p>
+                  {/* Ready without a hint stays quiet; the status label is enough. */}
+                  {(!showCues ||
+                    latest ||
+                    pose.state?.phase === "error" ||
+                    evaluation?.phase !== "ready") && (
+                    <>
+                      <p className="cue-message">
+                        {!showCues
+                          ? "Live hints hidden"
+                          : (latest?.title ??
+                            (pose.state?.phase === "error"
+                              ? "Landmarks unavailable"
+                              : "Find your neutral position"))}
+                      </p>
+                      <p className="live-cue-detail">
+                        {!showCues
+                          ? "Observations still appear in your review."
+                          : (latest?.action ??
+                            evaluation?.message ??
+                            "Enable your camera, then keep shoulders, hips and hands visible. Recording is optional for preview.")}
+                      </p>
+                    </>
+                  )}
                 </div>
                 <div className="live-readiness" aria-label="Tracking status">
                   <p>
@@ -775,16 +779,6 @@ export function LiveStudio() {
             >
               Pose lab
             </Button>
-            {poseLab && (
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setPoseView(poseView === "coach" ? "status" : "coach")
-                }
-              >
-                {poseView === "coach" ? "Status view" : "Coach view"}
-              </Button>
-            )}
             <Button
               variant="outline"
               aria-pressed={poseDebug}
