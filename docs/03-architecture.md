@@ -398,10 +398,12 @@ sequenceDiagram
         FE->>BE: POST /questions/agent/session
         BE->>E: Signed URL anfordern (API-Key bleibt serverseitig)
         BE-->>FE: Signed URL, Cache-Control no-store
-        Note over E: Gespeicherte First message leer; keine feste Begrüßung
-        FE->>E: SDK-WebSocket mit Kontext und Modus im Prompt-Override, first_message leer
+        Note over E: Gespeicherte First message fragt nach Bereitschaft
+        FE->>E: SDK-WebSocket mit Kontext im Prompt-Override und festem first_message
         E-->>FE: Verbindung bestätigt
-        FE->>E: user_message fordert kurzen Fragensatz und erste Frage aus Transkript an
+        E->>FE: Ich habe noch ein paar Fragen. Bist du bereit? (Audio + Text)
+        U->>FE: Bereitschaft bestätigen
+        FE->>E: Mikrofon-Audio; erst danach erste Frage zum Vortrag
         loop Eine Frage nach der anderen
             E->>FE: Frage / Reaktion, Audio + Text
             U->>FE: Gesprochene Antwort

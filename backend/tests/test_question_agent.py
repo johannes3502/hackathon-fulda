@@ -55,14 +55,16 @@ def test_missing_or_processing_sources_are_not_presented_as_ready(monkeypatch):
 
 
 @pytest.mark.parametrize("mode", PRESENTATION_STYLES)
-def test_teacher_receives_the_spoken_content_and_starts_without_an_introduction(mode):
+def test_teacher_receives_the_spoken_content_and_waits_for_readiness(mode):
     result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode))
     context = json.loads(result.prompt.splitlines()[-1])
     assert context["transcript"] == " ".join(word.word for word in TRANSCRIPT)
     assert "Do not greet" in result.prompt
     assert "teacher asking a student" in result.prompt
-    assert "Open with only 'I have a few questions.'" in result.prompt
-    assert "immediately followed by the first specific question" in result.prompt
+    assert "The first message is 'Ich habe noch ein paar Fragen. Bist du bereit?'" in result.prompt
+    assert "Wait for the student to confirm they are ready before asking any presentation question" in result.prompt
+    assert "If they are not ready, give them time and do not start the questions" in result.prompt
+    assert "without repeating the opening" in result.prompt
     assert "Do not add an introduction, recap or explanation" in result.prompt
     assert all(style not in result.prompt for style in PRESENTATION_STYLES.values())
     assert "actual claim, example or explanation" in result.prompt
@@ -81,7 +83,7 @@ def test_teacher_moves_on_after_limited_follow_ups_even_if_the_answer_is_wrong()
 
 
 @pytest.mark.skipif(os.getenv("RUN_CLOUD_SMOKE") != "1", reason="Opt-in read of the configured ElevenLabs agent")
-def test_live_agent_has_no_saved_greeting_and_allows_context_overrides():
+def test_live_agent_has_readiness_opening_and_allows_context_overrides():
     response = httpx.get(
         f"https://api.elevenlabs.io/v1/convai/agents/{os.environ['ELEVENLABS_AGENT_ID']}",
         headers={"xi-api-key": os.environ["ELEVENLABS_API_KEY"]},
@@ -90,7 +92,7 @@ def test_live_agent_has_no_saved_greeting_and_allows_context_overrides():
     assert response.status_code == 200, f"Agent configuration returned HTTP {response.status_code}"
     config = response.json()
     # The saved first message bypasses the LLM, so prompt-only tests cannot catch this regression.
-    assert config["conversation_config"]["agent"]["first_message"] == ""
+    assert config["conversation_config"]["agent"]["first_message"] == "Ich habe noch ein paar Fragen. Bist du bereit?"
     overrides = config["platform_settings"]["overrides"]["conversation_config_override"]["agent"]
     assert overrides["first_message"] is True
     assert overrides["prompt"]["prompt"] is True

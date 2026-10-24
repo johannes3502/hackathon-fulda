@@ -1709,7 +1709,7 @@ test("Deepgram streaming waits for the last word and reuses the final transcript
   ).toBeVisible();
 });
 
-test("ElevenLabs receives the presentation and starts a contextual question instead of its saved greeting", async ({
+test("ElevenLabs receives the presentation and asks for readiness without an automatic kickoff", async ({
   page,
 }, info) => {
   const jobId = "12345678-1234-1234-1234-123456789abc";
@@ -1800,7 +1800,7 @@ test("ElevenLabs receives the presentation and starts a contextual question inst
       if (message.type === "conversation_initiation_client_data") {
         override = message.conversation_config_override.agent.prompt.prompt;
         expect(message.conversation_config_override.agent.first_message).toBe(
-          "",
+          "Ich habe noch ein paar Fragen. Bist du bereit?",
         );
         socket.send(
           JSON.stringify({
@@ -1812,25 +1812,17 @@ test("ElevenLabs receives the presentation and starts a contextual question inst
             },
           }),
         );
-      }
-      if (message.type === "user_message") {
-        expect(override).toBe("Synthetic thesis context with source notes");
-        expect(message.text).toContain("first question");
-        expect(message.text).toContain("presentation");
-        expect(message.text).toContain("As their teacher");
-        expect(message.text).toContain("say only 'I have a few questions.'");
-        expect(message.text).toContain("Do not add any other introduction");
-        kickoffs++;
         socket.send(
           JSON.stringify({
             type: "agent_response",
             agent_response_event: {
               agent_response:
-                "I have a few questions. Why did you choose this research method?",
+                "Ich habe noch ein paar Fragen. Bist du bereit?",
             },
           }),
         );
       }
+      if (message.type === "user_message") kickoffs++;
     });
   });
   await backend(page, true, async () => {
@@ -1868,10 +1860,10 @@ test("ElevenLabs receives the presentation and starts a contextual question inst
   expect(override).toBe("Synthetic thesis context with source notes");
   await expect(
     page.getByRole("heading", {
-      name: "I have a few questions. Why did you choose this research method?",
+      name: "Ich habe noch ein paar Fragen. Bist du bereit?",
     }),
   ).toBeVisible();
-  expect(kickoffs).toBe(1);
+  expect(kickoffs).toBe(0);
   await page
     .getByRole("button", { name: "Mute microphone", exact: true })
     .click();
@@ -1888,5 +1880,6 @@ test("ElevenLabs receives the presentation and starts a contextual question inst
     .getByRole("button", { name: "Review moments" })
     .click();
   await expect.poll(() => closed).toBe(1);
+  expect(kickoffs).toBe(0);
   await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
 });

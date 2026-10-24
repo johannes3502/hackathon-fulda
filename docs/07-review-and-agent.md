@@ -81,24 +81,21 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
 
 - Einen privaten Conversational Agent anlegen. In **Security** die Authentifizierung
   und die Overrides für **System prompt** und **First message** aktivieren.
-- **First message auch im Agenten selbst leer speichern.** Die gespeicherte
-  Begrüßung wird direkt vorgelesen und durchläuft nicht den System-Prompt.
-  Ein Prompt wie „keine Vorstellung“ entfernt sie daher nicht. Der leere
-  Standard verhindert, dass ohne wirksamen Client-Override erneut „Hallo,
-  ich bin Leo … Worum ging es in deiner Präsentation?“ abgespielt wird.
+- **First message im Agenten speichern:** „Ich habe noch ein paar Fragen.
+  Bist du bereit?“ Die gespeicherte Nachricht wird direkt vorgelesen und
+  durchläuft nicht den System-Prompt; sie muss daher zum gewünschten Einstieg
+  passen.
 - Der API-Schlüssel braucht unter **ElevenAgents** die Berechtigung **Write**
   (`convai_write`). **Read** kann den Agenten laden, aber keine Signed URL
   ausstellen; dieser Aufruf scheitert dann mit HTTP 401 `missing_permissions`.
-- Sprache und Stimme passend zur Vorführung konfigurieren. Die App überschreibt
-  die gespeicherte erste Nachricht pro Gespräch mit einem leeren Text und sendet
-  nach dem Verbindungsaufbau einen Startauftrag per `sendUserMessage`. Damit
-  generiert der Agent seine erste Frage aus dem bereits übergebenen Transkript,
-  statt die feste Begrüßung vorzulesen. Der Startauftrag erscheint beim Anbieter
-  als programmatische Nutzernachricht; er ist keine gesprochene Antwort.
+- Sprache und Stimme passend zur Vorführung konfigurieren. Die App übergibt
+  „Ich habe noch ein paar Fragen. Bist du bereit?“ als `firstMessage`-Override.
+  Nach diesem festen deutschen Einstieg wartet der Agent auf eine Bestätigung.
+  Erst dann stellt er die erste konkrete Frage zum bereits übergebenen Transkript
+  in dessen Sprache. Wer noch nicht bereit ist, bekommt Zeit.
   Der Sprachagent ist in allen Präsentationsmodi eine Lehrkraft, die ihren
-  Schüler zum abgeschlossenen Vortrag befragt, kein Investor. Er beginnt nur
-  mit „Ich habe ein paar Fragen.“ in der Sprache des Transkripts und stellt
-  direkt die erste konkrete Frage; ohne Begrüßung, Vorstellung oder Rückblick.
+  Schüler zum abgeschlossenen Vortrag befragt, kein Investor; ohne zusätzliche
+  Begrüßung, Vorstellung oder Rückblick.
   Er prüft Verständnis, Zusammenhänge, Beispiele und Transfer anhand des
   Vortrags oder Materials. Bei falschen, unvollständigen oder unbelegten
   Antworten sind eine, höchstens zwei Nachfragen pro Hauptfrage vorgesehen;
@@ -161,22 +158,23 @@ im ElevenLabs-Konto angelegt oder verändert.
 ## Verifikation
 
 Der optionale Konfigurationstest liest den tatsächlich konfigurierten Agenten
-und prüft den leeren Standard sowie beide Override-Berechtigungen. Er benötigt
+und prüft den exakten Einstieg sowie beide Override-Berechtigungen. Er benötigt
 `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` in der Prozessumgebung und startet
-kein Gespräch; ein wieder eingetragener Begrüßungstext lässt ihn fehlschlagen:
+kein Gespräch; ein abweichender Begrüßungstext lässt ihn fehlschlagen:
 
 ```sh
 RUN_CLOUD_SMOKE=1 PYTHONPATH=backend python -m pytest backend/tests/test_question_agent.py -k live_agent -q
 ```
 
-Am 25.10.2026 schlug dieser Test zunächst am gespeicherten Leo-Begrüßungstext
-fehl. Nur dieses Feld wurde im konfigurierten Agenten geleert; alle anderen
-Gesprächs-, Plattform- und Workflow-Einstellungen blieben beim Rücklesen gleich.
-Danach bestanden alle 17 Question-Agent-Tests einschließlich des Live-Checks.
-Eine neue echte Voice-WebSocket-Session mit synthetischem Pflanzenversuch
-lieferte „Ich habe ein paar Fragen.“ und eine konkrete Frage zur gleichen
-Wassermenge sowie Audio – auch ohne `first_message` im Client-Override.
-Ein physisches Mikrofon oder die Audioausgabe am Gerät wurde dabei nicht geprüft.
+Am 25.10.2026 wurde der feste Bereitschaftseinstieg im Agenten und im Browser
+gesetzt. Alle 17 Question-Agent-Tests einschließlich Live-Konfigurationscheck
+bestanden; Desktop- und Mobile-Browsertests prüfen den genauen Wortlaut und
+dass kein automatischer Startauftrag eine Fachfrage vorzieht. Eine echte
+Voice-WebSocket-Session mit synthetischem Pflanzenversuch lieferte den exakten
+Einstieg, wartete auf „noch nicht bereit“ und stellte erst nach „jetzt bin ich
+bereit“ eine Frage zur gleichen Wassermenge. Audio wurde empfangen; physisches
+Mikrofon und Lautsprecher wurden nicht geprüft. Das Warten bleibt eine
+Prompt-Vorgabe, keine programmatisch erzwungene Gesprächssteuerung.
 
 Synthetische Tests prüfen Prompt-Schwerpunkte aller vier Modi, Quellenbindung,
 Job-Wiederzustellung, serverseitige Authentifizierung, Fehlermeldungen sowie

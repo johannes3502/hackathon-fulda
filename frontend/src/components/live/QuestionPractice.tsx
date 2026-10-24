@@ -107,7 +107,10 @@ export function QuestionPractice({
         connectionType: "websocket",
         textOnly: false,
         overrides: {
-          agent: { prompt: { prompt: context.prompt }, firstMessage: "" },
+          agent: {
+            prompt: { prompt: context.prompt },
+            firstMessage: "Ich habe noch ein paar Fragen. Bist du bereit?",
+          },
         },
         onConversationCreated: (created) => {
           if (pending.signal.aborted) void created.endSession();
@@ -154,10 +157,6 @@ export function QuestionPractice({
         return;
       }
       session.current = current;
-      // The saved greeting bypasses the LLM; request a generated opening after context is installed.
-      current.sendUserMessage(
-        "The student's presentation is complete. As their teacher, say only 'I have a few questions.' in the presentation's language, then immediately ask your first question about a specific point in the supplied presentation transcript. Do not add any other introduction.",
-      );
     } catch (failure) {
       if (!pending.signal.aborted) {
         setError(
