@@ -14,3 +14,4 @@
 **/playwright-report
 **/*.tsbuildinfo
 **/.DS_Store
+frontend/public/pose/runtime

@@ -6,7 +6,7 @@ Challenge-PDF (Stand 24.10.2026)
 **Thema:** Future Education – Lernen, Lehren und Prüfen neu denken
 **Ort:** Hochschule Fulda, Halle 8
 **Website:** https://www.hackathon-fulda.de
-**Challenge-PDF:** `Challenge_HackathonFulda2026_de.pdf` (erhalten 24.10.2026)
+**Challenge-PDF:** `specifications/Challenge_HackathonFulda2026_de.pdf` (erhalten 24.10.2026)
 **Challenge-Original-Link:** https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK
 **Team-Registrierung & Einreichung:** https://hackathon.kaleidoscode.de/register-team
 
@@ -313,7 +313,7 @@ stellt die KI-Reflection gleichberechtigt neben den Pitch (2 von 5 Minuten).
 ## 13. Quellenhinweis
 
 - Zwei Organisator-Mails zum 8. Hackathon Fulda 2026 (deutsch/englisch).
-- Offizielle Challenge-PDF: `Challenge_HackathonFulda2026_de.pdf`, erhalten am
+- Offizielle Challenge-PDF: `specifications/Challenge_HackathonFulda2026_de.pdf`, erhalten am
   24.10.2026; Original-Link:
   https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK
 - Die PDF ist die aktuelle Grundlage für Thema, sechs Beispiel-Challenges und
