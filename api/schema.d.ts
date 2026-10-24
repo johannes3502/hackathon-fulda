@@ -4,6 +4,67 @@
  */
 
 export interface paths {
+    "/factcheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Fact Check
+         * @description Check claims of a transcript against the collection's uploads, then the web.
+         *
+         *     Sends transcript sentences to the configured OpenAI-compatible model and,
+         *     for claims not settled by the uploads, search queries to the web provider.
+         *     Poll status_url for the result; events use `t_ms` of the recording.
+         */
+        post: operations["start_fact_check_factcheck_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factcheck/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job Status */
+        get: operations["job_status_factcheck_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factcheck/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Settings
+         * @description Whether the fact-check is configured and which third parties receive text.
+         */
+        get: operations["settings_factcheck_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -282,6 +343,35 @@ export interface components {
              */
             file: string;
         };
+        /** ClaimResult */
+        ClaimResult: {
+            /**
+             * Checked
+             * @description Where the claim was looked up
+             */
+            checked: ("upload" | "web")[];
+            /** Claim */
+            claim: string;
+            /** Duration Ms */
+            duration_ms: number;
+            evidence?: components["schemas"]["Evidence"] | null;
+            /** Explanation */
+            explanation: string;
+            /** Notes */
+            notes?: string[];
+            /** T Ms */
+            t_ms: number;
+            /**
+             * Transcript
+             * @description Spoken sentence(s) the claim was extracted from
+             */
+            transcript: string;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "supports" | "contradicts" | "not_found" | "unchecked";
+        };
         /** Event */
         Event: {
             /** Duration Ms */
@@ -307,6 +397,125 @@ export interface components {
              * @enum {string}
              */
             type: "posture" | "gesture" | "gaze" | "filler" | "pause" | "pace" | "volume" | "pitch" | "fact" | "question";
+        };
+        /** Evidence */
+        Evidence: {
+            /** Filename */
+            filename?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "upload" | "web";
+            /**
+             * Label
+             * @description e.g. `folien.pdf, Seite 3` or the web page title
+             */
+            label: string;
+            location?: components["schemas"]["Location"] | null;
+            /** Passage */
+            passage: string;
+            /**
+             * Quote
+             * @description Verbatim passage, verified by string match
+             */
+            quote: string;
+            /** Source Id */
+            source_id?: string | null;
+            /** Url */
+            url?: string | null;
+        };
+        /**
+         * FactCheckConfig
+         * @description Prototype limits, not tuned. Returned with every result.
+         */
+        FactCheckConfig: {
+            /**
+             * Max Claims
+             * @default 12
+             */
+            max_claims: number;
+            /**
+             * Min Quote Chars
+             * @description Shorter quotes are not accepted as evidence
+             * @default 12
+             */
+            min_quote_chars: number;
+            /**
+             * Top K
+             * @description Uploaded passages per claim
+             * @default 5
+             */
+            top_k: number;
+            /**
+             * Web Results
+             * @description Web passages per claim
+             * @default 4
+             */
+            web_results: number;
+        };
+        /** FactCheckJob */
+        FactCheckJob: {
+            /** Error */
+            error?: string | null;
+            /** Job Id */
+            job_id: string;
+            result?: components["schemas"]["FactCheckResult"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+        };
+        /** FactCheckRequest */
+        FactCheckRequest: {
+            /**
+             * Collection Id
+             * @description Uploaded sources to check against first
+             */
+            collection_id?: string | null;
+            config?: components["schemas"]["FactCheckConfig"];
+            /**
+             * Use Web
+             * @description Search the configured web provider if uploads do not settle a claim
+             * @default true
+             */
+            use_web: boolean;
+            /**
+             * Words
+             * @description Word timestamps relative to recording start
+             */
+            words: components["schemas"]["Word"][];
+        };
+        /** FactCheckResult */
+        FactCheckResult: {
+            /** Claims */
+            claims: components["schemas"]["ClaimResult"][];
+            config: components["schemas"]["FactCheckConfig"];
+            /** Events */
+            events: components["schemas"]["Event"][];
+            /** Model */
+            model: string;
+            /** Notices */
+            notices: string[];
+            /** Sources Checked */
+            sources_checked: boolean;
+            /** Web Provider */
+            web_provider: string | null;
+        };
+        /** FactCheckSettings */
+        FactCheckSettings: {
+            /** Available */
+            available: boolean;
+            /**
+             * Llm Host
+             * @description Host receiving transcript text; name it in consent notices
+             */
+            llm_host: string | null;
+            /** Model */
+            model: string | null;
+            /** Web Provider */
+            web_provider: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -517,6 +726,90 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    start_fact_check_factcheck_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_status_factcheck_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactCheckJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    settings_factcheck_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactCheckSettings"];
+                };
+            };
+        };
+    };
     live_health_live_get: {
         parameters: {
             query?: never;

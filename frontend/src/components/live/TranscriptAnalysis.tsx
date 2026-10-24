@@ -45,8 +45,12 @@ export function TranscriptAnalysis({
       if (active.signal.aborted) return;
       save({
         ...recording,
+        words,
+        factCheck: undefined,
         feedback: [
-          ...recording.feedback.filter((f) => !f.id.startsWith("words-")),
+          ...recording.feedback.filter(
+            (f) => !f.id.startsWith("words-") && !f.id.startsWith("fact-"),
+          ),
           ...result.feedback,
         ].sort((a, b) => a.startMs - b.startMs),
         metrics: [
@@ -70,9 +74,9 @@ export function TranscriptAnalysis({
     <section className="panel">
       <h2>Analyze a timestamped transcript</h2>
       <p>
-        Automatic transcription is not connected yet. Upload words from this
-        take to analyze pauses, fillers and pace. The sample rehearsal keeps its
-        mocked transcript.
+        {recording.words?.length
+          ? `This take has a transcript with ${recording.words.length} words. Importing another one replaces it and clears the fact-check.`
+          : "This take has no transcript. Turn on transcription before recording, or upload words from this take to analyze pauses, fillers and pace and to enable the fact-check."}
       </p>
       <label htmlFor="transcript-file">Word timestamps (JSON)</label>
       <input

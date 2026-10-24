@@ -45,12 +45,12 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 - **Transkription:** Stufe A (zuerst): Audio nach dem Stoppen hochladen, Wort-Timestamps zurück. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg → Anbieter mit Füllwort-Option prüfen (z. B. Deepgram, AssemblyAI) oder `faster-whisper`/CrisperWhisper als lokale Alternative. Wort-Timestamps und Füllwort-Unterstützung des gewählten Modells vor der Entscheidung gegen die aktuelle Doku prüfen.
 - **Embeddings:** umgesetzt mit lokalem `jinaai/jina-embeddings-v2-base-de` (Deutsch/Englisch, FastEmbed/ONNX) hinter einem austauschbaren `Embedder`-Interface; Retrieval-Qualität mit echten Dokumenten noch nicht gemessen.
-- **Fact-Check und Frage-Agent:** ein LLM-Anbieter für beides. Für den Web-Fetch-Agent Anbieter-Tool für Suche/Abruf nutzen, kein eigenes Scraping.
+- **Fact-Check und Frage-Agent:** ein LLM-Anbieter für beides. Umgesetzt: beliebiger OpenAI-kompatibler Endpunkt (`LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY`); konkreter Anbieter und Modell sind noch offen. Web-Zweitquelle über Such-APIs (Wikipedia-API ohne Schlüssel, optional Tavily), kein eigenes Scraping.
 - **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
 - **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
-**Offen:** LLM-Anbieter, Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
+**Offen:** konkreter LLM-Anbieter und Modell (Schnittstelle: OpenAI-kompatibel), Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
 
 ## 4. Architektur
 
@@ -150,16 +150,22 @@ die vollständige Aufnahme-/Clip-/Review-Pipeline aus der Zielarchitektur sind
 noch nicht umgesetzt. Quellen-Upload und Retrieval (RAG) sind umgesetzt
 (`backend/app/sources/`, Frontend-Seite `/sources`): PDF/PPTX/DOCX/TXT/MD →
 Chunks mit Seite/Folie → lokale Embeddings (`jina-embeddings-v2-base-de`) →
-Hybrid-Suche (pgvector + deutsche Volltextsuche). Fact-Check und Frage-Agent
-nutzen `app.sources.retrieval` (`search`, `format_context`, `quote_in_text`);
-beide sind noch nicht implementiert. Das Next.js-Frontend läuft in einem
+Hybrid-Suche (pgvector + deutsche Volltextsuche). Der Fact-Check ist umgesetzt
+(`backend/app/factcheck/`, `POST /factcheck`, Review-Panel in `/live/[id]/review`):
+LLM extrahiert Aussagen mit Satznummern, Timestamps kommen aus den Wörtern;
+pro Aussage zuerst Retrieval in den hochgeladenen Quellen, danach optional
+Websuche (Wikipedia/Tavily); Zitate werden per `quote_in_text` geprüft,
+Ergebnisse sind `fact`-Events. LLM über OpenAI-kompatible API, Anbieter offen.
+Der Frage-Agent ist noch nicht implementiert. Im Live-Studio lässt sich die
+Transkription (Deepgram) vor der Aufnahme zuschalten; die Wörter sind Eingabe
+für den Fact-Check. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
 erste Live-Regel „Arme verschränkt“ als Overlay-Hinweis, weitere Regeln und
 Pose-Events für die Timeline sind noch offen (`frontend/DATA_POINTS.md`).
 Der Aufnahme-Pfad nutzt die Audio-Job-API
-mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
-jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
+mit lokaler Signalanalyse und Status-Polling. ASR ist optional und im
+Live-Studio per Opt-in zuschaltbar. Umgesetzt sind zwei getrennte
 Analyse-Pipelines mit S3-Persistenz für kombinierte Jobs, beide mit `t_ms` ab Aufnahmestart im
 gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als
 Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription

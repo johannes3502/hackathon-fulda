@@ -70,7 +70,12 @@ export async function waitForAudioJob(
     if (job.status === "completed") {
       if (!object(job.result) || !object(job.result.audio))
         throw new Error("The backend returned an invalid analysis.");
-      return { summary: job.result.audio.summary, events: job.result.events };
+      return {
+        summary: job.result.audio.summary,
+        events: job.result.events,
+        words: job.result.words,
+        transcription: job.result.transcription,
+      };
     }
     if (job.status !== "queued" && job.status !== "running")
       throw new Error("The backend returned an invalid analysis job.");
@@ -154,7 +159,7 @@ export function analysisResult(
       startMs: e.t_ms,
       endMs: Math.min(durationMs, e.t_ms + e.duration_ms),
       title: `${e.type}${direction}${word}`,
-      detail: `${source === "speech" ? "Audio signal" : "Word timestamp"} heuristic. Review this observation in context; it is not a performance score.`,
+      detail: `${source === "speech" && e.source !== "asr" ? "Audio signal" : "Word timestamp"} heuristic. Review this observation in context; it is not a performance score.`,
       action:
         "Replay the surrounding seconds and decide whether you want to practice this moment.",
     };

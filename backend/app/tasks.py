@@ -74,3 +74,42 @@ def analyze_speech(self, job_id: str) -> dict[str, str]:
         return {"job_id": job_id, "status_key": storage.key(job_id, "status.json")}
     finally:
         lock.release()
+
+
+PREFIX = "factcheck-jobs"
+
+
+@celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
+def fact_check(self, job_id: str) -> dict[str, str]:
+    """Reuse terminal results on redelivery; delete the stored transcript afterwards."""
+    from app.connections import redis_client
+    from app.factcheck.llm import configured_llm
+    from app.factcheck.models import FactCheckJob, FactCheckRequest
+    from app.factcheck.pipeline import run_fact_check
+    from app.factcheck.web import configured_web_searcher
+
+    # Lease exceeds hard task timeout. Prevent concurrent duplicate paid requests.
+    lock = redis_client().lock(f"factcheck-job-lock:{job_id}", timeout=660, blocking=False)
+    if not lock.acquire(blocking=False):
+        raise self.retry(countdown=30)
+    try:
+        previous = storage.read_json(job_id, "status.json", PREFIX)
+        if not (previous and previous["status"] in ("completed", "failed")):
+            request = storage.read_json(job_id, "request.json", PREFIX)
+            if request is None:
+                raise ValueError("Missing fact-check request")
+            storage.write_json(job_id, "status.json", FactCheckJob(job_id=job_id, status="running").model_dump(), PREFIX)
+            try:
+                parsed = FactCheckRequest.model_validate(request)
+                result = run_fact_check(parsed, configured_llm(), configured_web_searcher() if parsed.use_web else None,
+                                        workers=int(os.getenv("LLM_CONCURRENCY", "4")))
+                status = FactCheckJob(job_id=job_id, status="completed", result=result)
+            except (Exception, SoftTimeLimitExceeded) as error:
+                # Never put model answers, transcripts or credentials into logs or Redis.
+                logging.getLogger(__name__).warning("Fact-check job %s failed (%s)", job_id, type(error).__name__)
+                status = FactCheckJob(job_id=job_id, status="failed", error="Faktencheck fehlgeschlagen. LLM-Konfiguration und Erreichbarkeit prüfen.")
+            storage.write_json(job_id, "status.json", status.model_dump(mode="json"), PREFIX)
+        s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=storage.key(job_id, "request.json", PREFIX))
+        return {"job_id": job_id, "status_key": storage.key(job_id, "status.json", PREFIX)}
+    finally:
+        lock.release()

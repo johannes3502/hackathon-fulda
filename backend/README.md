@@ -54,6 +54,7 @@ smoke command above to check the running containers.
 | MediaPipe | Python Tasks library in the shared backend/worker image | No separate service |
 | PostgreSQL + pgvector | Source metadata, text chunks and embeddings; later transcripts and timestamps | `localhost:5432` |
 | SeaweedFS | S3-compatible object storage for audio/video and uploaded files | `http://localhost:8333` |
+| OpenAI-compatible LLM (external or local) | Fact-check: claim extraction and judgments; optional | `LLM_BASE_URL` in `.env` |
 | MediaRecorder | Browser API that produces audio/video blobs | Frontend; no container or Python dependency |
 | FFmpeg | Available for converting browser recording formats when needed | Backend and worker containers |
 
@@ -274,6 +275,57 @@ The Postgres image is now `pgvector/pgvector` (PostgreSQL 18, Debian) instead
 of `postgres:18.6-alpine`. Existing local volumes keep working; the schema and
 extension are created on first use. `tests/test_sources.py` contains a
 database round trip that runs when `POSTGRES_HOST` is set.
+
+### Fact-check (`app/factcheck/`, `/factcheck`)
+
+Checks factual statements of a transcript against the uploaded sources of a
+collection first (RAG), then, only for statements the uploads do not settle,
+against a web search. Data flow:
+
+```
+POST /factcheck {words, collection_id?, use_web} → S3 factcheck-jobs/{id}/request.json
+  → Celery fact_check:
+      words → numbered sentences (timestamps from code, not from the model)
+      LLM: extract checkable claims + search query, referencing sentence numbers
+      per claim: retrieval.search(collection) → LLM judges with verbatim quote
+                 → quote_in_text() verifies the quote, otherwise discarded
+                 not settled? → web search (Wikipedia/Tavily) → same judge + check
+  → S3 factcheck-jobs/{id}/status.json (request.json deleted afterwards)
+GET /factcheck/jobs/{id}   queued | running | completed | failed
+GET /factcheck/settings    configured model, LLM host and web provider (for consent text)
+```
+
+- Verdicts: `supports`, `contradicts`, `not_found` ("not in the checked
+  sources", never "false") and `unchecked` (model or search failed for this
+  claim). Every result is also a `fact` event (`source="factcheck"`) on the
+  shared timeline: `contradicts` → `warning`, `not_found` → `hint`, otherwise
+  `info`. No scores.
+- Evidence is accepted only if the quoted text appears verbatim in the passage
+  (whitespace, case and quote style ignored) and has at least
+  `min_quote_chars` characters. Upload evidence names file and page/slide;
+  web evidence names title and URL.
+- Model: any OpenAI-compatible `POST {LLM_BASE_URL}/chat/completions`
+  (OpenAI, hosted open models, Ollama, vLLM, LM Studio). Configure
+  `LLM_BASE_URL`, `LLM_MODEL` and, if needed, `LLM_API_KEY` in `.env`; without
+  them `/factcheck` answers 503. `LLM_JSON_MODE=false` for servers without
+  `response_format=json_object`; `LLM_TEMPERATURE` stays unset unless the model
+  accepts it. A local server on the host is reachable from the containers as
+  `http://host.docker.internal:<port>/v1`. Calls are not retried (they may be
+  billed); `LLM_CONCURRENCY` claims are judged in parallel.
+- Web search (`WEB_SEARCH_PROVIDER`): `wikipedia` (default, MediaWiki API, no
+  key, `WEB_SEARCH_LANGUAGE=de`), `tavily` (`TAVILY_API_KEY`) or `none`. Only
+  search APIs, no HTML scraping. The client can switch it off per request
+  (`use_web=false`).
+- Third parties: transcript sentences go to the LLM host; short search queries
+  go to the web provider. The review UI names both before the check starts.
+- Limits (`FactCheckConfig`, returned with every result): 12 claims, 5 upload
+  passages and 4 web passages per claim. Not tuned; quality of claim
+  extraction and judgments depends on the chosen model and is not measured.
+
+Tests: `tests/test_factcheck.py` (scripted model answers, HTTP contracts for
+the OpenAI-compatible API and Wikipedia, task redelivery). A full run through
+the Compose stack needs a configured model; see the AI decision log entry for
+the end-to-end check with a deterministic stand-in model.
 
 ## MediaRecorder integration
 

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from redis.exceptions import RedisError
 
 from app.connections import connect_db, redis_client, s3_client
+from app.factcheck.router import router as factcheck_router
 from app.sources.router import router as sources_router
 from app.speech.router import router as speech_router
 from app.transcription.router import router as transcription_router
@@ -15,6 +16,7 @@ app = FastAPI(title="Presentation Trainer API", version="0.1.0")
 app.include_router(speech_router)
 app.include_router(transcription_router)
 app.include_router(sources_router)
+app.include_router(factcheck_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

@@ -226,7 +226,7 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   expect(errors).toEqual([]);
 });
 
-async function backend(page: Page) {
+async function backend(page: Page, transcribe = false) {
   await syntheticCamera(page);
   await page.route("http://localhost:8000/health/**", (route) =>
     route.fulfill({ json: { status: "ok" } }),
@@ -236,6 +236,10 @@ async function backend(page: Page) {
   await expect(
     page.getByText("analysis results remain stored", { exact: false }),
   ).toBeVisible();
+  if (transcribe)
+    await page
+      .getByLabel("Transcribe speech for word analysis and fact-check")
+      .check();
   await page.getByRole("button", { name: "Enable camera preview" }).click();
   await page.getByRole("button", { name: "Record & analyze audio" }).click();
   await expect(
@@ -550,4 +554,148 @@ test("pose model failure preserves camera recording controls", async ({
   await expect(
     page.getByRole("button", { name: "Retry landmarks" }),
   ).toBeEnabled();
+});
+
+test("transcribed take is fact-checked against sources and links back to the video", async ({
+  page,
+}, info) => {
+  const jobId = "12345678-1234-1234-1234-123456789abc";
+  const factJob = "87654321-4321-4321-4321-cba987654321";
+  const words = [
+    { word: "Wir", start_ms: 200, end_ms: 400 },
+    { word: "haben", start_ms: 450, end_ms: 700 },
+    { word: "9000", start_ms: 750, end_ms: 1000 },
+    { word: "Studierende.", start_ms: 1050, end_ms: 1400 },
+  ];
+  await page.route("http://localhost:8000/speech/analyze", async (route) => {
+    expect(route.request().postData()).toContain(
+      'name="transcribe"\r\n\r\ntrue',
+    );
+    await route.fulfill({
+      status: 202,
+      json: { job_id: jobId, status_url: `/speech/jobs/${jobId}` },
+    });
+  });
+  await page.route("http://localhost:8000/speech/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        job_id: jobId,
+        status: "completed",
+        result: {
+          audio: { summary: { pause_count: 0 } },
+          events: [],
+          words,
+          transcription: { summary: { word_count: 4 }, events: [] },
+        },
+      },
+    }),
+  );
+  await page.route("http://localhost:8000/factcheck/settings", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        model: "synthetic-model",
+        llm_host: "llm.example",
+        web_provider: "wikipedia",
+      },
+    }),
+  );
+  await page.route("http://localhost:8000/sources?*", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "00000000-0000-4000-8000-000000000001",
+          collection_id: "00000000-0000-4000-8000-000000000002",
+          filename: "folien.pdf",
+          content_type: "application/pdf",
+          size_bytes: 10,
+          status: "ready",
+          chunk_count: 3,
+          created_at: "2026-10-24T12:00:00Z",
+        },
+      ],
+    }),
+  );
+  let request: Record<string, unknown> | null = null;
+  await page.route("http://localhost:8000/factcheck", async (route) => {
+    request = route.request().postDataJSON();
+    await route.fulfill({
+      status: 202,
+      json: { job_id: factJob, status_url: `/factcheck/jobs/${factJob}` },
+    });
+  });
+  await page.route(`http://localhost:8000/factcheck/jobs/${factJob}`, (route) =>
+    route.fulfill({
+      json: {
+        job_id: factJob,
+        status: "completed",
+        result: {
+          claims: [
+            {
+              claim: "Die Hochschule hat 9000 Studierende.",
+              transcript: "Wir haben 9000 Studierende.",
+              t_ms: 200,
+              duration_ms: 1200,
+              verdict: "contradicts",
+              explanation: "Die Folie nennt rund 9.500 Studierende.",
+              evidence: {
+                kind: "upload",
+                label: "folien.pdf, Seite 2",
+                quote: "rund 9.500 Studierende in acht Fachbereichen",
+                passage:
+                  "Die Hochschule hat rund 9.500 Studierende in acht Fachbereichen.",
+                filename: "folien.pdf",
+                location: { kind: "page", start: 2, end: 2 },
+              },
+              checked: ["upload"],
+              notes: [],
+            },
+          ],
+          events: [],
+          model: "synthetic-model",
+          web_provider: "wikipedia",
+          sources_checked: true,
+          config: {
+            max_claims: 12,
+            min_quote_chars: 12,
+            top_k: 5,
+            web_results: 4,
+          },
+          notices: ["Synthetic notice."],
+        },
+      },
+    }),
+  );
+  await backend(page, true);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  const inputs = page.locator(".fact-check-inputs");
+  await expect(inputs).toContainText("4 words");
+  await expect(inputs).toContainText("1 ready");
+  await expect(page.getByText("llm.example", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Check facts" }).click();
+  await expect(page.locator(".fact-verdict")).toHaveText(
+    "Source says otherwise",
+  );
+  await expect(page.locator(".review-moments")).toContainText(
+    "Source says otherwise",
+  );
+  await expect(page.locator(".fact-claim blockquote")).toContainText(
+    "“rund 9.500 Studierende in acht Fachbereichen”folien.pdf, Page 2",
+  );
+  expect(request).toMatchObject({ words, use_web: true });
+  expect(request!.collection_id).toMatch(/^[0-9a-f-]{36}$/);
+  await page.locator(".fact-claim-head button").click();
+  await expect(page.locator(".selected-feedback")).toContainText(
+    "Source says otherwise",
+  );
+  await noOverflow(page);
+  await page.locator(".fact-check").screenshot({
+    path: `test-results/fact-check-${info.project.name}.png`,
+  });
+  await page.getByRole("link", { name: "Feedback moments" }).click();
+  await page.getByLabel("Filter by category").selectOption("fact");
+  await expect(
+    page.getByText("Source says otherwise", { exact: false }).first(),
+  ).toBeVisible();
 });

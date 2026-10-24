@@ -319,6 +319,81 @@
         "title": "Body_upload_source_sources_post",
         "type": "object"
       },
+      "ClaimResult": {
+        "properties": {
+          "checked": {
+            "description": "Where the claim was looked up",
+            "items": {
+              "enum": [
+                "upload",
+                "web"
+              ],
+              "type": "string"
+            },
+            "title": "Checked",
+            "type": "array"
+          },
+          "claim": {
+            "title": "Claim",
+            "type": "string"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Evidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "t_ms": {
+            "title": "T Ms",
+            "type": "integer"
+          },
+          "transcript": {
+            "description": "Spoken sentence(s) the claim was extracted from",
+            "title": "Transcript",
+            "type": "string"
+          },
+          "verdict": {
+            "enum": [
+              "supports",
+              "contradicts",
+              "not_found",
+              "unchecked"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "claim",
+          "transcript",
+          "t_ms",
+          "duration_ms",
+          "verdict",
+          "explanation",
+          "checked"
+        ],
+        "title": "ClaimResult",
+        "type": "object"
+      },
       "Event": {
         "properties": {
           "duration_ms": {
@@ -380,6 +455,315 @@
           "payload"
         ],
         "title": "Event",
+        "type": "object"
+      },
+      "Evidence": {
+        "properties": {
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "kind": {
+            "enum": [
+              "upload",
+              "web"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "description": "e.g. `folien.pdf, Seite 3` or the web page title",
+            "title": "Label",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Location"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "passage": {
+            "title": "Passage",
+            "type": "string"
+          },
+          "quote": {
+            "description": "Verbatim passage, verified by string match",
+            "title": "Quote",
+            "type": "string"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "quote",
+          "passage"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "FactCheckConfig": {
+        "description": "Prototype limits, not tuned. Returned with every result.",
+        "properties": {
+          "max_claims": {
+            "default": 12,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Max Claims",
+            "type": "integer"
+          },
+          "min_quote_chars": {
+            "default": 12,
+            "description": "Shorter quotes are not accepted as evidence",
+            "minimum": 1.0,
+            "title": "Min Quote Chars",
+            "type": "integer"
+          },
+          "top_k": {
+            "default": 5,
+            "description": "Uploaded passages per claim",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "type": "integer"
+          },
+          "web_results": {
+            "default": 4,
+            "description": "Web passages per claim",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Web Results",
+            "type": "integer"
+          }
+        },
+        "title": "FactCheckConfig",
+        "type": "object"
+      },
+      "FactCheckJob": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FactCheckResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "FactCheckJob",
+        "type": "object"
+      },
+      "FactCheckRequest": {
+        "properties": {
+          "collection_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Uploaded sources to check against first",
+            "title": "Collection Id"
+          },
+          "config": {
+            "$ref": "#/components/schemas/FactCheckConfig"
+          },
+          "use_web": {
+            "default": true,
+            "description": "Search the configured web provider if uploads do not settle a claim",
+            "title": "Use Web",
+            "type": "boolean"
+          },
+          "words": {
+            "description": "Word timestamps relative to recording start",
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "maxItems": 50000,
+            "minItems": 1,
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "words"
+        ],
+        "title": "FactCheckRequest",
+        "type": "object"
+      },
+      "FactCheckResult": {
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimResult"
+            },
+            "title": "Claims",
+            "type": "array"
+          },
+          "config": {
+            "$ref": "#/components/schemas/FactCheckConfig"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "sources_checked": {
+            "title": "Sources Checked",
+            "type": "boolean"
+          },
+          "web_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Provider"
+          }
+        },
+        "required": [
+          "claims",
+          "events",
+          "model",
+          "web_provider",
+          "sources_checked",
+          "config",
+          "notices"
+        ],
+        "title": "FactCheckResult",
+        "type": "object"
+      },
+      "FactCheckSettings": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "llm_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Host receiving transcript text; name it in consent notices",
+            "title": "Llm Host"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "web_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web Provider"
+          }
+        },
+        "required": [
+          "available",
+          "model",
+          "llm_host",
+          "web_provider"
+        ],
+        "title": "FactCheckSettings",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -859,6 +1243,113 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/factcheck": {
+      "post": {
+        "description": "Check claims of a transcript against the collection's uploads, then the web.\n\nSends transcript sentences to the configured OpenAI-compatible model and,\nfor claims not settled by the uploads, search queries to the web provider.\nPoll status_url for the result; events use `t_ms` of the recording.",
+        "operationId": "start_fact_check_factcheck_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FactCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Fact Check",
+        "tags": [
+          "factcheck"
+        ]
+      }
+    },
+    "/factcheck/jobs/{job_id}": {
+      "get": {
+        "operationId": "job_status_factcheck_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactCheckJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Status",
+        "tags": [
+          "factcheck"
+        ]
+      }
+    },
+    "/factcheck/settings": {
+      "get": {
+        "description": "Whether the fact-check is configured and which third parties receive text.",
+        "operationId": "settings_factcheck_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactCheckSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Settings",
+        "tags": [
+          "factcheck"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "live_health_live_get",

@@ -58,6 +58,7 @@ export function LiveStudio() {
   const [title, setTitle] = useState("My pitch rehearsal");
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("demo");
+  const [transcribe, setTranscribe] = useState(false);
   const [endpoint, setEndpoint] = useState(
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
   );
@@ -129,6 +130,7 @@ export function LiveStudio() {
       targetMs,
       mode,
       endpoint: destination,
+      transcribe: mode === "backend" && transcribe,
     };
     const recorder = new LiveRecorder(
       stream,
@@ -379,7 +381,7 @@ export function LiveStudio() {
                 ? (progress.notice ??
                   (mode === "demo"
                     ? "Demo feedback is scripted. No video is uploaded. Pose landmarks and logging stay local."
-                    : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis.`))
+                    : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis${transcribe ? " and transcription" : ""}.`))
                 : cameraCopy[cameraStatus]}
             </p>
             <section
@@ -484,7 +486,20 @@ export function LiveStudio() {
                       microphone audio to this destination after stopping. The
                       backend stores the upload for its analysis job and removes
                       the original after processing; analysis results remain
-                      stored. No ASR or LLM request is made in this mode.
+                      stored.
+                    </p>
+                    <label className="live-transcribe">
+                      <input
+                        type="checkbox"
+                        checked={transcribe}
+                        onChange={(e) => setTranscribe(e.target.checked)}
+                      />
+                      Transcribe speech for word analysis and fact-check
+                    </label>
+                    <p className="field-hint">
+                      {transcribe
+                        ? "The backend sends the audio to its configured speech recognition provider (default: Deepgram, EU endpoint). The transcript is needed for the fact-check in the review."
+                        : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
                     </p>
                   </div>
                 )}
@@ -512,7 +527,7 @@ export function LiveStudio() {
                   {latest?.action ??
                     (mode === "demo"
                       ? "Start a recording to try example feedback markers and video replay."
-                      : "Audio heuristics appear after you finish. Pose logging is separate from feedback. Automatic transcription is not connected yet.")}
+                      : `Audio heuristics appear after you finish. Pose logging is separate from feedback. ${transcribe ? "Transcript-based feedback follows the audio analysis." : "Transcription is off."}`)}
                 </p>
               </div>
               {latest && (

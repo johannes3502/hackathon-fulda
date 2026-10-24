@@ -26,6 +26,20 @@ x-backend: &backend
     EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
     EMBEDDING_MODEL_PATH: /app/models/embedding
     SOURCE_MAX_BYTES: ${SOURCE_MAX_BYTES:-26214400}
+    LLM_BASE_URL: ${LLM_BASE_URL:-}
+    LLM_MODEL: ${LLM_MODEL:-}
+    LLM_API_KEY: ${LLM_API_KEY:-}
+    LLM_JSON_MODE: ${LLM_JSON_MODE:-true}
+    LLM_TEMPERATURE: ${LLM_TEMPERATURE:-}
+    LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-90}
+    LLM_CONCURRENCY: ${LLM_CONCURRENCY:-4}
+    WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-wikipedia}
+    WEB_SEARCH_LANGUAGE: ${WEB_SEARCH_LANGUAGE:-de}
+    TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+  # Lets a local OpenAI-compatible server on the host (e.g. Ollama) be reached
+  # as http://host.docker.internal:<port>/v1 on Linux as well.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   volumes:
     - ./backend/app:/app/app:ro
   depends_on:

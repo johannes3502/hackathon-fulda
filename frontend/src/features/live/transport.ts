@@ -4,13 +4,21 @@ import type {
   VideoChunkMeta,
   VideoTransport,
 } from "./contracts";
-import { analysisResult, request, waitForAudioJob } from "./analysis";
+import {
+  analysisResult,
+  parseWords,
+  request,
+  waitForAudioJob,
+} from "./analysis";
 
 export class AnalysisTransport implements VideoTransport {
   private controller = new AbortController();
   private receive?: (message: LiveMessage) => void;
   private sessionId = "";
-  constructor(private endpoint: string) {}
+  constructor(
+    private endpoint: string,
+    private transcribe = false,
+  ) {}
   async connect(
     session: { sessionId: string },
     receive: (message: LiveMessage) => void,
@@ -28,8 +36,8 @@ export class AnalysisTransport implements VideoTransport {
       recording,
       recording.type.includes("mp4") ? "take.mp4" : "take.webm",
     );
-    // Preserve this UI's local signal-analysis mode; paid ASR is opt-in via API.
-    body.append("transcribe", "false");
+    // Paid ASR only when the user opted in before recording.
+    body.append("transcribe", this.transcribe ? "true" : "false");
     const accepted = await request(
       this.endpoint,
       "/speech/analyze",
@@ -39,18 +47,36 @@ export class AnalysisTransport implements VideoTransport {
         body,
       },
     );
-    const result = analysisResult(
-      await waitForAudioJob(this.endpoint, accepted, this.controller.signal),
-      "speech",
-      durationMs,
+    const job = await waitForAudioJob(
+      this.endpoint,
+      accepted,
+      this.controller.signal,
     );
+    const result = analysisResult(job, "speech", durationMs);
+    const words =
+      this.transcribe && Array.isArray(job.words) && job.words.length
+        ? parseWords(job.words, Number.MAX_SAFE_INTEGER)
+        : [];
+    const wordMetrics =
+      words.length &&
+      job.transcription &&
+      typeof job.transcription === "object" &&
+      "summary" in job.transcription
+        ? analysisResult(
+            { summary: job.transcription.summary, events: [] },
+            "words",
+            durationMs,
+          ).metrics
+        : [];
     for (const feedback of result.feedback)
       this.receive?.({ type: "feedback", sessionId: this.sessionId, feedback });
+    if (words.length)
+      this.receive?.({ type: "transcript", sessionId: this.sessionId, words });
     this.receive?.({
       type: "metrics",
       sessionId: this.sessionId,
       atMs: durationMs,
-      metrics: result.metrics,
+      metrics: [...result.metrics, ...wordMetrics],
     });
   }
   close() {
@@ -130,5 +156,5 @@ export class DemoVideoTransport implements VideoTransport {
 export function createVideoTransport(config: LiveConfig): VideoTransport {
   return config.mode === "demo"
     ? new DemoVideoTransport()
-    : new AnalysisTransport(config.endpoint);
+    : new AnalysisTransport(config.endpoint, !!config.transcribe);
 }

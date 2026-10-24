@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import type { LiveFeedback } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
+import { FactCheckPanel } from "./FactCheckPanel";
 import { FeedbackMoment, LiveNav, MissingRecording } from "./shared";
 import { PoseDownload } from "./PoseDownload";
 import { TranscriptAnalysis } from "./TranscriptAnalysis";
@@ -211,7 +212,18 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
           </aside>
         </div>
         {recording.config.mode === "backend" && (
-          <TranscriptAnalysis recording={recording} />
+          <>
+            <TranscriptAnalysis recording={recording} />
+            <FactCheckPanel
+              recording={recording}
+              onSelect={(item) => {
+                setSelected({ ...item });
+                document
+                  .querySelector(".playback-panel")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            />
+          </>
         )}
         <section className="review-moments">
           <div className="panel-title-row">

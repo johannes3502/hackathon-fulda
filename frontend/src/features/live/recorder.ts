@@ -64,6 +64,7 @@ export class LiveRecorder {
       this.latestMetricMs = message.atMs;
       this.progress.metrics = message.metrics;
     }
+    if (message.type === "transcript") this.progress.words = message.words;
     if (message.type === "error") this.fail(message.message);
     this.publish();
   };
@@ -252,6 +253,7 @@ export class LiveRecorder {
       mimeType: video.type,
       feedback: this.progress.feedback,
       metrics: this.progress.metrics,
+      words: this.progress.words,
       chunksSent: this.progress.chunksSent,
       bytesSent: this.progress.bytesSent,
       completion: this.failed ? "interrupted" : "complete",
