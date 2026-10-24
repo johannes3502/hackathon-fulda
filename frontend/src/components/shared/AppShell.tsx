@@ -1,10 +1,99 @@
 "use client";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleHelp, FlaskConical, ShieldCheck } from "lucide-react";
+import {
+  BarChart3,
+  CircleHelp,
+  Eye,
+  FileText,
+  FlaskConical,
+  LineChart,
+  Menu,
+  Play,
+  ShieldCheck,
+  Video,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import type { ReactNode } from "react";
+
+const DrawerContext = createContext<{
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}>({
+  open: false,
+  setOpen: () => {},
+});
+
+export function useNavigationDrawer() {
+  return useContext(DrawerContext);
+}
+
+export function DrawerTriggerButton() {
+  const { open, setOpen } = useNavigationDrawer();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="drawer-trigger"
+      aria-label="Menü"
+      aria-expanded={open}
+      aria-controls="app-navigation-drawer"
+      onClick={() => setOpen(!open)}
+    >
+      <Menu size={17} />
+      <span className="drawer-trigger-label">Menü</span>
+    </Button>
+  );
+}
+
+
+export const NAV_ITEMS = [
+  {
+    href: "/",
+    label: "Start & Stats",
+    description: "Aktuelle Stats-Karte, Monatsfortschritt & Diagramme",
+    icon: BarChart3,
+  },
+  {
+    href: "/live",
+    label: "Live-Studio",
+    description: "Kamera- & Mikrofon-Aufnahme mit Echtzeit-Hinweisen",
+    icon: Video,
+  },
+  {
+    href: "/sources",
+    label: "Quellen (RAG)",
+    description: "PDF, PPTX & Notizen für den Fact-Check verwalten",
+    icon: FileText,
+  },
+  {
+    href: "/review-preview",
+    label: "Analyse-Review",
+    description: "Zeitachsen-Analyse & Video-Momente im Detail",
+    icon: LineChart,
+  },
+  {
+    href: "/gestures",
+    label: "Gesten-Walkthrough",
+    description: "Synthetischer 22-Sekunden-Durchlauf der Haltungsregeln",
+    icon: Eye,
+  },
+  {
+    href: "/demo",
+    label: "Sample Demo",
+    description: "Geführte Pitch-Simulation mit Jury-Rückfragen",
+    icon: Play,
+  },
+] as const;
+
 export function DemoBadge() {
   return (
     <span className="demo-badge">
@@ -12,32 +101,58 @@ export function DemoBadge() {
     </span>
   );
 }
+
 export function AppShell({
   children,
   experience = "sample",
 }: {
   children: ReactNode;
+  step?: number;
   experience?: "sample" | "live";
 }) {
   const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setDrawerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [drawerOpen]);
+
   return (
-    <>
+    <DrawerContext.Provider value={{ open: drawerOpen, setOpen: setDrawerOpen }}>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
       <header className="app-header">
-        <Link href="/" className="brand" aria-label="418 home">
-          <span className="brand-mark">418</span>
-          <span className="brand-caption">Presentation studio</span>
-        </Link>
+        <div className="header-brand-group">
+          <Button
+            variant="outline"
+            size="sm"
+            className="drawer-trigger"
+            aria-label="Menü"
+            aria-expanded={drawerOpen}
+            aria-controls="app-navigation-drawer"
+            onClick={() => setDrawerOpen((prev) => !prev)}
+          >
+            <Menu size={17} />
+            <span className="drawer-trigger-label">Menü</span>
+          </Button>
+          <Link href="/" className="brand" aria-label="418 home">
+            <span className="brand-mark">418</span>
+            <span className="brand-caption">Presentation studio</span>
+          </Link>
+        </div>
         <nav aria-label="Main navigation" className="app-nav">
           <Link
             href="/live"
-            aria-current={
-              pathname === "/" || pathname.startsWith("/live")
-                ? "page"
-                : undefined
-            }
+            aria-current={pathname.startsWith("/live") ? "page" : undefined}
           >
             Studio
           </Link>
@@ -50,9 +165,7 @@ export function AppShell({
           <Link
             href="/demo"
             aria-current={
-              /^\/(demo|practice|gestures|review-preview|stats-preview)(\/|$)/.test(
-                pathname,
-              )
+              /^\/(demo|practice|gestures|review-preview)(\/|$)/.test(pathname)
                 ? "page"
                 : undefined
             }
@@ -134,6 +247,80 @@ export function AppShell({
           )}
         </Dialog>
       </header>
+      {drawerOpen && (
+        <div className="nav-drawer-layer">
+          <div
+            className="nav-drawer-backdrop"
+            aria-hidden="true"
+            onClick={() => setDrawerOpen(false)}
+          />
+          <aside
+            id="app-navigation-drawer"
+            className="nav-drawer"
+            aria-label="Hauptnavigation"
+          >
+            <div className="nav-drawer-header">
+              <div className="brand">
+                <span className="brand-mark">418</span>
+                <div>
+                  <strong className="nav-drawer-title">Navigation</strong>
+                  <span className="nav-drawer-subtitle">
+                    Live-Präsentationstrainer
+                  </span>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Menü schließen"
+                onClick={() => setDrawerOpen(false)}
+              >
+                <X size={18} />
+              </Button>
+            </div>
+            <nav aria-label="App-Navigation" className="nav-drawer-list">
+              {NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const active =
+                  item.href === "/"
+                    ? pathname === "/" || pathname === "/stats-preview"
+                    : pathname === item.href ||
+                      pathname?.startsWith(`${item.href}/`);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`nav-drawer-link${active ? " active" : ""}`}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => setDrawerOpen(false)}
+                  >
+                    <span className="nav-drawer-icon" aria-hidden="true">
+                      <Icon size={18} />
+                    </span>
+                    <span className="nav-drawer-copy">
+                      <strong>{item.label}</strong>
+                      <small>{item.description}</small>
+                    </span>
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="nav-drawer-footer">
+              <Link
+                href="/live"
+                className="button button-primary nav-drawer-cta"
+                onClick={() => setDrawerOpen(false)}
+              >
+                <Video size={16} />
+                Neue Aufnahme starten
+              </Link>
+              <span className="nav-drawer-meta">
+                <ShieldCheck size={14} /> A rehearsal, not a verdict.
+              </span>
+            </div>
+          </aside>
+        </div>
+      )}
       <main id="main" tabIndex={-1}>
         {children}
       </main>
@@ -143,6 +330,7 @@ export function AppShell({
         </span>
         <span>Built for Hackathon Fulda 2026</span>
       </footer>
-    </>
+    </DrawerContext.Provider>
   );
 }
+

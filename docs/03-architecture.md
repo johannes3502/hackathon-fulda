@@ -338,12 +338,20 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
+    DRAWER["AppShell Navigations-Drawer (Menü)<br/>Open Sans + #3803bf, verbindet /, /live,<br/>/sources, /review-preview, /gestures, /demo"]
     LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>Three.js, statischer Fallback"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
-    SP["/stats-preview<br/>Stats-Karte mit Replay"] --> SC["StatsCard<br/>Three.js-Ring, vier Kriterien<br/>synthetische Demo-Werte"]
+    SP["/ und /stats-preview<br/>Startseite: StatsCard als Start +<br/>Monatsfortschritt, Kriterienvergleich & Sessions"] --> SC["StatsCard + Monatsdiagramme<br/>Three.js-Ring, vier Kriterien,<br/>6-Monats-Verlauf (synthetisch)"]
+    DRAWER --> SP
+    DRAWER --> LIVE
+    DRAWER --> SRC
+    DRAWER --> RP
+    DRAWER --> WALK
+    DRAWER --> DEMOPAGE
     SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
+    SC --> LIVE
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
-    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE["/live - LiveStudio<br/>Large View als Standard, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
     LIVE --> DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]

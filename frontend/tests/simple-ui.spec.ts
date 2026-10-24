@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("home opens monitoring directly and keeps the sample optional", async ({
+test("home opens current stats with monthly charts, drawer navigation and Open Sans #3803bf styling", async ({
   page,
 }, info) => {
   await page.route("**/sources?collection_id=*", (route) =>
@@ -8,6 +8,53 @@ test("home opens monitoring directly and keeps the sample optional", async ({
   );
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
+  expect(
+    await page.evaluate(
+      async () =>
+        (await document.fonts.load('16px "Open Sans Variable"')).length,
+    ),
+  ).toBeGreaterThan(0);
+
+  await expect(
+    page.getByRole("article", {
+      name: "Deine Stats – Demo mit synthetischen Werten",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Deine Präsentations-Stats im Überblick.",
+      exact: true,
+    }),
+  ).toHaveCSS(
+    "font-family",
+    '"Open Sans Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
+  );
+  await expect(
+    page.getByRole("region", { name: "Fortschritt über Monate" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Kriterien im Monatsvergleich" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Übungsaktivität pro Monat" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Flow 84%" }).click();
+  await expect(page.getByText("+19 % seit Mai")).toBeVisible();
+  await page.getByRole("button", { name: "Mai 65%" }).click();
+  await expect(
+    page.getByText("Mai 2026", { exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Menü", exact: true }).click();
+  const drawer = page.getByRole("navigation", { name: "App-Navigation" });
+  await expect(drawer).toBeVisible();
+  await expect(
+    drawer.getByRole("link", { name: /Start & Stats/i }),
+  ).toHaveAttribute("aria-current", "page");
+  await drawer.getByRole("link", { name: /Live-Studio/i }).click();
+  await expect(page).toHaveURL(/\/live$/);
+
   for (const [selector, color] of [
     ["body", "#f5f5f7"],
     [".stage-placeholder .button", "#3803bf"],
@@ -39,7 +86,7 @@ test("home opens monitoring directly and keeps the sample optional", async ({
       name: "Practice your presentation.",
       exact: true,
     }),
-  ).toHaveCSS("font-family", /-apple-system/);
+  ).toHaveCSS("font-family", /Open Sans Variable/);
   await expect(
     page.getByRole("button", { name: "Large view", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
@@ -99,6 +146,9 @@ test("home opens monitoring directly and keeps the sample optional", async ({
   for (const path of ["/", "/live", "/sources", "/review-preview"]) {
     await page.goto(path);
     await expect(page.getByRole("link", { name: "418 home" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Menü", exact: true }),
+    ).toBeVisible();
     await expect(page.locator("main")).toHaveCount(1);
     expect(
       await page.evaluate(
@@ -186,7 +236,7 @@ test("camera permission is requested only on click, with a clear retry after den
       });
     };
   });
-  await page.goto("/");
+  await page.goto("/live");
   await expect(
     page.getByRole("button", { name: "Enable camera", exact: true }),
   ).toBeVisible();
@@ -226,7 +276,10 @@ test("shared navigation and help work with keyboard focus", async ({
   );
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Record your presentation" }),
+    page.getByRole("heading", {
+      name: "Deine Präsentations-Stats im Überblick.",
+      exact: true,
+    }),
   ).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(
@@ -234,6 +287,16 @@ test("shared navigation and help work with keyboard focus", async ({
   ).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("main")).toBeFocused();
+  const menuButton = page.getByRole("button", { name: "Menü", exact: true });
+  await menuButton.focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("navigation", { name: "App-Navigation" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("navigation", { name: "App-Navigation" }),
+  ).toHaveCount(0);
   const navigation = page.getByRole("navigation", { name: "Main navigation" });
   for (const [label, path] of [
     ["Sources", "/sources"],
@@ -264,6 +327,7 @@ test("shared surfaces stay readable in light and dark appearance", async ({
     await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
     for (const path of [
       "/",
+      "/live",
       "/sources",
       "/demo",
       "/review-preview",
@@ -325,7 +389,7 @@ test("enlarged text reflows without hiding navigation or primary controls", asyn
   await page.route("**/sources?collection_id=*", (route) =>
     route.fulfill({ json: [] }),
   );
-  for (const path of ["/", "/sources", "/demo", "/review-preview"]) {
+  for (const path of ["/", "/live", "/sources", "/demo", "/review-preview"]) {
     await page.goto(path);
     await expect(
       page.getByRole("navigation", { name: "Main navigation" }),
@@ -343,7 +407,7 @@ test("enlarged text reflows without hiding navigation or primary controls", asyn
       await expect(link).toBeVisible();
       expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     }
-    if (path === "/") {
+    if (path === "/live") {
       const camera = page.getByRole("button", {
         name: "Enable camera",
         exact: true,

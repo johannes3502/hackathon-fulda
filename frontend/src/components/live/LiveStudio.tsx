@@ -17,7 +17,10 @@ import {
   Square,
   Video,
 } from "lucide-react";
-import { AppShell } from "@/components/shared/AppShell";
+import {
+  AppShell,
+  DrawerTriggerButton,
+} from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { useCameraPreview } from "@/hooks/useCameraPreview";
@@ -490,6 +493,7 @@ export function LiveStudio() {
                 </Button>
               )}
               <div className="live-view-toolbar">
+                {largeView && <DrawerTriggerButton />}
                 <Button
                   variant="ghost"
                   aria-pressed={largeView}

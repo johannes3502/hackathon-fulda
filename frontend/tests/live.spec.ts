@@ -115,7 +115,7 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 async function enable(page: Page) {
-  await page.goto("/");
+  await page.goto("/live");
   await page.getByLabel("Speech analysis").selectOption("local");
   await page.getByRole("button", { name: "Enable camera" }).click();
   await expect(
@@ -132,7 +132,7 @@ test("local microphone feedback emits live volume/pause markers and preserves th
     if (request.method() === "POST" && request.url().includes("/speech/"))
       uploads++;
   });
-  await page.goto("/");
+  await page.goto("/live");
   await expect(page.getByLabel("Speech analysis")).toHaveValue("live");
   await page
     .getByRole("button", { name: "Enable camera", exact: true })
@@ -1293,7 +1293,7 @@ test("signal feedback appears during recording without captions and failure pres
       }
     });
   });
-  await page.goto("/");
+  await page.goto("/live");
   await page.getByLabel("Speech analysis").selectOption("backend");
   await page
     .getByRole("button", { name: "Enable camera", exact: true })
@@ -1335,7 +1335,7 @@ test("unavailable backend never starts recording and offers a working local retr
   await page.route("**/api/health/ready", (route) =>
     route.fulfill({ status: 500 }),
   );
-  await page.goto("/");
+  await page.goto("/live");
   await page.getByLabel("Speech analysis").selectOption("backend");
   await page
     .getByRole("button", { name: "Enable camera", exact: true })
