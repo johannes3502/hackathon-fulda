@@ -81,6 +81,22 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
 
 - Einen privaten Conversational Agent anlegen. In **Security** die Authentifizierung
   und die Overrides für **System prompt** und **First message** aktivieren.
+- Websuche als Webhook-Tool **search_web** am Agenten hinterlegen:
+  Vorlage `templates/elevenlabs-web-search.json`. In ElevenLabs ein Workspace-Secret
+  mit Wert `Bearer <TAVILY_API_KEY>` anlegen und dessen ID anstelle von
+  `REPLACE_WITH_TAVILY_BEARER_SECRET_ID` einsetzen. Das Tool über
+  `POST /v1/convai/tools` mit `{ "tool_config": <Vorlage> }` anlegen und seine ID
+  zu `conversation_config.agent.prompt.tool_ids` hinzufügen; vorhandene IDs und
+  System-Tools erhalten. Kein API-Key im Prompt, Browser oder eingecheckten JSON.
+  Der Agent ruft direkt Tavily auf; ein öffentlich erreichbares lokales Backend
+  ist dafür nicht nötig. `WEB_SEARCH_PROVIDER` steuert weiterhin nur den separaten
+  Backend-Fact-Check, nicht dieses Tool.
+  Upload-Auszüge haben Vorrang. Reichen sie für eine Sachfrage nicht aus, soll
+  der Agent zuerst suchen, dann mit Website/Publisher und zurückgegebener URL
+  antworten. Kein pauschales „fehlt in deinen Quellen“. Bei Suchfehlern oder
+  unklaren Treffern bleibt das Urteil offen; niemals eine Suche behaupten, die
+  nicht erfolgreich ausgeführt wurde. Tool-Auswahl und Quellenqualität bleiben
+  Modellverhalten, keine garantierte Verifikation.
 - **First message im Agenten speichern:** „Ich habe noch ein paar Fragen.
   Bist du bereit?“ Die gespeicherte Nachricht wird direkt vorgelesen und
   durchläuft nicht den System-Prompt; sie muss daher zum gewünschten Einstieg
@@ -97,7 +113,12 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
   Schüler zum abgeschlossenen Vortrag befragt, kein Investor; ohne zusätzliche
   Begrüßung, Vorstellung oder Rückblick.
   Er prüft Verständnis, Zusammenhänge, Beispiele und Transfer anhand des
-  Vortrags oder Materials. Bei falschen, unvollständigen oder unbelegten
+  Vortrags oder Materials. Ist eine Antwort geprüft korrekt und beantwortet die
+  Frage, folgt nur ein kurzer Bestätigungssatz und direkt die nächste Hauptfrage
+  (nach der dritten die Abschlusshinweise). Keine Wiederholung der Antwort,
+  lange Erklärung, ausführliches Lob oder weitere Nachfrage zur beantworteten
+  Frage; notwendige Quellenangaben bleiben knapp. Mehr Erklärung nur auf Wunsch.
+  Bei falschen, unvollständigen oder unbelegten
   Antworten sind eine, höchstens zwei Nachfragen pro Hauptfrage vorgesehen;
   danach kurz quellenbelegt korrigieren oder Unsicherheit benennen und zur
   nächsten Hauptfrage wechseln, auch wenn die Antwort weiter falsch ist.
@@ -130,14 +151,19 @@ curl http://localhost:3000/api/questions/agent/settings
 Erst eine echte Gesprächsverbindung bestätigt Agent-Berechtigungen, Prompt-
 und First-message-Override, Mikrofon, Audioausgabe und Anbieter-Verfügbarkeit.
 Der Browser lädt den offiziellen `@elevenlabs/client` erst beim Start. Er bekommt eine kurzlebige
-Signed URL; der API-Key bleibt im Backend. Es werden keine Agenten automatisch
-im ElevenLabs-Konto angelegt oder verändert.
+Signed URL; der API-Key bleibt im Backend. Die App legt keine Agenten automatisch
+an und verändert sie nicht. Das Suchtool wird einmalig wie oben im Konto konfiguriert.
 
 ## Auswertung nach der Fragerunde (24.10.2026)
 
 Sobald jede Frage der getippten Runde beantwortet ist, zeigt der Web-Review
-unterhalb der Fragereunde eine Auswertung („Your take at a glance“) mit
-Score 0–100. Sie ist rein clientseitig und deterministisch
+unterhalb der Fragerunde eine Auswertung („Your take at a glance“) mit
+Score 0–100. Der Sprachdialog öffnet dasselbe Panel nach **End conversation**
+oder einem regulären Gesprächsende durch den Agenten und setzt den Tastaturfokus
+auf die Überschrift. **Back to questions** führt zurück zur Fragerunde;
+Abbrechen beim Verbindungsaufbau und Verbindungsfehler öffnen keine Auswertung.
+Vor dem Wechsel wird die Voice-Verbindung geschlossen und das Mikrofon freigegeben.
+Die Auswertung ist rein clientseitig und deterministisch
 (`frontend/src/features/evaluation/performance.ts`, Panel
 `frontend/src/components/live/PerformanceEvaluation.tsx`); kein Backend-Endpunkt,
 kein LLM, Eingaben sind nur Daten, die der Browser ohnehin hat
@@ -166,6 +192,27 @@ Inhalts-Kategorie auf den Fact-Check beschränkt.
 
 ## Daten und Grenzen
 
+Abgeschlossene Live-Sessions einschließlich Video, Pose-Log, Analyse und
+Fragen-/Gesprächsverlauf werden pro Take in Browser-IndexedDB gespeichert.
+Updates aus späteren Analysen und Gesprächen werden ebenfalls gespeichert.
+Nach Reload entstehen neue Objekt-URLs aus den gespeicherten Blobs. Studio
+(„Past sessions“) und Dashboard zeigen die gespeicherten Takes; im Review unter
+„Recording details and exports“ lässt sich ein Take mit Bestätigung lokal löschen.
+Speicherfehler lassen die aktuelle Aufnahme im Tab verfügbar und zeigen einen
+Download-Hinweis. Der Browser kann Daten bei Speicherdruck verdrängen; Löschen
+der Browserdaten entfernt die Historie. Keine Cloud-Synchronisation, keine
+automatische Löschung der separaten Backend-Ergebnisse oder Quellen. Bereits
+vor dieser Änderung aus dem Arbeitsspeicher verlorene Takes sind nicht rekonstruierbar.
+
+Websuche geprüft am 25.10.2026: synthetischer Textdialog über denselben privaten
+ElevenLabs-Agenten und den App-Prompt ohne Upload-Auszüge. Der Agent rief
+`search_web` zum Thema Mars/Eisenoxid auf; das Gesprächsprotokoll enthält
+`tool_has_been_called=true`, `is_error=false` und Web-URLs im Resultat. Anschließend
+nannte er Quellen-URLs in der Antwort. Ein erster Versuch mit einer schwächeren
+Prompt-Vorgabe gab ungeprüftes Modellwissen aus; deshalb steht die verpflichtende
+Tool-Nutzung jetzt am Prompt-Anfang. Das ist ein einzelner Integrationstest,
+keine Garantie für jede Antwort und keine Mikrofon-/Audio-Abnahme.
+
 - Ein Celery-Job bereitet Kontext aus dem Transkript und bis zu acht passenden
   Quellenauszügen aus der Collection des Takes vor. Redis erhält nur die Job-ID.
   Maximal 24.000 Transkriptzeichen und 2.200 Zeichen pro Auszug; Kürzung des
@@ -174,6 +221,11 @@ Inhalts-Kategorie auf den Fact-Check beschränkt.
 - Beim Start gehen dieser Kontext, optionale Fact-Check-Funde und Live-Audio an
   ElevenLabs. Dessen Speicherung richtet sich nach den Einstellungen des
   Nutzerkontos; diese Integration konfiguriert oder löscht dort keine Daten.
+- Bei unzureichenden Auszügen gehen gezielte öffentliche Sachfragen von ElevenLabs
+  an Tavily (basic, höchstens drei Treffer pro Aufruf, keine Rohseiten). Die UI
+  benennt den Anbieter vor Gesprächsstart. Der Prompt verbietet vollständige
+  Transkripte/private Details als Suchanfrage und behandelt Suchtreffer als
+  unvertrauenswürdige Daten. Websuche kann zusätzliche Latenz und Kosten verursachen.
 - Der Backend-Job löscht `request.json`. `status.json` enthält weiterhin den
   vorbereiteten Kontext; wie bei anderen Analyse-Jobs fehlt noch automatisches
   TTL-Cleanup. Keine Zusage, dass alle Transkriptkopien gelöscht sind.
@@ -240,5 +292,7 @@ Reale Audioqualität über Mac-Lautsprecher, Geräteverhalten und pädagogische
 Qualität sind durch synthetische Audioübertragung nicht abgenommen.
 
 Offizielle Referenzen: [JavaScript SDK](https://elevenlabs.io/docs/eleven-agents/libraries/java-script),
+[Webhook-Tools](https://elevenlabs.io/docs/eleven-agents/customization/tools/webhook-tools),
+[Workspace-Secrets](https://elevenlabs.io/docs/api-reference/workspace/secrets/create),
 [Signed URLs](https://elevenlabs.io/docs/api-reference/conversations/get-signed-url),
 [Prompt overrides](https://elevenlabs.io/docs/eleven-agents/customization/personalization/overrides).

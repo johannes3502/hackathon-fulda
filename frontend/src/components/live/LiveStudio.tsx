@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { SessionStorageNotice } from "./shared";
 import {
   ArrowLeft,
   Camera,
@@ -10,7 +11,6 @@ import {
   Eye,
   Mic,
   Radio,
-  ShieldCheck,
   Square,
   Video,
 } from "lucide-react";
@@ -840,10 +840,7 @@ export function LiveStudio() {
               </span>
             </div>
           </details>
-          <p className="local-recording-note">
-            <ShieldCheck size={16} /> Video is held in browser memory for
-            review. Download it before refreshing or leaving this workspace.
-          </p>
+          <SessionStorageNotice />
           <details className="live-settings">
             <summary>Session observations</summary>
             <section className="panel live-events">
@@ -903,16 +900,19 @@ export function LiveStudio() {
         </section>
         {Object.values(recordings).length > 0 && (
           <section className="recent-recordings">
-            <h2>Recordings in this workspace</h2>
-            {Object.values(recordings).map((recording) => (
-              <Link href={`/live/${recording.id}/review`} key={recording.id}>
-                <span>{recording.config.title}</span>
-                <span>
-                  {time(recording.durationMs)} · {recording.feedback.length}{" "}
-                  moments
-                </span>
-              </Link>
-            ))}
+            <h2>Past sessions</h2>
+            {Object.values(recordings)
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .map((recording) => (
+                <Link href={`/live/${recording.id}/review`} key={recording.id}>
+                  <span>{recording.config.title}</span>
+                  <span>
+                    {new Date(recording.createdAt).toLocaleDateString()} ·{" "}
+                    {time(recording.durationMs)} · {recording.feedback.length}{" "}
+                    moments
+                  </span>
+                </Link>
+              ))}
           </section>
         )}
       </div>

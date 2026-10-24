@@ -115,6 +115,12 @@ und besser lesbarer Schrift.
   „Done“), Sprache außer Deutsch, Anzahl der Fragen.
 
 ### Daten und Datenschutz
+- Live-Sessions werden lokal in IndexedDB gespeichert: Video, Transkript,
+  Feedback, Quellenurteile und Fragen-/Gesprächsverlauf. Studio und Dashboard
+  zeigen frühere Takes nach dem Neuladen. Löschen im Review entfernt den lokalen
+  Take; Quellen und Backend-Daten bleiben separat. Speicherfehler werden angezeigt,
+  der Take bleibt dann im aktuellen Tab verfügbar. Kein Geräte-/Browser-Sync;
+  gelöschte Browserdaten und vom Browser verdrängte Daten sind nicht wiederherstellbar.
 - Neuer Backend-Vertrag: `docs/06-backend-review-api.md`. Video bleibt im
   Client; keine serverseitigen Clips, Snapshots oder Wiedergabe-URLs. Die
   additive Session-/Take-API persistiert Timestamp-Events, Wörter, Metriken

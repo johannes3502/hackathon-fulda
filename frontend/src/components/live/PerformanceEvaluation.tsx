@@ -13,7 +13,7 @@ export function PerformanceEvaluation({ input }: { input: PerformanceInput }) {
       aria-labelledby="performance-evaluation-title"
     >
       <div className="panel-title-row">
-        <h2 id="performance-evaluation-title">
+        <h2 id="performance-evaluation-title" tabIndex={-1}>
           <Gauge size={18} /> Your take at a glance
         </h2>
         {evaluation.score !== null && (

@@ -30,7 +30,7 @@ Zeitverlauf ist eine geglättete Linie mit ausdrücklich interpolierten Übergä
 2. **Aufnahme:** Kamera und Mikro laufen. Im Browser erzeugt MediaPipe live Pose-Landmarks und einen Kopforientierungs-Proxy, daraus entstehen Events; das Mikro liefert den Pegel.
 3. **Übergabe:** Session/Take-Metadaten und abgeleitete Pose-Events gehen ans Backend. Audio oder Aufnahme für ASR/Sprechanalyse nur optional und temporär hochladen.
 4. **Analyse (Backend):** Transkription mit Wort-Timestamps, Sprechmerkmale, Fact-Check. Timestamp-Daten und Review bleiben in Postgres; der Upload wird auch bei Analysefehlern gelöscht.
-5. **Review:** Timeline über alle finalen Events; `peakMs` ist das Sprungziel im lokalen Video. Browser-Speicherung und Wiedergabe gehören dem Frontend.
+5. **Review:** Timeline über alle finalen Events; `peakMs` ist das Sprungziel im lokalen Video. Das Frontend speichert abgeschlossene Takes inklusive Video, Analyse und Fragenverlauf lokal in IndexedDB und stellt sie nach Reload wieder her. Lokales Löschen im Review; kein Geräte-Sync, Backend-Daten bleiben separat.
 6. **Frage-Simulator:** Der Agent stellt gezielte Rückfragen, vor allem zu Widersprüchen und Lücken aus dem Fact-Check, und vergleicht die Antworten mit den Quellen.
 
 ## 3. Tech-Stack
@@ -336,6 +336,10 @@ Vor der Aufnahme stehen Material-Upload und vier Präsentationstypen bereit:
 ElevenLabs ist auf Nutzerwunsch als optionaler Sprachdialog integriert; Nutzer
 konfiguriert `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` selbst. Kontext als
 Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Sprachreaktionen sind nicht zitateverifiziert; die Auswertung nach der getippten Runde ist ein Client-Heuristik-Score aus gemessenen Events (siehe Abschnitt 6, Frage-Simulator).
+Bei unzureichenden Upload-Auszügen nutzt der ElevenLabs-Agent das Webhook-Tool
+`search_web` (Tavily, Secret im ElevenLabs-Konto) für gezielte öffentliche
+Sachfragen. Webquellen werden benannt; Suchfehler/fehlende Belege bleiben offen.
+Vorlage: `templates/elevenlabs-web-search.json`; keine API-Keys im Browser/Prompt.
 Einrichtung und offene Grenzen: `docs/07-review-and-agent.md`.
 
 ## Datenbasierter Kurzreview-Fallback (24.10.2026)

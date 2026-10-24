@@ -18,6 +18,9 @@ flowchart TB
         MR["MediaRecorder / Vision Camera<br/>Video + Audio"]
     end
 
+    WEB -->|"LiveSessionProvider: abgeschlossene Takes und Review-Updates"| IDB["Browser IndexedDB<br/>Video, Pose-Log, Transkript, Feedback,<br/>Fragen, Antworten, Gespräch"]
+    IDB -->|"Nach Reload: Blob-URLs neu erzeugen"| WEB
+
     subgraph API["api/ - Geteilter API-Vertrag"]
         OAS["openapi.json + schema.d.ts<br/>generiert aus FastAPI"]
     end
@@ -56,6 +59,7 @@ flowchart TB
     LLM["LLM: Gemini (Cloud)<br/>3.1 Flash Lite / 3.8 Flash<br/>JSON-Modus, austauschbarer Adapter"]
     ELEVEN["ElevenLabs Agent, optional<br/>Live-Audio + Gespräch; serverseitiger Schlüssel"]
     WEBS["Websuche (Zweitquelle)<br/>Wikipedia-API oder Tavily"]
+    ELEVEN -->|"search_web bei unzureichenden Upload-Auszügen<br/>Secret im ElevenLabs-Konto"| TAVILY["Tavily Search API<br/>Titel, URLs, Auszüge"]
 
     WEB -- "Kamera/Mikro" --> MP_W
     WEB -- "Aufnahme" --> MR
@@ -382,6 +386,7 @@ sequenceDiagram
     participant W as Celery Worker
     participant PG as Postgres + pgvector
     participant E as ElevenLabs Agent
+    participant T as Tavily (Websuche)
     participant L as Gemini (JSON-Modus)
 
     U->>FE: Practice questions
@@ -411,10 +416,21 @@ sequenceDiagram
             E->>FE: Frage / Reaktion, Audio + Text
             U->>FE: Gesprochene Antwort
             FE->>E: Mikrofon-Audio
+            opt Upload-Auszüge fehlen oder klären Sachfrage nicht
+                E->>T: search_web: gezielte öffentliche Sachfrage
+                T-->>E: Bis zu drei Treffer mit Titel, URL und Auszug
+                Note over E: Webquelle nennen; bei Fehler/fehlendem Beleg Urteil offenlassen
+            end
             Note over E: Prompt: höchstens zwei Nachfragen, danach nächste Hauptfrage
         end
-        U->>FE: End conversation oder Ansicht verlassen
-        FE->>E: Verbindung schließen, Mikrofon freigeben
+        alt End conversation oder reguläres Agent-Ende
+            U->>FE: Gespräch beenden
+            FE->>E: Verbindung schließen, Mikrofon freigeben
+            FE->>FE: PerformanceEvaluation anzeigen; Fokus auf Statistik-Überschrift
+            Note over FE: Gleiche vorhandene Messdaten wie bei getippter Runde;<br/>keine neuen Urteile über gesprochene Antworten
+        else Ansicht verlassen / Verbindung abbrechen
+            FE->>E: Verbindung schließen, keine Auswertung öffnen
+        end
     else Practice by typing
         FE->>BE: Optional automatisch POST /factcheck + Status-Polling
         FE->>BE: POST /questions (Wörter, Funde, Collection, Modus)
@@ -483,6 +499,7 @@ flowchart TD
     LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video, Stärken und nächste Übungsschritte<br/>Feste Erklärungen aus Messdaten ohne LLM<br/>Transkript, Quellencheck und Exporte als Details"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>sourceCollectionId des aufgenommenen Takes"]
     LREV -->|"POST /questions/agent + /agent/session<br/>oder /questions + /answers"| QAPI["ElevenLabs-Dialog oder getippte Fragen<br/>Startup, Thesis, Schule, Nonprofit<br/>eine Frage pro Schritt"]
+    QAPI -->|"Sprachdialog beenden oder<br/>getippte Runde beantworten"| FINALSTATS["PerformanceEvaluation: Your take at a glance<br/>bestehende Messdaten, Heuristik und Grenzen"]
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
     RP --> RA["ReviewAnalysis + PerformanceGraph / FeedbackGraph<br/>qualitativer Event-Saldo, positive Hinweise oben<br/>neutrale Mittellinie, Anpassungshinweise unten<br/>video.currentTime, Zeitmarken, Abschnitt-Loop"]
@@ -752,7 +769,7 @@ Zusätzlich (außerhalb Postgres):
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), optional Profil-ID/Token (`pp_…`) und zufälliger `deviceKey`; Token ist XSS-exponiert |
-| Browser-Speicher (Live-Workspace) | FeatureFlags, presentationMode und sourceCollectionId pro Take, ElevenLabs-Gespräch, Wörter, Pose-Events mit runtime, Fact-Check-Ergebnis, Fragen und Antworten; nur bis zum Neuladen |
+| Browser IndexedDB `presentation-recordings`, Store `recordings` | Abgeschlossene Live-Takes inklusive Video-/Pose-Log-Blobs, Config mit FeatureFlags/presentationMode/sourceCollectionId, ElevenLabs-Gespräch, Wörter, Pose-Events, Fact-Check, Fragen und Antworten; pro Take gespeichert, nach Reload wiederhergestellt. Objekt-URLs nur im Arbeitsspeicher. Löschen im Review entfernt den lokalen Take, keine Backend-Daten/Quellen. |
 
 ## 9. Event-Modell: gemeinsame Timeline
 

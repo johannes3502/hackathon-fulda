@@ -1,12 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, BarChart3, FileText, LineChart, Video } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  FileText,
+  LineChart,
+  Video,
+} from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { time } from "@/lib/utils";
 import { summarizeRecordings } from "./stats";
 import { PresentationIntro } from "./PresentationIntro";
+import { SessionStorageNotice } from "../live/shared";
 import "./stats-card.css";
 
 export function StatsDashboard() {
@@ -44,8 +51,8 @@ export function StatsDashboard() {
               </Link>
             </div>
             <p className="stats418-retention">
-              Diese Übersicht zählt die Aufnahmen in diesem
-              Browser-Arbeitsbereich. Lade dein Video vor dem Neuladen herunter.
+              Deine Aufnahmen bleiben in diesem Browser gespeichert, auch nach
+              dem Neuladen. Browserdaten löschen entfernt auch deine Aufnahmen.
             </p>
           </div>
           <article className="stats418-card" aria-label="Aufnahmeübersicht">
@@ -93,6 +100,7 @@ export function StatsDashboard() {
           aria-labelledby="recordings-heading"
         >
           <h2 id="recordings-heading">Deine Takes</h2>
+          <SessionStorageNotice />
           <p>Hinweise sind Beobachtungen zum Nachschauen, keine Bewertung.</p>
           {takes.length ? (
             <ul className="stats418-take-list">
