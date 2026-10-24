@@ -9,6 +9,9 @@ import {
   CameraOff,
   CheckCircle2,
   Eye,
+  EyeOff,
+  Maximize2,
+  Minimize2,
   Mic,
   Radio,
   Square,
@@ -18,6 +21,7 @@ import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { useCameraPreview } from "@/hooks/useCameraPreview";
+import { useStageFullscreen } from "@/hooks/useStageFullscreen";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { LiveCaptions } from "@/features/live/captions";
 import { speechCue } from "@/features/live/speech-feedback";
@@ -70,6 +74,7 @@ const cameraCopy = {
 };
 export function LiveStudio() {
   const router = useRouter();
+  const { stageRef, toggleRef, fullscreen, toggle } = useStageFullscreen();
   const { save, recordings, featureFlags, setFeatureFlags } = useLiveSessions();
   const {
     status: cameraStatus,
@@ -466,7 +471,7 @@ export function LiveStudio() {
         )}
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
-            <div className="live-control-bar">
+            <div className="live-control-bar" aria-hidden={fullscreen}>
               <p className="field-hint live-audio-hint">
                 Microphone audio is sent to your server for live feedback. The
                 full take is uploaded after stopping.
@@ -509,7 +514,8 @@ export function LiveStudio() {
               </div>
             </div>
             <section
-              className={`media-stage live-camera-stage${poseAlert ? " pose-alert" : ""}`}
+              ref={stageRef}
+              className={`media-stage live-camera-stage${poseAlert ? " pose-alert" : ""}${fullscreen ? " recording-fullscreen" : ""}`}
               aria-label="Live camera preview"
             >
               <div className="stage-top">
@@ -523,9 +529,35 @@ export function LiveStudio() {
                         ? "Finishing recording"
                         : "Preview only"}
                 </span>
-                <span className="stage-demo">
-                  <Mic size={14} /> Microphone audio
-                </span>
+                <div className="stage-view-actions">
+                  {fullscreen && progress && (
+                    <strong className="fullscreen-time">
+                      {time(progress.elapsedMs)}
+                    </strong>
+                  )}
+                  <span className="stage-demo">
+                    <Mic size={14} /> Microphone audio
+                  </span>
+                  {(cameraStatus === "active" || fullscreen) && (
+                    <Button
+                      ref={toggleRef}
+                      variant="ghost"
+                      size="sm"
+                      aria-label={
+                        fullscreen ? "Exit fullscreen" : "Enter fullscreen"
+                      }
+                      aria-pressed={fullscreen}
+                      onClick={() => void toggle()}
+                    >
+                      {fullscreen ? (
+                        <Minimize2 size={18} />
+                      ) : (
+                        <Maximize2 size={18} />
+                      )}
+                      {fullscreen ? "Exit fullscreen" : "Fullscreen"}
+                    </Button>
+                  )}
+                </div>
               </div>
               <video
                 ref={videoRef}
@@ -595,7 +627,7 @@ export function LiveStudio() {
                       ? "Choose Allow in your browser’s camera permission prompt."
                       : "First, enable your camera to see yourself here."}
                   </p>
-                  {!progress && (
+                  {!progress && !fullscreen && (
                     <Button
                       disabled={cameraStatus === "pending"}
                       onClick={() => void enable(true)}
@@ -617,23 +649,123 @@ export function LiveStudio() {
                     {caption.text && <p>{caption.text.slice(-500)}</p>}
                   </div>
                 )}
+              {fullscreen && (
+                <div className="fullscreen-cue-rail">
+                  <div
+                    className="fullscreen-cue"
+                    data-feedback={appearance.tone}
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    title={
+                      showCues
+                        ? (latest?.action ??
+                          evaluation?.message ??
+                          appearance.label)
+                        : "Observations still appear in your review."
+                    }
+                  >
+                    <span className="fullscreen-cue-symbol" aria-hidden="true">
+                      <FeedbackIcon size={36} strokeWidth={1.7} />
+                    </span>
+                    <span className="fullscreen-cue-copy">
+                      <small>
+                        {latest && showCues
+                          ? `${appearance.label} · Heuristic`
+                          : "Live feedback · Heuristic"}
+                      </small>
+                      <strong>
+                        {showCues && latest ? latest.title : appearance.label}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="stage-bottom">
-                <span>
-                  <Video size={14} />
-                  {progress?.phase === "recording"
-                    ? "Recording saved locally"
-                    : "Camera stays local until Start"}
-                </span>
-                <span>
-                  {progress?.phase === "recording"
-                    ? liveCaptions && transcribe
-                      ? "Live speech feedback + captions"
-                      : "Live speech feedback · audio sent to server"
-                    : "Live + full backend analysis"}
-                </span>
+                {fullscreen ? (
+                  <div className="fullscreen-controls">
+                    {error && (
+                      <p className="fullscreen-notice" role="alert">
+                        {error}
+                      </p>
+                    )}
+                    {!progress && (
+                      <p className="fullscreen-consent">
+                        Starting sends microphone audio to your server live and
+                        uploads the full take after stopping.
+                        {transcribe &&
+                          liveCaptions &&
+                          " Live transcription uses Deepgram EU."}
+                      </p>
+                    )}
+                    {(progress?.notice ||
+                      serverStatus.includes("unavailable")) && (
+                      <p className="fullscreen-notice" role="status">
+                        {progress?.notice || serverStatus}
+                      </p>
+                    )}
+                    <div className="fullscreen-control-actions">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-pressed={showCues}
+                        onClick={() => setShowCues(!showCues)}
+                      >
+                        {showCues ? <Eye size={18} /> : <EyeOff size={18} />}
+                        {showCues ? "Hide hints" : "Show hints"}
+                      </Button>
+                      {!progress && cameraStatus !== "active" ? (
+                        <Button
+                          disabled={cameraStatus === "pending"}
+                          onClick={() => void enable(true)}
+                        >
+                          <Camera size={18} /> Enable camera
+                        </Button>
+                      ) : !progress ? (
+                        <Button onClick={() => void start()}>
+                          <Radio size={17} /> Start recording
+                        </Button>
+                      ) : progress.phase === "connecting" ? (
+                        <Button variant="outline" onClick={cancel}>
+                          Cancel connection
+                        </Button>
+                      ) : (
+                        <Button
+                          disabled={progress.phase === "finishing"}
+                          onClick={() => owner.current?.stop()}
+                        >
+                          <Square size={14} fill="currentColor" />
+                          {progress.phase === "finishing"
+                            ? "Preparing video & feedback…"
+                            : "Finish & review"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <span>
+                      <Video size={14} />
+                      {progress?.phase === "recording"
+                        ? "Recording saved locally"
+                        : "Camera stays local until Start"}
+                    </span>
+                    <span>
+                      {progress?.phase === "recording"
+                        ? liveCaptions && transcribe
+                          ? "Live speech feedback + captions"
+                          : "Live speech feedback · audio sent to server"
+                        : "Live + full backend analysis"}
+                    </span>
+                  </>
+                )}
               </div>
             </section>
-            <p className="camera-message" role="status">
+            <p
+              className="camera-message"
+              role="status"
+              aria-hidden={fullscreen}
+            >
               {progress
                 ? (progress.notice ??
                   `${serverStatus} Speak normally for the first 3 seconds. Full analysis follows after stopping.`)
@@ -656,7 +788,7 @@ export function LiveStudio() {
             </p>
           </div>
           {(cameraStatus === "active" || progress) && (
-            <aside className="coaching-column">
+            <aside className="coaching-column" aria-hidden={fullscreen}>
               <section className="cue-panel" data-feedback={appearance.tone}>
                 <div className="panel-title-row">
                   <h2>
@@ -758,6 +890,7 @@ export function LiveStudio() {
           id="live-options"
           className="live-options"
           aria-label="Studio options"
+          aria-hidden={fullscreen}
           tabIndex={-1}
         >
           <PresentationSetup
