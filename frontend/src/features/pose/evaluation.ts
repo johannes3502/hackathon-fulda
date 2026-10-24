@@ -377,7 +377,7 @@ export class PoseEvaluator {
       ...state(
         "ready",
         !f.handsVisible
-          ? "Posture ready. Bring both elbows and wrists into view for gesture feedback."
+          ? "Posture ready. Bring your wrists into view for more gesture feedback."
           : "Ready. Raise a hand, bring your hands together, or move sideways with the camera fixed.",
         1,
         f.handsVisible,

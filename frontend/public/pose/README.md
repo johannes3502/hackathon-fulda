@@ -18,7 +18,7 @@ https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/
 
 SHA-256: `fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1`
 
-It runs only in the local pose-lab pocket heuristic. Its landmarks are not
+It runs locally for finger tracking, independently of the pose lab. Its landmarks are not
 logged and are not sent to a backend or third-party service.
 
 Model documentation and model card links:
@@ -43,6 +43,7 @@ uses the selected mode. Model confidence settings are 0.5, not accuracy claims.
 The worker prefers hardware WebGL2/GPU, with CPU fallback on unsupported or
 software WebGL, creation/warm-up failure, and runtime inference failure.
 Diagnostics report the actual delegate, model, mode, renderer and fallback.
-Normal recording does not load or run Hand Landmarker. **Pose lab** enables it
-for diagnostic frames with a detected pose; it uses the same running mode,
-up to two hands and its own CPU fallback. Hand failures leave pose running.
+**Track fingers** is on by default and runs Hand Landmarker at most 5 Hz,
+even when no torso is detected. It uses the same running mode, up to two hands
+and its own CPU fallback. Hand failures leave pose running. Disabling the flag
+skips the hand model entirely; **Pose lab** remains a separate diagnostic tool.

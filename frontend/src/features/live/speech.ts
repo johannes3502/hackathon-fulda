@@ -67,6 +67,8 @@ export class SpeechEvaluator {
   private activeEvents = new Map<string, LiveFeedback>();
   private cooldown = new Map<string, number>();
   private observations: LiveFeedback[] = [];
+  private visibleCue: LiveFeedback | null = null;
+  private cueUntil = 0;
   constructor(
     private flags: FeatureFlags = DEFAULT_FEATURE_FLAGS,
     private sessionId = "preview",
@@ -98,6 +100,8 @@ export class SpeechEvaluator {
       this.frames = [];
       this.pauseStart = null;
       this.spoke = false;
+      this.visibleCue = null;
+      this.cueUntil = 0;
       for (const key of this.activeEvents.keys())
         this.release(key, this.previous);
       if (!this.baseline) {
@@ -291,7 +295,18 @@ export class SpeechEvaluator {
             ? 1
             : b.startMs - a.startMs,
       )[0] ?? null;
-    return state("Live voice feedback ready. Listening locally.", cue);
+    if (this.visibleCue && input.tMs < this.cueUntil) {
+      this.visibleCue =
+        this.observations.find((event) => event.id === this.visibleCue!.id) ??
+        this.visibleCue;
+    } else {
+      this.visibleCue = cue;
+      this.cueUntil = input.tMs + POSE_RULES.cueDwellMs;
+    }
+    return state(
+      "Live voice feedback ready. Listening locally.",
+      this.visibleCue,
+    );
   }
   private release(key: string, t: number) {
     this.activeEvents.delete(key);

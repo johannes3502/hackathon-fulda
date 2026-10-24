@@ -1349,7 +1349,11 @@ body:has(.live-workspace-large) .app-footer,
 }
 .live-audio-hint {
   flex-basis: 100%;
+  order: 1;
   margin: 0;
+}
+.studio-main > .live-control-bar {
+  align-items: center;
 }
 .live-readiness {
   margin: 0.75rem 0;
@@ -1363,4 +1367,29 @@ body:has(.live-workspace-large) .app-footer,
 .live-readiness meter {
   width: 100%;
   height: 0.5rem;
+}
+.live-workspace-large .live-readiness {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 4px 0;
+}
+.live-workspace-large .live-readiness p {
+  margin: 0;
+}
+.live-workspace-large .live-readiness progress,
+.live-workspace-large .live-readiness meter {
+  max-width: 100px;
+}
+@media (max-width: 760px) {
+  .live-control-bar {
+    flex-wrap: nowrap;
+  }
+  .studio-main > .live-control-bar {
+    align-items: stretch;
+  }
+  .live-audio-hint {
+    flex-basis: auto;
+  }
 }

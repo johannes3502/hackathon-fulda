@@ -124,16 +124,23 @@ Konfiguration und Fallback-Gründe.
 
 **Speech feedback** schaltet alle Sprachmarker; **Pauses**, **Speaking pace**,
 **Filler words**, **Volume**, **Pitch variation** wählen einzelne Typen.
-Dafür **Speech analysis** oberhalb der Kamera aktivieren. Marker kommen nach
-dem Stoppen. Abschalten der Marker stoppt keine Transkription oder
-Signalanalyse und entfernt keine Messwerte. Importierte Wort-Timestamps
+**Speech analysis → Live · in browser** ist Standard: Kamera/Mikro bleiben lokal;
+3 s normal sprechen, dann Lautstärke, längere Pause oder Tonhöhenvariation testen.
+Bei **Live + full backend analysis** nutzt die App den Server-Signalstream.
+Füllwörter/Wort-Tempo benötigen weiterhin die Analyse nach dem Stoppen.
+**Off · gestures only** benötigt kein Mikro. Abschalten eines Feedbacktyps
+entfernt dessen Marker, nicht die Messwerte der vollständigen Analyse. Importierte Wort-Timestamps
 beachten dieselben Schalter der jeweiligen Aufnahme. Pose-/Fact-Check- und
 Frage-Ergebnisse bleiben unabhängig davon.
 
 Schalter gelten für neue Aufnahmen, werden mit dem Take festgehalten und sind
 während Aufnahme/Analyse gesperrt. Im Workspace bleiben sie bis zum Reload.
 Ein Wechsel von Modell, Modus oder **Pose lab** startet Pose und Kalibrierung neu.
-**Pose lab** ist standardmäßig aus; nur dort wird das Handmodell geladen.
+**Pose lab** ist standardmäßig aus. **Track fingers** ist unabhängig davon
+standardmäßig an: bis 5 Hz, auch ohne Torso. Finger werden pink eingezeichnet;
+„Hands detected“ und Mikrofonpegel helfen bei der Diagnose. Die Haltungsreferenz
+kalibriert ohne Hand-Stillhaltepflicht. Im Nutzertest funktionierte die Korrektur;
+dies ist eine informelle Rückmeldung ohne gezählte Versuche oder Genauigkeitsmessung.
 T12, Pocket und Kopforientierung erzeugen keine Produktions-Events.
 
 Vor Ort weiter offen: echtes GPU-Verhalten, Heavy-Durchsatz unter Kamera-/Audio-

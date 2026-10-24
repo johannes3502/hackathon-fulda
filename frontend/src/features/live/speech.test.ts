@@ -4,6 +4,7 @@ import { expect, it, vi } from "vitest";
 import { DEFAULT_FEATURE_FLAGS } from "./feature-flags";
 import {
   SpeechEvaluator,
+  LiveSpeech,
   mergeSpeechFeedback,
   type SpeechState,
 } from "./speech";
@@ -68,6 +69,70 @@ it("requires voiced pitch and enough evidence for a pitch-variation observation"
   ).toBe(true);
   const noPitch = ready({ ...DEFAULT_FEATURE_FLAGS, pitchFeedback: false });
   expect(feed(noPitch, 3040, 9000).events).toEqual([]);
+});
+it("detects a sustained faster envelope rhythm relative to calibration", () => {
+  const e = new SpeechEvaluator();
+  let state!: SpeechState;
+  for (let tMs = 0; tMs <= 9000; tMs += 40)
+    state = e.update({
+      tMs,
+      levelDb: tMs % (tMs <= 3000 ? 400 : 120) < 40 ? -20 : -35,
+      f0Hz: null,
+    });
+  expect(state.events.some((e) => e.category === "pace")).toBe(true);
+});
+it("anchors microphone measurements to the recording and closes its own audio graph without stopping shared tracks", async () => {
+  const updates = vi.fn(),
+    track = { readyState: "live", stop: vi.fn() },
+    close = vi.fn(async () => {}),
+    disconnect = vi.fn();
+  const port = {
+    onmessage: null as
+      | ((event: {
+          data: { tMs: number; levelDb: number; f0Hz: null };
+        }) => void)
+      | null,
+  };
+  vi.stubGlobal("performance", { now: () => 2000 });
+  vi.stubGlobal(
+    "AudioContext",
+    class {
+      currentTime = 1;
+      state = "running";
+      destination = {};
+      close = close;
+      audioWorklet = { addModule: async () => {} };
+      resume = async () => {};
+      createMediaStreamSource = () => ({ connect: vi.fn(), disconnect });
+    },
+  );
+  vi.stubGlobal(
+    "AudioWorkletNode",
+    class {
+      port = port;
+      connect = vi.fn();
+      disconnect = disconnect;
+    },
+  );
+  try {
+    const voice = new LiveSpeech(DEFAULT_FEATURE_FLAGS, updates);
+    await voice.start({
+      getAudioTracks: () => [track],
+    } as unknown as MediaStream);
+    voice.beginRecording(2500, "take-clock");
+    port.onmessage?.({ data: { tMs: 1460, levelDb: -25, f0Hz: null } });
+    expect(updates).toHaveBeenCalledTimes(2); // loading + reset, no late preview block
+    for (let tMs = 1500; tMs <= 4600; tMs += 40)
+      port.onmessage?.({ data: { tMs, levelDb: -25, f0Hz: null } });
+    expect(updates.mock.lastCall![0].phase).toBe("ready");
+    voice.stop();
+    expect(close).toHaveBeenCalledOnce();
+    expect(disconnect).toHaveBeenCalledTimes(2);
+    expect(track.stop).not.toHaveBeenCalled();
+    expect(port.onmessage).toBeNull();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 it("keeps live markers on backend failure but deduplicates overlapping full-recording observations", () => {
   const live = feed(ready(), 3040, 6040, -100, null).events;

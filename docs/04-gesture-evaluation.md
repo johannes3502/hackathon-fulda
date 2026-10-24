@@ -1,7 +1,7 @@
 # Gesten und Haltung: Was wir beobachten und warum
 
 Stand: 24.10.2026. **Prototyp, keine validierte Beurteilung.**
-Implementierung: `frontend/src/features/pose/evaluation.ts` (`pose-rules-v4`).
+Implementierung: `frontend/src/features/pose/evaluation.ts` (`pose-rules-v5`).
 Kamera: `/live`. Synthetischer, reproduzierbarer Rundgang: `/gestures`.
 Diese Regeln beschreiben den Web-Pfad. Die native App verwendet weiterhin
 ihren separaten `CrossArmsCue`-Adapter; dessen bisherige Release-Zeiten wurden
@@ -87,10 +87,10 @@ Regelversion, Tests und erneute Prüfung vor Ort.
 | Einstellung | Wert | Technischer Zweck |
 | --- | --- | --- |
 | Landmark visibility / optionale presence | mindestens 0,5, im Bild, endlich | An bestehende MediaPipe-Prototypkonfiguration anschließen; nicht als 50 % Genauigkeit interpretieren. |
-| Framing | Schulterbreite ≥ 12 % der Bildbreite; Schulter-Hüft-Höhe ≥ 12 % der Bildhöhe | Winzige/degenerierte Geometrie nicht auswerten. Keine Entfernungsangabe in Metern. |
+| Framing | Sichtbare, sichere Schultern/Hüften, nicht degenerierte Schulterlinie; Schulter-Hüft-Höhe ≥ 12 % der Bildhöhe | Die frühere pauschale Schulterbreite von 12 % verwarf im Nutzer-Test gute Landmarks und entfällt in v5. Keine Entfernungsangabe in Metern. |
 | Kalibrierung | 3 s zusammenhängend, mindestens 15 Samples | Eine kurze stabile Referenz statt eines einzelnen Ausreißers. Median für die Baseline. |
-| Neutrale Hände | Höhe ≤ −0,15 Schulterbreiten, Abstand ≥ 0,65 Schulterbreiten; im Torso-Band | Neutrale getrennte Hände als verständliche Referenz. UI erklärt die Pose. |
-| Stabilität der Kalibrierung | Spannweite Torso ≤ 6°; Höhe/Abstand/seitliche Position jeweils ≤ 0,3 Schulterbreiten | Während Bewegung keine scheinbar neutrale Baseline übernehmen; Kalibrierung beginnt neu. |
+| Neutrale Hände | Optional: Höhe ≤ −0,15 Schulterbreiten, Abstand ≥ 0,65 Schulterbreiten; im Torso-Band | Mindestens 15 geeignete Samples für eine Handreferenz. Sonst `null`; Handhöhe/-abstand nutzen die bestehende Schultergeometrie-Schwelle. Hände blockieren keine Haltungsreferenz. |
+| Stabilität der Kalibrierung | Spannweite Torso ≤ 6°; seitliche Position ≤ 0,3 Schulterbreiten | Handbewegungen setzen die Haltungsreferenz nicht zurück. Körperbewegung startet die Kalibrierung neu. |
 | Maximaler Sample-Abstand | 350 ms | Lücken nicht als gehaltene Bewegung zählen. Sehr langsame Geräte können so nicht kalibrieren. |
 | Hand hoch | Eintritt max(0,15; neutrale Höhe + 0,5); Austritt 0,1 darunter | Klar über der Schulter; Hysterese reduziert Flackern an der Grenze. 0,8 s halten. |
 | Hände zusammen | Eintritt min(0,35; neutraler Abstand / 2); Austritt 0,15 darüber | Deutlich näher als neutral. 1,2 s halten, nur im Torso-Band. |

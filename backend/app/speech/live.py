@@ -25,6 +25,8 @@ import numpy as np
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
 
+from app.speech.analysis import analyze_samples
+from app.speech.config import AudioConfig
 from app.transcription.models import Word
 from app.transcription.streaming import (
     LiveDoneMessage,
@@ -46,9 +48,59 @@ _MAX_WINDOW_MS = _env_int("WHISPER_LIVE_MAX_WINDOW_MS", 10000)
 _MAX_SECONDS = _env_int("WHISPER_LIVE_MAX_SECONDS", 600)
 _MAX_IDLE_SECONDS = _env_int("WHISPER_LIVE_MAX_IDLE_SECONDS", 30)
 _STREAM_SLOTS = asyncio.Semaphore(1)
+_FEEDBACK_SLOTS = asyncio.Semaphore(1)
 _SLOT_ACQUIRE_TIMEOUT = 5.0
 
 _STOP = object()  # Sentinel: stop received or a finalization limit was reached.
+
+
+@router.websocket("/feedback")
+async def live_feedback(ws: WebSocket) -> None:
+    """Signal-only preview, independent of Whisper. PCM lives only in memory."""
+    try:
+        await asyncio.wait_for(_FEEDBACK_SLOTS.acquire(), timeout=_SLOT_ACQUIRE_TIMEOUT)
+    except TimeoutError:
+        await ws.close(code=1013, reason="Live speech feedback is at capacity")
+        return
+    try:
+        await ws.accept()
+        await asyncio.wait_for(_await_start(ws), timeout=10)
+        await _send(ws, LiveReadyMessage(sample_rate=SAMPLE_RATE))
+        pcm = bytearray()
+        checked_ms = 0
+        config = AudioConfig()
+        minimum = {"volume": config.volume_window_ms, "pitch": config.pitch_window_ms,
+                   "pace": config.pace_window_ms, "pause": config.pause_min_ms}
+        # shortcut: reanalyse the prefix to preserve batch calibration; use incremental DSP beyond five minutes.
+        limit = 300 * SAMPLE_RATE * 2
+        while len(pcm) < limit:
+            raw = await _receive(ws)
+            if not isinstance(raw, bytes):
+                break
+            if len(raw) % 2 or len(raw) > SAMPLE_RATE * 2:
+                raise ValueError("Send aligned Int16 PCM frames of at most one second")
+            pcm.extend(raw[:limit - len(pcm)])
+            position_ms = len(pcm) * 1000 // (SAMPLE_RATE * 2)
+            if position_ms - checked_ms < 5000:
+                continue
+            result = await run_in_threadpool(analyze_samples, _pcm_to_float32(bytes(pcm)), config)
+            checked_ms = position_ms
+            events = [e.model_dump() for e in result.events
+                      if e.duration_ms >= minimum[e.type]
+                      and e.t_ms + e.duration_ms > position_ms - 5000]
+            await ws.send_json({"type": "feedback", "position_ms": position_ms, "events": events})
+        await _send(ws, LiveDoneMessage())
+        await ws.close(code=1000)
+    except WebSocketDisconnect:
+        pass
+    except Exception as error:
+        try:
+            await _send(ws, LiveErrorMessage(message=str(error) or error.__class__.__name__))
+            await ws.close(code=1011)
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+    finally:
+        _FEEDBACK_SLOTS.release()
 
 
 def _pcm_to_float32(raw: bytes) -> np.ndarray:

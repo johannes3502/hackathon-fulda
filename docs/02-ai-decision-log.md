@@ -576,3 +576,94 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
   Dieser Integrationslauf hat keinen vollständigen Compose-/Whisper-/Ollama-
   End-to-End-Lauf wiederholt; frühere Ergebnisse oben gelten für deren jeweiligen
   Stand. Aktuelle Geräte-Checkliste: `docs/05-jury-demo.md`.
+
+## Live-Sprechfeedback auf dem M5 Pro testen und anschließen (24.10.2026)
+
+- Nutzer meint Analyse während des Sprechens, nicht Sprachausgabe/TTS.
+  Verifizierte Hardware: Apple M5 Pro, 15 CPU-Kerne, 24 GB RAM; Backend
+  im bestehenden Colima-Stack. Kein neues Modell oder Cloudanbieter.
+- Vorhandene Silero/RMS/YIN/Silben-Regeln wiederverwendet. Einzelmessungen
+  mit wiederholter synthetischer Sprach-Fixture: 10 s Audio in 0,105 s,
+  30 s in 0,193 s, 60 s in 0,354 s, 180 s in 1,189 s, 300 s in 2,273 s.
+  Dies ist kein fünfminütiger Live-Dauertest.
+- `WS /speech/feedback` verarbeitet alle fünf Sekunden den bisherigen
+  Aufnahmeabschnitt, damit die Anfangskalibrierung identisch zum Batch-Pfad
+  bleibt. Begrenzung auf fünf Minuten, einen Signal-Slot und reine RAM-Daten;
+  Inkremental-DSP bleibt erst bei längeren Aufnahmen erforderlich.
+  Whisper-Captions haben einen unabhängigen Slot. UI: ein Hinweis, pro Typ
+  15 s Cooldown, abschaltbare Hinweise; Aufnahme bleibt bei Ausfall erhalten.
+- Tatsächlicher 30-s-Stream in Echtzeit, mittlere zehn Sekunden absichtlich
+  leiser: sechs Updates, zwei Lautstärke-Beobachtungen; Lieferverzögerung
+  nach jeweiliger Audioposition 80–182 ms (Median 140 ms). Dazu kommen das
+  5-s-Sammelintervall und die jeweiligen Regel-/Kalibrierungsfenster.
+  Echter Next.js-Proxy auf Port 3000: ready → PCM → feedback → done,
+  gemessene Signal-Lieferverzögerung 112 ms.
+- Gleichzeitig mit Whisper blieb die Signal-Vorschau bei 78–160 ms.
+  Der Caption-Stream endete dagegen mit Keepalive-Timeout. Isolierte
+  6,845-s-Fixture: erstes Wortpaket nach 5,08 s, final erst nach 20,26 s,
+  mit falschen Wörtern. Deshalb keine Zusage für Live-WPM/Füllwörter und
+  kein standardmäßiges Aktivieren von Captions. Batch-Whisper bleibt erhalten.
+- Benchmark korrigiert: Verzögerung gegen die gelieferte Audio-/Wortposition
+  messen, nicht gegen zuletzt gesendetes Audio (das verbarg Rückstau).
+  Kurzes PCM-Endstück geht nicht mehr verloren. Zusätzlich begrenzt die
+  gemeinsame Signalanalyse Events auf die echte Aufnahmedauer statt auf
+  ein aufgefülltes Schlussfenster. Jeweils Regressionstests ergänzt.
+- Verifiziert: 102 Frontend-Unit-Tests, Typecheck/Lint, 58 relevante Backend-
+  Tests, drei Desktop-Browserfälle mit synthetischem Kamera-/Audioeingang.
+  Browserfälle prüfen Live-Hinweis vor Stop, Caption-/Signal-Ausfall und
+  weiterhin abspielbare Aufnahme. Echtes Mikrofon, Safari/iOS, parallele
+  vollständige Coaching-Last und allgemeine Heuristikqualität bleiben offen.
+
+## Fingertracking, Kalibrierung und lokale Live-Sprache korrigieren (24.10.2026)
+
+- Nutzer meldet fehlende Finger und ausbleibende Live-Hinweise für Gesten sowie
+  Sprache/Pausen. Nach der Korrektur meldet er „ok it works great“ und beauftragt
+  ausdrücklich den Merge nach `main`. Das ersetzt die frühere Beschränkung auf
+  den Integrationsbranch; es ist ein informeller Test ohne Genauigkeitsmessung.
+- Der lokale Landmark-Export reproduziert den Posefehler: Modelle liefern gute
+  Schulter-/Hüftpunkte, aber die pauschale Mindest-Schulterbreite von 12 % und die
+  Hand-Stillhaltepflicht verhindern die gesamte Kalibrierung. Regelversion v5
+  entfernt die pauschale Breite, behält sichere Punkte, nicht degenerierte
+  Schultergeometrie und das Torso-Framing. Die 3-s-Haltungsreferenz hängt nur noch
+  von Torso und Position ab. Im Nachspielen wird sie nach rund 3 s fertig und
+  erzeugt Ereignisse. Der persönliche Export ist keine eingecheckte Testfixture;
+  die Regressionen verwenden handgezeichnete synthetische Geometrie.
+- Eine neutrale Handreferenz entsteht nur aus genug geeigneten Samples, sonst
+  bleibt sie `null`. Die vorhandenen Schwellen für Handhöhe/-abstand werden dann
+  geometrisch auf die Schultern bezogen; keine erfundene Referenz. Ein sichtbares
+  angehobenes Handgelenk reicht für „Hand above shoulder“. Hold, Cooldown,
+  Hysterese, Framing und die Aufnahmezeitbasis bleiben erhalten.
+- `Track fingers` ist unabhängig vom Pose Lab, standardmäßig an und auf 5 Hz
+  begrenzt. Hand Landmarker läuft auch ohne Torso; das Overlay kann allein eine
+  Hand mit allen 21 Punkten zeigen. Abschalten lädt das Modell nicht. GPU/CPU-
+  Fallback bleibt pro Modell erhalten. Pocket/T12 sind weiterhin nur Dev-Checks.
+- `Speech analysis → Live · in browser` ist Standard. Der vorhandene Kamera-/
+  Mikrostream speist ein lokales AudioWorklet (RMS, YIN, 40-ms-Frames). Ein neuer
+  lokaler Evaluator nutzt die vorhandenen Backend-Parameter für Pausen, relative
+  Lautstärke, Tonhöhenvariation und einen Energiehüllkurven-Rhythmus-Proxy.
+  Kalibrierung braucht 3 s aktive Messungen, kein Feedback aus Anfangsstille;
+  Mindestfenster, Datenlücken, ein Cue mit Mindestanzeige und Cooldown werden
+  berücksichtigt. Das ist Energieaktivität, kein Silero-VAD und keine WPM.
+- `Off · gestures only` braucht kein Mikro. Der Backend-Modus erhält den parallel
+  eingetroffenen `WS /speech/feedback`-Pfad aus `a9f9f9c`, einschließlich dessen
+  unabhängiger Whisper-Captions. Individuelle Feature-Schalter gelten auch für
+  Server-Hinweise. Lokaler und Server-Signalpfad laufen je nach gewähltem Modus;
+  keine doppelten Signalpipelines für denselben Take. Füllwörter/Wort-Tempo
+  bleiben beim Transkript. Aufnahme, Zeitachse und Review behalten die Live-
+  Marker auch bei Serverausfall; überlappende vollständige Analyse hat Vorrang.
+- UI zeigt Pose-Kalibrierung, Handzahl und lokale Mikrofonaktivität. Audio-
+  Kontexte und Worklets werden beendet, ohne den geteilten Stream vorzeitig zu
+  stoppen. Aufnahmestart setzt die Referenz und den Signal-Evaluator auf die
+  gemeinsame `MediaRecorder.onstart`-Zeit zurück.
+- Verifiziert: 166 Web- und 18 Mobile-Unit-Tests; 37 Desktop- und 37 Mobile-
+  Browserfälle bestanden. Der erste Mobil-Durchlauf fand einen seitlichen
+  Überlauf der Aufnahmeleiste; nach dem CSS-Fix die komplette Mobile-Suite
+  erneut erfolgreich. Audio-Browserfälle nutzen echte Worklet-Messungen auf
+  synthetischen Tönen und Pausen; Modell-/UI-Fixtures bleiben synthetisch.
+  Die vier Pose-Modell-/Modus-Kombinationen laden auch das echte Handmodell.
+  Geprüft sind zusätzlich Timestamp-Anker, Preview-Verwerfung, Abschalten,
+  Fehler-Fallback, Review-Erhalt und Audio-Ressourcenfreigabe. 92 Backendtests
+  bestanden; ein PostgreSQL-Roundtrip ohne `POSTGRES_HOST` übersprungen.
+  Lint/Typecheck beider Workspaces, Next.js-Produktionsbuild, API-Schema-Aktualität und alle elf Mermaid-Diagramme
+  bestanden. Reale Finger-/Sprachqualität, Raumgeräusche, Safari-Mikro und
+  längere gemeinsame Kamera-/Audio-Last sind dadurch nicht qualifiziert.

@@ -12,9 +12,11 @@ unten sind weiterhin Zielentwürfe, keine zweite implementierte Pipeline.
 VIDEO (Standard) oder IMAGE per Schalter, immer GPU-first mit CPU-Fallback.
 Kalibrierte Produktionsregeln aus `goal`, inklusive Review/Evidenzexport.
 Arme verschränkt mit toleranter Geometrie und Unterarmwinkel, 2 s Hold und
-20 s Cooldown. Pose Lab T1–T12 und Handmodell nur hinter Dev-Schalter.
+20 s Cooldown. Pose Lab T1–T12 bleibt Dev-only; Fingertracking ist separat
+schaltbar und standardmäßig an, höchstens 5 Hz, auch ohne sichtbaren Torso.
 Kein Gaze-/Pocket-/Bein-Produktionsereignis. Sprachfeedback ist pro Typ
-schaltbar und kommt nach dem Stoppen. Live-Captions sind ein eigener Schalter.
+schaltbar: lokale Mikrofonhinweise sind live, Backend-Signalfeedback ebenfalls;
+Füllwörter und Wort-Tempo nach dem Stoppen. Live-Captions sind ein eigener Schalter.
 
 Diese Entscheidung ersetzt insbesondere die frühere Heavy-Pflicht, das
 Lite-Verbot für Live-Hinweise und die sofortige Produktionsanzeige verschränkter
@@ -175,8 +177,8 @@ Unterarm grob vertikal, 3 s stabil, Framing gültig. Text: „Hand über 3 s nic
 sichtbar (Hüfthöhe). Das kann eine Tasche, eine Jacke oder eine verdeckte Hand
 sein – keine Bewertung.“
 
-**MUSS:** Der Hand Landmarker läuft nur lokal und nur für den Dev-Check
-„Hand in pocket“ (FR-POSE-20). Er nutzt das Handgelenk (Punkt 0) und den
+**UMGESETZT:** Der Hand Landmarker läuft lokal für das separat schaltbare
+Finger-Overlay und den Dev-Check „Hand in pocket“ (FR-POSE-20). Dieser nutzt das Handgelenk (Punkt 0) und den
 Abstand zur Pose-Hüfte; eine verdeckte Hand erkennt er nicht. Er erzeugt keine
 Events, Clips oder Backend-Payloads.
 
@@ -206,9 +208,9 @@ Gestentypen, kein „mehr ist besser“, keine Populationsnorm.
 **MUSS:** Vergleich nur gegen die eigene Baseline (10 s) und eigene
 5./95.-Perzentile über 60 s. Mindestens 5 Strokes pro Fenster.
 
-**SOLL:** Hand Landmarker ist für diese Gestenmetriken nicht nötig. Er läuft
-im Dev-Modus nur für den Pocket-Check (FR-POSE-20) und ist kein
-Produktions-Gestenmodell.
+**SOLL:** Hand Landmarker ist für diese Gestenmetriken nicht nötig. Er liefert
+das optionale Finger-Overlay und Daten für den Dev-Pocket-Check (FR-POSE-20);
+er ist kein Modell zur Klassifikation von Produktionsgesten.
 
 ### FR-POSE-11 — Event-Engine
 
@@ -372,12 +374,12 @@ Heuristiken und wird nicht als Event, Clip oder Backend-Payload gespeichert.
 
 ### FR-POSE-20 — Pocket-Check (Dev-Heuristik)
 
-**UMGESETZT:** Der Hand Landmarker wird ausschließlich bei aktivem Pose Lab
-lokal geladen. Er läuft im gewählten IMAGE-/VIDEO-Modus auf Frames mit Pose,
+**UMGESETZT:** Der Hand Landmarker wird bei aktiviertem „Track fingers“
+lokal geladen (Standard an), unabhängig vom Pose Lab. Er läuft im gewählten IMAGE-/VIDEO-Modus höchstens 5 Hz, auch ohne Pose,
 GPU bevorzugt mit eigenem CPU-Fallback, maximal zwei Hände und Confidence 0,5.
 Ein Handfehler darf Pose nicht stoppen. Hand-Landmarks werden nicht in JSONL
 oder ans Backend geschickt; das Dev-Overlay zeigt sie pink. Das Nichtfinden
-einer Hand beweist keine Tasche. Im normalen Aufnahmepfad ist das Handmodell aus.
+einer Hand beweist keine Tasche. Abschalten von „Track fingers“ deaktiviert das Modell vollständig.
 
 **MUSS:** `pocketCheck` prüft pro Seite:
 1. `wrist_hip_dist <= 0.45` Schulterbreiten (2D-Abstand des Pose-Handgelenks
@@ -892,7 +894,7 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 |---|---|---|---|
 | OD-1 | Face Landmarker + Iris für echtes Gaze? | Nein im MVP; nur als separates Feature mit Consent, Kalibrierung und „Kamera-Blick“, nie „Eye Contact“ | offen |
 | OD-2 | `full-body` standardmäßig? | Nein, opt-in und experimentell | entschieden |
-| OD-3 | Hand Landmarker für Gesten? | Für Produktions-Gesten nein; nur bei aktivem Pose Lab auf Frames mit Pose, Confidence 0,5 | entschieden |
+| OD-3 | Hand Landmarker für Gesten? | Fingertracking separat schaltbar (Standard an), max. 5 Hz auch ohne Pose, Confidence 0,5; Pocket nur Dev | entschieden |
 | OD-4 | Live-Gestenhinweise? | Im integrierten Prototyp kalibrierte Pose-Hinweise aus `goal`, abschaltbar; keine Scores | Nutzerauftrag Integration |
 | OD-5 | Kalibrierungs-Set | 10–20 Personen, 0,5/1/2 m, Brille, Licht, Hauttöne; Precision/Recall berichten | offen |
 | OD-6 | Default `audienceMode` | Kein stiller Default; Demo `camera` | entschieden |
@@ -908,8 +910,8 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 - **Kopforientierung:** Pose-only liefert einen Kopfrichtungs-Proxy, keinen
   Blickkontakt. Face/Iris wäre ein Scope- und Datenschutzwechsel. `camera` und
   `room` sind getrennte Modi; „Scanning“ ist keine validierte Wirkung.
-- **Hände:** Der Hand Landmarker lädt nur bei aktivem Pose Lab (auf Frames mit Pose, Confidence
-  0,5) und zeichnet die 21 Landmarks im Pose-Lab-Overlay. Der Dev-Pocket-Check
+- **Hände:** Der Hand Landmarker lädt bei „Track fingers“ (max. 5 Hz, Confidence
+  0,5) und zeichnet die 21 Landmarks im Kamera-Overlay. Der Dev-Pocket-Check
   kombiniert einen Handgelenk-Hüft-Abstand ≤ 0,45 Schulterbreiten mit „keine
   Hand an diesem Handgelenk gefunden“. Eine vollständig verdeckte Hand erkennt
   das Modell nicht, deshalb bleibt `hand_found=false` der Proxy;

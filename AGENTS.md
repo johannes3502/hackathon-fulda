@@ -36,7 +36,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | Hintergrundjobs | Celery-Worker; Redis als Broker und temporäres Result-Backend (Docker Compose) |
 | Datenbank | Postgres mit `pgvector` (Docker Compose): Sessions, Events, Transkript, Quellen-Chunks + Embeddings |
 | Objektspeicher | MinIO, S3-kompatibel (Docker Compose): Uploads, Event-Clips, Snapshots; Browser lädt per Presigned URL direkt hoch |
-| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker (MVP); HandLandmarker lokal für den Dev-Pocket-Check; FaceLandmarker (Iris) nicht MVP |
+| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker und optionaler HandLandmarker für Fingertracking; Pocket nur Dev; FaceLandmarker (Iris) nicht MVP |
 | Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
 | Medien-Verarbeitung | `ffmpeg` im Backend: Clips schneiden, WebM/MP4 remuxen (seekbar machen) |
 | Transkription | Lokales Whisper (`faster-whisper`) hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}` + Text), Deepgram optional; Anbieter bleibt austauschbar |
@@ -58,7 +58,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 ```
 Browser (Next.js, TS)
- ├─ Kamera → MediaPipe Pose + Hand (Dev-Pocket) → Regeln → Events + Landmarks [live, lokal]
+ ├─ Kamera → MediaPipe Pose + Hand (Fingertracking, Pocket nur Dev) → Regeln → Events + Landmarks [live, lokal]
  ├─ Mikro  → AudioWorklet → Pegel, F0, Silbenrate → Regeln → Events + Live-Hinweis [live, lokal]
  └─ MediaRecorder → komplette Aufnahme ──(Presigned URL)──► MinIO
                                                      │
@@ -187,11 +187,19 @@ Der integrierte Web-Worker startet standardmäßig mit Lite/VIDEO. Unter
 GPU-first mit CPU-Fallback bei Start- oder Laufzeitfehlern, kein Modellwechsel.
 JSONL/Event-Payload enthalten `runtime` (Modell, Modus, Delegate). VIDEO-Logs
 enthalten zeitlich geglättete Modell-Ausgaben; IMAGE-Logs unabhängige Frames.
-Pose Lab T1–T12 bleibt ein Dev-Werkzeug; nur dieser Schalter lädt das Handmodell.
+Pose Lab T1–T12 bleibt ein Dev-Werkzeug. Fingertracking ist separat unter
+„Track fingers“ schaltbar, standardmäßig an und auf höchstens 5 Hz begrenzt;
+es funktioniert auch ohne sichtbaren Torso. Es erzeugt keine Pocket-Events.
+Die Haltungsreferenz kalibriert ohne Hand-Stillhaltepflicht. Fehlende neutrale
+Handreferenzen bleiben im Payload `null`; Gesten nutzen dann Schultergeometrie.
 Die tolerantere Arm-Geometrie verwendet weiter 2 s Hold / 20 s Cooldown.
 Sprachfeedback ist insgesamt und für Pausen, Tempo, Füllwörter, Lautstärke und
-Tonhöhe einzeln schaltbar. Es bleibt nachgelagerte Analyse; Live-Captions sind
-separat. Schalter werden pro Aufnahme gespeichert und sind währenddessen gesperrt.
+Tonhöhe einzeln schaltbar. „Live · in browser“ ist Standard: Kamera/Mikro bleiben
+lokal, ein AudioWorklet liefert RMS/YIN und einen Energiehüllkurven-Tempo-Proxy.
+Pausen, Lautstärke, Tonhöhenvariation und Rhythmus erscheinen während der Aufnahme.
+„Off · gestures only“ schaltet das Mikro aus. Der Backend-Modus nutzt den separaten
+Signal-Stream unten; Füllwörter und Wort-Tempo bleiben nachgelagert. Live-Captions
+sind separat. Schalter werden pro Aufnahme gespeichert und sind währenddessen gesperrt.
 Die ausführlichen Research-Ziele in `docs/04-pose-tracking-requirements.md`
 sind nicht vollständig implementiert und überschreiben diese Entscheidung nicht.
 Der Aufnahme-Pfad nutzt die Audio-Job-API
@@ -207,6 +215,16 @@ Nova-3 über EU-Endpunkt optional; deutsche Füllworterhaltung ungeprüft).
 Das Ergebnis enthält zusätzlich den zusammengesetzten Transkripttext. Silero VAD v6.2 (ONNX, lokal) erkennt
 Sprachaktivität; RMS und YIN bleiben erhalten, Standard-Kalibrierung 3 s. Die Umstellung des Speichers
 ist eine separate Implementierungsaufgabe.
+
+Live-Sprechfeedback ist im Web-Backend-Modus umgesetzt: `WS /speech/feedback`
+analysiert Mikrofon-PCM alle 5 s mit denselben Signalregeln und 3-s-Baseline.
+Ein Live-Slot pro API-Prozess, maximal 5 min; PCM nur im RAM. Die Vorschau
+läuft unabhängig von optionalen Whisper-Captions, zeigt höchstens einen
+Hinweis mit 15-s-Cooldown pro Typ und stoppt bei mehr als 15 s Rückstand.
+Vollständige Analyse und wortbasierte Merkmale bleiben nach dem Stoppen.
+Benchmark auf dem M5 Pro/24 GB: synthetischer 30-s-Stream mit 80–182 ms
+Signal-Verarbeitungs-/Lieferzeit zusätzlich zum 5-s-Sammelintervall.
+Echtes Mikrofon/Safari und Genauigkeit sind damit nicht abgenommen.
 
 Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
 sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die

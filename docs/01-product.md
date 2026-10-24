@@ -50,7 +50,14 @@ Produktentscheidung.
 - Gesten: sichtbare Geometrie relativ zur Neutralstellung, Mindestdauer,
   Hysterese und Cooldown sind als Prototyp-Heuristiken umgesetzt; keine Scores.
   Systematische Genauigkeits-/Geräteprüfung bleibt offen.
-- Was läuft live, was erst nach der Präsentation?
+- Live-Sprechfeedback (24.10.2026, Nutzerauftrag): Im Backend-Modus laufen
+  dieselben kalibrierten Signalregeln für Lautstärke, Tonhöhe, Silben-Tempo
+  und Pausen bereits während der Aufnahme (Updates alle 5 s, maximal 5 min).
+  Ein Hinweis gleichzeitig, pro Typ 15 s Cooldown, Hinweise ausblendbar.
+  Mikrofon-PCM wird an den lokalen Server gesendet und nur im RAM gehalten.
+  Wortbasierte Füllwörter/WPM, vollständiges Review und Quellenvergleich
+  bleiben nachgelagert. Live-Whisper bleibt eine optionale Vorschau; der
+  aktuelle Docker-CPU-Pfad hielt im längeren Test nicht mit.
 - Wie werden Fehlalarme und Unsicherheit angezeigt?
 - Eye Tracking: Webcam-basiert oder zusätzliche Hardware?
 
@@ -156,7 +163,10 @@ einbauen**:
 
 Nutzerentscheidung: VIDEO als Standard; IMAGE/VIDEO und Lite/Heavy unabhängig
 umschaltbar, Lite bleibt Standard. GPU-first mit CPU-Fallback ohne Modellwechsel.
-Pose Lab einschließlich Handmodell und T12 bleibt Dev-only. Produktions-Evaluator,
+Pose Lab und T12 bleiben Dev-only; Fingertracking läuft separat schaltbar
+standardmäßig im normalen Overlay, bis 5 Hz auch ohne Torso. Produktions-Evaluator,
 Zeitachse und Review aus `goal` bleiben aktiv. Sprachfeedback ist insgesamt und
-für Pause, Tempo, Füllwörter, Lautstärke und Tonhöhe einzeln schaltbar. Es kommt
-nach dem Stoppen; die lokale Analyse und Transkription haben eigene Einstellungen.
+für Pause, Tempo, Füllwörter, Lautstärke und Tonhöhe einzeln schaltbar.
+„Live · in browser“ ist Standard und liefert lokale Mikrofonhinweise ohne Backend;
+der Backend-Modus nutzt den Signal-Stream. Füllwörter und Wort-Tempo kommen nach
+dem Stoppen. Die Haltungsreferenz benötigt keine stillgehaltenen Hände mehr.

@@ -79,13 +79,15 @@ export function AppShell({
                 </li>
               </ol>
               <p>
-                Local mode keeps video and gesture observations in this browser,
-                without microphone audio. Optional speech analysis captures
-                video and microphone audio, then uploads the complete take after
-                stopping. Live captions additionally send audio during recording
-                when enabled in Recording options. Camera observations are
-                prototype heuristics, not quality scores. The synthetic
-                walkthrough is separately labelled and needs no camera.
+                Live · in browser keeps video, microphone measurements and
+                feedback local. Off · gestures only uses no microphone. Full
+                backend analysis captures video and microphone audio, sends
+                audio during recording for live feedback and uploads the
+                complete take after stopping. Live captions additionally send
+                audio when enabled in Recording options. Camera and voice
+                observations are prototype heuristics, not quality scores. The
+                synthetic walkthrough is separately labelled and needs no
+                camera.
               </p>
               <p>
                 Recordings live in browser memory only. Download before

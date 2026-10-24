@@ -45,7 +45,12 @@ Der Adapter akzeptiert nur lokale Hostnamen und keinen Cloud-Modelltag.
    **Create a transcript with local Whisper** eingeschaltet lassen.
 3. Kamera und Mikro erlauben. Für die ersten drei Sekunden neutral stehen und
    normal sprechen: Pose und Stimme brauchen ihre jeweilige Baseline.
-4. Kurzen Vortrag aufnehmen → **Finish & review**. Ein vollständiger Upload
+4. Während der Aufnahme liefert **On · local speech analysis** jetzt alle fünf
+   Sekunden Live-Hinweise zu Lautstärke, Tonhöhenvariation, Tempo und Pausen.
+   Die ersten drei Sekunden normal sprechen (Kalibrierung). Mikrofon-PCM geht
+   währenddessen an den lokalen Server; kein Whisper nötig. Die Regeln sind
+   Heuristiken, Tempo ist eine Silbenrate. Live-Hinweise lassen sich ausblenden.
+   Kurzen Vortrag aufnehmen → **Finish & review**. Ein vollständiger Upload
    geht an den lokalen Server; ASR-Ergebnisse kommen nach der Aufnahme.
 5. Transkript prüfen. Ein Wort anklicken spielt die Umgebung im Video ab.
    Fehlerhafte Wörter können über den Import korrigierter Wort-Timestamps

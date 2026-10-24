@@ -262,6 +262,30 @@ Measured reference on this repo's fixture (6.8 s German speech, CPU `int8`):
 `medium` was not measurable on a 7.7 GB host (OOM-killed) — treat it as a
 16 GB+ model.
 
+### Live speech feedback (`WS /speech/feedback`)
+
+The web studio's backend mode streams 16 kHz mono Int16 PCM while recording.
+Control frames are the same as `/speech/live`: `start` with `sample_rate: 16000`,
+wait for `ready`, then binary PCM (at most one second per frame), then `stop`.
+Every five seconds the server sends `{"type":"feedback","position_ms":5000,"events":[...]}`.
+These are the existing calibrated volume, pitch, syllable-pace and pause rules;
+no Whisper or LLM is needed. Preview audio stays in RAM and is released when
+the socket ends. One signal session per API process, separately from captions.
+The prototype reanalyses the prefix, capped at five minutes (the studio's limit).
+The browser aligns preview timestamps to recording start, shows one cue with a
+15-second per-type cooldown, and stops the preview if analysis falls over 15
+seconds behind. Hide live hints to suppress cues. Full batch review is unchanged.
+
+Benchmark with synthetic audio of at least five seconds:
+
+```sh
+python -m scripts.smoke_live tests/fixtures/speech-de.wav --feedback
+```
+
+The reported signal delivery delay is measured from the analysed audio position;
+the five-second collection interval is additional. Caption delay uses the last
+delivered word timestamp and includes pauses; it is not pure inference time.
+
 ### Live transcription (`WS /speech/live`, backend prototype)
 
 Near-realtime transcript while recording, same local Whisper, without Celery.

@@ -14,10 +14,10 @@ Recherche, Formeln, Konfiguration, Unsicherheit und Evaluationsplan:
 **MediaPipe Pose Landmarker** (33 Punkte) für das Logging.
 
 **MediaPipe Hand Landmarker** (21 Punkte pro Hand) läuft zusätzlich live im
-selben Worker nur bei aktiviertem **Pose lab**, auf Frames mit erkannter Pose,
-mit Confidence 0,5, für die Dev-Checks. Im normalen Aufnahmepfad wird das
-Handmodell weder geladen noch ausgeführt. Seine Landmarks werden nicht geloggt und nicht an das
-Backend geschickt; im Pose-Lab-Overlay erscheinen sie als pinke Punkte und
+selben Worker bei aktiviertem **Track fingers** (Standard an), höchstens 5 Hz,
+auch ohne erkannte Pose, mit Confidence 0,5. Pose Lab nutzt dieselben Ergebnisse
+für seine Dev-Checks. Seine Landmarks werden nicht geloggt und nicht an das
+Backend geschickt; im Kamera-Overlay erscheinen sie als pinke Punkte und
 Linien.
 
 - Augen kommen aus den Pose-Punkten.
@@ -160,7 +160,7 @@ Regeln:
 - vollständiges 478-Punkte-Face-Mesh
 - Iris, Pupille, Gaze-Richtung
 - Yaw-Winkel
-- Hand- und Finger-Landmarks im JSONL-Log (live-only für den Dev-Pocket-Check)
+- Hand- und Finger-Landmarks im JSONL-Log (nur Live-Overlay und Dev-Checks)
 - Emotionen, Persönlichkeit, Scores
 - Segmentierungsmaske
 - Fußanalyse
