@@ -1,5 +1,10 @@
 # Pose-Datenpunkte — MVP
 
+> **Analyse-Anforderungen:** Dieses Dokument beschreibt das Roh-Logging.
+> Die finalen Pose-, Event- und Feedback-Anforderungen stehen in
+> `docs/04-pose-tracking-requirements.md`. Bei Konflikt gilt
+> `docs/04-pose-tracking-requirements.md`.
+
 Ziel: Kamera starten, Pose-Landmarks pro Sample erfassen und als JSONL loggen.  
 Keine Bewertung, kein Backend, kein Face-Mesh, keine Iris/Pupille, keine Finger.
 

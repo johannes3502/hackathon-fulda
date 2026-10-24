@@ -1,6 +1,6 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Finale Pose-/Feedback-Anforderungen: `docs/04-pose-tracking-requirements.md`.
 
 ## 1. Projekt
 
@@ -8,7 +8,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 | # | Feature | Inhalt |
 |---|---|---|
-| 1 | Posture / Gesture / Eye Tracking | Pose-, Gesten- und Blick-Landmarks aus der Kamera; Regeln darauf erzeugen Events (z. B. „Haltung auffällig“) |
+| 1 | Posture / Gesture / Eye Tracking | Pose- und Gesten-Landmarks aus der Kamera; Kopforientierung als Proxy (kein Gaze); Regeln darauf erzeugen Events (z. B. „Haltung auffällig“) |
 | 2 | Transkription + Fact-Check | Transkript mit Wort-Timestamps; Abgleich der Aussagen per RAG mit vorab hochgeladenen Quellen (PDF, PPTX, …); Web-Fetch-Agent als Zweitquelle |
 | 3 | Sprechmerkmale | Tempo, Pausen, Zögern, Füllwörter, Lautstärke (zu leise/laut), Tonhöhenvariation (monoton); live Hinweise während des Vortrags |
 | 4 | Timestamp-Review | Events auf einer Timeline; Klick springt zur Stelle und spielt den Clip des Events ab |
@@ -19,7 +19,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 ## 2. Ablauf
 
 1. **Vorbereitung:** Nutzer lädt Quellen hoch (PDF, PPTX, Text). Backend zerlegt sie in Chunks mit Quelle und Seite/Folie und legt sie für die Suche ab.
-2. **Aufnahme:** Kamera und Mikro laufen. Im Browser erzeugt MediaPipe live Pose-/Blick-Landmarks, daraus entstehen Events; das Mikro liefert den Pegel.
+2. **Aufnahme:** Kamera und Mikro laufen. Im Browser erzeugt MediaPipe live Pose-Landmarks und einen Kopforientierungs-Proxy, daraus entstehen Events; das Mikro liefert den Pegel.
 3. **Upload:** Nach dem Stoppen wird die komplette Aufnahme hochgeladen.
 4. **Analyse (Backend):** Transkription mit Wort-Timestamps, Sprechmerkmale, Fact-Check. Pro Event wird ein kurzer Clip geschnitten, die Aufnahme danach gelöscht.
 5. **Review:** Timeline über alle Events; Klick spielt den Clip, ggf. mit Skelett-Overlay.
@@ -36,7 +36,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | Hintergrundjobs | Celery-Worker; Redis als Broker und temporäres Result-Backend (Docker Compose) |
 | Datenbank | Postgres mit `pgvector` (Docker Compose): Sessions, Events, Transkript, Quellen-Chunks + Embeddings |
 | Objektspeicher | MinIO, S3-kompatibel (Docker Compose): Uploads, Event-Clips, Snapshots; Browser lädt per Presigned URL direkt hoch |
-| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker, FaceLandmarker (Iris, Kopfausrichtung), HandLandmarker |
+| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker (MVP, Heavy); FaceLandmarker (Iris) und HandLandmarker nur optional, nicht MVP |
 | Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
 | Medien-Verarbeitung | `ffmpeg` im Backend: Clips schneiden, WebM/MP4 remuxen (seekbar machen) |
 | Transkription | Gehostete ASR-API hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}`), damit der Anbieter austauschbar bleibt |
@@ -56,7 +56,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 ```
 Browser (Next.js, TS)
- ├─ Kamera → MediaPipe (Pose/Face/Hand) → Regeln → Events + Landmarks      [live, lokal]
+ ├─ Kamera → MediaPipe Pose (MVP) → Regeln → Events + Landmarks      [live, lokal]
  ├─ Mikro  → AudioWorklet → Pegel, F0, Silbenrate → Regeln → Events + Live-Hinweis [live, lokal]
  └─ MediaRecorder → komplette Aufnahme ──(Presigned URL)──► MinIO
                                                      │
@@ -134,6 +134,7 @@ docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
   01-product.md                    # Features und offene Punkte
   02-ai-decision-log.md            # tatsächliche Entscheidungen und Prüfergebnisse
+  04-pose-tracking-requirements.md # finale Pose-, Event- und Feedback-Anforderungen
 templates/
   ai-decision-log.md               # Vorlage für die AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
@@ -151,8 +152,10 @@ Hybrid-Suche (pgvector + deutsche Volltextsuche). Fact-Check und Frage-Agent
 nutzen `app.sources.retrieval` (`search`, `format_context`, `quote_in_text`);
 beide sind noch nicht implementiert. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
-Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
-Bewertungs-/Feedback-Regeln darauf sind noch offen (`frontend/DATA_POINTS.md`).
+Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren.
+Die finalen Pose-/Feedback-Regeln stehen in
+`docs/04-pose-tracking-requirements.md`; die Umsetzung ist noch offen
+(`frontend/DATA_POINTS.md` beschreibt das Roh-Logging).
 Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
 jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
