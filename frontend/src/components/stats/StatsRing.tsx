@@ -43,7 +43,7 @@ export function StatsRing({ value }: { value: number }) {
         const geometry = new THREE.RingGeometry(0.84, 1, 360);
         const trackMaterial = new THREE.MeshBasicMaterial({ color: "#edf1ee" });
         const progressMaterial = new THREE.MeshBasicMaterial({
-          color: "#42ff8c",
+          color: "#3803bf",
         });
         const progressGeometry = geometry.clone();
         scene.add(new THREE.Mesh(geometry, trackMaterial));
@@ -115,7 +115,7 @@ export function StatsRing({ value }: { value: number }) {
           cy="115"
           r="92"
           fill="none"
-          stroke="#42ff8c"
+          stroke="#3803bf"
           strokeWidth="16"
           pathLength="100"
           strokeDasharray={`${value} 100`}

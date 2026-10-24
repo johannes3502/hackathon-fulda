@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import "@fontsource/noto-serif-display/latin-400.css";
+import "@fontsource-variable/open-sans";
 import "./loading-screen.css";
 
 /** Indeterminate loading: mount while work is pending, unmount when complete. */
@@ -29,7 +29,7 @@ export function LoadingScreen({ label = "Einen Moment bitte" }: { label?: string
         const camera = new THREE.OrthographicCamera(-1.35, 1.35, 1.35, -1.35, 0.1, 10);
         camera.position.z = 4;
         const geometry = new THREE.CylinderGeometry(1, 1, 0.055, 96);
-        const material = new THREE.MeshBasicMaterial({ color: "#42ff8c" });
+        const material = new THREE.MeshBasicMaterial({ color: "#3803bf" });
         const disc = new THREE.Mesh(geometry, material);
         disc.rotation.x = Math.PI / 2;
         const pivot = new THREE.Group();

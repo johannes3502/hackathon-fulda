@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LiveSessionProvider } from "@/features/live/LiveSessionProvider";
-import "@fontsource/noto-serif-display/latin-400.css";
+import "@fontsource-variable/open-sans";
 import "./globals.css";
 import "./live.css";
 import "./sources.css";

@@ -2,12 +2,11 @@
 
 ## Shared web interface (2026-10-24)
 
-The shared web interface restores the original Pitch Coach blue palette and
-Arial/Helvetica sans-serif type. Tokens in `src/app/globals.css` use the original
-OKLCH blue primary (0.49 0.2 264), cool neutral background, and dark slate camera
-stage. Primary buttons use white text. The 418 name remains; its shared wordmark
-now also uses sans-serif. Specialized loading and stats previews retain their
-separate historical 418 artwork. The current layout and startup flow are unchanged.
+The web interface uses locally hosted Open Sans Variable and accent #3803bf.
+Shared tokens in `src/app/globals.css` also supply the hover and soft accent
+colors. Loading, stats and review previews follow the same typography and accent.
+Primary buttons use white text. Neutral backgrounds and the dark camera stage
+remain unchanged. The historical directions below are superseded by this update.
 
 Both `/` and `/live` render the recording studio directly. Large view is the
 default; Standard view reveals settings and navigation. The monitoring preview
@@ -71,5 +70,3 @@ Restrained palette: neutral page, white surfaces, dark slate text and stage, blu
 These inform structure, not copied assets. On mobile, stack stage and feedback; use disclosures for secondary information. Motion only communicates changing state and respects reduced motion.
 
 The added camera workspace carries the Riverside/VEED stage-and-feedback layout into actual recording. Review separates the full video from category frequencies and the next practice action; the feedback browser puts category filtering alongside a native video player. Mobile puts playback before the section list. Keep script labels adjacent to feedback and distinguish observation counts from performance scores.
-
-Design-hook review: the generic-font warning is contextually intentional, not a defect for this product workspace. The product-register guidance allows a familiar system sans stack. Keeping Arial/Helvetica fallbacks avoids remote font loading and retains the plan’s single-font approach; no hook suppression was added.
