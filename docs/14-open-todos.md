@@ -6,12 +6,9 @@ Pitch-Generator und der Doku-Abgleich.
 
 ## P0 — vor Jury/Feature Freeze entscheiden
 
-- [ ] **Struktur-Score im Live-Pfad.** `review-scores.ts` bewertet `structure`,
-  aber keine Live-Regel erzeugt diese Evidenz; nur der Demo-Datensatz enthält
-  Struktur-Momente. Entweder ehrlich `–`/„nicht gemessen“ zeigen oder eine
-  klar begrenzte Discourse-Marker-Heuristik (z. B. „zuerst“, „danach“,
-  „zum Schluss“, Satzgrenzen-Pausen) mit Tests, sichtbarer Evidenz und
-  `unvalidiert`-Label ergänzen. Keine vierte Zahl ohne Beleg.
+- [x] **Struktur aus den Review-Kriterien entfernen.** Nutzerentscheidung
+  25.10.2026: drei Kriterien (Gestik, Fachwissen, Flow). Ältere Struktur-Momente
+  bleiben allgemeine Anmerkungen; sie erzeugen keinen eigenen Score.
 - [ ] **Long-Term-Progress an Live-Takes anbinden.** Das Web-Frontend ruft
   `/sessions` und `/takes` nicht auf; `/progress` hat für echte Profile keine
   Daten. Checkliste in `13-long-term-progress-frontend-contract.md` §2
@@ -41,7 +38,7 @@ Pitch-Generator und der Doku-Abgleich.
   Turn-Zähler, sichtbarer Stop und `endSession`, Abschlussgrund loggen.
   Automatisches Antwortende per Stille bleibt separat.
 - [ ] **Zwei Score-Systeme klar trennen.** Review nutzt
-  `evidence-share-v1` (vier Kriterien, Zeitanteile/Quellenurteile), die
+  `evidence-share-v1` (drei Kriterien, Zeitanteile/Quellenurteile), die
   Auswertung nach der Fragerunde `evidence-count-heuristic.v1` (drei
   Kategorien, Marker/Urteile). Nicht addieren oder vergleichen; im UI als
   „Review-Evidenz“ vs. „Auswertung nach der Fragerunde“ benennen. Später
@@ -64,8 +61,6 @@ Pitch-Generator und der Doku-Abgleich.
 
 ## P1 — nach dem Hackathon
 
-- [ ] Struktur-Score belastbarer machen: Quellen-/Folienstruktur oder
-  LLM-Rubrik mit Zitatbelegen; erst dann als Produkt-Score bezeichnen.
 - [ ] Retention auch für Audio-/S3-Ergebnisse, Jobs, Idempotency-Einträge und
   Quellen-Collections dokumentieren und testen.
 - [ ] Optionalen Web-Fallback (`WEB_SEARCH_PROVIDER=wikipedia`) und

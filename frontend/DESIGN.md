@@ -57,13 +57,17 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   stack. Shared controls, speech choice and recording timer sit
   above the camera. Options links to setup, recording options and diagnostics
   below the studio. The live toolbar has no navigation menu.
+  Camera setup and recording share readable controls: 52px buttons and inputs,
+  17px control text, 16px instructions and consent, and 15px secondary status
+  labels. Options and checkbox labels have at least 48px targets. Controls and
+  camera overlays wrap on narrow screens; enlarged text can grow the page.
   Live cues use large text, contextual SVG icons, a clear panel tint and a lighter
   tint across the live workspace. Red means an adjustment to
   consider; green means explicit positive feedback or labelled tracking readiness.
   Ordinary gestures, pauses, calibration and hidden hints remain neutral. Color
   always has a text label; tracking readiness is not a performance assessment.
 - **Review:** two primary views, Review moments and Practice questions.
-  Four `ReviewScores` cards above playback show 0–100 prototype ratings on the
+  Three `ReviewScores` cards (Gestik, Fachwissen, Flow) above playback show 0–100 prototype ratings on the
   user's explicit request (`evidence-share-v1`). Formula: positive assessed
   time / (positive + critical assessed time) × 100; same-kind overlaps count once.
   Neutral observations and unknown time are excluded; assessed seconds and

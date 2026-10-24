@@ -265,6 +265,12 @@ test("camera setup hides global navigation and full-size recording preserves the
   ).toHaveAttribute("href", "/sources");
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
+  const startButton = page.getByRole("button", {
+    name: "Start recording",
+    exact: true,
+  });
+  await expect(startButton).toHaveCSS("font-size", "17px");
+  expect((await startButton.boundingBox())!.height).toBeGreaterThanOrEqual(52);
   await page
     .getByRole("button", { name: "Start recording", exact: true })
     .click();
@@ -276,6 +282,12 @@ test("camera setup hides global navigation and full-size recording preserves the
     page.getByRole("link", { name: "Back to sources", exact: true }),
   ).toHaveCount(0);
   const cue = page.locator(".cue-message");
+  const finishButton = page.getByRole("button", {
+    name: "Finish & review",
+    exact: true,
+  });
+  await expect(finishButton).toHaveCSS("font-size", "17px");
+  expect((await finishButton.boundingBox())!.height).toBeGreaterThanOrEqual(52);
   await expect(
     page.getByRole("button", { name: /^(Large|Standard) view$/ }),
   ).toHaveCount(0);
@@ -2224,10 +2236,10 @@ test("review scores and statistics follow each recorded take across views and re
   await expect(page).toHaveURL(/\/review$/);
   const firstReview = page.url();
   const scores = page.getByRole("region", {
-    name: "Bewertung der vier Kriterien",
+    name: "Bewertung der drei Kriterien",
   });
   const values = scores.locator(".review-score-value");
-  await expect(values).toHaveText(["–", "–", "75/100", "–"]);
+  await expect(values).toHaveText(["–", "–", "75/100"]);
   await expect(scores.locator(".review-score-origin")).toContainText(
     "First recorded take",
   );
@@ -2242,7 +2254,7 @@ test("review scores and statistics follow each recorded take across views and re
 
   await page.getByText("Transcript and source checks", { exact: true }).click();
   await page.getByRole("button", { name: "Check facts", exact: true }).click();
-  const expected = ["–", "50/100", "75/100", "–"];
+  const expected = ["–", "50/100", "75/100"];
   await expect(values).toHaveText(expected);
   await expect(scores).toContainText("1 von 2 Aussagen gestützt");
   await expect(scores).toContainText("2 Aussagen offen");
@@ -2282,7 +2294,7 @@ test("review scores and statistics follow each recorded take across views and re
   const secondReview = page.url();
   expect(secondReview).not.toBe(firstReview);
   expect(uploads).toBe(2);
-  await expect(values).toHaveText(["–", "–", "0/100", "–"]);
+  await expect(values).toHaveText(["–", "–", "0/100"]);
   await expect(scores.locator(".review-score-origin")).toContainText(
     "Second recorded take",
   );

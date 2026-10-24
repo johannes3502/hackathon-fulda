@@ -25,11 +25,11 @@ export function ReviewScores({
     <section
       data-score-version={REVIEW_SCORE_VERSION}
       className="review-scores"
-      aria-label="Bewertung der vier Kriterien"
+      aria-label="Bewertung der drei Kriterien"
       lang="de"
     >
       <div className="review-scores-heading">
-        <h2>Deine vier Kriterien</h2>
+        <h2>Deine drei Kriterien</h2>
         <span>{demo ? "Demo · " : ""}Prototyp-Score · 0–100</span>
       </div>
       {recordingTitle && (
@@ -95,10 +95,10 @@ export function ReviewScores({
       <details className="review-score-method">
         <summary>Wie wird der Score berechnet?</summary>
         <p>
-          Gestik, Flow und Struktur: 100 × positiv bewertete Sekunden ÷
-          (positive + kritische Sekunden). Überlappende Hinweise derselben Art
-          zählen zeitlich nur einmal. Neutrale Beobachtungen und nicht
-          beobachtete Zeit fließen nicht ein.
+          Gestik und Flow: 100 × positiv bewertete Sekunden ÷ (positive +
+          kritische Sekunden). Überlappende Hinweise derselben Art zählen
+          zeitlich nur einmal. Neutrale Beobachtungen und nicht beobachtete Zeit
+          fließen nicht ein.
         </p>
         <p>
           Fachwissen: Wenn ein Quellencheck vorliegt, zählt der Anteil

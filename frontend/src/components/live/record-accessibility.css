@@ -1,0 +1,143 @@
+/* Shared by camera setup, active recording and studio options. */
+.live-workspace {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.live-workspace .workspace-heading h1 {
+  font-size: clamp(2rem, 3vw, 2.5rem);
+  line-height: 1.25;
+}
+.live-workspace .workspace-heading p,
+.live-workspace .field-hint,
+.live-workspace .camera-message,
+.live-workspace .recording-consent,
+.live-workspace .local-recording-note {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.live-workspace .button {
+  min-height: 52px;
+  padding: 13px 20px;
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+.live-workspace .button > svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.live-workspace .button-ghost {
+  color: var(--foreground);
+}
+.live-workspace .text-button,
+.live-workspace .workspace-back a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 10px 4px;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.live-workspace .input {
+  min-height: 52px;
+  padding: 13px 14px;
+  font-size: 1.0625rem;
+}
+.live-workspace .field label,
+.live-workspace .field legend,
+.live-workspace .live-transcribe,
+.live-workspace .loop-control {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.live-workspace .live-transcribe,
+.live-workspace .loop-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding-block: 10px;
+}
+.live-workspace input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.live-workspace .live-options summary {
+  min-height: 52px;
+  padding-block: 12px;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+.live-workspace .live-options h2,
+.live-workspace .panel-title-row h2 {
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
+.live-workspace .presentation-materials .panel-title-row {
+  flex-wrap: wrap;
+}
+.live-workspace .presentation-setup-fields > *,
+.live-workspace .form-row > * {
+  min-width: 0;
+}
+.live-workspace .stage-placeholder h2 {
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  line-height: 1.3;
+}
+.live-workspace .stage-placeholder p {
+  max-width: 50ch;
+  margin-inline: auto;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.live-workspace .live-camera-stage:has(.camera-video.hidden) {
+  height: auto;
+  min-height: 32rem;
+  aspect-ratio: auto;
+}
+.live-workspace .stage-placeholder {
+  padding: 24px 20px;
+}
+.live-workspace .stage-top,
+.live-workspace .stage-bottom {
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.live-workspace .live-pose-status {
+  top: 5rem;
+  max-width: calc(100% - 32px);
+  font-size: 0.9375rem;
+}
+.live-workspace .live-readiness,
+.live-workspace .cue-caption,
+.live-workspace .cue-panel .panel-title-row > span,
+.live-workspace .preparation-files small,
+.live-workspace .live-captions small {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+.live-workspace .live-captions {
+  bottom: 6rem;
+}
+.live-workspace .live-captions p {
+  font-size: clamp(1.125rem, 2vw, 1.5rem);
+}
+.live-workspace .live-view-time {
+  font-size: 2rem;
+  line-height: 1.3;
+}
+@media (max-width: 760px) {
+  .live-workspace .live-control-bar > .button {
+    flex-basis: 100%;
+  }
+  .live-workspace .live-view-toolbar {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .live-workspace .form-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

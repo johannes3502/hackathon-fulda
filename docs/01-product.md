@@ -51,7 +51,8 @@ neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.m
 
 ## 3. Offen — muss das Team entscheiden
 
-Ergänzender Nutzerauftrag (24.10.2026): Vier 0–100-Scores über dem Review-Video
+Ergänzender Nutzerauftrag (aktualisiert 25.10.2026): Drei 0–100-Scores für
+Gestik, Fachwissen und Flow über dem Review-Video
 statt Moment-Anzahlen. `evidence-share-v1` nutzt bewertete positive bzw. kritische
 Zeitanteile (Überlappungen derselben Art vereinigt); Fachwissen nutzt bevorzugt
 gestützte / (gestützte + widersprochene) Aussagen. Nicht gefunden, ungeprüft,
@@ -60,9 +61,8 @@ Score ohne bewertbare Evidenz; Zeitabdeckung und Formel stehen im UI.
 Die Graph-Darstellung ist eine durchgehende Linie aus geraden Segmenten ohne
 Säulenflächen, mit beweglichem Wiedergabepunkt. Zwischenwerte sind als
 Interpolation gekennzeichnet, nicht als zusätzliche Messungen.
-**Struktur hat im Live-Pfad noch keine Evidenzquelle**; nur der synthetische
-Demo-Datensatz enthält Struktur-Momente. Der Live-Score bleibt dort bis zu
-einer eigenen Regel „–“ (TODO: [14-open-todos.md](14-open-todos.md)).
+Struktur ist auf Nutzerwunsch aus den Kriterien und der Berechnung entfernt.
+Vorhandene Struktur-Momente bleiben allgemeine Anmerkungen ohne eigenen Score.
 
 Review-Graph (24.10.2026, Nutzerauftrag): Timestamp-Momente als qualitativer
 Verlauf unter dem Video. Nach Nutzerkorrektur positive Momente oberhalb,
@@ -265,7 +265,7 @@ evidenzbasierte Stärken, Übungsvorschläge und ein aufklappbarer
 Methoden-/Grenzen-Hinweis. Der Score ist eine transparente Client-Heuristik aus
 bereits gemessenen Events (`evidence-count-heuristic.v1`), keine Note und keine
 Personenbewertung; Details: `docs/07-review-and-agent.md`. Diese Auswertung ist
-**getrennt** von den vier Review-Scores (`evidence-share-v1`): andere Formel,
+**getrennt** von den drei Review-Scores (`evidence-share-v1`): andere Formel,
 andere Bezugsgröße, kein gemeinsamer Gesamtscore. Die UI soll die beiden
 Ergebnisse entsprechend benennen; eine Vereinheitlichung ist offen
 (`docs/14-open-todos.md`).

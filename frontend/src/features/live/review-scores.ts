@@ -5,7 +5,6 @@ export const SCORE_LABELS = {
   gesture: "Gestik",
   knowledge: "Fachwissen",
   flow: "Flow",
-  structure: "Struktur",
 } as const;
 export type ScoreCriterion = keyof typeof SCORE_LABELS;
 export type ScoreMoment = {

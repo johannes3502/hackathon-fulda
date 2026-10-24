@@ -1,19 +1,24 @@
 import { expect, test } from "@playwright/test";
 
-test("four evidence-based scores sit above the video and the curve is continuous", async ({
+test("three evidence-based scores sit above the video and the curve is continuous", async ({
   page,
 }, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/review-preview");
   const scores = page.getByRole("region", {
-    name: "Bewertung der vier Kriterien",
+    name: "Bewertung der drei Kriterien",
   });
-  await expect(scores.locator(".review-score-card")).toHaveCount(4);
+  await expect(scores.locator(".review-score-card")).toHaveCount(3);
+  await expect(scores.locator(".review-score-label")).toHaveText([
+    "Gestik",
+    "Fachwissen",
+    "Flow",
+  ]);
+  await expect(scores).not.toContainText("Struktur");
   await expect(scores.locator(".review-score-value")).toHaveText([
     "100/100",
     "0/100",
     "43/100",
-    "100/100",
   ]);
   const values = await scores.locator(".review-score-value").allTextContents();
   expect(

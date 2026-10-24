@@ -4,7 +4,6 @@ export const STAT_LABELS = {
   gesture: "Gestik",
   knowledge: "Fachwissen",
   flow: "Flow",
-  structure: "Struktur",
 } as const;
 
 /** Counts and durations from captured takes; observations are not quality scores. */

@@ -166,6 +166,23 @@ test("recording consent stays visible while diagnostics and server details are o
   await expect(page.getByLabel("Backend API URL")).toBeHidden();
   await page.getByText("Server connection", { exact: true }).click();
   await expect(page.getByLabel("Backend API URL")).toBeVisible();
+  await expect(page.getByLabel("Backend API URL")).toHaveCSS(
+    "font-size",
+    "17px",
+  );
+  expect(
+    (await page.getByLabel("Backend API URL").boundingBox())!.height,
+  ).toBeGreaterThanOrEqual(52);
+  await expect(page.locator(".recording-consent")).toHaveCSS(
+    "font-size",
+    "16px",
+  );
+  const enableCamera = page.getByRole("button", {
+    name: "Enable camera",
+    exact: true,
+  });
+  await expect(enableCamera).toHaveCSS("font-size", "17px");
+  expect((await enableCamera.boundingBox())!.height).toBeGreaterThanOrEqual(52);
   await page.getByText("Camera diagnostics", { exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Pose debug", exact: true }),
@@ -383,6 +400,9 @@ test("enlarged text reflows without hiding navigation or primary controls", asyn
       await expect(
         page.getByRole("link", { name: "Options", exact: true }),
       ).toBeVisible();
+      await page.getByText("Presentation & material", { exact: false }).click();
+      await page.getByText("Recording options", { exact: true }).click();
+      await page.getByText("Title and duration", { exact: true }).click();
     } else {
       await expect(
         page.getByRole("navigation", { name: "Main navigation" }),

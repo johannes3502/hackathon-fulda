@@ -26,7 +26,8 @@ opens the missing-recording state; it does not create a take or access a recordi
   The matching `/live/[sessionId]/analysis` view and the main review use one
   adapter for the selected recording's video, duration, feedback and latest
   source checks. Knowledge scores require a verified source quote; missing
-  measurements stay empty (including structure, which has no automatic rule).
+  measurements stay empty. The three criteria are Gestik, Fachwissen and Flow;
+  structure is no longer scored.
   Click a marker or the timeline to seek; the slider supports keyboard seeking.
   Selected sections play with
   ±2 seconds of context and optional looping. Criterion buttons filter moments.

@@ -55,6 +55,7 @@ import { backendLabel, fallbackLabel } from "@/features/pose/backend";
 import { PresentationSetup } from "./PresentationSetup";
 import type { PresentationMode } from "@/features/questions/presentation";
 import { collectionId } from "@/features/sources/api";
+import "./record-accessibility.css";
 
 const cameraCopy = {
   idle: "Enable your camera to check your framing. Then start recording when you’re ready.",
