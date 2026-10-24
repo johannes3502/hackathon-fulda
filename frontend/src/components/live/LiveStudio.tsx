@@ -9,8 +9,10 @@ import {
   CheckCircle2,
   Clock3,
   Eye,
+  Maximize2,
   Mic,
   MicOff,
+  Minimize2,
   Radio,
   ShieldCheck,
   Square,
@@ -60,9 +62,18 @@ export function LiveStudio() {
   const [progress, setProgress] = useState<LiveProgress | null>(null);
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [largeView, setLargeView] = useState(false);
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   useEffect(() => () => owner.current?.dispose(), []);
+  useEffect(() => {
+    if (!largeView) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLargeView(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [largeView]);
   useEffect(() => {
     if (mode !== "backend") return;
     const controller = new AbortController();
@@ -153,7 +164,9 @@ export function LiveStudio() {
   const latest = progress?.feedback.at(-1);
   return (
     <AppShell experience="live">
-      <div className="workspace live-workspace">
+      <div
+        className={`workspace live-workspace${largeView ? " live-workspace-large" : ""}`}
+      >
         <div className="workspace-back">
           <Link href="/">
             <ArrowLeft size={15} /> Sample rehearsal
@@ -180,7 +193,23 @@ export function LiveStudio() {
             {error}
           </p>
         )}
-        <div className="studio-grid live-studio-grid">
+        <div className="live-view-toolbar">
+          <Button
+            variant="outline"
+            aria-pressed={largeView}
+            aria-controls="live-studio"
+            onClick={() => setLargeView(!largeView)}
+          >
+            {largeView ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            {largeView ? "Standard view" : "Large view"}
+          </Button>
+          {largeView && (
+            <strong className="live-view-time">
+              {time(progress?.elapsedMs ?? 0)}
+            </strong>
+          )}
+        </div>
+        <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <section
               className="media-stage live-camera-stage"
