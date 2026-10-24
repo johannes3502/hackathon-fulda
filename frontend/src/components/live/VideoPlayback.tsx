@@ -4,8 +4,8 @@ import { Download, Play, RotateCcw, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { LiveFeedback, LiveRecording } from "@/features/live/contracts";
 import { clipRange } from "@/features/live/protocol";
-import { playbackAnnotation, reviewMoments } from "@/features/live/review";
-import { cueAppearance } from "@/features/live/cue-appearance";
+import { playbackAnnotation } from "@/features/live/review";
+import { FeedbackGraph } from "./FeedbackGraph";
 import { time } from "@/lib/utils";
 export function VideoPlayback({
   recording,
@@ -18,13 +18,29 @@ export function VideoPlayback({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const rangeRef = useRef<{ start: number; end: number } | null>(null);
+  const pendingSeek = useRef<number | null>(null);
   const [position, setPosition] = useState(0);
   const [loop, setLoop] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const annotation = playbackAnnotation(recording.feedback, position, selected);
+  const seekTo = (tMs: number) => {
+    rangeRef.current = null;
+    const player = videoRef.current;
+    if (!player || player.readyState < 1) {
+      pendingSeek.current = tMs;
+      return;
+    }
+    pendingSeek.current = null;
+    player.currentTime = Math.min(
+      tMs / 1000,
+      Number.isFinite(player.duration) ? player.duration : tMs / 1000,
+    );
+    setPosition(player.currentTime * 1000);
+  };
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    pendingSeek.current = null;
     if (!selected) {
       rangeRef.current = null;
       return;
@@ -68,6 +84,12 @@ export function VideoPlayback({
           playsInline
           preload="metadata"
           aria-label="Recorded pitch video"
+          onLoadedMetadata={() => {
+            if (pendingSeek.current !== null) seekTo(pendingSeek.current);
+          }}
+          onSeeked={(event) =>
+            setPosition(event.currentTarget.currentTime * 1000)
+          }
           onError={() =>
             setError(
               "This browser could not decode the recording. Download it to play in another player.",
@@ -119,25 +141,14 @@ export function VideoPlayback({
             {time(position)} / {time(recording.durationMs)}
           </span>
         </div>
-        <div
-          className="video-timeline"
-          role="group"
-          aria-label="Feedback timeline"
-        >
-          {reviewMoments(recording.feedback).map((item) => (
-            <button
-              key={item.id}
-              className={`timeline-marker ${item.kind} ${selected?.id === item.id ? "selected" : ""}`}
-              data-feedback={cueAppearance(item, "ready").tone}
-              aria-label={`Replay ${item.category}: ${item.title} at ${time(item.startMs)}`}
-              aria-pressed={selected?.id === item.id}
-              onClick={() => onSelect(item)}
-            >
-              <span className="timeline-time">{time(item.startMs)}</span>
-              <span className="timeline-title">{item.title}</span>
-            </button>
-          ))}
-        </div>
+        <FeedbackGraph
+          feedback={recording.feedback}
+          durationMs={recording.durationMs}
+          positionMs={position}
+          selectedId={selected?.id}
+          onSelect={onSelect}
+          onSeek={seekTo}
+        />
         <p className="field-hint">
           {selected
             ? `Replaying ${time(clipRange(selected, recording.durationMs).start * 1000)}–${time(clipRange(selected, recording.durationMs).end * 1000)} with up to 2 seconds of context on each side.`

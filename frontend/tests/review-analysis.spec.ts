@@ -1,5 +1,76 @@
 import { expect, test } from "@playwright/test";
 
+test("review graph places strengths above neutral, adjustments below and seeks the video", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    await page.goto("/review-preview");
+    const graph = page.getByRole("region", {
+      name: "Dein Performance-Verlauf",
+    });
+    await expect(graph).toBeVisible();
+    await expect(graph.locator(".feedback-graph-baseline")).toHaveAttribute(
+      "y1",
+      "120",
+    );
+    const positive = graph.locator(".feedback-graph-dot.positive").first();
+    const adjustment = graph.locator(".feedback-graph-dot.attention").first();
+    expect(
+      await positive.evaluate((element) =>
+        parseFloat((element as HTMLElement).style.top),
+      ),
+    ).toBeLessThan(50);
+    expect(
+      await adjustment.evaluate((element) =>
+        parseFloat((element as HTMLElement).style.top),
+      ),
+    ).toBeGreaterThan(50);
+    const videoBounds = await page.locator("video").boundingBox();
+    const plot = graph.locator("svg");
+    const plotBounds = await plot.boundingBox();
+    expect(plotBounds!.y).toBeGreaterThan(videoBounds!.y + videoBounds!.height);
+    await expect(
+      page.getByRole("button", { name: "Stelle ansehen" }),
+    ).toBeEnabled();
+    await plot.click({
+      position: { x: (plotBounds!.width * 43) / 90, y: plotBounds!.height / 2 },
+    });
+    await expect
+      .poll(() =>
+        page
+          .locator("video")
+          .evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBe(43);
+    await graph.getByText("Alle 7 Zeitmarken", { exact: true }).click();
+    const target = graph.getByRole("button", { name: /0:08.*Ein Einstieg/ });
+    await target.focus();
+    await page.keyboard.press("Enter");
+    await expect
+      .poll(() =>
+        page
+          .locator("video")
+          .evaluate((element: HTMLVideoElement) => element.currentTime),
+      )
+      .toBe(8);
+    expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+    await graph.locator("summary").click();
+    await graph.screenshot({
+      path: info.outputPath(`review-graph-${colorScheme}.png`),
+    });
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "200%";
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
+});
+
 test("review connects annotations, evidence and video timestamps", async ({
   page,
 }) => {
@@ -30,7 +101,7 @@ test("review connects annotations, evidence and video timestamps", async ({
     .filter({ hasText: "Gestik" })
     .click();
   await expect(page.locator(".review418-moment")).toHaveCount(1);
-  await expect(page.locator(".review418-plot-moment")).toHaveCount(1);
+  await expect(page.locator(".feedback-graph-dot")).toHaveCount(1);
   await page
     .getByRole("button", { name: "Alle Kriterien", exact: true })
     .click();

@@ -13,6 +13,13 @@ Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
    Der sichtbare Aufnahmehinweis erklärt Deepgram EU und lokalen Whisper-Fallback.
 3. Aufnehmen und **Finish & review**. **Review moments** verbindet Video,
    begrenzte Wiedergabe-Abschnitte und zeitgenaue Feedback-Anmerkungen.
+   Unter dem Video zeigt ein qualitativer Graph die Zeit auf der x-Achse und
+   den Saldo gleichzeitiger Hinweise um eine neutrale Mittellinie: positive
+   Momente oben, Anpassungshinweise unten. Größere Ausschläge bedeuten mehr
+   gleichzeitige Hinweise, keine gemessene Performance und keine Note.
+   Beobachtungen bleiben neutral; fehlende Hinweise sind keine positive Evidenz.
+   Klick im Graphen wählt den nächsten Moment; Zeitregler und aufklappbare
+   Zeitmarken erlauben präzise bzw. tastaturbedienbare Sprünge.
 4. **Practice questions**: sprechen oder tippen, eine Frage pro Schritt.
    Fehlt ein Transkript, kann **Transcribe this take** die Aufnahme nach explizitem
    Klick zur lokalen Whisper-Analyse hochladen. Das Originalvideo bleibt im Tab.

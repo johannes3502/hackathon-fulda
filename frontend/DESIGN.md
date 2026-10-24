@@ -58,7 +58,20 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   Ordinary gestures, pauses, calibration and hidden hints remain neutral. Color
   always has a text label; tracking readiness is not a performance assessment.
 - **Review:** two primary views, Review moments and Practice questions. Large
-  playback sits beside one selected observation and a compact list of replay
+  playback includes a Stockfish-inspired qualitative graph immediately below
+  the video: timestamps on the horizontal axis, a dashed neutral midpoint,
+  explicit positive feedback above and adjustments below. The line is the net
+  count of simultaneous directional events, scaled to the take's maximum absolute
+  count; height is not measured presentation quality. Ordinary observations stay
+  neutral; gaps contain no directional evidence, not proof of good performance.
+  The same `FeedbackGraph` serves live playback and the analysis example. A click
+  selects the nearest event, the labelled slider seeks exact times, and the
+  disclosure offers full timestamp buttons with at least 48px targets for dense
+  or simultaneous events. The playhead follows `video.currentTime`.
+  Review controls are at least 48px high, supporting text at least 0.9375rem,
+  body copy 1–1.0625rem, with larger headings and comfortable line spacing.
+
+  Playback sits beside one selected observation and a compact list of replay
   sections. Annotations follow video.currentTime; ordinary gestures are not
   labelled bad performance. On phones, playback precedes the feedback.
   Timestamp jump buttons show the time and feedback title, wrapping without
@@ -76,7 +89,8 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   and when search becomes available. Continue to recording is the main action.
 - **Sample:** retain explicit synthetic-data labels for the walkthrough and
   example annotations. Review criteria count timestamped moments; synthetic
-  quality scores and performance curves have been removed.
+  quality scores remain absent; the qualitative event graph uses only the
+  supplied example annotations.
 - **Loading:** small wordmark and announced status, with a reduced-motion-safe
   indicator. Loading must not download a font or initialize WebGL.
 

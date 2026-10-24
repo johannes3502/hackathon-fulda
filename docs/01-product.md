@@ -50,6 +50,13 @@ neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.m
 
 ## 3. Offen — muss das Team entscheiden
 
+Review-Graph (24.10.2026, Nutzerauftrag): Timestamp-Momente als qualitativer
+Verlauf unter dem Video. Nach Nutzerkorrektur positive Momente oberhalb,
+Anpassungshinweise unterhalb der neutralen Mittellinie. Die Ausschläge bilden
+den Saldo gleichzeitiger Feedback-Events ab, keinen erfundenen Performance-Score.
+Die restliche Review bleibt strukturell erhalten, mit größeren Bedienelementen
+und besser lesbarer Schrift.
+
 ### Zielgruppe und Setting
 - Wer präsentiert damit: Studierende, Schule, Ausbildung, Beruf?
 - Übungsraum oder echter Vortrag?

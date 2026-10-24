@@ -770,6 +770,7 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
   ).toBeVisible();
   await expect(page.getByText("Transcript: filler count")).toBeVisible();
   // Both events begin at 100 ms: duration bars used to obscure each other.
+  await page.getByText("All 2 timestamped moments", { exact: true }).click();
   const timeline = page.getByRole("group", { name: "Feedback timeline" });
   const jumps = timeline.getByRole("button");
   await expect(jumps).toHaveCount(2);
@@ -1172,6 +1173,7 @@ test("sideways motion and crossed arms reach review while live hints can be mute
   });
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
+  await page.getByText("All 2 timestamped moments", { exact: true }).click();
   await expect(
     page.getByLabel("Feedback timeline").getByRole("button"),
   ).toHaveCount(2);
@@ -1794,7 +1796,9 @@ test("ElevenLabs receives the presentation and starts a contextual question inst
       const message = JSON.parse(raw);
       if (message.type === "conversation_initiation_client_data") {
         override = message.conversation_config_override.agent.prompt.prompt;
-        expect(message.conversation_config_override.agent.first_message).toBe("");
+        expect(message.conversation_config_override.agent.first_message).toBe(
+          "",
+        );
         socket.send(
           JSON.stringify({
             type: "conversation_initiation_metadata",

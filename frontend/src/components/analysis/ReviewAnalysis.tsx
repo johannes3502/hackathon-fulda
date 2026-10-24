@@ -21,6 +21,7 @@ import {
   type ReviewMoment,
 } from "./review-data";
 import "./review-analysis.css";
+import "../live/review-accessibility.css";
 
 const kindLabels = {
   positive: "Gelungen",
@@ -244,7 +245,6 @@ export function ReviewAnalysis({
               </section>
               <PerformanceGraph
                 durationMs={data.durationMs}
-                points={data.performance}
                 moments={visible}
                 positionMs={positionMs}
                 selectedId={selectedId}

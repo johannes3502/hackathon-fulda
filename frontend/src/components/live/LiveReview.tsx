@@ -26,6 +26,7 @@ import { PoseDownload } from "./PoseDownload";
 import { QuestionPractice } from "./QuestionPractice";
 import { TranscriptAnalysis } from "./TranscriptAnalysis";
 import { VideoPlayback } from "./VideoPlayback";
+import "./review-accessibility.css";
 
 export function LiveReview({ sessionId }: { sessionId: string }) {
   const { recordings } = useLiveSessions();

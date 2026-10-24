@@ -1,0 +1,115 @@
+.review-workspace .button,
+.review-workspace .review-view-switch button {
+  min-height: 48px;
+  padding: 12px 18px;
+  font-size: 1rem;
+}
+.review-workspace .playback-body {
+  padding: 24px;
+}
+.review-workspace .playback-body > .panel-title-row {
+  margin-bottom: 24px;
+}
+.review-workspace .playback-body > .panel-title-row h2 {
+  font-size: 1.25rem;
+}
+.review-workspace .playback-controls {
+  gap: 12px;
+}
+.review-workspace .timestamp,
+.review-workspace .review-clip-time {
+  font-size: 0.9375rem;
+}
+.review-workspace .field-hint,
+.review-workspace .badge,
+.review-workspace .feedback-kind,
+.review-workspace .loop-control,
+.review-workspace .review-clip small {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+.review-workspace .text-button {
+  min-height: 48px;
+  font-size: 1rem;
+}
+.review-workspace .review-observation > p,
+.review-workspace .review-intro {
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+.review-workspace .review-clip {
+  min-height: 72px;
+  padding: 18px 12px;
+}
+.review-workspace .review-clip strong {
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+.review-workspace .review-details > summary {
+  min-height: 56px;
+  font-size: 1.0625rem;
+}
+.review-workspace .review-stage-grid {
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+}
+.review-workspace .loop-control input {
+  width: 20px;
+  height: 20px;
+}
+.review418-page .review418-panel-title h2 {
+  font-size: 1.25rem;
+}
+.review418-page .review418-panel-title p,
+.review418-page .review418-annotation > p,
+.review418-page .review418-moment p {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.review418-page .review418-under-chart {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+.review418-page .review418-moment,
+.review418-page .review418-play-section,
+.review418-page .review418-criterion {
+  min-height: 48px;
+}
+.review418-page .review418-graph-panel {
+  margin-top: 20px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.review418-page .review418-graph-panel .feedback-graph {
+  padding: 24px;
+}
+.review418-page .review418-annotation h2 {
+  font-size: 1.5rem;
+  line-height: 1.35;
+}
+@media (max-width: 1000px) {
+  .review-workspace .review-stage-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (min-width: 761px) {
+  body:has(.review-workspace, .review418-page) .app-header {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  body:has(.review-workspace, .review418-page) .app-nav {
+    flex: 1;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+@media (max-width: 640px) {
+  .review-workspace .playback-body,
+  .review418-page .review418-graph-panel .feedback-graph {
+    padding: 20px 16px;
+  }
+  .review-workspace .review-view-switch button {
+    padding: 12px 10px;
+  }
+}
