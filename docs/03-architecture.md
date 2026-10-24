@@ -413,8 +413,14 @@ sequenceDiagram
             FE->>E: Mikrofon-Audio
             Note over E: Prompt: höchstens zwei Nachfragen, danach nächste Hauptfrage
         end
-        U->>FE: End conversation oder Ansicht verlassen
-        FE->>E: Verbindung schließen, Mikrofon freigeben
+        alt End conversation oder reguläres Agent-Ende
+            U->>FE: Gespräch beenden
+            FE->>E: Verbindung schließen, Mikrofon freigeben
+            FE->>FE: PerformanceEvaluation anzeigen; Fokus auf Statistik-Überschrift
+            Note over FE: Gleiche vorhandene Messdaten wie bei getippter Runde;<br/>keine neuen Urteile über gesprochene Antworten
+        else Ansicht verlassen / Verbindung abbrechen
+            FE->>E: Verbindung schließen, keine Auswertung öffnen
+        end
     else Practice by typing
         FE->>BE: Optional automatisch POST /factcheck + Status-Polling
         FE->>BE: POST /questions (Wörter, Funde, Collection, Modus)
@@ -483,6 +489,7 @@ flowchart TD
     LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video, Stärken und nächste Übungsschritte<br/>Feste Erklärungen aus Messdaten ohne LLM<br/>Transkript, Quellencheck und Exporte als Details"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>sourceCollectionId des aufgenommenen Takes"]
     LREV -->|"POST /questions/agent + /agent/session<br/>oder /questions + /answers"| QAPI["ElevenLabs-Dialog oder getippte Fragen<br/>Startup, Thesis, Schule, Nonprofit<br/>eine Frage pro Schritt"]
+    QAPI -->|"Sprachdialog beenden oder<br/>getippte Runde beantworten"| FINALSTATS["PerformanceEvaluation: Your take at a glance<br/>bestehende Messdaten, Heuristik und Grenzen"]
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
     RP --> RA["ReviewAnalysis + PerformanceGraph / FeedbackGraph<br/>qualitativer Event-Saldo, positive Hinweise oben<br/>neutrale Mittellinie, Anpassungshinweise unten<br/>video.currentTime, Zeitmarken, Abschnitt-Loop"]

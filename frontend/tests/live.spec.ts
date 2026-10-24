@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
 import { POSE_RULES } from "../src/features/pose/evaluation";
 
 test.beforeEach(async ({ page }) => {
@@ -1709,7 +1709,7 @@ test("Deepgram streaming waits for the last word and reuses the final transcript
   ).toBeVisible();
 });
 
-test("ElevenLabs receives the presentation and asks for readiness without an automatic kickoff", async ({
+test("ElevenLabs receives the presentation, asks for readiness and opens final stats when ended", async ({
   page,
 }, info) => {
   const jobId = "12345678-1234-1234-1234-123456789abc";
@@ -1789,11 +1789,13 @@ test("ElevenLabs receives the presentation and asks for readiness without an aut
       },
     }),
   );
-  let closed = 0;
+  const closed = new Set<WebSocketRoute>();
   let override = "";
   let kickoffs = 0;
+  let endFromAgent = () => {};
   await page.routeWebSocket("wss://api.elevenlabs.io/**", (socket) => {
-    socket.onClose(() => closed++);
+    endFromAgent = () => socket.close({ code: 1000 });
+    socket.onClose(() => closed.add(socket));
     socket.onMessage((raw) => {
       if (typeof raw !== "string") return;
       const message = JSON.parse(raw);
@@ -1816,8 +1818,7 @@ test("ElevenLabs receives the presentation and asks for readiness without an aut
           JSON.stringify({
             type: "agent_response",
             agent_response_event: {
-              agent_response:
-                "Ich habe noch ein paar Fragen. Bist du bereit?",
+              agent_response: "Ich habe noch ein paar Fragen. Bist du bereit?",
             },
           }),
         );
@@ -1875,11 +1876,57 @@ test("ElevenLabs receives the presentation and asks for readiness without an aut
     path: info.outputPath("professor-question.png"),
     fullPage: true,
   });
+  const stoppedBeforeEnd = await page.evaluate(
+    () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+  );
+  await page
+    .getByRole("button", { name: "End conversation", exact: true })
+    .click();
+  await expect.poll(() => closed.size).toBe(1);
+  await expect.poll(() => page.evaluate(
+    () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+  )).toBeGreaterThan(stoppedBeforeEnd);
+  const stats = page.getByRole("heading", { name: "Your take at a glance" });
+  await expect(stats).toBeVisible();
+  await expect(stats).toBeFocused();
+  await expect(
+    page.getByRole("heading", { name: "Meet your teacher." }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByText(
+      "No checked statements or answered questions were available.",
+    ),
+  ).toBeVisible();
+  await noOverflow(page);
+  await page
+    .getByRole("button", { name: "Back to questions", exact: true })
+    .click();
+  await expect(stats).not.toBeVisible();
+  await expect(page.getByRole("heading", { name: "Meet your teacher." })).toBeFocused();
+  await page
+    .getByRole("button", { name: "Start a new conversation", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "End conversation", exact: true }),
+  ).toBeVisible();
+  endFromAgent();
+  await expect(stats).toBeVisible();
+  await expect(stats).toBeFocused();
+  await expect.poll(() => closed.size).toBe(2);
+  await page
+    .getByRole("button", { name: "Back to questions", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start a new conversation", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "End conversation", exact: true }),
+  ).toBeVisible();
   await page
     .getByRole("group", { name: "Review steps" })
     .getByRole("button", { name: "Review moments" })
     .click();
-  await expect.poll(() => closed).toBe(1);
+  await expect.poll(() => closed.size).toBe(3);
   expect(kickoffs).toBe(0);
   await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
 });

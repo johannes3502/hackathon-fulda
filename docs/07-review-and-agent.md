@@ -136,8 +136,13 @@ im ElevenLabs-Konto angelegt oder verändert.
 ## Auswertung nach der Fragerunde (24.10.2026)
 
 Sobald jede Frage der getippten Runde beantwortet ist, zeigt der Web-Review
-unterhalb der Fragereunde eine Auswertung („Your take at a glance“) mit
-Score 0–100. Sie ist rein clientseitig und deterministisch
+unterhalb der Fragerunde eine Auswertung („Your take at a glance“) mit
+Score 0–100. Der Sprachdialog öffnet dasselbe Panel nach **End conversation**
+oder einem regulären Gesprächsende durch den Agenten und setzt den Tastaturfokus
+auf die Überschrift. **Back to questions** führt zurück zur Fragerunde;
+Abbrechen beim Verbindungsaufbau und Verbindungsfehler öffnen keine Auswertung.
+Vor dem Wechsel wird die Voice-Verbindung geschlossen und das Mikrofon freigegeben.
+Die Auswertung ist rein clientseitig und deterministisch
 (`frontend/src/features/evaluation/performance.ts`, Panel
 `frontend/src/components/live/PerformanceEvaluation.tsx`); kein Backend-Endpunkt,
 kein LLM, Eingaben sind nur Daten, die der Browser ohnehin hat

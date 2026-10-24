@@ -226,6 +226,9 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
       .getByRole("button", { name: "End conversation", exact: true })
       .click();
     await expect.poll(() => socketClosed).toBe(true);
+    await expect(
+      page.getByRole("heading", { name: "Your take at a glance" }),
+    ).toBeVisible();
   } finally {
     await page
       .getByRole("button", { name: "End conversation", exact: true })
