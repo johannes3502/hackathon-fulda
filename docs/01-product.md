@@ -242,6 +242,18 @@ Nutzer hat ElevenLabs für den Sprachdialog beauftragt und konfiguriert den
 Agenten selbst nach der Implementierung. Getippte Fragen nutzen das
 konfigurierte Gemini-Modell (Cloud). Einrichtung: `docs/07-review-and-agent.md`.
 
+### Auswertung nach der Fragerunde (24.10.2026)
+
+Nutzerauftrag: Nach den Agenten-Fragen eine Auswertung des Vortrags. Sobald
+jede Frage der getippten Runde beantwortet ist, zeigt der Web-Review unten eine
+Zusammenfassung mit Score 0–100 und drei Kategorien: **Inhalt** (Fakten und
+Wissen, Gewicht 0,5 — Anteil quellengestützter Aussagen und Antwort-Urteile),
+**Stimme** (0,25) und **Gestik** (0,25 — Abzug je Marker pro Minute). Dazu
+evidenzbasierte Stärken, Übungsvorschläge und ein aufklappbarer
+Methoden-/Grenzen-Hinweis. Der Score ist eine transparente Client-Heuristik aus
+bereits gemessenen Events (`evidence-count-heuristic.v1`), keine Note und keine
+Personenbewertung; Details: `docs/07-review-and-agent.md`.
+
 ## Deep Research (24.10.2026)
 
 Die Produktentscheidungen sind in `docs/11-deep-research-validation.md`
@@ -251,5 +263,6 @@ gefunden“ ist nicht „falsch“. Der geplante TTS-Voice-Agent soll im Gesprä
 aufgabenbezogenes Feedback, die vollständige Evidenz steht im Review. Harte
 Grenzen des Plans: 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop. Umgesetzt
 ist bisher das Maximum von fünf Anfangsfragen im getippten Pfad; ein
-Sitzungstimer oder ein globales Follow-up-Limit ist noch nicht implementiert. Es gibt
-weiterhin keine Noten, Scores oder Personenbewertung.
+Sitzungstimer oder ein globales Follow-up-Limit ist noch nicht implementiert.
+Scores gibt es nur in der transparenten Auswertung nach der getippten
+Fragerunde (siehe oben); weiterhin keine Personenbewertung.

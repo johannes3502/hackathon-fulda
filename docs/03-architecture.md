@@ -368,7 +368,10 @@ Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
 Vor der Aufnahme werden `presentationMode` (startup/thesis/school/nonprofit)
 und `sourceCollectionId` im Take eingefroren. Im getippten Fragepfad steuert der
 Modus Rolle und fachliche Schwerpunkte. Der Sprachagent ist immer eine
-Lehrkraft, die Verständnis des Vortrags prüft, ohne Scores oder Noten.
+Lehrkraft, die Verständnis des Vortrags prüft, ohne Scores oder Noten. Nach der
+vollständig beantworteten getippten Runde zeigt der Client zusätzlich eine
+Auswertung mit transparentem Heuristik-Score aus gemessenen Events; siehe
+`docs/07-review-and-agent.md`.
 
 ```mermaid
 sequenceDiagram
@@ -422,6 +425,8 @@ sequenceDiagram
         W->>L: Quellenvergleich + Nachfrage
         W->>W: Zitat im Quelltext prüfen
         FE->>FE: Nächste Frage / Nachfrage anzeigen
+        U->>FE: Letzte Frage beantworten
+        FE->>FE: Auswertung: Client-Heuristik-Score<br/>(Inhalt 0,5 / Stimme 0,25 / Gestik 0,25)<br/>kein Backend-Aufruf
     end
 ```
 
