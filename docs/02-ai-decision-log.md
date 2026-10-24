@@ -763,3 +763,50 @@ neue Erfolgsfall. Die lokale `.env` stand noch auf Deepgram ohne Schlüssel;
 `ASR_PROVIDER=whisper` wurde als lokaler Ersatzweg eingerichtet, kein Schlüssel
 geändert oder eingecheckt. Aktivierung: `DEEPGRAM_API_KEY` setzen und Frontend,
 Backend sowie Worker neu bauen/starten. Kein echter Anbieteraufruf getestet.
+
+## Persistente Backend-Review ohne Server-Clips (24.10.2026)
+
+- Nutzerauftrag: `docs/06-backend-review-api.md` prüfen und umsetzen,
+  ausschließlich Backend; Frontend-Arbeit läuft beim Team parallel.
+- Implementiert: Postgres-Sessions/Takes/Events/Reviews/Jobs, abgeleitete
+  Wort-/Audio-Summaries, atomare Idempotenz, validierte Browser-Pose-Events,
+  A/V-Probe/Offset, finale Timeline mit Pausen-Dedupe und getrennten Tempo-
+  Einheiten, explizite Coverage, Template-Review und geprüfte LLM-Auswahl,
+  Fact-Check-/Frage-/Antwort-Anbindung, technische Evaluation und Cascade-Delete.
+  Keine serverseitigen Wiedergabe-Medien oder Clip-/Snapshot-Felder.
+- Korrigierte Entwurfsunklarheiten: Dedupe-Key fehlt im Beispiel und fällt
+  deshalb auf Event-ID zurück; unbekannte Coverage wird nicht als gültig
+  interpretiert; fehlende Peak-Messung wird als Event-Anfang gekennzeichnet;
+  Token-IDs und echte UUIDs sind dokumentiert. Ein Zitat bleibt am angegebenen
+  Fundort, fuzzy Matching darf Zahlen/Negationen nicht verändern. Seitenköpfe
+  werden ohne Layout-Evidenz nicht heuristisch aus Zitaten gelöscht.
+- Der Writer bekommt einen begrenzten Karten-Pack mit erlaubten Textframes.
+  Native Ollama-JSON-Schema-Ausgabe plus Code-Verifier ersetzen unbelegte
+  freie Formulierungen. Summary und Kennwerte kommen aus Code. Nach einem
+  Retry Template-Fallback, bei mehr als 20 % Fallback fehlgeschlagener Job
+  mit weiter abrufbarer geerdeter Review. Keine behauptete Modellgenauigkeit.
+- Geprüft: **183 Backend-Tests bestanden**, inklusive echter Postgres- und
+  Silero-ONNX-Prüfung. Zwanzig adversariale Writer-Fixtures sowie Cleanup-
+  Ausfälle, Queue-Retry, Event-ID-Konflikt, Delete während Verarbeitung,
+  Teilfehler und take-gebundene Antworten. Die bestehende Deepgram-
+  Disconnect-TestClient-Race war auch auf unverändertem HEAD reproduzierbar;
+  Test wartet nun auf Protokoll-Cleanup, keine Änderung am Streaming-Code.
+- Reale lokale Infrastruktur mit synthetischen Daten: HTTP → Celery →
+  Postgres/S3, Upload-Löschung im Objektspeicher geprüft, Idempotenz und
+  Cascade-Delete bestanden. Template ca. 0,25 s; fünfminütiger Take mit 60
+  Events ohne Medien ca. 0,23 s inklusive Queue/Polling. Lokaler Qwen-Pfad
+  separat ca. 17,3 s, gültige Claims ohne Fallback. Keine Latenzzusage.
+- Nach Integration der Team-Commits zusätzlich: synthetische deutsche Sprache
+  mit echtem lokalem Whisper transkribiert (13 Wörter), Quellen-Ingest über
+  bestehendes RAG, Fact-Check-Job, eine Frage, Quellenvergleich der getippten
+  Antwort und Template-Review vollständig über HTTP/Worker. Session und
+  Testquelle gelöscht. Keine Tatsachenbehauptung extrahiert, daher kein
+  Fact-Check-Urteil geprüft; Modellantwort ist kein menschliches Qualitätslabel.
+- API-Schema/TypeScript regeneriert und aktuell. Frontend-/Mobile-Code blieb
+  unberührt; Architekturdiagramme auf den neuen Backend-Vertrag abgestimmt.
+- Offen: **30 menschliche Labels** (synthetisches Paket vorbereitet, alle
+  Labels null), echte ASR-/Retrieval-/Fact-Check-Qualität, Mikrofon/Browser/
+  Geräte und Frontend-Integration. Kein periodischer Outbox-/Retention-Sweeper,
+  keine öffentliche Deployment-Abnahme. Abgebrochene Publikation braucht
+  denselben POST/Key oder Session-Löschung; harter Worker-Verlust verzögert
+  temporäres Audio-Cleanup bis zur erneuten Zustellung.

@@ -89,6 +89,15 @@ Produktentscheidung.
   „Done“), Sprache außer Deutsch, Anzahl der Fragen.
 
 ### Daten und Datenschutz
+- Neuer Backend-Vertrag: `docs/06-backend-review-api.md`. Video bleibt im
+  Client; keine serverseitigen Clips, Snapshots oder Wiedergabe-URLs. Die
+  additive Session-/Take-API persistiert Timestamp-Events, Wörter, Metriken
+  und Review in Postgres. Audio oder Aufnahme wird nur optional zur Analyse
+  temporär hochgeladen und auch bei Analysefehlern gelöscht. Eine Session-
+  Löschung kaskadiert alle zugehörigen Backend-Daten und temporären Uploads;
+  die lokale Aufnahme und getrennte Quellen-Collection löscht sie nicht.
+  Coverage ohne gemeldete Messintervalle bleibt unbekannt. Frontend-Anbindung
+  dieser neuen API erfolgt separat.
 - Lokales Grundgerüst: PostgreSQL und S3-Dateispeicher mit persistenten
   Docker-Volumes, ausschließlich für synthetische Entwicklungsdaten.
   Expliziter Audio-Upload unter `/speech/analyze`, keine automatische Aufzeichnung.
@@ -100,8 +109,10 @@ Produktentscheidung.
 - Redis hält Hintergrundjobs und kleine Status-/Referenzwerte in einem
   persistenten Docker-Volume. Task-Ergebnisse verfallen nach einer Stunde;
   dies legt keine Aufbewahrungsdauer für Medien oder Transkripte fest.
-- Werden Audio, Video und Transkript gespeichert? Wie lange?
-- Einwilligung, Löschung, lokale Verarbeitung?
+- Offen: automatische Aufbewahrungsdauer für Sessions und abgeleitete Daten;
+  Wiederanlauf-/Cleanup-Regel für nie erneut zugestellte, verwaiste Jobs.
+- Neue Session-API verlangt Einwilligung; Cloud-Verarbeitung benötigt den
+  Scope `local-and-cloud-analysis`. Lokaler Template-Pfad ohne LLM bleibt verfügbar.
 - Keine echten personenbezogenen Daten in der Demo.
 
 ### Technik
@@ -147,6 +158,7 @@ einbauen**:
 | Datum | Änderung | Grund |
 |---|---|---|
 | 24.10.2026 | Produkt angelegt | Thema auf Live-Präsentationstrainer festgelegt; fünf erste Features genannt. |
+| 24.10.2026 | Backend-Review-Vertrag umgesetzt | Nutzerauftrag: `06-backend-review-api.md` prüfen und umsetzen; Session-/Take-Persistenz, Timeline, Template-/LLM-Review und Fragen ohne Server-Clips. Frontend bleibt Teamaufgabe; menschlich gelabelte Evaluation steht aus. |
 | 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
 | 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |

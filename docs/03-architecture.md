@@ -29,8 +29,9 @@ flowchart TB
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
         FC["Factcheck-Router<br/>POST /factcheck<br/>GET /factcheck/jobs/id, /settings"]
         QR["Questions-Router<br/>POST /questions, /questions/answers,<br/>/questions/answers/voice<br/>GET /questions/jobs/id, /questions/answers/id"]
+        RV["Review-Router (additiv)<br/>/sessions, /takes, /jobs<br/>Idempotency-Key, camelCase"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>run_take_job"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -40,6 +41,7 @@ flowchart TB
         EMB["Lokale Embeddings<br/>jina-embeddings-v2-base-de<br/>FastEmbed/ONNX"]
         FACT["Fact-Check<br/>Aussagen extrahieren, RAG zuerst,<br/>Web optional (Standard aus), Zitat-Check"]
         QUEST["Frage-Simulator / Voice-Agent<br/>Rolle: Student oder Professor/Tutor,<br/>Fragen aus Funden + Quellen,<br/>gesprochene Antwort -> ASR,<br/>Antwort-Abgleich mit Zitat-Check"]
+        REVIEW["Take-Review<br/>Probe + Timestamp-Offset, Merge,<br/>Coverage, Evidence Cards,<br/>Template oder LLM + Code-Verifier"]
     end
 
     subgraph Infra["Infrastruktur (Docker Compose)"]
@@ -82,6 +84,10 @@ flowchart TB
     MAIN --> SO
     MAIN --> FC
     MAIN --> QR
+    MAIN --> RV
+    RV -- "Session/Take/Event/Review/Job" --> PG
+    RV -- "nur temporärer Analyse-Upload" --> S3
+    RV -- "enqueue: nur Job-ID" --> CEL
 
     SP -- "S3-Upload, Enqueue" --> S3
     SP -- "enqueue" --> CEL
@@ -99,6 +105,10 @@ flowchart TB
     TASKS --> INGEST
     TASKS --> FACT
     TASKS --> QUEST
+    TASKS --> REVIEW
+    REVIEW --> PG
+    REVIEW -- "Audio laden und löschen; keine Wiedergabe-Medien" --> S3
+    REVIEW -. "nur geprüfte Karten, keine Tools" .-> LLM
     QUEST -- "Auszüge für Lücken<br/>und Antwort-Abgleich" --> PG
     QUEST -. "Sätze, Funde, Auszüge,<br/>getippte Antwort" .-> LLM
     QUEST -- "Ergebnis, Request löschen" --> S3
@@ -180,7 +190,7 @@ sequenceDiagram
         BE->>DG: PCM fortlaufend, 16 kHz mono Int16
         DG-->>BE: Vorläufige und finale Abschnitte
         BE-->>FE: Kumulativer Text
-        Note over FE,BE: Abbruch oder Überlast: Aufnahme läuft weiter; lokaler Ersatzweg
+        Note over FE,BE: Abbruch oder Überlast: Aufnahme läuft weiter, lokaler Ersatzweg
     end
     U->>FE: Stop
     FE->>BE: Letztes PCM-Paket flushen, danach WS stop
@@ -190,7 +200,7 @@ sequenceDiagram
         BE-->>FE: Finale words, text, done
     end
     FE->>BE: POST /speech/analyze (recording, transcribe, optional live_transcript)
-    Note over FE,BE: Mit finalem Cloud-Transkript local_only=false; sonst true
+    Note over FE,BE: Mit finalem Cloud-Transkript local_only=false, sonst true
     BE->>S3: Original speichern
     BE->>R: Task analyze_speech einreihen
     BE-->>FE: 202 {job_id, status_url}
@@ -201,7 +211,7 @@ sequenceDiagram
     W->>W: RMS-Pegel, YIN-Pitch, Silero VAD, Silben-Peaks
     opt transcribe=true
         alt Vollständiges live_transcript vorhanden
-            W->>W: Finale Wörter prüfen und wiederverwenden; keine erneute ASR
+            W->>W: Finale Wörter prüfen und wiederverwenden, keine erneute ASR
         else Stream aus oder fehlgeschlagen
             W->>ASR: faster-whisper small (de, word_timestamps=true)
             ASR-->>W: Text und Wort-Timestamps
@@ -217,7 +227,53 @@ sequenceDiagram
         BE-->>FE: queued / running / completed
     end
     FE->>FE: Sprachmarker nach FeatureFlags des Takes filtern (auch bei Wort-Import)
-    FE->>FE: Timeline mit Video-Clips (±2s) verknüpfen,<br/>Wörter an der Aufnahme speichern (Eingabe für Fact-Check)
+    FE->>FE: Timeline mit lokaler Aufnahme verknüpfen,<br/>Wörter speichern (Eingabe für Fact-Check), kein Server-Clip
+```
+
+### 3b. Persistente Take-Review (Backend implementiert, Client-Anbindung separat)
+
+```mermaid
+sequenceDiagram
+    participant C as Client mit lokaler Aufnahme
+    participant A as FastAPI Review-Router
+    participant P as Postgres
+    participant S as SeaweedFS
+    participant Q as Redis / Celery
+    participant W as run_take_job
+    participant L as Optionales LLM
+    C->>A: POST /sessions + /sessions/id/takes (Idempotency-Key)
+    A->>P: Metadaten, Timebase, gemessene Coverage
+    C->>A: POST /takes/id/events (max 500 abgeleitete Pose-Events)
+    A->>P: Validierung + Upsert (take_id, dedupe_key)
+    opt Audio/ASR gewünscht
+        C->>A: POST /takes/id/audio (file, transcribe, config)
+        A->>P: Job + idempotente Response atomar reservieren
+        A->>S: Upload temporär, unter Session-Lock
+        A->>Q: Job-ID
+        Q->>W: audio_analyze
+        W->>S: Upload laden
+        W->>W: FFprobe, Signal/ASR, Audio-Offset auf Take-Zeitachse
+        W->>S: Upload in finally löschen, auch bei Analysefehlern
+        W->>P: Wörter, Summaries, Events, Probe, Job completed
+    end
+    C->>A: POST /takes/id/review (template standardmäßig)
+    A->>P: Pack-Hash prüfen, sonst Job reservieren
+    A->>Q: Job-ID
+    Q->>W: review_generate
+    W->>P: Konsistenter Snapshot (Revision)
+    W->>W: Finale Events, Pausen-Merge, Coverage, Karten, max 3 Findings
+    opt mode=llm
+        W->>L: Begrenzte Evidence Cards + erlaubte Platzhalter-Texte
+        L-->>W: JSON-Auswahl
+        W->>W: Schema/Katalog prüfen, ein Retry, dann Template
+    end
+    W->>P: review.v1 + Verification, nur wenn Eltern/Revision bestehen
+    C->>A: GET /jobs/id, /takes/id/timeline, /takes/id/review
+    A-->>C: Events + peakMs + Review, keine Clip-/Video-URL
+    C->>C: Sprung in lokaler Aufnahme (Client-Vertrag)
+    C->>A: DELETE /sessions/id
+    A->>S: Noch vorhandene temporäre Uploads löschen
+    A->>P: Cascade: Takes, Events, Reviews, Jobs, Idempotenz
 ```
 
 ## 4. RAG-Pipeline: Quellen-Ingest, Suche und Fact-Check
@@ -236,7 +292,7 @@ flowchart TB
     PGDB --> RET
     RET --> HITS["Top-k SourceHits<br/>mit Zitat-Ort: page/slide/<br/>paragraph/line"]
     FCQ["Fact-Check je Aussage<br/>(app/factcheck/pipeline.py)"] -- "Suchanfrage" --> RET
-    HITS --> JUDGE["LLM-Urteil mit wörtlichem Zitat<br/>quote_in_text-Prüfung<br/>stützt / widerspricht / nicht gefunden<br/>ungültiges Zitat: unchecked"]
+    HITS --> JUDGE["LLM-Urteil mit Zitat<br/>exakt oder konservativ fuzzy; Fundort bindend<br/>Zahlen/Negation bleiben gleich<br/>ungültiges Zitat: unchecked"]
     JUDGE -. "nicht belegt" .-> WEBQ["Websuche als Zweitquelle<br/>(Wikipedia / Tavily)"]
     JUDGE --> EVT["fact-Events auf der Timeline"]
     HITS --> QA["Frage-Simulator<br/>(app/questions/pipeline.py)<br/>Lücken-Fragen + Antwort-Abgleich"]
@@ -403,6 +459,76 @@ flowchart LR
 ```mermaid
 erDiagram
     SOURCES ||--o{ SOURCE_CHUNKS : "hat Chunks"
+    SESSIONS ||--o{ TAKES : "hat Takes"
+    SESSIONS ||--o{ REVIEW_IDEMPOTENCY : "24 h, bei Zugriff bereinigt"
+    TAKES ||--o{ EVENTS : "Cascade"
+    TAKES ||--o| REVIEWS : "Cascade"
+    TAKES ||--o{ JOBS : "Cascade"
+
+    SESSIONS {
+        uuid id PK
+        uuid collection_id "gleiche Collection wie Sources"
+        text title
+        text status
+        jsonb consent
+        jsonb capture
+        timestamptz created_at
+    }
+    TAKES {
+        uuid id PK
+        uuid session_id FK
+        text status
+        int duration_ms
+        text mime_type
+        jsonb timebase
+        jsonb audio_probe
+        jsonb coverage
+        jsonb analysis "Wörter, Summaries, Fact-Check, Fragen"
+        int revision
+    }
+    EVENTS {
+        uuid take_id PK,FK
+        text id PK
+        text dedupe_key "UNIQUE mit take_id"
+        int t_ms
+        int peak_ms
+        int duration_ms
+        text type
+        text severity
+        text source
+        text stage
+        jsonb payload
+        text rule_version
+    }
+    REVIEWS {
+        uuid id PK
+        uuid take_id FK "UNIQUE"
+        text status
+        jsonb report "review.v1"
+        jsonb generator
+        jsonb verification
+    }
+    JOBS {
+        uuid id PK
+        uuid take_id FK
+        text kind
+        text status
+        int progress
+        jsonb error
+        jsonb result
+        jsonb input "bei terminalem Status geleert"
+        text object_key "privat, nur temporäres Audio"
+        bool upload_ready
+    }
+    REVIEW_IDEMPOTENCY {
+        text scope PK
+        text key PK
+        uuid session_id FK
+        text request_hash
+        int status
+        jsonb response
+        timestamptz expires_at
+    }
 
     SOURCES {
         uuid id PK
@@ -439,6 +565,7 @@ Zusätzlich (außerhalb Postgres):
 | Speicher | Inhalt |
 | --- | --- |
 | SeaweedFS `sources/{id}/original` | Original-Uploads |
+| SeaweedFS `review-audio/{session}/{take}/{job}/upload` | nur temporär für Take-Analyse; vor erfolgreichem Job-Abschluss oder bei Analysefehler löschen, Cleanup-Fehler erneut versuchen |
 | SeaweedFS `speech-jobs/{job_id}/` | Job-Konfig, Status, Analyse-Ergebnis (Original wird nach Abschluss gelöscht) |
 | SeaweedFS `factcheck-jobs/{job_id}/` | Status und Fact-Check-Ergebnis; `request.json` (Transkript) wird nach Abschluss gelöscht |
 | SeaweedFS `question-jobs/{job_id}/`, `answer-jobs/{job_id}/` | Status mit Fragen bzw. Antwort-Abgleich (bei Sprache mit Transkript der Antwort); `request.json` (Transkript, Antworttext) und `recording` (gesprochene Antwort) werden nach Abschluss gelöscht |
@@ -467,9 +594,13 @@ flowchart LR
     F --> EV
     G --> EV
 
-    EV --> MT["merge_timeline()<br/>Deduplizierung<br/>(Tempo aus ASR,<br/>Pausen akustisch)"]
+    EV --> MT["Legacy merge_timeline()<br/>Tempo aus ASR, Pausen akustisch"]
+    EV --> PERSIST["Take-Adapter + Browser-Pose-Vertrag<br/>eventId, dedupeKey, tMs, peakMs,<br/>durationMs, stage, ruleVersion<br/>kein gaze, kein Medien-Key"]
+    PERSIST --> REVIEWMERGE["Finale Review-Timeline<br/>Pausen: ASR mit mid_sentence, sonst längste<br/>WPM und Silben/s getrennt<br/>stabil nach Start, Peak, ID"]
+    REVIEWMERGE --> REPORT["Aggregate + explizite Coverage<br/>max 3 geerdete Findings<br/>review.v1 in Postgres"]
     MT --> FILTER["Sprachmarker-Filter pro Take<br/>Speech / pause / pace / filler / volume / pitch"]
     FILTER --> UI["Timestamp-Timeline im Frontend<br/>Klick springt zum Videoclip ±2s"]
+    REPORT -. "Client-Anbindung separat" .-> UI
 ```
 
 Pose-Event-Payload und JSONL tragen optional `runtime` mit Modell, Modus und
@@ -507,10 +638,17 @@ flowchart LR
         Q3["POST /questions/answers"]
         Q4["GET /questions/answers/{job_id}"]
         Q5["POST /questions/answers/voice"]
+        V1["POST /sessions<br/>GET / DELETE /sessions/id"]
+        V2["POST /sessions/id/takes<br/>GET /takes/id"]
+        V3["POST /takes/id/events<br/>POST /takes/id/audio"]
+        V4["POST /takes/id/review<br/>GET /takes/id/review<br/>GET /takes/id/timeline"]
+        V5["GET /jobs/id<br/>GET /takes/id/evaluation"]
+        V6["POST /takes/id/factcheck<br/>POST / GET /takes/id/questions<br/>POST /takes/id/questions/answers"]
     end
 
     WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5
     MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
+    CLIENT["Neuer Take-Client-Vertrag<br/>Frontend-Integration separat"] -.-> V1 & V2 & V3 & V4 & V5 & V6
 ```
 
 Der Vertrag wird über `npm run api:generate` aus dem FastAPI-Code generiert (`api/openapi.json` -> `api/schema.d.ts`) und ist damit immer synchron zum Backend.

@@ -28,6 +28,7 @@ from app.factcheck.transcript import Sentence, clock, sentences, windows
 from app.factcheck.web import WebPassage, WebSearcher
 from app.sources import retrieval
 from app.sources.models import SourceHit
+from app.sources.quotes import quote_match
 
 log = logging.getLogger(__name__)
 
@@ -118,18 +119,22 @@ def verified_evidence(quote: object, preferred: object, passages: list[Passage],
     quote = quote if isinstance(quote, str) else ""
     if len(retrieval.normalize(quote).strip(" \"'.…")) < min_chars:
         return None
-    order = list(range(len(passages)))
-    if isinstance(preferred, int) and 1 <= preferred <= len(passages):
-        order.remove(preferred - 1)
-        order.insert(0, preferred - 1)
+    # A declared location is binding; never move a quote to another source/page.
+    if isinstance(preferred, int) and not isinstance(preferred, bool):
+        if not 1 <= preferred <= len(passages):
+            return None
+        order = [preferred - 1]
+    else:
+        order = list(range(len(passages)))
     for index in order:
-        if retrieval.quote_in_text(quote, passages[index].text):
+        match = "exact" if retrieval.quote_in_text(quote, passages[index].text) else quote_match(quote, passages[index].text)
+        if match:
             passage = passages[index]
             hit, web = passage.hit, passage.web
             return Evidence(
                 kind=passage.kind, label=passage.label, quote=quote.strip(), passage=passage.text,
                 filename=hit.filename if hit else None, source_id=hit.source_id if hit else None,
-                location=hit.location if hit else None, url=web.url if web else None,
+                location=hit.location if hit else None, url=web.url if web else None, quote_verified=match,
             )
     return None
 
