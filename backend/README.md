@@ -73,9 +73,8 @@ smoke command above to check the running containers.
 | FFmpeg | Available for converting browser recording formats when needed | Backend and worker containers |
 
 File bytes belong in object storage; PostgreSQL can hold their object key,
-MIME type, size and relation to a presentation. No product tables, recording
-endpoints or inference models are implemented yet. The analysis pipelines
-below operate without persistence.
+MIME type, size and relation to a presentation. Audio jobs persist uploads and analysis in S3. Product database tables,
+clips and a frontend are not implemented yet.
 
 SeaweedFS `mini` runs the file store in one container and creates `S3_BUCKET`
 on startup. Credentials come from `.env`; the bucket is not public. Only the
@@ -107,9 +106,8 @@ synchronous Redis result lookups to a thread.
 
 Only pass IDs and S3 object keys through the queue. Workers fetch media from
 S3 and write durable output to S3/PostgreSQL; Redis task results should contain
-small status/reference values. The current `worker_probe` task is a synthetic
-smoke check, with no HTTP endpoint. Transcription and job/status routes are
-not implemented yet.
+small status/reference values. The `worker_probe` task is an infrastructure smoke check. `analyze_speech`
+runs the audio/ASR pipeline; `/speech/jobs/{job_id}` reads its status from S3.
 
 Jobs use JSON, the `background` queue, late acknowledgements and one reserved
 job per process. Make tasks idempotent: interrupted jobs may be delivered
@@ -129,16 +127,16 @@ docker compose restart worker
 
 Two independent pipelines write the shared `Event` schema (`app/events.py`,
 see `AGENTS.md`). Every timestamp is in ms relative to the recording start,
-so results can be combined later (`merge_timeline`). Nothing is stored yet;
-persistence, the upload route and clip cutting are not implemented.
+and are combined with `merge_timeline`. Uploads, options, status and analysis
+are stored under `speech-jobs/{job_id}/` in S3. Clip cutting is not implemented.
 
 ### Audio signal (`app/speech/`, `POST /speech/analyze`)
 
-Works on the sound only, no transcript:
+The signal pipeline measures sound; the combined worker optionally adds ASR:
 
 ```
 recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
-  → time series: level_db, f0_hz (YIN), active (voice activity), syllable peaks
+  → time series: level_db, f0_hz (YIN), active (Silero VAD), syllable peaks
   → events: pause | volume | pitch | pace   (source "speech")
 ```
 
@@ -150,10 +148,64 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
 - Pitch: spread of F0 in semitones per window; low spread → `monotone`.
   No statement about emotion.
 - Pace: syllable rate from the level envelope vs. baseline (`fast` / `slow`).
-- Baseline: the first `baseline_ms` (calibration) or, if unset, the whole
-  recording. Adjacent windows with the same direction become one event.
+- Baseline: the first 3000 ms by default; speak normally during calibration.
+  Explicit `baseline_ms: null` selects the whole recording. Adjacent windows with the same direction become one event.
 - Upload as multipart field `recording`, optional field `config` with
-  `AudioConfig` JSON. Undecodable files return 422.
+  `AudioConfig` JSON, and `transcribe` (default true).
+- `POST /speech/analyze` now returns **202** with `job_id` and `status_url`;
+  this replaces the previous synchronous 200 response. Poll the status URL:
+  `queued` → `running` → `completed` (with `result`) or `failed` (with `error`).
+  Decode failures occur in the worker and are reported as failed jobs.
+- `result.events` uses word-based tempo and acoustic pauses without duplicate
+  events. Raw pipeline events remain in `audio.events` / `transcription.events`.
+- Silero v6.2 is installed and checksum-verified at image build time. CPU ONNX
+  inference runs locally, without PyTorch or runtime downloads. `activity_detector:
+  "energy"` explicitly selects the old energy gate for DSP tests/debugging.
+- Set `DEEPGRAM_API_KEY` in `.env`, then recreate backend/worker. Default ASR:
+  Nova-3, German, batch upload to `https://api.eu.deepgram.com/v1/listen`.
+  The audio is sent to this third party; only synthetic demo recordings are
+  intended at this stage. German filler preservation is **unverified** and the
+  English-only `filler_words` feature is not enabled.
+- Without a key, submit `transcribe=false` for local signal analysis, or set
+  `ASR_PROVIDER=json` to explicitly replay `app/demo/words.json`. Demo output is
+  flagged `synthetic_demo=true`; those words are invented and not aligned to an
+  arbitrary upload. Failed ASR never silently turns into fabricated feedback.
+- No automatic paid ASR retries. Completed/failed jobs reuse stored results on
+  redelivery. A 660-second Redis lease prevents simultaneous processing; hard
+  worker loss permits redelivery after the lease. A crash after a successful
+  provider call but before saving the result can still repeat that call.
+- Originals are deleted after terminal processing (including analysis failure).
+  If storage is unavailable or a process is killed, cleanup can be delayed;
+  queued/stalled jobs and analysis results have no automatic expiry yet.
+
+Example from the repository root, using only the synthetic fixture:
+
+```sh
+curl -F recording=@backend/tests/fixtures/speech-de.wav -F transcribe=false http://localhost:8000/speech/analyze
+curl http://localhost:8000/speech/jobs/JOB_ID
+```
+
+Full local queue/model smoke (synthetic fixture, no paid ASR by default):
+
+```sh
+docker compose cp backend/tests/fixtures/speech-de.wav backend:/tmp/speech-de.wav
+docker compose exec -T backend python -m scripts.smoke_audio /tmp/speech-de.wav
+```
+
+Use `--transcribe` only when the desired provider is configured. With
+`ASR_PROVIDER=json` this checks the explicit deterministic demo; with
+`ASR_PROVIDER=deepgram` it sends the synthetic audio to the paid ASR API.
+
+For local inference outside Docker, from `backend/`:
+
+```sh
+.venv/bin/python -m scripts.install_silero /tmp/fulda-models
+SILERO_MODEL_PATH=/tmp/fulda-models/silero_vad.onnx .venv/bin/python -m pytest tests
+```
+
+The real ONNX smoke test uses computer-generated German speech, seeded noise
+and silence. Without a model path it is skipped; other tests still run. Provider
+contract tests use mocked HTTP responses and do not prove German ASR quality.
 
 ### Transcription (`app/transcription/`, `POST /transcription/analyze-words`)
 
@@ -162,8 +214,8 @@ recording → FFmpeg WAV → Transcriber → words {word, start_ms, end_ms}
   → events: filler (incl. repetition) | pause | pace   (source "asr")
 ```
 
-- `Transcriber` protocol keeps the ASR provider exchangeable; the provider is
-  still open, `JsonTranscriber` replays precomputed words (demo / tests).
+- `Transcriber` keeps the provider exchangeable. `DeepgramTranscriber` maps
+  seconds to millisecond word timestamps; `JsonTranscriber` replays demo words.
 - Fillers use a configurable list (still open, see `docs/01-product.md`);
   repetitions ("ich ich") are `filler` events with `payload.kind = "repetition"`.
 - Word-based pause and words-per-minute complement the signal-based values.
@@ -171,7 +223,7 @@ recording → FFmpeg WAV → Transcriber → words {word, start_ms, end_ms}
 All thresholds (`AudioConfig`, `WordConfig`) are unvalidated heuristics and
 are returned in `heuristics` so the UI can label them. No scores.
 
-Tests (synthetic tones and word lists only), from `backend/`:
+Tests (synthetic tones, computer-generated speech and word lists only), from `backend/`:
 
 ```sh
 .venv/bin/python -m pip install -r requirements-dev.txt
@@ -197,8 +249,8 @@ does not set up public hosting or TLS.
 ## Storage decision for this scaffold
 
 This is a local development setup for synthetic data only, following
-`AGENTS.md`. There is no recording/upload route, so starting the stack does
-not capture or save audio, video or transcripts. The smoke check generates
+`AGENTS.md`. Starting the stack does not capture audio. The explicit `/speech/analyze`
+upload route stores recordings for worker processing and analysis in S3. The smoke check generates
 silent audio and deletes it again; its temporary database table disappears
 when the connection closes.
 
@@ -208,7 +260,7 @@ no automatic expiry for database records, media or queued jobs. Redis uses
 AOF persistence with a one-second sync interval and no key eviction; abrupt
 host failure can still lose the most recent writes. Task results expire after
 one hour; the smoke check removes its result immediately. This does not define
-media/transcript retention. Before implementing real recording persistence, decide
+media/transcript retention. Before using human recordings, decide
 and document consent, retention, session deletion and cleanup of both files
 and database references in `docs/01-product.md`.
 

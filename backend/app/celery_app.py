@@ -6,8 +6,8 @@ from celery import Celery
 
 celery_app = Celery(
     "presentation_trainer",
-    broker=os.environ["CELERY_BROKER_URL"],
-    backend=os.environ["CELERY_RESULT_BACKEND"],
+    broker=os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
+    backend=os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1"),
     include=["app.tasks"],
 )
 celery_app.conf.update(
