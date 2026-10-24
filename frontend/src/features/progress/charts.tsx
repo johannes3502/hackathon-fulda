@@ -123,7 +123,7 @@ export function Sparkline({ series }: { series: MetricSeries }) {
   return (
     <svg
       className="progress-sparkline"
-      viewBox="0 0 120 36"
+      viewBox="0 0 100 100"
       preserveAspectRatio="none"
       aria-hidden="true"
       focusable="false"
@@ -137,9 +137,9 @@ export function Sparkline({ series }: { series: MetricSeries }) {
       {baseline != null && (
         <line
           x1="0"
-          x2="120"
-          y1={(baseline / 100) * 36}
-          y2={(baseline / 100) * 36}
+          x2="100"
+          y1={baseline}
+          y2={baseline}
           className="progress-sparkline-baseline"
           vectorEffect="non-scaling-stroke"
         />
@@ -147,10 +147,10 @@ export function Sparkline({ series }: { series: MetricSeries }) {
       {changeSequences.map((x, index) => (
         <line
           key={index}
-          x1={(x / 100) * 120}
-          x2={(x / 100) * 120}
+          x1={x}
+          x2={x}
           y1="0"
-          y2="36"
+          y2="100"
           className="progress-sparkline-change"
           vectorEffect="non-scaling-stroke"
         />
@@ -254,9 +254,13 @@ export function MetricChart({
   );
 
   return (
-    <figure className="progress-chart">
+    <figure
+      className={`progress-chart${changeMarkers.length ? " has-changes" : ""}`}
+    >
+      <span className="progress-chart-unit" aria-hidden="true">
+        {series.label.de}
+      </span>
       <div className="progress-chart-axis" aria-hidden="true">
-        <span className="progress-chart-unit">{series.label.de}</span>
         {ticks.map((tick) => (
           <span
             key={tick.value}
@@ -355,11 +359,12 @@ export function MetricChart({
 
           {changeMarkers.map((change) => {
             const x = ((change.sequence - xRange.first) / xRange.span) * 100;
+            const edge = x < 8 ? " is-left" : x > 92 ? " is-right" : "";
             return (
               <button
                 key={change.id}
                 type="button"
-                className="progress-change-flag"
+                className={`progress-change-flag${edge}`}
                 style={{ left: `${x}%` }}
                 onClick={() => onSelect(change.takeId)}
                 aria-label={`Ab Aufnahme ${change.sequence}: beobachtete Niveauänderung; Details anzeigen`}

@@ -1193,7 +1193,7 @@ function MetricCard({
         className={`progress-card${selected ? " is-selected" : ""}`}
         aria-pressed={selected}
         onClick={onSelect}
-        aria-label={`${series.label.de}: ${formatValue(latest?.value ?? null, series.unit)}. ${trend.label}. ${CONFIDENCE_COPY[series.trend.confidence]}. ${series.quality.excludedPoints} Aufnahmen nicht vergleichbar.`}
+        aria-label={`${series.label.de}: ${formatValue(latest?.value ?? null, series.unit)}. ${delta != null ? `${formatDelta(delta, series.unit)} seit Start. ` : ""}${trend.label}. ${CONFIDENCE_COPY[series.trend.confidence]}. ${series.quality.excludedPoints} Aufnahmen nicht vergleichbar.`}
       >
         <span className="progress-card-top">
           <span className="progress-source-icon" aria-hidden="true">
@@ -1221,15 +1221,15 @@ function MetricCard({
           )}
           {delta != null && (
             <span className="progress-card-delta">
-              {formatDelta(delta, series.unit)}
+              {formatDelta(delta, series.unit)} seit Start
             </span>
           )}
           <span className={`progress-quality-mark is-${series.quality.status}`}>
-            {series.quality.status === "good"
-              ? "vollständig"
-              : series.quality.status === "partial"
-                ? `${series.quality.excludedPoints} nicht vergleichbar`
-                : "begrenzt"}
+            {series.quality.excludedPoints > 0
+              ? `${series.quality.excludedPoints} nicht vergleichbar`
+              : series.quality.status === "poor"
+                ? "begrenzt"
+                : "vollständig"}
           </span>
         </span>
         {series.goal && (
@@ -1297,6 +1297,8 @@ function SeriesDetail({
   const visiblePoints = showExcluded
     ? series.points
     : series.points.filter((point) => point.eligible);
+  const hasExcluded = visiblePoints.some((point) => !point.eligible);
+  const hasGaps = visiblePoints.some((point) => point.value == null);
   return (
     <section className="progress-detail" aria-labelledby="progress-detail-heading">
       <div className="progress-detail-head">
@@ -1390,6 +1392,20 @@ function SeriesDetail({
             <span>
               <i className="progress-legend-line is-series" /> Messwerte
             </span>
+            {hasExcluded && (
+              <span>
+                <i className="progress-dot is-excluded" aria-hidden="true" />{" "}
+                nicht vergleichbar
+              </span>
+            )}
+            {hasGaps && (
+              <span>
+                <i className="progress-dot is-gap" aria-hidden="true">
+                  ×
+                </i>{" "}
+                nicht berechenbar
+              </span>
+            )}
             <span>
               <i className="progress-legend-line is-baseline" /> Startphase
             </span>
