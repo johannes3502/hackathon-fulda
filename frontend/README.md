@@ -1,0 +1,71 @@
+# Pitch Coach
+
+Pitch rehearsal built from `../Pitch_Coach_Frontend_Plan.md`, with two connected entry points: a deterministic sample rehearsal, and a camera workspace with live feedback, stats, video playback and feedback-section replay.
+
+## Run
+
+Requires Node 22.12+ and npm. Run from the monorepo root; dependencies and the lockfile are shared.
+
+```sh
+npm ci
+npm run dev
+```
+
+Open http://localhost:3000 and choose **Try sample demo**. No credentials, microphone, camera, backend, or hosted services are needed. Production: `npm run build` then `npm start`.
+
+## Camera, stats and replay
+
+Open http://localhost:3000/live or choose **Open camera studio** from setup.
+
+1. Enable the camera preview, then **Record with demo feedback**. This records actual silent video while scripted feedback markers appear in the first ten seconds. No detection or upload runs in local demo mode.
+2. Choose **Finish & review** for recording stats, feedback frequencies, optional backend measurements and a video player.
+3. Choose **Rewatch feedback sections** to filter by category, seek to a feedback moment, loop the surrounding section, or watch the full take.
+4. Download before refreshing or leaving the live workspace. Recordings are held in browser memory only.
+
+For backend streaming, choose **Backend**, enter its WebSocket URL and start. The app sends contiguous encoded video chunks and accepts timestamped feedback. The replaceable proposed protocol, JSON examples and integration seam are in [live-camera-protocol.md](../docs/live-camera-protocol.md). No backend server or detection model is included. `frontend/.env.example` provides an optional URL prefill.
+
+## Demo walkthrough
+
+1. Continue with demo preview. The three-second countdown starts the sample.
+2. Around 10 seconds, a pace cue appears. At 18 seconds, the sample claims a 50% improvement.
+3. End pitch. The judge quotes that exact claim.
+4. Start answer, select **Vague answer**, and submit. The follow-up challenges the missing measurement.
+5. Finish Q&A. Select a finding’s timestamp to inspect the transcript.
+6. Choose **Try a focused retry**. The original claim is carried forward as judge context in a new attempt.
+7. Select **Direct answer** to compare the actual sample texts. No overall score or measured learning improvement is invented.
+
+The **Demo controls** disclosure offers next event, Q&A/review jumps, speed, pause/resume, restart, interruption, and a failure of the next command. One scenario is intentionally supported: Viva’s hackathon pitch. A jump replays its prerequisite events; restarting preserves completed reports. Start new practice creates a separate session.
+
+## Checks
+
+```sh
+npm run lint
+npm run typecheck
+npm test
+npx playwright install chromium
+npm run test:e2e
+npm run build
+```
+
+Unit tests exercise the sample session lifecycle and the live protocol, feedback validation, ordering, clip ranges, backpressure and cancellation. Playwright checks both journeys at 1366px and 375px, including generated camera video, actual MediaRecorder playback, a WebSocket protocol harness, recovery, overflow and camera cleanup. Screenshots and failure traces go to ignored `frontend/test-results/`.
+
+## Boundaries
+
+- Next.js App Router + strict TypeScript + Tailwind, local shadcn-style Radix primitives, Lucide icons. Dependency versions are locked in the root `package-lock.json`.
+- `src/features/coach/contracts.ts` is the adapter contract.
+- `SessionProvider` owns the subscription and exposes `useCoachSession`; UI components issue commands, never schedule the scenario.
+- `reducer.ts` handles normalized events, sequence/ID deduplication, transcript upserts, metric patches, cues, evidence selection, and reports.
+- `mock/MockCoachGateway.ts` is the only fixture consumer. Its monotonic clock freezes during pauses; cleanup stops subscription timers.
+- `session-repository.ts` stores synthetic setup and report data in this browser tab’s `sessionStorage`. Refresh restores completed reports and offers a restart for an interrupted active attempt.
+- `useCameraPreview.ts` requests **video only**, on an explicit user action. Tracks stop on exit; late permission results are immediately released. Preview alone does not record or upload; the live workspace has a separate explicit recording action.
+- `features/live/recorder.ts` owns actual capture, monotonic timestamps and local video. `transport.ts` is its replaceable stream boundary. `LiveSessionProvider` owns in-memory recordings and releases object URLs on exit.
+
+`NEXT_PUBLIC_COACH_GATEWAY` applies only to the sample rehearsal and defaults to `mock`. Selecting anything else shows a configuration error. Never put provider credentials in a public variable. The sample judge/transcript integration is separate from the video contract; see [the integration handoff](../docs/pitch-coach-handoff.md).
+
+## Design and limitations
+
+Mobbin MCP references and their specific design influence are recorded in [DESIGN.md](DESIGN.md). Setup, studio, judge, review, and comparison use the plan’s neutral/blue palette and explicitly label simulated coaching.
+
+In the sample rehearsal, custom title, context, audience, mode, duration, and focus areas are retained; **they do not generate new analysis**. Its metrics and questions remain fixtures; timestamps select transcript evidence. The camera workspace instead replays actual captured video and clearly labels the source of feedback. Scripted markers are not assessments. No accounts, persistent recording history, PDF parser, live AI, deployment, or actual human-performance evaluation is included.
+
+Real camera hardware, Safari/iOS behavior, and a public deployment still require acceptance in the actual presentation environment.

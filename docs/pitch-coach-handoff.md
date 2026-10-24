@@ -1,0 +1,39 @@
+# Pitch Coach frontend handoff
+
+2026-10-24 · Source: `Pitch_Coach_Frontend_Plan.md` and the implemented TypeScript contracts.
+
+## Integration seam
+
+The frontend now lives in the root `frontend/` npm workspace. The new `/live` camera, stats and video replay flow has its own [replaceable video protocol](live-camera-protocol.md). This document describes the original sample transcript/judge flow.
+
+Replace the sample adapter in `frontend/src/features/coach/gateway.ts`. Keep screens consuming `useCoachSession`. The current factory returns the mock, with mock-only defaults and demo controls outside `CoachGateway`; a live factory must hide or replace these demo affordances.
+
+The implementation adds `clock.updated` and `pause.changed` events to the proposed union. They carry active presentation/answer clocks and pause state. `judge.question` includes labeled sample answer choices. Reports also carry their finalized transcript so previous-attempt evidence survives retries and refresh. A live boundary must validate incoming records before dispatch; the mock’s TypeScript contracts are not an external-input validator.
+
+## Example normalized event sequence
+
+This abbreviated sequence shows the envelope and data shapes. Session/attempt/event IDs are illustrative; the mock stamps actual attempt IDs at runtime.
+
+```json
+[
+  {"sessionId":"sample","attemptId":"attempt-1","eventId":"attempt-1:1","seq":1,"atMs":0,"origin":"mock","type":"phase.changed","phase":"countdown"},
+  {"sessionId":"sample","attemptId":"attempt-1","eventId":"attempt-1:2","seq":2,"atMs":3000,"origin":"mock","type":"phase.changed","phase":"presenting"},
+  {"sessionId":"sample","attemptId":"attempt-1","eventId":"attempt-1:3","seq":3,"atMs":5000,"origin":"mock","type":"transcript.updated","segment":{"id":"opening","revision":1,"speaker":"presenter","startMs":3000,"endMs":5000,"text":"What if a polished essay","isFinal":false}},
+  {"sessionId":"sample","attemptId":"attempt-1","eventId":"attempt-1:4","seq":4,"atMs":7000,"origin":"mock","type":"transcript.updated","segment":{"id":"opening","revision":2,"speaker":"presenter","startMs":3000,"endMs":7000,"text":"What if a polished essay no longer tells us what a student understands?","isFinal":true}}
+]
+```
+
+The full presentation fixture and both answer branches are in `mock/fixtures/scenario.ts`. Question construction and event-derived report templates live in `MockCoachGateway.ts`; `coach.test.ts` exercises both question branches, early reports, and before/after evidence.
+
+## Semantics to preserve
+
+- `atMs` is active attempt time; pauses freeze it. Presentation time runs only while presenting. Answer time resets per turn. No recording-time mapping currently exists.
+- Normalize upstream providers into one increasing sequence per attempt. Reject wrong-session, wrong-attempt, duplicate, and late-turn events.
+- A higher transcript revision replaces a partial segment; finalization commits it once. Judge transcript remains separate from presenter metrics.
+- Metric events patch keys; null is unavailable, never zero. The UI treats observations older than 15 active seconds as stale sample data. This age threshold is a demo policy, not a calibrated live metric threshold.
+- A question remains until the user starts an answer. Submission determines the next turn. Ending early cannot introduce future fixture findings.
+- Retry creates a new attempt and preserves original report/transcript evidence. Retry context is attributed to the judge, not to a newly spoken user claim.
+- Mock reconnection resumes a paused sample. No equivalent live reconnect guarantee is implied.
+- Storage failure leaves the in-memory demo usable and warns that refresh may lose it.
+
+Before connecting a real transcript/judge backend, agree authentication, command idempotency, report readiness, timestamp/recording offsets, retry endpoints, and error/reconnection semantics. The separate camera flow now proposes a replaceable WebSocket endpoint and video contract at the user's request; it does not yet integrate live judge Q&A or transcription.

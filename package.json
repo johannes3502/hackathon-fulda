@@ -1,7 +1,17 @@
 {
-  "name": "hackathon-fulda-api",
+  "name": "hackathon-fulda",
   "private": true,
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
+    "dev": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "start": "npm run start --workspace frontend",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace frontend",
     "api:export": "node scripts/export-openapi.mjs",
     "api:types": "openapi-typescript api/openapi.json -o api/schema.d.ts",
     "api:generate": "npm run api:export && npm run api:types",
