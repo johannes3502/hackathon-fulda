@@ -80,7 +80,7 @@ export function LiveStudio() {
       .catch(() => {
         if (!controller.signal.aborted)
           setHealth(
-            "Backend readiness check failed. Audio analysis may still work without storage services.",
+            "Backend services are not ready. If analysis fails, your recording stays available locally.",
           );
       });
     return () => controller.abort();
@@ -409,9 +409,10 @@ export function LiveStudio() {
                     )}
                     <p className="field-hint">
                       By starting, you agree to send your complete video and
-                      microphone audio to this destination after stopping. This
-                      endpoint processes it temporarily without persistent
-                      storage. No ASR or LLM provider is used.
+                      microphone audio to this destination after stopping. The
+                      backend stores the upload for its analysis job and removes
+                      the original after processing; analysis results remain
+                      stored. No ASR or LLM request is made in this mode.
                     </p>
                   </div>
                 )}

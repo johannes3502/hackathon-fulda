@@ -5,17 +5,18 @@ The camera workspace now uses the existing REST endpoints. This section supersed
 | Endpoint | Frontend use |
 | --- | --- |
 | `GET /health/live` | Before backend recording starts |
-| `GET /health/ready` | Backend service status; unavailable storage does not block stateless analysis |
-| `POST /speech/analyze` | Complete camera/microphone recording after stop; events and measurements in review |
+| `GET /health/ready` | Backend service status; queued audio analysis requires storage and a worker |
+| `POST /speech/analyze` | Complete recording after stop with `transcribe=false`; returns a queued job |
+| `GET /speech/jobs/{job_id}` | Polls the queued audio result for review |
 | `POST /transcription/analyze-words` | Optional timestamped transcript JSON import in backend review |
 
-### Still needed — keep mocks until these services exist
+### Still needed — keep mocks until these integrations exist
 
-- Audio-to-text / ASR with word timestamps: the sample transcript stays mocked. Word analysis is not ASR.
+- ASR is now optional in the backend API, but not connected to the UI. The sample transcript stays mocked; word JSON analysis is not ASR.
 - Pose capture now runs locally in the camera studio and exports JSONL (see `frontend/DATA_POINTS.md`). Pose/gesture/gaze feedback rules are still pending; local demo markers stay explicitly scripted.
 - Source upload/ingest and fact-check API: sample evidence and fact-check findings stay mocked.
 - Question simulator / answer evaluation API: sample judge and follow-up responses stay mocked.
-- Session persistence, presigned upload, asynchronous jobs/status, event-clip retrieval: local browser replay remains temporary; no backend routes are invented.
+- Session persistence, presigned upload, event-clip retrieval: local browser replay remains temporary; no backend routes are invented.
 
 Do not present mocked findings as observations about a live recording. Backend audio failures retain the user's video and show an error, without silently substituting mock results. The default sample path remains deterministic and available without any backend.
 

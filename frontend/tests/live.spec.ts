@@ -164,6 +164,9 @@ async function backend(page: Page) {
   );
   await page.goto("/live");
   await page.getByLabel("Feedback source").selectOption("backend");
+  await expect(
+    page.getByText("analysis results remain stored", { exact: false }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Enable camera preview" }).click();
   await page.getByRole("button", { name: "Record & analyze audio" }).click();
   await expect(
