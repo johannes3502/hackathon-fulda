@@ -119,10 +119,12 @@ docker compose exec -T backend python -m scripts.smoke_live /tmp/v.wav
 ## Review, Demo und Native
 
 Review spielt das komplette lokale Video mit ±2 s Kontext um Marker ab.
-Video bleibt im Browser-Speicher; vor Reload/Verlassen downloaden. Backend-
-Uploads liegen bis zum Ende der Verarbeitung in S3 und werden danach gelöscht;
-Ergebnisse bleiben dort. Persistente Session-Historie und Server-Clips sind noch
-nicht implementiert. Neue Review-/IndexedDB-Entwürfe sind davon getrennt.
+Video und lokale Review-Historie bleiben in IndexedDB im Browser; ein Download
+ist nur für Export oder ein anderes Gerät nötig. Backend-Uploads liegen bis zum
+Ende der Verarbeitung in S3 und werden danach gelöscht; Ergebnisse bleiben dort.
+Die persistente Session-/Take-API ist im Backend implementiert, aber im
+Web-Frontend noch nicht angebunden. Server-Clips bleiben bewusst nicht
+implementiert. Lokale Löschung und getrennte Backend-Daten sind dokumentiert.
 
 `/demo` ist ein deterministischer synthetischer Übungsablauf. Die Fabrik in
 `features/coach/gateway.ts` liefert `MockCoachGateway`, konsumiert über

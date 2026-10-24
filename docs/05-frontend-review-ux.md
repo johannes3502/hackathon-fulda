@@ -1,8 +1,13 @@
 # Frontend & UI/UX — Review, Videojump und lokale Speicherung
 
-Status: Empfehlungen und Ideen, bewusst offen.
+Status: Historischer Entwurf (24.10.2026), bewusst offen. Die Leitplanke
+„keine Scores“ wurde am 24.10. auf ausdrücklichen Nutzerwunsch für
+evidenzbasierte Prototyp-Scores gelockert; verbindlich sind
+`docs/01-product.md`, `docs/07-review-and-agent.md` und `AGENTS.md`.
 Bezug: `docs/03-architecture.md`, `docs/04-pose-tracking-requirements.md`, `AGENTS.md`.
-Leitplanken: keine Scores/Noten, keine Emotions- oder Persönlichkeitsaussagen, Heuristiken als „Heuristik, unvalidiert“ kennzeichnen, Video bleibt lokal.
+Leitplanken: keine Noten oder Personenbewertung, keine Emotions- oder
+Persönlichkeitsaussagen, Heuristiken als „Heuristik, unvalidiert“ kennzeichnen,
+Video bleibt lokal. Scores nur als transparente Aggregation erfasster Evidenz.
 
 ## 1. Leitidee
 
@@ -236,7 +241,7 @@ Neue pure Funktion, z. B. `analyzePoseLog(jsonl, options)`:
 - Post-hoc-State-Machine: 1 s Fenster, 1 s Enter-Dwell, 0,5 s Exit-Dwell, 2 s Gap-Merge.
 - `startMs` rückdatiert, `peakMs` = stärkste Abweichung, `endMs` = Ende Exit-Dwell.
 - `validRatio < 0.8` → kein Deviation-Event, stattdessen `data-quality`/`framing`.
-- Keine „good“-Events, keine Scores.
+- Keine „good“-Events; Review-Scores aggregieren nur separat belegte Evidenz.
 - `PoseTestTracker` nicht direkt wiederverwenden: dev-only, `holdMs=0`, keine Baseline, kein Peak, keine ValidRatio.
 
 ### 4.3 Merge

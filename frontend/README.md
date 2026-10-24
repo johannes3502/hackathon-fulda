@@ -40,7 +40,7 @@ opens the missing-recording state; it does not create a take or access a recordi
 
 - **Sample demo** (`/demo`): deterministic rehearsal, sample transcript, judge questions
   and review. Works without camera, microphone or backend credentials.
-- **Monitoring studio** (`/` and `/live`): navigation and settings are visible by default; **Large view** is optional. Choose **Enable camera**, then **Start recording**. Local gesture observations replace scripted markers; hold a neutral position for 3 seconds first.
+- **Monitoring studio** (`/live`): navigation and settings are visible by default; **Large view** is optional. Choose **Enable camera**, then **Start recording**. Local gesture observations replace scripted markers; hold a neutral position for 3 seconds first.
 - **See gestures in 22 seconds** (`/gestures`): synthetic walkthrough using the real observation rules.
 - **Speech analysis:** every recording uses live backend feedback and full
   analysis after stopping. The microphone is always enabled and the complete

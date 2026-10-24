@@ -1,10 +1,10 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Grafische Architektur-Übersicht (Mermaid): `docs/03-architecture.md`. Pose-Research-Ziele und Integrationsstand: `docs/04-pose-tracking-requirements.md`.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Offene TODOs: `docs/14-open-todos.md`. Grafische Architektur-Übersicht (Mermaid): `docs/03-architecture.md`. Pose-Research-Ziele und Integrationsstand: `docs/04-pose-tracking-requirements.md`.
 
 ## 1. Projekt
 
-**Live-Präsentationstrainer** (8. Hackathon Fulda, 24.–25.10.2026, Thema Future Education): analysiert Auftritt und Sprache, macht Feedback timestamp-genau zurückspulbar und fragt danach gezielt nach. Web-App für Laptop und Smartphone, öffentliche URL, kein Login.
+**418 Pitch Practice** — Live-Präsentationstrainer (8. Hackathon Fulda, 24.–25.10.2026, Thema Future Education): analysiert Auftritt und Sprache, macht Feedback timestamp-genau zurückspulbar und fragt danach gezielt nach. Web-App für Laptop; die Jury-Demo läuft lokal und ohne Login. Smartphone und öffentliche URL sind nicht Teil des aktuellen Demo-Pfads.
 
 | # | Feature | Inhalt |
 |---|---|---|
@@ -22,7 +22,11 @@ Die Version `evidence-share-v1` bewertet die erfasste Evidenz: positive Zeitante
 gegen positive + kritische Zeitanteile; Fachwissen bevorzugt über entscheidbare
 Quellenurteile. Formel, Datenabdeckung und fehlende Daten bleiben sichtbar;
 ohne Evidenz kein Score. Keine Validierungs- oder Benotungsbehauptung. Der
-Zeitverlauf ist eine geglättete Linie mit ausdrücklich interpolierten Übergängen.
+Zeitverlauf ist eine Linie aus geraden Segmenten; Zwischenwerte sind
+ausdrücklich interpoliert. **Struktur hat im Live-Pfad noch keine
+Evidenzquelle** (nur der synthetische Demo-Datensatz enthält Struktur-Momente);
+das bleibt bis zu einer eigenen Regel als „–“ sichtbar. TODO:
+`docs/14-open-todos.md`.
 
 Review-Verdrahtung (25.10.2026): Beide Web-Review-Ansichten nutzen denselben
 Adapter für die gewählte, lokal gespeicherte Aufnahme. Quellen-Marker kommen
@@ -70,7 +74,10 @@ Für Struktur existiert noch keine automatische Messregel; ohne Evidenz kein Sco
 - **Hosting:** Nutzer bestätigt lokale Vorführung auf `localhost`; kein öffentliches Deployment nötig. Für andere Geräte/öffentliche Hosts bleibt HTTPS für `getUserMedia` erforderlich.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
-**Offen:** belastbare Schwellenwerte, automatische Aufbewahrungsdauer/Cleanup, Füllwortqualität, Fact-Check-Quellen im Web, automatisches Antwortende per Stille-Erkennung, Produktname. Umgesetzt: Post-Transkription lokal und Text-Fragerunde mit Quellenvergleich ohne Noten.
+**Offen:** offene Punkte und TODOs stehen in `docs/14-open-todos.md`
+(Retention/Cleanup, Struktur-Evidenz, Persistenz-/Progress-Anbindung,
+Prompt-Safety-Grenzen, Demo-Härtung). Umgesetzt: Post-Transkription lokal und
+Text-Fragerunde mit Quellenvergleich ohne Noten.
 
 ## 4. Architektur
 
@@ -168,6 +175,7 @@ docs/
   04-pose-tracking-requirements.md # Pose-Research-Ziele und Integrationsstand
   12-long-term-progress-data-design.md # Backend-Data-Design, Research, DDL, API
   13-long-term-progress-frontend-contract.md # progress.v1 und UI-Vertrag
+  14-open-todos.md                 # Offene TODOs, Priorität und Abnahmekriterien
 templates/
   ai-decision-log.md               # Vorlage für die AI Reflection
   team-roles.md                    # Rollen, Gates, RACI

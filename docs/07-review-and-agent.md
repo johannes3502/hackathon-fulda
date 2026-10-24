@@ -20,8 +20,9 @@ aus dem aktuellen Check abgeleitet, damit alte Marker nach einem erneuten Check
 keine abweichenden Scores ergeben. `evidenceVerdict` hält Urteile ohne geprüftes
 Zitat auch im Score offen. Die Score-Karten benennen den Titel der Aufnahme;
 der synthetische Pfad `/review-preview` bleibt ausdrücklich ein Beispiel.
-Für Struktur gibt es derzeit keine automatische Messregel; ohne entsprechende
-Evidenz bleibt dieses Kriterium daher offen.
+**Struktur** hat im Live-Pfad derzeit keine Evidenzquelle; nur der synthetische
+Demo-Datensatz enthält Struktur-Momente. Der Live-Wert bleibt deshalb „–“
+(TODO: `14-open-todos.md`).
 Der Graph ist eine durchgehende, ungefüllte Linie mit geraden, zackigen Segmenten. Zwischenwerte
 sind als interpoliert gekennzeichnet, der Wiedergabepunkt folgt dem Video.
 Darunter teilt eine Wiedergabeleiste dieselbe Zeitachse und die Grün-/Rot-/Neutralbereiche
@@ -180,7 +181,9 @@ Die Auswertung ist rein clientseitig und deterministisch
 kein LLM, Eingaben sind nur Daten, die der Browser ohnehin hat
 (Fact-Check-Urteile, Antwort-Urteile, Wörter, Feedback-Events, Pose-Events).
 
-Formel `evidence-count-heuristic.v1`:
+Formel `evidence-count-heuristic.v1` — **separat** von den vier Review-Scores
+oben. Die Werte sind nicht vergleichbar und werden nicht zu einem Gesamtscore
+verrechnet; „Inhalt“ ist nicht dasselbe wie „Fachwissen“ im Review:
 
 - **Inhalt** (Gewicht 0,5): Jede Fact-Check-Aussage und jede beantwortete Frage
   zählt nach Urteil — `supports` = 1, `contradicts` = 0, `not_found`/

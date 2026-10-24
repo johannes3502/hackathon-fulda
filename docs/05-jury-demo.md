@@ -1,11 +1,15 @@
 # Jury-Rundgang und Abnahme
 
-Stand: 24.10.2026. Ziel: selbstständig verständlicher Prototyp in unter 3 Minuten.
-Die App-Texte sind Englisch; diese Anleitung ist für das Team.
+Stand: 25.10.2026. Ziel: selbstständig verständlicher Prototyp in unter 3 Minuten.
+Die App-Texte sind überwiegend Englisch; Start, Progress und Review-Scores sind
+teilweise Deutsch. Diese Anleitung ist für das Team.
 **Nutzerentscheidung: lokal reicht.** Keine öffentliche Bereitstellung nötig;
 die Jury nutzt den vorbereiteten Demo-Laptop unter `http://localhost:3000`.
 Start: `docker compose up --build -d --wait` (siehe Root-README). Für reine
 Gesten-/Sample-Demo reicht alternativ Node.js 22.12+: `npm ci`, `npm run dev`.
+Nach Code-Merges vor der Vorführung `docker compose restart frontend` ausführen:
+Turbopack findet neue Module im laufenden Container sonst gelegentlich nicht
+(beobachtet bei `/review-preview`).
 
 ## Ablauf am Stand (ca. 2 Minuten)
 
@@ -160,5 +164,9 @@ Tests mit synthetischen Bildern belegen Start und Datenfluss, keine Genauigkeit.
   senden.
 - **Fragegrenzen:** 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop; die
   Begründung und Zitate stehen in `docs/11-deep-research-validation.md`.
+  Im Voice-Pfad sind sie derzeit Prompt-Vorgaben, nicht hart erzwungen (TODO).
+- **Scores:** Struktur hat im Live-Pfad keine Evidenzquelle und bleibt „–“;
+  Struktur-Momente im Demo-Review sind synthetisch. Die vier Review-Scores und
+  die Auswertung nach der Fragerunde sind getrennte Heuristiken (TODO).
 - **Was die Demo nicht verspricht:** keine Genauigkeits-, Latenz- oder
   Lernwirksamkeitsgarantie; keine Noten oder Personenbewertung.
