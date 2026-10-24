@@ -9,7 +9,7 @@ falls sich der Datenfluss ändert, in die Diagramme von `docs/03-architecture.md
 
 **Für den Hackathon: keinen neuen Voice-Stack einführen.** Weder Pipecat noch
 LiveKit noch OpenAI Realtime noch ACP. Der vorhandene Pfad
-(`MediaRecorder` → `POST /questions/answers/voice` → Whisper → Ollama) bleibt
+(`MediaRecorder` → `POST /questions/answers/voice` → Whisper → Gemini) bleibt
 die Wahrheit für die fachliche Prüfung. Davor kommt eine dünne
 Echtzeit-Schicht:
 
@@ -26,43 +26,46 @@ Echtzeit-Schicht:
    Qualitätsstufe, wenn noch Zeit ist.
 
 Damit sinkt die wahrgenommene Antwortzeit von heute **~9 s auf ~0,3–1 s bis zum
-ersten Ton**, ohne die Quellenbindung oder die Local-only-Zusage zu brechen.
+ersten Ton**, ohne die Quellenbindung zu brechen. Die Cloud-Entscheidung für
+das LLM ist bereits gefallen (Gemini, §8); Audio/TTS folgen erst später.
 
 **Sonderfall: vorhandener ElevenLabs-API-Key.** Dann ist Muster A aus
 Abschnitt 3.6 (ElevenLabs Agents + Client Tool auf unser Backend) der
 schnellste Weg zu einem natürlich klingenden Gespräch: Scribe/Flash/Turn-Taking
-kommen gehostet, die Quellenprüfung bleibt lokal. Das ist **nicht lokal** und
-muss im Pitch gesagt werden; es ersetzt die Empfehlung oben nur, wenn die
-Cloud-Audio-Ausnahme bewusst beschlossen wird.
+kommen gehostet, die Quellenprüfung bleibt im Backend. Das ist **ein weiterer
+Cloud-Schritt** und muss im Pitch gesagt werden; es ersetzt die Empfehlung oben
+nur, wenn die Cloud-Audio-Ausnahme bewusst beschlossen wird.
 
 **Wenn das Produkt nach dem Hackathon weiterläuft:** Pipecat ist die beste
-Anschlussoption (Python, lokal, BSD-2, Ollama/Whisper/Piper als First-Class-
+Anschlussoption (Python, lokal, BSD-2, Gemini/Whisper/Piper als First-Class-
 Services, WebSocket- und SmallWebRTC-Transport). LiveKit nur bei Mehrnutzer-
 Räumen/Telefonie/Skalierung. OpenAI Realtime oder Gemini Live nur, wenn
-Local-only fällt; dann ist Gemini Live deutlich billiger, OpenAI stärker bei
-Reasoning/Tool-Calls.
+zusätzlich Cloud-Audio akzeptiert wird; dann ist Gemini Live deutlich billiger,
+OpenAI stärker bei Reasoning/Tool-Calls.
 
 ## 1. Ist-Stand (gemessen, nicht geschätzt)
 
 | Baustein | Heute | Gemessene Zeit | Lokal? |
 |---|---|---|---|
 | Spracherkennung Antwort | Batch-Whisper `small`, CPU/int8, ganze Datei | **4,8 s** für 6,8 s Audio (Beam 5); Beam 1 ≈ 3,3 s; `tiny` warm ≈ 1,0 s | ja (Docker) |
-| Antwortbewertung | Ollama `qwen3.5:4b-q4_K_M`, JSON-Schema, `stream: false` | **4,1 s** | ja (Host-GPU) |
-| Fragenrunde vorab | derselbe LLM-Pfad | **6,1 s** | ja |
-| Fact-Check | derselbe LLM-Pfad | **10,1 s** | ja |
+| Antwortbewertung | Gemini `gemini-3.1-flash-lite`, JSON-Modus, kein Streaming | **1,7 s** (synthetisch) | nein (Cloud) |
+| Fragenrunde vorab | derselbe Gemini-Pfad | **2,1 s** | nein (Cloud) |
+| Fact-Check | derselbe Gemini-Pfad | **3,4 s** | nein (Cloud) |
 | Sprachausgabe | Browser `speechSynthesis` | Start ~0,1–0,3 s | **nicht garantiert** (Browser kann Cloud-Stimme nutzen) |
 | Antwortende | Button „Done“ | manuell | – |
 | Transport | HTTP-Multipart + Polling; daneben `WS /speech/live` (2-s-Fenster) und `WS /speech/feedback` (5-s-Takt) | – | ja |
 
-Wahrgenommene Latenz pro Sprachzug heute: **Upload + 4,8 s ASR + 4,1 s LLM +
-TTS-Start ≈ 9 s** plus Klick. Das ist kein Gespräch, sondern eine
-Sprachnachricht mit Wartezeit.
+Wahrgenommene Latenz pro Sprachzug mit dem schwachen Gemini-Testmodell:
+**Upload + 4,8 s ASR + 1,7 s LLM + TTS-Start ≈ 7 s** plus Klick. Die
+Batch-ASR bleibt der große Block; das LLM ist nicht mehr der Hauptgrund für
+die Wartezeit.
 
 Zwei technische Ursachen, die kein Framework wegzaubert:
 
-- **Der LLM-Adapter kann nicht streamen.** `LocalOllamaChat.complete_json` setzt
-  `"stream": False` und verlangt ein vollständiges JSON-Objekt. Erst danach darf
-  gesprochen werden, weil `reply` nur mit verifiziertem Zitat erlaubt ist.
+- **Der LLM-Adapter kann nicht streamen.** `OpenAICompatibleChat.complete_json`
+  verlangt ein vollständiges JSON-Objekt und setzt kein `stream`. Erst danach darf
+  gesprochen werden, weil `reply` nur mit verifiziertem Zitat erlaubt ist. Ein
+  natives Gemini-Streaming wäre ein eigener Adapter, kein Freischalten.
 - **ASR läuft als Batch nach dem Upload.** Die vorhandene Live-Transkription
   (`WHISPER_LIVE_CHUNK_MS=2000`, 10-s-Fenster, ein Slot pro Prozess) liefert
   Wörter schon während des Sprechens, wird für die Antwortrunde aber nicht
@@ -72,10 +75,10 @@ Zwei technische Ursachen, die kein Framework wegzaubert:
 
 | Anforderung | Konsequenz |
 |---|---|
-| Kurz reden, nicht zehn Minuten | 3 Fragen, kurze Reaktion, eine optionale Nachfrage |
+| Kurz reden, nicht zehn Minuten | 3–4 Fragen (Cap 5), kurze Reaktion, eine optionale Nachfrage |
 | Nach der Präsentation, mit Quellen | Fragen und Feedback müssen an Fact-Check-Funde/Quellen gebunden bleiben |
 | Keine erfundenen Inhalte | Spoken feedback nur aus verifizierten Urteilen oder als procedurelles Template |
-| Lokal, kein API-Key | Cloud nur als bewusst zu beschließende Ausnahme; mit ElevenLabs-Key ist die Cloud-Ausnahme möglich |
+| Cloud bewusst akzeptiert | Gemini ist Cloud (kein EU-Pinning); Audio/TTS nur mit separater Entscheidung |
 | Laptop + Smartphone, lokale Demo | Browser-Transport, kein eigener WebRTC-SFU im Docker-Netz |
 | Hackathon-Zeit | Wiederverwenden, was getestet ist; kein neuer Dienst mit neuem Protokoll |
 
@@ -124,8 +127,8 @@ Pipecat ist die richtige Wahl, sobald **echtes Barge-in, mehrere Züge mit
 Unterbrechungen und ein eigener Voice-Service** gefordert sind. Die Integration
 wäre: neuer Container `voice-agent` mit Pipecat, `WebSocketTransport` (oder
 SmallWebRTC auf einem Host mit sauberem Networking), STT `faster-whisper`,
-LLM Ollama, TTS Piper-HTTP; ein Custom Processor ruft die vorhandene
-Bewertungs-API auf und spricht nur das verifizierte Ergebnis. Aufwand: eher
+LLM Gemini (Custom Processor), TTS Piper-HTTP; ein Custom Processor ruft die
+vorhandene Bewertungs-API auf und spricht nur das verifizierte Ergebnis. Aufwand: eher
 1–2 Tage als 4 Stunden.
 
 ### 3.2 LiveKit Agents
@@ -162,8 +165,9 @@ Route zu einem natürlichen Gespräch.
 
 Warum nicht hier:
 
-- **Local-only und „kein API-Key“ sind eine ausdrückliche Nutzerentscheidung.**
-  Das Modell hört und spricht die Jury-Aufnahme in der Cloud.
+- **Die Cloud-Entscheidung ist bereits gefallen.** Gemini verarbeitet
+  Transkript und Quellen; ein zusätzliches Realtime-Modell würde auch Audio an
+  einen weiteren Anbieter senden.
 - **Die Quellenbindung wird weicher.** Ein Speech-to-Speech-Modell kann frei
   formulieren; die Garantie „nur mit wörtlich geprüftem Zitat sprechen“ gilt nur
   noch für Tool-Ergebnisse, nicht für den Dialog drumherum.
@@ -249,10 +253,11 @@ kein Mikrofon-Audio. Voice-Qualität steigt, die 4–6 s Prüfpfad-Latenz bleibt
 Auto-Endpointing und Sofort-Template sind trotzdem nötig. Aufwand ~2–3 h.
 
 **Urteil:** Mit vorhandenem API-Key ist Muster A der schnellste Weg zu einem
-Gespräch, das sich wie ein Lehrer anfühlt – **wenn** die Demo Cloud-Audio
-zulassen darf. Muster B ist der Kompromiss, wenn Audio das Gerät nicht
-verlassen soll. Die bisherige Local-only-Zusage aus `docs/06-local-coaching.md`
-gilt dann nicht mehr und muss im Pitch ausdrücklich angepasst werden.
+Gespräch, das sich wie ein Lehrer anfühlt – **wenn** die Demo zusätzlich
+Cloud-Audio zulassen darf. Muster B ist der Kompromiss, wenn Audio das Gerät
+nicht verlassen soll. Die frühere Local-only-Zusage aus
+`docs/06-local-coaching.md` ist bereits durch Gemini ersetzt; Audio-Cloud wäre
+ein weiterer Schritt und muss im Pitch ausdrücklich benannt werden.
 
 Die konkrete Fragen-/Sprech-Architektur (wer formuliert, Plan-first,
 Niveau-Heuristik, Filler, Streaming) steht in
@@ -275,7 +280,7 @@ Nutzer spricht
    ▼
 [2] PARALLEL (1–6 s)
    ├─ Batch-ASR (bestehend) oder Live-WS-Transkript
-   ├─ Ollama-Bewertung (bestehend, JSON + Zitatprüfung)
+   ├─ Gemini-Bewertung (bestehend, JSON + Zitatprüfung)
    └─ Ergebnis als Karte
    ▼
 [3] NÄCHSTER ZUG (ab ~4–6 s)
@@ -352,8 +357,8 @@ läuft und lokale Modelle unterstützt. Zielbild:
 Browser ──WebSocket/RTVI──► voice-agent (Pipecat-Container)
                                  ├─ Silero VAD + Smart Turn v3
                                  ├─ faster-whisper (Streaming)
-                                 ├─ Ollama (kurze Reaktion)
-                                 ├─ Piper-HTTP (TTS)
+                                 ├─ Gemini (kurze Reaktion)
+                                 ├─ Piper- oder ElevenLabs-TTS
                                  └─ Custom Processor
                                         └─► POST /questions/answers/voice
                                             (bestehende JSON-/Zitatprüfung)
@@ -365,11 +370,11 @@ nicht-faktischen LLM-Call. So bleibt die Quellenbindung erhalten, während
 Pipecat Turn-Taking, Unterbrechungen und Audio-Transport übernimmt.
 
 **LiveKit Agents** erst, wenn mehrere Personen/Telefonie/Räume gebraucht werden.
-**OpenAI Realtime/Gemini Live** erst, wenn Local-only fällt; dann Gemini Live
-wegen der Kosten, OpenAI wegen Reasoning/Tool-Calls. **ElevenLabs Agents** ist
-der pragmatische Mittelweg, wenn ein Key vorhanden ist: Es liefert die beste
-Voice-Schicht ohne eigenen Audio-Stack, während die Quellenprüfung als
-Client-Tool im lokalen Backend bleibt. **ACP** bleibt außen vor.
+**OpenAI Realtime/Gemini Live** erst, wenn zusätzlich Cloud-Audio akzeptiert
+wird; dann Gemini Live wegen der Kosten, OpenAI wegen Reasoning/Tool-Calls.
+**ElevenLabs Agents** ist der pragmatische Mittelweg, wenn ein Key vorhanden
+ist: Es liefert die beste Voice-Schicht ohne eigenen Audio-Stack, während die
+Quellenprüfung als Client-Tool im Backend bleibt. **ACP** bleibt außen vor.
 
 ## 6. Risiken und ehrliche Grenzen
 
@@ -381,8 +386,9 @@ Client-Tool im lokalen Backend bleibt. **ACP** bleibt außen vor.
   ist Piper die ehrlichere Wahl.
 - **Echo.** Lautsprecher + offenes Mikrofon erzeugt Selbsthören. Halbduplex
   oder Kopfhörer, kein ungetestetes AEC.
-- **CPU-Konkurrenz.** Whisper, Piper und Ollama teilen sich den Mac. `tiny`
-  für Live, `small` für die Batch-Wahrheit; Ollama läuft auf der Host-GPU.
+- **CPU-Konkurrenz.** Whisper und Piper teilen sich den Mac; Gemini läuft in
+  der Cloud. `tiny` für Live, `small` für die Batch-Wahrheit; die Cloud-Latenz
+  ist von der lokalen CPU unabhängig, aber netzwerkabhängig.
 - **Safari/iOS.** `getUserMedia` braucht einen sicheren Kontext; `localhost`
   ist sicher, eine LAN-IP nicht. `MediaRecorder` liefert MP4 statt WebM.
 - **Ein Live-Slot.** `WS /speech/live` erlaubt einen Slot pro Prozess; bei
@@ -421,3 +427,37 @@ Client-Tool im lokalen Backend bleibt. **ACP** bleibt außen vor.
   <https://huggingface.co/rhasspy/piper-voices>
 - Lokale Messwerte: `docs/06-local-coaching.md`,
   `docs/02-ai-decision-log.md` (Voice-Agent, Live-Transkription)
+
+## 8. Deep Research (24.10.2026)
+
+Vollständige Evidenzbasis, Grade und Zitate: `docs/11-deep-research-validation.md`.
+
+**Bestätigt.** Kein neuer Voice-Stack ist für die Demo gerechtfertigt: Die
+gemessenen ~9 s stammen aus Modell-Batch-Latenz, nicht aus dem Transport;
+WebRTC/Pipecat/LiveKit würden diese Latenz nicht beseitigen, aber neue
+Betriebsrisiken einführen. „Unser LLM schreibt, ElevenLabs spricht“ bleibt die
+richtige Kontrolle über Quellenbindung und Zitate. Vorgerenderte feste Fragen
+und Filler sind ein legitimer Latenzhebel; Streaming bleibt für dynamische
+Nachfragen.
+
+**Korrigiert.**
+
+- **Turn-Taking-Ziele:** 200 ms ist der menschliche Mittelwert, kein
+  Agenten-Ziel. Praktisch: <700 ms First Audio für bekannte Texte, <1,5 s für
+  dynamische Texte mit Filler, >4 s ist schlecht (Stivers et al. 2009;
+  Heldner & Edlund 2010; Skantze 2021).
+- **Halbduplex ist nicht kostenlos.** Barge-in wirkt in explorativen Studien
+  natürlicher; die Demo braucht mindestens einen sichtbaren
+  Listening/Speaking-State und eine Stop-Möglichkeit. Naturalness erst nach
+  Barge-in-Test beurteilen.
+- **„Lokal“ ist mit Gemini/ElevenLabs nicht mehr wahr.** Die Gemini Developer
+  API hat kein EU-Region-Pinning; ElevenLabs speichert Text/Audio
+  standardmäßig. Cloud-Weg und Einwilligung müssen im UI benannt werden, sonst
+  ist die frühere Local-only-Aussage ein Bruch.
+- **Vorrendern ist ein Latenz-, kein Natürlichkeitsbeweis.** Nur feste Texte
+  cachen, gleiche Stimme/Version, Cache-Key aus Text+Voice+Settings.
+
+**Empirisch geprüft.** `gemini-3.1-flash-lite` mit minimalem Reasoning lieferte
+valides JSON in 0,7–1,5 s; der End-to-End-Coaching-Smoke brauchte 3,4 s
+(Fact-Check), 2,1 s (Fragen) und 1,7 s (Antwortprüfung). Das stützt den
+Batch-Pfad, nicht eine Latenzzusage für die Jury-Hardware.

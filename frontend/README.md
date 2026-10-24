@@ -42,7 +42,7 @@ rebuild after changing dependencies or configuration.
   feedback types. **Track fingers** is independent of the diagnostic **Pose lab**.
   Filler words and word-based pace require the transcript after stopping.
 - **Source review and questions:** upload sources under `/sources`, then in a
-  recorded take choose **Check facts**. Local Ollama selects claims,
+  recorded take choose **Check facts**. Gemini selects claims and
   compares retrieved passages. **Start question round** asks follow-up questions;
   enter a text answer to compare it with the sources. Quotes are verified against retrieved text.
   [Setup, evaluation and limits](../docs/06-local-coaching.md).

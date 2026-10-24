@@ -810,3 +810,45 @@ Backend sowie Worker neu bauen/starten. Kein echter Anbieteraufruf getestet.
   keine öffentliche Deployment-Abnahme. Abgebrochene Publikation braucht
   denselben POST/Key oder Session-Löschung; harter Worker-Verlust verzögert
   temporäres Audio-Cleanup bis zur erneuten Zustellung.
+
+## Gemini statt Ollama (24.10.2026)
+
+- Nutzerentscheidung: den lokalen Ollama-Pfad entfernen und Gemini über den
+  OpenAI-kompatiblen Endpoint als Default nutzen; Key aus dem Image-Skill in
+  die lokale, nicht versionierte `.env` übernehmen. Kein Schlüssel wurde
+  ausgegeben oder committet.
+- Code: `LocalOllamaChat` und `backend/app/factcheck/local.py` entfernt;
+  `llm_settings()` hat keinen impliziten lokalen Fallback mehr;
+  `configured_llm()` liest `LLM_API_KEY`, sonst `GEMINI_API_KEY`, sonst
+  `GOOGLE_API_KEY`; `llm_available()` verlangt für Gemini einen Key.
+  `factcheck/settings` und `review/require_llm` prüfen keine lokale
+  Modellliste mehr; Review verlangt Cloud-Einwilligung. Compose übergibt
+  `LLM_*`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`; `OLLAMA_URL`, `COACH_MODEL` und
+  `host.docker.internal` sind entfernt. `QuestionConfig.max_questions` ist
+  auf 5 begrenzt.
+- Modellwahl: `gemini-3.1-flash-lite` (minimales Reasoning) für Test/Live,
+  `gemini-3.8-flash` (kein `minimal`) für final. `gemini-2.5-flash-lite` ist
+  im Projekt nicht erreichbar (404). Der OpenAI-kompatible Endpoint akzeptiert
+  `response_format={"type":"json_object"}` im Test; für Garantien ist natives
+  `responseJsonSchema` nötig. Thinking-Tokens zählen als Output.
+- Datenschutz: Gemini Developer API ohne EU-Region-Pinning; Paid-Inhalte
+  werden nicht zum Training genutzt, Unpaid kann geprüft werden. Die frühere
+  Local-only-Zusage ist hinfällig. Nur synthetische Demo-Daten senden oder
+  Vertex AI mit EU-Region prüfen.
+- Build: Ollama war kein Bestandteil des Docker-Images, sondern ein
+  Host-Dienst. Die Build-Zeit ändert sich durch das Entfernen daher nicht;
+  entfernt wurde die Laufzeit- und Konfigurationsabhängigkeit.
+- Geprüft: **187 Backend-Tests bestanden** (Container, inkl. neuer
+  LLM-Konfigurationstests). `scripts/smoke_gemini.py`:
+  `gemini-3.1-flash-lite`, 0,71 s, valides JSON. `scripts/smoke_coaching.py`:
+  Fact-Check 3,4 s, Fragen 2,1 s, Antwortprüfung 1,7 s; drei korrekte Urteile
+  auf synthetischen Daten. Keine Genauigkeits- oder Latenzzusage.
+- `scripts/smoke_review.py --llm` mit `gemini-3.1-flash-lite` scheiterte
+  erwartungsgemäß an der Verifikationsgrenze (`E_REVIEW_VERIFICATION`, >20 %
+  Fallback); die geprüfte Template-Review blieb abrufbar. Das ist der
+  vorgesehene sichere Fallback, kein stiller Fehler. `gemini-3.8-flash`
+  lieferte im direkten JSON-Test 2,15 s und ist für den finalen Writer
+  vorgesehen.
+- Offen: echte deutsche Prompts/Quellen, Rate-Limits unter Last, EU-Region,
+  Frontend-Einwilligungstext für Google, finaler Lauf mit
+  `gemini-3.8-flash`. Evidenz: `docs/11-deep-research-validation.md`.

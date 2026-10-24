@@ -1,40 +1,48 @@
-# Lokale KI: Transkript, Quellenvergleich und Rückfragen
+# Coaching-Backend: Gemini, Transkript und Quellenvergleich
 
-Stand: 24.10.2026. Nutzerentscheidung: lokal vorführen, keine kostenpflichtige
-API nötig. Die zunächst genannte OpenAI API wird für diesen Pfad nicht verwendet.
+Stand: 24.10.2026. Nutzerentscheidung: Gemini über den OpenAI-kompatiblen
+Endpoint, kein lokales Ollama mehr. Die frühere Local-only-Zusage ist damit
+hinfällig: Transkripte und Quellen werden an Google gesendet. Nur synthetische
+Demo-Daten verwenden oder Vertex AI mit EU-Region prüfen.
 
-## Start auf dem Demo-Mac
+## Start
 
-Einmalig [Ollama](https://ollama.com/download) installieren (hier über Homebrew:
-`brew install ollama`). In einem eigenen Terminal starten und laufen lassen:
+1. In `.env` den Schlüssel setzen (nur serverseitig, nie committen):
 
-```sh
-OLLAMA_NO_CLOUD=1 OLLAMA_HOST=127.0.0.1:11434 OLLAMA_MAX_LOADED_MODELS=1 OLLAMA_NUM_PARALLEL=1 ollama serve
-```
+   ```sh
+   GEMINI_API_KEY=...
+   # optionaler Alias für das Image-Skill:
+   GOOGLE_API_KEY=...
+   LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+   LLM_MODEL=gemini-3.1-flash-lite   # Tests/Live; final: gemini-3.8-flash
+   LLM_JSON_MODE=true
+   LLM_TIMEOUT_S=45
+   LLM_CONCURRENCY=4
+   ```
 
-In einem zweiten Terminal, aus dem Repository:
+2. Stack starten und Konfiguration prüfen:
 
-```sh
-ollama pull qwen3.5:4b-q4_K_M
-docker compose up --build -d --wait
-curl http://localhost:3000/api/factcheck/settings
-```
+   ```sh
+   docker compose up --build -d --wait
+   curl http://localhost:3000/api/factcheck/settings
+   ```
 
-`available: true` bestätigt Erreichbarkeit und vorhandenes Modell. Der erste
-Aufruf lädt es in den Speicher. Der Quellen-Smoke unten prüft echte Inferenz.
-Kein Login und kein API-Key. Modell-Downloads benötigen einmalig Internet;
-danach laufen die beschriebenen Modelle lokal. Ollama nutzt auf diesem Mac
-die GPU; Whisper und Embeddings laufen im Docker-Worker auf CPU.
+   `available: true` bestätigt Schlüssel und Modellkonfiguration. Es gibt
+   keinen stillen Fallback auf ein lokales Modell. Der erste echte Aufruf ist
+   der Gemini-Smoke:
 
-**Den vollständigen Modellnamen verwenden.** Der allgemeine Tag `qwen3.5:4b`
-lieferte auf diesem Mac eine MLX-Variante. Mit Ollama 0.40.10 antwortete diese
-bei JSON-Schema-Ausgabe mit `501 structured output is unavailable`. Die explizite
-GGUF-Variante `qwen3.5:4b-q4_K_M` wurde erfolgreich geprüft.
+   ```sh
+   docker compose exec -T backend python - < backend/scripts/smoke_gemini.py
+   ```
 
-Compose erreicht Ollama über `host.docker.internal:11434`. Getestet mit Docker
-Desktop auf macOS; Linux benötigt eine passende Host-/Container-Verbindung.
-Konfiguration in `.env`: `COACH_MODEL`, `OLLAMA_URL`, `ASR_PROVIDER=whisper`.
-Der Adapter akzeptiert nur lokale Hostnamen und keinen Cloud-Modelltag.
+3. `gemini-3.1-flash-lite` unterstützt `thinkingLevel=minimal` und ist der
+   getestete Default für schwache/live Aufrufe. `gemini-3.8-flash` unterstützt
+   **kein** `minimal`; für den finalen Lauf `low`/`medium`/`high` verwenden.
+   `gemini-2.5-flash-lite` ist im Projekt nicht erreichbar (404).
+
+Compose reicht `LLM_*`, `GEMINI_API_KEY` und `GOOGLE_API_KEY` an backend und
+worker weiter. Der Schlüssel bleibt aus dem Frontend heraus. `LLM_API_KEY`
+gewinnt, falls gesetzt; sonst greift `GEMINI_API_KEY`, dann `GOOGLE_API_KEY`.
 
 ## In der Oberfläche
 
@@ -72,14 +80,15 @@ Während einer Modellprüfung im Review bleiben; Navigation bricht das Polling a
 
 | Aufgabe | Auswahl | Grund und Grenze |
 | --- | --- | --- |
-| Wort-Timestamps | faster-whisper 1.2.1, Whisper `small`, Deutsch, CPU/int8 | Bereits vorhandenes austauschbares ASR-Interface; lokale Datenverarbeitung. Keine geprüfte deutsche Füllwortquote. |
+| Wort-Timestamps | faster-whisper 1.2.1, Whisper `small`, Deutsch, CPU/int8 | Bereits vorhandenes austauschbares ASR-Interface; Audio bleibt im Backend-Container. Keine geprüfte deutsche Füllwortquote. |
 | Quellen suchen | Jina Embeddings v2 base de + pgvector/Volltext | Vorhandene deutsche lokale Retrieval-Pipeline. Die ähnlichste Passage ist nicht automatisch ein Beleg. |
-| Aussagen, Vergleiche, Fragen, Antworten | Qwen3.5 4B Q4_K_M über Ollama | Offene Gewichte (Apache-2.0), etwa 3,3 GB Download; passt auf den Demo-Mac mit M2 Pro/32 GB. JSON-Schema-Ausgabe funktioniert im geprüften Lauf. |
+| Aussagen, Vergleiche, Fragen, Antworten | Gemini `gemini-3.1-flash-lite` (Test/Live) bzw. `gemini-3.8-flash` (final) | Cloud-Modell über den OpenAI-kompatiblen Endpoint; JSON-Modus getestet. Kein Genauigkeits- oder Latenzversprechen. |
 
-Ein größeres lokales Modell könnte anders antworten, benötigt aber mehr Speicher
-und eine eigene Prüfung. Eine gehostete API wäre eine austauschbare Alternative;
-sie ist hier weder erforderlich noch als stiller Fallback eingebaut. „Lokal“
-begründet Datenweg und fehlende API-Gebühren, keine Genauigkeitsbehauptung.
+Die Umstellung auf Gemini ist eine bewusste Entscheidung für Geschwindigkeit
+und Verfügbarkeit, nicht für bessere Genauigkeit. Ein lokales Modell wäre eine
+austauschbare Alternative, ist aber nicht mehr als Default eingebaut. „Cloud“
+bedeutet: Transkript und Quellen verlassen das Gerät; die Developer API hat
+kein EU-Region-Pinning. Für die Jury nur synthetische Inhalte verwenden.
 
 ## Wie entsteht ein Quellenvergleich?
 
@@ -124,28 +133,33 @@ reduzieren definierte Fehler, garantieren aber keine Prompt-Injection-Sicherheit
 - Redis transportiert nur IDs, keine Transkripte oder Videodaten. Längere Arbeit
   läuft in Celery, die API antwortet sofort mit einer Job-ID.
 - Modell/Quelle/Queue nicht verfügbar: sichtbarer Fehler, Video bleibt vorhanden.
-  Kein stiller Wechsel zu Demoantworten oder einer kostenpflichtigen API.
+  Kein stiller Wechsel zu Demoantworten; ein Cloud-Ausfall wird sichtbar.
 - Für die Jury ausschließlich synthetische Demo-Inhalte verwenden. Vor einer
   freiwilligen echten Aufnahme Datenweg und Speicherung im UI erklären.
 
 ## Reproduzierbare Prüfung und Evidenz
 
 ```sh
+docker compose exec -T backend python - < backend/scripts/smoke_gemini.py
 docker compose exec -T backend python - < backend/scripts/smoke_coaching.py
 docker compose cp backend/tests/fixtures/speech-de.wav backend:/tmp/speech-de.wav
 docker compose exec -T backend python -m scripts.smoke_audio /tmp/speech-de.wav --transcribe
 ```
 
-Die endgültige integrierte Pipeline wird mit dem Smoke oben auf dem M2 Pro
-mit 32 GB geprüft: gestützte Aussage, Widerspruch, fehlende Evidenz, passende
-Rückfrage und belegte Antwort. Konkrete Laufzeiten stehen im
-[Entscheidungsprotokoll](02-ai-decision-log.md). Einzelne synthetische Durchläufe
-sind keine allgemeine Qualitäts- oder Latenzzusage. `ollama ps` bestätigt lokale
-GPU-Nutzung. Der Smoke entfernt seine Quellen und Ergebnisobjekte.
-Letzter integrierter Lauf: Quellenvergleich 10,1 s, Frage 6,1 s,
-Antwortvergleich 4,1 s. Ein früherer Lauf ordnete eine korrigierte Antwort trotz
-passendem Zitat falsch ein; die Prompt-Korrektur und der bestandene Wiederholungslauf
-sind im Protokoll beschrieben. Modelle können weiterhin falsch urteilen.
+Der Gemini-Smoke prüft einen echten JSON-Aufruf durch den Backend-Adapter. Der
+Coaching-Smoke prüft die integrierte Pipeline mit synthetischen Daten:
+gestützte Aussage, Widerspruch, fehlende Evidenz, passende Rückfrage und
+belegte Antwort. Einzelne synthetische Durchläufe sind keine allgemeine
+Qualitäts- oder Latenzzusage. Der Smoke entfernt seine Quellen und
+Ergebnisobjekte.
+
+Letzter integrierter Lauf mit `gemini-3.1-flash-lite` (minimales Reasoning):
+Quellenvergleich 3,4 s, Fragen 2,1 s, Antwortvergleich 1,7 s; alle drei Urteile
+korrekt. Der frühere lokale Ollama-Lauf brauchte 10,1 s / 6,1 s / 4,1 s und ist
+nur noch historisch. Ein früherer Lauf ordnete eine korrigierte Antwort trotz
+passendem Zitat falsch ein; die Prompt-Korrektur und der bestandene
+Wiederholungslauf sind im Protokoll beschrieben. Modelle können weiterhin
+falsch urteilen; die Latenz ist keine Jury-Zusage.
 
 Whisper `small` transkribierte die 6,845-s-eSpeak-Fixture mit 13 Wort-Timestamps:
 „In unserem Prototyp üben wir Präsentationen. Wir sprechen deutlich und erklären
@@ -156,11 +170,35 @@ sind damit nicht allgemein geprüft.
 
 ## Primärquellen
 
-- [Ollama: Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs)
-  — JSON-Schema an `format`, zusätzlich im Prompt, danach Pydantic-Validierung.
-- [Qwen3.5-4B Modellkarte](https://huggingface.co/Qwen/Qwen3.5-4B)
-  und [konkreter Ollama-Tag](https://ollama.com/library/qwen3.5:4b-q4_K_M)
-  — Modellherkunft, Lizenz und Artefakt; Benchmarks nicht auf unsere App übertragen.
-- [Ollama FAQ](https://docs.ollama.com/faq) — lokaler Server und GPU-Anzeige.
+- [Gemini OpenAI-Kompatibilität](https://ai.google.dev/gemini-api/docs/openai)
+  — Endpoint, Auth und unterstützte Parameter.
+- [Gemini Structured Output](https://ai.google.dev/gemini-api/docs/structured-output)
+  — `responseMimeType`/`responseJsonSchema` und Schema-Grenzen.
+- [Gemini Thinking](https://ai.google.dev/gemini-api/docs/generate-content/thinking)
+  — `thinkingLevel`/`thinkingBudget`, Modellunterstützung.
+- [Gemini Modelle](https://ai.google.dev/gemini-api/docs/models) und
+  [Preise](https://ai.google.dev/gemini-api/docs/pricing) — Modell-IDs,
+  Kontextfenster, Kosten; Stände ändern sich.
+- [Gemini Terms](https://ai.google.dev/gemini-api/terms) — Datenverarbeitung,
+  Retention und Regionen.
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
   — lokale CTranslate2-Inferenz und `word_timestamps=True`.
+- Evidenz und Grenzen: `docs/11-deep-research-validation.md`.
+
+## Deep Research (24.10.2026)
+
+- **Schwaches Modell reicht für den Batch-Pfad, nicht für den strikten
+  Writer.** `gemini-3.1-flash-lite` (minimal) lieferte Fact-Check, Fragen und
+  Antwortprüfung in 3,4 / 2,1 / 1,7 s; der Review-Writer fiel an der
+  Verifikationsgrenze auf die geprüfte Template-Review zurück. Final
+  `gemini-3.8-flash` verwenden.
+- **Fact-Check bleibt fallibel.** Claim-Verifikation ist in Benchmarks etwa
+  57–63 % genau; der Code prüft nur das wörtliche Zitat. Keine
+  Genauigkeits- oder Latenzzusage aus synthetischen Läufen.
+- **Cloud ist eine bewusste Abkehr von Local-only.** Gemini Developer API ohne
+  EU-Region-Pinning; Paid-Inhalte nicht zum Training, Unpaid kann geprüft
+  werden. Nur synthetische Demo-Daten senden oder Vertex AI mit EU-Region
+  prüfen.
+- **Ollama ist kein Build-Bestandteil mehr.** Es war ein Host-Dienst; die
+  Entfernung ändert die Build-Zeit nicht, nur die Laufzeitabhängigkeit.
+- Vollständige Zitate und Evidenzgrade: `docs/11-deep-research-validation.md`.

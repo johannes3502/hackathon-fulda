@@ -9,9 +9,10 @@ ist die checklistenförmige Umsetzung.
 Nach der Präsentation führt ein Lehrer-/Tutor-Agent ein kurzes, deutsches
 Gespräch:
 
-- 3 Fragen, eine davon quellengebunden, eine Verständnis-/Anwendungsfrage,
-  eine Vertiefung.
-- Kurzes, verifiziertes Feedback, keine Noten, keine Punkte.
+- 3–4 Fragen (Hard Cap 5), eine davon quellengebunden, eine
+  Verständnis-/Anwendungsfrage, eine Vertiefung.
+- Kurzes, aufgabenbezogenes Feedback im Gespräch; vollständige Evidenz und
+  Zitate im finalen Review. Keine Noten, keine Punkte.
 - Erste Frage hörbar, sobald die Session startet – nicht erst nach dem
   Fact-Check.
 - Quellen: Transkript, hochgeladene Quellen, optional Web-Zweitquelle.
@@ -29,11 +30,13 @@ Gespräch:
    - Lane A: Widerspruch/Beleg/Lücke, startet mit dem finalen Fact-Check.
    Lane D führt beides zusammen, rankt und validiert.
 4. **Fact-Check hybrid:** Live-Lane sammelt nur Kandidaten und prefetcht
-   Retrieval; die finale, autoritative Pipeline läuft nach dem Stoppen auf dem
-   finalen Batch-Transkript und schreibt die `fact`-Events.
-5. **Gemini:** `gemini-3.8-flash` als Default, `thinking_level=low` live und
-   `high` final. Optional `gemini-3.1-flash-lite` für die Live-Lane,
-   `gemini-3.1-pro-preview` nur für den finalen Lauf (Preview-Risiko).
+   Retrieval; die finale, quellengebundene Pipeline läuft nach dem Stoppen auf
+   dem finalen Batch-Transkript und schreibt die `fact`-Events. Kein
+   „autoritatives“ Urteil, keine Live-Urteile.
+5. **Gemini:** Test/Live `gemini-3.1-flash-lite` mit
+   `thinking_level=minimal`; final `gemini-3.8-flash` mit `high`
+   (`gemini-3.8-flash` kennt kein `minimal`). `gemini-3.1-pro-preview` nur
+   optional final (Preview-Risiko).
 6. **Bekannte Fragen und Filler vorrendern.** Streaming nur für dynamische
    Nachfragen, satzweise, nie JSON/Markdown an die TTS.
 7. **Keine Bewertung der Person.** Niveau ist eine interne Heuristik für die
@@ -163,16 +166,18 @@ $0,10–1,00 je nach Modell und Caching.
 
 ## 6. Offene Entscheidungen
 
-- **Cloud vs. lokal:** Gemini + ElevenLabs sind Cloud. Wenn „alles lokal“ im
-  Pitch bleiben soll, stattdessen Ollama + Piper; dann entfällt die
-  ElevenLabs-Stimme.
+- **Cloud vs. lokal:** entschieden für Gemini (Cloud) und ElevenLabs (später).
+  Die frühere Local-only-Zusage ist damit hinfällig; nur synthetische
+  Demo-Daten senden oder Vertex AI mit EU-Region prüfen. Ollama ist aus dem
+  Projekt entfernt.
 - **ASR im Dialog:** lokales Whisper (Audio bleibt lokal) vs. ElevenLabs
   Scribe Realtime (schneller, Cloud).
 - **ElevenLabs-Umfang:** nur TTS (empfohlen) vs. vollständiger Agent mit
   Client-Tool (mehr Turn-Taking, weniger Textkontrolle).
-- **Barge-in:** Halbduplex für die Demo; echtes Barge-in später.
-- **Fragenanzahl/Persona:** 3 Fragen, `tutor` als Default; `student` als
-  Option.
+- **Barge-in:** Halbduplex für die Demo, aber mit sichtbarem State und
+  Stop-Möglichkeit; echtes Barge-in später testen.
+- **Fragenanzahl/Persona:** 3–4 Fragen (Cap 5), `tutor` als Default;
+  `student` als Option.
 
 ## 7. Nicht-Ziele
 
@@ -184,8 +189,59 @@ $0,10–1,00 je nach Modell und Caching.
 
 ## 8. Referenzen
 
-- `docs/07-voice-agent-stack.md` – Stack-Vergleich, ElevenLabs, Local-only.
+- `docs/07-voice-agent-stack.md` – Stack-Vergleich, ElevenLabs, Cloud-Grenzen.
 - `docs/08-question-agent-architecture.md` – Fragen, Didaktik, Niveau,
   TTS-Streaming.
 - `docs/09-streaming-analysis-and-models.md` – inkrementelle Analyse,
   Fact-Check-Lanes, Gemini-Modelle.
+
+## 9. Deep Research (24.10.2026)
+
+Vollständige Evidenzbasis, Grade und Zitate: `docs/11-deep-research-validation.md`.
+
+**Was der Plan richtig macht.** Kein neuer Voice-Stack; LLM schreibt den
+exakten Sprechtext; TTS spricht nur; plan-first Fragen; zwei Question-Lanes;
+finaler Fact-Check bleibt quellengebunden; vorgerenderte feste Texte; keine
+Noten oder Personenbewertung. Die gemessenen 3,4 s / 2,1 s / 1,7 s mit
+`gemini-3.1-flash-lite` zeigen, dass der Batch-Pfad mit einem schwachen Modell
+ohne Reasoning läuft. Der **strikte Review-Writer** fiel mit diesem Modell an
+der Verifikationsgrenze auf die geprüfte Template-Review zurück
+(`E_REVIEW_VERIFICATION`); für den finalen Writer ist `gemini-3.8-flash`
+einzuplanen. Der Fallback ist bewusst und sichtbar, kein stiller Fehler.
+
+**Was korrigiert wird.**
+
+1. **Live-Lane event-driven**, nicht alle 20–30 s: nur finalisierte
+   ASR-Segmente, 20–30 s als Fallback. Partials sind zu unzuverlässig.
+2. **Kein „autoritativer“ Fact-Check.** Drei Ausgänge, Zitatprüfung, Quelle;
+   „nicht gefunden“ ist nicht „falsch“; keine Live-Urteile. Benchmark-Realität
+   liegt bei ~57–63 %, nicht bei Gewissheit.
+3. **Plan-first mit mehreren akzeptablen Antwortpunkten**, nicht einer
+   goldenen Antwort. PFQS stützt Fragenqualität, nicht Lerngewinn.
+4. **Halbduplex nur mit sichtbarem State und Stop-Möglichkeit.** Barge-in
+   wirkt natürlicher; vor einem Naturalness-Urteil testen.
+5. **Zweistufiges Feedback:** kurz und aufgabenbezogen im Gespräch, Evidenz
+   und Zitate im Review. Kein „falsch“ mitten im Gespräch; bei falscher
+   Antwort klären → Hinweis → ein Retry, dann später zurückkommen.
+
+**Harte Grenzen (Demo).** 3–5 Hauptfragen (Default 4), ein Follow-up (max. 2
+nur bei klarem Widerspruch), 8–10 min Ziel, Hard Stop 10 min (12 min inkl.
+Abschied), 3–5 s Wartezeit nach der Frage, 10 s Answer-Timeout, ≤15
+Agent-Turns, kein neues Thema nach Minute 8, letzte 90 s Zusammenfassung, zwei
+Timeouts in Folge → früh schließen. Das sind Safety-Rails, keine Pädagogik;
+adaptiver Stop ergänzt sie. `QuestionConfig.max_questions` ist im Code auf 5
+begrenzt.
+
+**Ollama entfernt.** Der lokale Ollama-Adapter, `OLLAMA_URL`/`COACH_MODEL`,
+der Host-Gateway-Eintrag und die Ollama-Tests sind aus dem Projekt entfernt.
+Ollama war **nicht** im Docker-Image, sondern ein Host-Dienst; die Build-Zeit
+ändert sich dadurch nicht. Der Backend-Default ist jetzt Gemini über den
+OpenAI-kompatiblen Endpoint (`gemini-3.1-flash-lite` für Tests,
+`gemini-3.8-flash` für den finalen Lauf). Wichtig: Damit ist die frühere
+Local-only-Zusage hinfällig; die Gemini Developer API hat kein EU-Pinning.
+Nur synthetische Demo-Daten senden oder Vertex AI mit EU-Region nutzen.
+
+**Empfohlene Pilotmessungen.** Antwortlänge, Reparaturrate, Student-Talk-Anteil,
+wahrgenommener Druck, Abbruchquote, First-Audio-Latenz, Fragenqualität und
+Quote-Match-Quote. Keine dieser Zahlen aus synthetischen Läufen als
+Genauigkeits- oder Latenzversprechen verwenden.

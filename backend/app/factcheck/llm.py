@@ -1,8 +1,9 @@
 """Chat model behind a small interface; any OpenAI-compatible endpoint works.
 
 Base URL, model and key come from the environment (`LLM_BASE_URL`,
-`LLM_MODEL`, `LLM_API_KEY`), so the team can switch between OpenAI, a hosted
-open model or a local server (Ollama, vLLM, LM Studio) without code changes.
+`LLM_MODEL`, `LLM_API_KEY`). The default is Gemini through its
+OpenAI-compatible endpoint; `GEMINI_API_KEY` and `GOOGLE_API_KEY` are accepted
+as key aliases so the same `.env` can serve the image skill and the backend.
 """
 
 import json
@@ -13,7 +14,6 @@ from urllib.parse import urlsplit
 
 import httpx
 from pydantic import BaseModel
-from app.factcheck.local import LocalOllamaChat
 
 
 class LLMError(RuntimeError):
@@ -29,10 +29,7 @@ class ChatModel(Protocol):
 
 
 def structured_json(llm: ChatModel, system: str, user: str, output: type[BaseModel]) -> dict:
-    """Native local inference constrains the JSON grammar; other adapters retain their contract."""
-    if isinstance(llm, LocalOllamaChat):
-        raw = llm.complete_json(system, user, schema=output.model_json_schema())
-        return output.model_validate(raw).model_dump()
+    """The caller validates the returned object; Gemini's JSON mode constrains the shape."""
     return llm.complete_json(system, user)
 
 
@@ -88,27 +85,40 @@ class OpenAICompatibleChat:
         return parse_json_object(content)
 
 
+def llm_api_key() -> str:
+    """Backend key, preferring an explicit LLM key over the Gemini aliases."""
+    for name in ("LLM_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
 def llm_settings() -> dict[str, str] | None:
-    """Base URL and model if configured; None disables the fact-check."""
+    """Base URL and model if configured; None disables LLM-backed features."""
     base_url, model = os.getenv("LLM_BASE_URL", "").strip(), os.getenv("LLM_MODEL", "").strip()
-    if not base_url and not model:
-        coach = LocalOllamaChat()
-        return {"base_url": coach.endpoint, "model": coach.model,
-                "host": urlsplit(coach.endpoint).hostname or "localhost", "provider": "ollama"}
     if not base_url or not model:
         return None
-    return {"base_url": base_url, "model": model, "host": urlsplit(base_url).hostname or base_url}
+    host = urlsplit(base_url).hostname or base_url
+    provider = "gemini" if host.endswith("generativelanguage.googleapis.com") else "openai-compatible"
+    return {"base_url": base_url, "model": model, "host": host, "provider": provider}
+
+
+def llm_available(settings: dict[str, str] | None = None) -> bool:
+    """Gemini needs a key; generic OpenAI-compatible endpoints may be keyless."""
+    settings = settings or llm_settings()
+    if settings is None:
+        return False
+    return settings["provider"] != "gemini" or bool(llm_api_key())
 
 
 def configured_llm() -> ChatModel:
     settings = llm_settings()
     if settings is None:
         raise ValueError("Set LLM_BASE_URL and LLM_MODEL for the fact-check")
-    if settings.get("provider") == "ollama":
-        return LocalOllamaChat()
     temperature = os.getenv("LLM_TEMPERATURE", "").strip()
     return OpenAICompatibleChat(
-        settings["base_url"], settings["model"], os.getenv("LLM_API_KEY", ""),
+        settings["base_url"], settings["model"], llm_api_key(),
         json_mode=os.getenv("LLM_JSON_MODE", "true").lower() not in ("0", "false", "no"),
         temperature=float(temperature) if temperature else None,
         timeout_s=float(os.getenv("LLM_TIMEOUT_S", "90")),

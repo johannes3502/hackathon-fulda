@@ -64,7 +64,7 @@ Produktentscheidung.
 ### Fact-Checking
 - Quellen-Ingest ist für PDF, PPTX, DOCX, TXT und Markdown umgesetzt.
   Lokale Jina-Embeddings und pgvector/Volltextsuche liefern zitierbare Passagen;
-  darauf läuft ein lokaler Ollama-Quellenvergleich mit Wort-Timestamps und
+  darauf läuft ein Gemini-Quellenvergleich mit Wort-Timestamps und
   codegeprüften Zitaten. Höchstens sechs ausgewählte Aussagen, fünf Passagen je
   Aussage; keine vollständige Wahrheitsprüfung. [Wie und warum](06-local-coaching.md).
 - Welche Web-Quellen darf der Agent abrufen?
@@ -128,8 +128,9 @@ Produktentscheidung.
   Speicherverhalten: `backend/README.md`.
 - Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
 - Nutzerentscheidung: lokale Vorführung reicht; öffentliches Hosting ist
-  derzeit nicht nötig. Nutzer bevorzugt freie/lokale Modelle statt OpenAI API:
-  Qwen3.5 4B Q4_K_M läuft nativ über Ollama, Whisper `small` im Worker.
+  derzeit nicht nötig. Für Quellenvergleich und Fragen ist Gemini (Cloud) der
+  Default; Whisper `small` läuft im Worker. Wegen fehlendem EU-Region-Pinning
+  nur synthetische Demo-Daten senden.
 - Latenz, Ausfall-Fallback, Kosten.
 - Browser- und Geräte-Support (Laptop und Smartphone).
 
@@ -170,6 +171,7 @@ einbauen**:
 | 24.10.2026 | Lokaler Quellenvergleich und echte Text-Fragerunde im Web-Review | Nutzer präferiert freie/lokale Alternative zur zunächst gewählten OpenAI API. Keine API-Schlüssel; Zitate werden vor Anzeige geprüft. |
 | 24.10.2026 | Live-Transkription als optionale Web-Vorschau | Nutzerauftrag: Transcript nahezu in Echtzeit während der Aufnahme (`WS /speech/live`); AudioWorklet-Sender und Ausfallhinweis im Web integriert. |
 | 24.10.2026 | Pose-/Feedback-Anforderungen festgelegt | Deep Research zu Haltung, Kopforientierung, Händen, Füßen und Gesten; Research-Ziele in `docs/04-pose-tracking-requirements.md`; aktueller Integrationsstand dort separat markiert. |
+| 24.10.2026 | Gemini statt lokalem Ollama | Nutzerauftrag: Gemini-Key aus dem Image-Skill in die lokale `.env`, Ollama aus dem Projekt entfernen, schwache Gemini-Modelle testen. Die frühere Local-only-Zusage ist hinfällig; nur synthetische Demo-Daten oder Vertex AI mit EU-Region. |
 
 ## Integrierte Analyse-Schalter (24.10.2026)
 
@@ -182,3 +184,13 @@ für Pause, Tempo, Füllwörter, Lautstärke und Tonhöhe einzeln schaltbar.
 „Live · in browser“ ist Standard und liefert lokale Mikrofonhinweise ohne Backend;
 der Backend-Modus nutzt den Signal-Stream. Füllwörter und Wort-Tempo kommen nach
 dem Stoppen. Die Haltungsreferenz benötigt keine stillgehaltenen Hände mehr.
+
+## Deep Research (24.10.2026)
+
+Die Produktentscheidungen sind in `docs/11-deep-research-validation.md`
+evidenzgeordnet. Wichtig für die Produktzusage: Der Fact-Check ist eine
+quellengebundene Prüfung mit Zitat-Gate, keine Wahrheitsgarantie; „nicht
+gefunden“ ist nicht „falsch“. Der Voice-Agent gibt im Gespräch nur kurzes
+aufgabenbezogenes Feedback, die vollständige Evidenz steht im Review. Harte
+Grenzen: 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop. Es gibt
+weiterhin keine Noten, Scores oder Personenbewertung.

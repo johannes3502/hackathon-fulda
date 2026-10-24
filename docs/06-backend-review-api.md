@@ -1150,8 +1150,8 @@ Niemals „falsch“, „erfunden“, „halluziniert“, „beweist“.
 | Kartenanzahl | 8–15, nicht die ganze Session |
 | Verifier | anderes Modell, claim-level, 3 Votes, Temperatur 0 |
 
-Die Tabelle war eine Empfehlung des Entwurfs. Implementiert sind lokale
-Ollama-JSON-Schema-Ausgabe und harte Code-Prüfungen für alle Adapter. Ein
+Die Tabelle war eine Empfehlung des Entwurfs. Implementiert sind der
+Gemini-JSON-Modus und harte Code-Prüfungen für alle Adapter. Ein
 mehrfach abstimmendes zweites Modell wird nicht als Qualitätsbeweis verwendet.
 Die endliche Formulierungsauswahl macht unbekannte Einheiten, Quellen,
 Kausalität oder Ratschläge ungültig. Menschliche Claim-Labels bleiben nötig.
@@ -1276,7 +1276,7 @@ Frontend-/Mobile-Implementierung geändert.
 | P0 temporäres Audio, Probe, A/V-Offset, Merge | bestehende Pipeline adaptiert; Original-Löschung vor `completed`, auch bei Analysefehler; Worker verhindert Wiederanlegen nach Session-Löschung |
 | P0 Template, Idempotenz, Delete, kein Medien-Schema | implementiert; atomare Keys/Jobs, Ready-Review-Wiederverwendung, Cascade inkl. temporärem Audio |
 | P1 Fact-Check, Quellenbezug, exakte/fuzzy Zitate | bestehende Pipeline angebunden; Auszug-Verweis bindend, Unicode-/Hyphen-/Bidi-Normalisierung, Zahlen-/Negationsschutz |
-| P1 Evidence Cards, Verifier, Template-Fallback | implementiert; lokales Qwen über Ollama im echten Queue-/HTTP-Pfad geprüft; keine Tools oder Retrieval im Writer |
+| P1 Evidence Cards, Verifier, Template-Fallback | implementiert; LLM-Writer nutzt den konfigurierten Gemini-Adapter; keine Tools oder Retrieval im Writer |
 | P1 adversariale Fixtures | zwanzig Writer-Fälle plus Schema-, Quote-, Timestamp- und Coverage-Tests; synthetisch, keine Genauigkeitsvalidierung |
 | P1 dreißig menschliche Claim-Labels | **offen**; dreißig synthetische Fälle in `backend/tests/fixtures/review-human-labels.json` vorbereitet, alle Labels bewusst null |
 | P2 Fragen und Antwortvergleich | Take-Routen implementiert; gespeicherte Wörter, Collection und Funde; Antwort nur auf Fragen dieses Takes, keine Note |

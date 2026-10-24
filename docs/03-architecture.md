@@ -51,7 +51,7 @@ flowchart TB
     end
 
     EXT["ASR lokal: faster-whisper small<br/>CPU/int8, Deutsch<br/>Deepgram nur explizit optional"]
-    LLM["LLM lokal: Ollama auf dem Host<br/>Qwen3.5 4B Q4_K_M<br/>JSON-Schema, kein Cloud-Fallback"]
+    LLM["LLM: Gemini (Cloud)<br/>3.1 Flash Lite / 3.8 Flash<br/>JSON-Modus, austauschbarer Adapter"]
     WEBS["Websuche (Zweitquelle)<br/>Wikipedia-API oder Tavily"]
 
     WEB -- "Kamera/Mikro" --> MP_W
@@ -150,7 +150,7 @@ flowchart LR
     WK --> PG
     WK --> ST
     WK --> RD
-    WK -. "OLLAMA_URL<br/>(Host: host.docker.internal)" .-> LLM(["Ollama lokal; kompatibler Adapter optional"])
+    WK -. "LLM_BASE_URL / LLM_MODEL<br/>(Gemini, OpenAI-kompatibel)" .-> LLM(["Gemini; austauschbarer Adapter"])
     WK -. "WEB_SEARCH_PROVIDER" .-> WS(["Wikipedia / Tavily"])
 ```
 
@@ -310,7 +310,7 @@ sequenceDiagram
     participant S3 as SeaweedFS (S3)
     participant W as Celery Worker (fact_check)
     participant PG as Postgres + pgvector
-    participant L as Ollama lokal (JSON-Schema)
+    participant L as Gemini (JSON-Modus)
     participant WS as Wikipedia / Tavily
 
     FE->>BE: GET /factcheck/settings (Modell, LLM-Host, Web-Anbieter)
@@ -354,7 +354,7 @@ sequenceDiagram
     participant S3 as SeaweedFS (S3)
     participant W as Celery Worker
     participant PG as Postgres + pgvector
-    participant L as Ollama lokal (JSON-Schema)
+    participant L as Gemini (JSON-Modus)
     participant A as ASR (lokales Whisper, Deepgram optional)
 
     U->>FE: Rolle wählen, Start question round
@@ -653,3 +653,14 @@ flowchart LR
 ```
 
 Der Vertrag wird über `npm run api:generate` aus dem FastAPI-Code generiert (`api/openapi.json` -> `api/schema.d.ts`) und ist damit immer synchron zum Backend.
+
+## Deep Research (24.10.2026)
+
+Die Architektur ist in `docs/11-deep-research-validation.md` gegen Forschung
+und offizielle API-Dokumentation geprüft. Drei Korrekturen sind bindend:
+Live-Analyse läuft **ereignisgetrieben auf finalisierten ASR-Segmenten**
+(nicht auf einem festen 20–30-s-Takt), der finale Fact-Check ist
+**quellengebunden, aber nicht autoritativ** (keine Live-Urteile,
+„nicht gefunden“ ≠ „falsch“), und das Gespräch hat **harte Grenzen**
+(3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop). Gemini ist Cloud ohne
+EU-Region-Pinning; nur synthetische Demo-Daten oder Vertex AI mit EU-Region.

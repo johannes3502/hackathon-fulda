@@ -234,20 +234,20 @@ Stand 24.10.2026. Preise sind USD pro 1 Mio. Tokens (Input/Output).
 
 | Modell | Kontext | Thinking | Preis | Rolle |
 |---|---|---|---|---|
-| **`gemini-3.8-flash`** | 1M / 65k | low, medium, high (Default medium) | **$0,75 / $3,75** (Intro bis 31.12.2026; regulär $1,50 / $7,50) | **Default für Live + Final** |
+| **`gemini-3.8-flash`** | 1M / 65k | low, medium, high (Default medium) | **$0,75 / $3,75** (Intro bis 31.12.2026; regulär $1,50 / $7,50) | **empfohlener Final-Default**; Live optional |
 | `gemini-3.6-flash` | 1M / 65k | low, medium, high | $0,75 / $3,75 | stabiler Fallback |
-| `gemini-3.1-flash-lite` | 1M / 64k | minimal, low, high (Default minimal) | $0,25 / $1,50 | billige Live-Lane |
-| `gemini-3.5-flash-lite` | 1M | minimal/low | $0,30 / $2,50 | neuere Lite-Alternative |
+| `gemini-3.1-flash-lite` | 1M / 64k | minimal, low, medium, high (Default minimal) | $0,25 / $1,50 | **aktueller Test-Default**, billige Live-Lane |
+| `gemini-3.5-flash-lite` | 1M | minimal, low, medium, high | $0,30 / $2,50 | neuere Lite-Alternative |
 | `gemini-3.1-pro-preview` | 1M / 65k | low, medium, high | $2,00 / $12,00 (Cache-Read $0,20) | maximale Reasoning-Qualität, **Preview-Risiko** |
 | `gemini-4-argon` | 1M | – | – | nicht für den Hackathon; Zugang/Preis prüfen |
 
 **Empfehlung:**
 
-- **Default:** `gemini-3.8-flash`.
-  - Live-Lane: `thinking_level=low`.
-  - Finaler Plan + Judge: `thinking_level=high`.
-- **Kostenoptimiert:** `gemini-3.1-flash-lite` mit `thinking_level=minimal`
-  für die Live-Lane; `gemini-3.8-flash` high für den finalen Lauf.
+- **Aktueller Test-Default:** `gemini-3.1-flash-lite` mit
+  `thinking_level=minimal` für Live und schnelle Tests.
+- **Produktions-Default:** `gemini-3.8-flash` (`low` live, `high` final).
+- **Kostenoptimiert:** `gemini-3.1-flash-lite` minimal für die Live-Lane;
+  `gemini-3.8-flash` high für den finalen Lauf.
 - **Maximale Qualität:** `gemini-3.1-pro-preview` high **nur** für den finalen
   Judge/Plan, nicht für die Live-Lane. Preview-Modelle können sich ändern oder
   verschwinden; Modell-ID pinnen, keinen `latest`-Alias verwenden.
@@ -268,7 +268,9 @@ Warum Flash statt Pro als Default:
 ### 4.1 API-Details, die zählen
 
 - **Strukturierte Ausgabe:** `response_mime_type="application/json"` +
-  `response_json_schema`. Gemini 3.8 Flash unterstützt das.
+  `response_json_schema`. Der OpenAI-kompatible Endpoint akzeptiert im Test
+  auch `response_format={"type":"json_object"}`, ist dafür aber nicht offiziell
+  dokumentiert; für Garantien die native API nutzen.
 - **Thinking:** `thinking_level` explizit setzen. 3.8 Flash kennt **kein**
   `minimal`; für die Live-Lane `low`, für den finalen Lauf `high`. Thinking-
   Tokens zählen als Output und kosten mit.
@@ -278,9 +280,8 @@ Warum Flash statt Pro als Default:
 - **Temperatur:** 0–0,2 für Extraktion/Judge; 0,2–0,4 für Frageformulierung.
 - **Max Output:** groß genug für Thinking + JSON; bei `high` nicht knapp
   setzen, sonst wird die Antwort abgeschnitten.
-- **Parallelität:** Judge-Aufrufe parallel, bounded (4–8). Bei API-Modellen
-  bringt das mehr als bei lokalem Ollama, wo die Workers um dieselbe GPU
-  konkurrieren.
+- **Parallelität:** Judge-Aufrufe parallel, bounded (4–6). Bei Gemini ist TPM
+  der wahrscheinliche Engpass, nicht die lokale GPU; 429 mit Backoff behandeln.
 - **Kein Batch API** für den Live-Pfad; Batch nur für Offline-Evaluation.
 
 ### 4.2 Grobe Kosten
@@ -322,8 +323,8 @@ sondern: ein Wahrheitspfad, ein Vorlauf, parallele Fragen-Lanes.
 - **Claim-Extraktion parallelisieren:** `extract_claims` läuft heute sequentiell
   über Fenster. Bei einem Cloud-Modell die Fenster parallel schicken und
   Ergebnisse mergen (Satznummern bleiben die Referenz).
-- **Judge-Workers erhöhen:** `ThreadPoolExecutor(4)` ist für lokales Ollama
-  sinnvoll; mit Gemini 6–8, solange Rate-Limits es zulassen.
+- **Judge-Workers erhöhen:** `ThreadPoolExecutor(4)` auf 6–8 erhöhen, solange
+  TPM/Rate-Limits es zulassen; 429 mit Backoff.
 - **Retrieval cachen:** pro normalisiertem Claim + Collection einen Cache-Key.
   Die Live-Lane füllt ihn vor; die finale Lane liest ihn.
 - **Claim-Matching:** wiederholte Aussagen nur einmal judgen, alle Timestamps
@@ -345,8 +346,8 @@ sondern: ein Wahrheitspfad, ein Vorlauf, parallele Fragen-Lanes.
 ## 6. Sicherheits- und Datenschutzgrenzen
 
 - **Cloud:** Gemini verarbeitet Transkript und Quellen. Wenn „alles lokal“ im
-  Pitch steht, ist das ein Bruch. Entweder bewusst kommunizieren oder bei
-  Ollama bleiben.
+  Pitch steht, ist das ein Bruch. Entweder bewusst kommunizieren oder ein
+  lokales Modell außerhalb dieses Projekts betreiben.
 - **Modell-IDs pinnen:** `gemini-3.8-flash` ist stabil, aber Preise/Modelle
   ändern sich; kein `latest`-Alias.
 - **Keine Live-Urteile:** Die Live-Lane darf nur intern Kandidaten sammeln.
@@ -391,3 +392,39 @@ der die Endlatenz weiter drückt.
   <https://www.yepic.ai/blog/streaming-speech-recognition-ai-avatar-asr-policy>
 - Bestehende Pipeline: `backend/app/factcheck/pipeline.py`,
   `backend/app/questions/pipeline.py`, `backend/app/speech/live.py`
+
+## 9. Deep Research (24.10.2026)
+
+Vollständige Evidenzbasis: `docs/11-deep-research-validation.md`.
+
+**Korrektur 1: event-driven statt fester 20–30-s-Takt.** Partielle ASR ist
+deutlich fehleranfälliger als finalisierte Sätze; ein fester Takt analysiert
+unnötig instabile Hypothesen. Die Live-Lane läuft auf **finalisierten
+Segmenten**; 20–30 s bleiben der maximale Fallback-Abstand. Jede Zustandsversion
+trägt Quelle/Confidence und wird gegen das finale Transkript re-groundet.
+
+**Korrektur 2: kein „autoritativer“ Fact-Check.** Realweltliche
+Claim-Verifikation erreicht in Benchmarks etwa 57–63 %; Zitatbelege sind oft
+nur teilweise stützend; LLM-Richter haben Positions-, Längen- und
+Selbstpräferenz-Bias. Der finale Lauf ist die beste verfügbare Prüfung, keine
+Wahrheitsgarantie. Drei Ausgänge, wörtliche Zitatprüfung, Quelle sichtbar,
+„nicht gefunden“ ≠ „falsch“. Keine Live-Urteile.
+
+**Korrektur 3: Gemini-Modellwahl.** `gemini-3.1-flash-lite` unterstützt
+`thinkingLevel=minimal` und ist der getestete Default für schwache/live
+Aufrufe; `gemini-3.8-flash` unterstützt **kein** `minimal` und ist der
+finale Qualitätskandidat (`low`/`medium`/`high`). `gemini-2.5-flash-lite` ist
+im Projekt nicht erreichbar (404). Der OpenAI-kompatible Endpoint akzeptiert im
+Test `response_format={"type":"json_object"}`; für Garantien natives
+`responseJsonSchema` verwenden. Thinking-Tokens zählen als Output.
+
+**Empirie.** `gemini-3.1-flash-lite` (minimal) lieferte valides JSON in
+0,7–1,5 s; der Coaching-Smoke mit drei Claims brauchte 3,4 s Fact-Check,
+2,1 s Fragen und 1,7 s Antwortprüfung. Das ist eine synthetische
+Einzelmessung, keine Latenz- oder Genauigkeitszusage.
+
+**Weitere Grenzen.** Kontext-Caching ist implizit ab 4.096 Tokens (3.8/3.1
+Pro) bzw. 2.048 (2.5 Flash), aber nicht garantiert; Rate-Limits sind nicht
+publik; TPM ist bei langen Transkripten der Engpass. Die Gemini Developer API
+hat kein EU-Region-Pinning; nur synthetische Demo-Daten senden oder Vertex AI
+mit EU-Region nutzen.

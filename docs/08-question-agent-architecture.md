@@ -32,7 +32,7 @@ Nach der Umsetzung gehören die betroffenen Diagramme in
 |---|---|---|
 | Transkript | Wörter mit Timestamps, Sätze, `t_ms` | `backend/app/transcription/`, `app/factcheck/transcript.py` |
 | Fact-Check | Aussagen → Quellen-Chunks → Urteil + wörtliches Zitat | `backend/app/factcheck/` |
-| Fragen | 3–10 Fragen, Typen `contradiction`, `unsupported`, `gap`, `clarification` | `backend/app/questions/pipeline.py` |
+| Fragen | 3–5 Fragen (Code-Cap 5), Typen `contradiction`, `unsupported`, `gap`, `clarification` | `backend/app/questions/pipeline.py` |
 | Antwortprüfung | Urteil + Zitat + `reply` + `follow_up`, keine Noten | `POST /questions/answers` |
 | Gesprochene Antwort | Upload → Whisper → gleiche Prüfung | `POST /questions/answers/voice` |
 | Live-ASR | `WS /speech/live`, 2-s-Fenster, Wörter/Text | `backend/app/speech/live.py` |
@@ -623,3 +623,67 @@ Alles optional und abwärtskompatibel; die bestehende UI ignoriert neue Felder.
 - Bestehende Implementierung: `backend/app/questions/pipeline.py`,
   `backend/app/questions/models.py`, `backend/app/speech/live.py`,
   `frontend/src/features/questions/voice.ts`
+
+## 12. Deep Research (24.10.2026)
+
+Vollständige Evidenzbasis: `docs/11-deep-research-validation.md`.
+
+**Bestätigt.** Plan-first (erst Erwartungspunkte/Evidenz, dann Frage) ist für
+Kontrollierbarkeit und Quellenbindung sinnvoll; die Evidenz stützt
+Fragenqualität, nicht einen Lerngewinn. Ein einzelner „goldener“ Antwortplan
+ist zu eng: mehrere akzeptable Punkte, Evidenz-IDs und eine Must-not-ask-Liste
+sind nötig (Li & Zhang 2024; Dugan et al. 2022).
+
+### 12.1 Was echte Lehrkräfte tun
+
+- **3–5 s warten**, bei „warum/wie“ 5–10 s; nach der Antwort 2–3 s
+  nachwarten. Häufigster Fehler ist <1 s Wartezeit (Rowe 1974; Tobin 1987).
+- **IRF statt IRE:** anknüpfen, revoicen, nachfassen statt nur bewerten
+  (Nystrand et al. 1997; O’Connor & Michaels 1993).
+- **Falsche Antwort:** klären → Hinweis → Retry; nicht „falsch“, nicht jede
+  Formulierung korrigieren (Lyster & Ranta 1997).
+- **Teilantwort:** einmal nachfassen, dann fokussieren; ein Hinweis, dann
+  weiter (Graesser et al. 1995; van de Pol et al. 2010).
+- **„Ich weiß es nicht“:** als Information behandeln, 3 s warten, „Was wissen
+  Sie sicher?“; später einmal zurückkommen.
+- **Aufgaben-/Prozesslob**, kein Personenlob; Lob sparsam (Hattie &
+  Timperley 2007; Mueller & Dweck 1998; Sisk et al. 2018).
+- **Fokussieren statt trichtern**, accountable talk („Woher wissen Sie das?“),
+  kurze Agent-Turns, sparsame Backchannels, Abschluss in 60–90 s.
+- **Deutsch:** fragend-entwickelnder Unterricht ist IRF-dominiert und oft zu
+  schnell; das ist eine Beschreibung, keine Empfehlung (Reiss 1983; Heinze &
+  Erhard 2006).
+
+### 12.2 Harte Grenzen gegen Endlosschleifen
+
+| Grenze | Wert |
+|---|---|
+| Gespräch | 8–10 min Ziel, Hard Stop 10 min (12 min inkl. Abschied) |
+| Hauptfragen | 3–5, Default 4 |
+| Follow-ups | 1 pro Frage; max. 2 nur bei klarem Widerspruch |
+| Wartezeit | 3–5 s nach der Frage; 2–3 s nach der Antwort |
+| Answer-Timeout | 10 s, dann Hinweis oder weiter |
+| Agent-Turns | ≤15 |
+| Stille | 3 s: eine neutrale Nachfrage; 8–10 s: Hinweis/weiter; 2 Timeouts in Folge: früh schließen |
+| Neues Thema | keins nach Minute 8; letzte 90 s Zusammenfassung |
+
+Die Zahlen sind Safety-Rails, keine Pädagogik. Ergänze einen adaptiven Stop:
+alle Erwartungspunkte abgedeckt, keine neue Evidenz, Ermüdungssignal oder zwei
+Timeouts. `QuestionConfig.max_questions` ist im Code jetzt auf **5** begrenzt;
+der Answer-Review liefert höchstens **eine** Nachfrage.
+
+### 12.3 Sofort antworten/prüfen oder erst im Review?
+
+**Zweistufig.** Der Agent prüft die Antwort direkt, gibt aber nur kurzes
+aufgabenbezogenes Feedback („Das deckt X; der Beleg für Y fehlt noch“), keine
+Note und kein „falsch“. Bei falscher Antwort: klären, Hinweis, ein Retry; bleibt
+es falsch, im Review eine explizite Korrektur mit Quelle. Bei Teilantwort:
+einmal nachfassen, dann weiter. Bei ASR-Unsicherheit nachfragen statt
+bewerten. Die vollständige Evidenz (Zitat, Seite/Folie, drei Urteile,
+Alternative) erscheint im finalen Review. Der Agent beantwortet seine eigene
+Frage nicht.
+
+Begründung: Retrieval Practice und Feedbackqualität sprechen für zeitnahe,
+knappe Rückmeldung; die Timing-Evidenz ist gemischt, und ein vorschnelles
+Urteil bei Teilantworten/ASR-Fehlern ist riskanter als ein Hinweis. Details:
+`docs/11-deep-research-validation.md` §4.

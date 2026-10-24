@@ -45,7 +45,13 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 - **Transkription:** Stufe A (umgesetzt): Audio nach dem Stoppen hochladen, Wort-Timestamps und Text zurück. Standard ist lokales `faster-whisper` (deutsch), damit keine Audiodaten an einen Cloudanbieter gehen; Deepgram bleibt als optionaler Adapter verfügbar. Stufe B: optionale Live-Transkript-Vorschau im Web umgesetzt (`WS /speech/live` mit PCM aus dem `AudioWorklet`, ein Live-Slot pro Prozess, `WHISPER_LIVE_*`-Konfiguration); Browser-Sender in `frontend/src/features/live/captions.ts`, aktivierbar unter Recording options. Im Web ist zusätzlich Deepgram EU live wählbar (im Backend-Modus standardmäßig an, `DEEPGRAM_API_KEY` erforderlich): finales Live-Transkript mit Wort-Timestamps wird ohne erneute ASR im Review verwendet; bei Ausfall weiterhin lokaler Batch-Pfad. Der Datenschutzhinweis benennt Deepgram. Die lokale Whisper-Vorschau ersetzt keine Batch-Wort-Timestamps. Whisper lässt Füllwörter oft weg; deutsche Füllwortqualität ist ungeprüft. Wort-Timestamps sind vorhanden.
 - **Embeddings:** umgesetzt mit lokalem `jinaai/jina-embeddings-v2-base-de` (Deutsch/Englisch, FastEmbed/ONNX) hinter einem austauschbaren `Embedder`-Interface; Retrieval-Qualität mit echten Dokumenten noch nicht gemessen.
-- **Fact-Check und Frage-Agent:** auf Nutzerwunsch lokal und ohne API-Schlüssel: Ollama mit `qwen3.5:4b-q4_K_M` für beide Aufgaben. JSON-Schema, Satzverweis-/Zitatprüfung im Code; Details in `docs/06-local-coaching.md`. Web-Zweitquelle über Team-API vorhanden, für den lokalen Standard aus; kein eigenes Scraping.
+- **Fact-Check und Frage-Agent:** Gemini über den OpenAI-kompatiblen Endpoint
+  (`gemini-3.1-flash-lite` für Test/Live, `gemini-3.8-flash` für final), Key nur
+  serverseitig in `.env`. JSON-Modus, Satzverweis-/Zitatprüfung im Code; Details
+  in `docs/06-local-coaching.md` und `docs/11-deep-research-validation.md`.
+  Web-Zweitquelle über Team-API vorhanden, standardmäßig aus; kein eigenes
+  Scraping. Die frühere Local-only-Zusage ist hinfällig: Gemini ist Cloud ohne
+  EU-Region-Pinning, daher nur synthetische Demo-Daten senden.
 - **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
 - **Hosting:** Nutzer bestätigt lokale Vorführung auf `localhost`; kein öffentliches Deployment nötig. Für andere Geräte/öffentliche Hosts bleibt HTTPS für `getUserMedia` erforderlich.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
@@ -167,7 +173,8 @@ Hybrid-Suche (pgvector + deutsche Volltextsuche). Der Fact-Check ist umgesetzt
 LLM extrahiert Aussagen mit Satznummern, Timestamps kommen aus den Wörtern;
 pro Aussage zuerst Retrieval in den hochgeladenen Quellen, danach optional
 Websuche (Wikipedia/Tavily); Zitate werden per `quote_in_text` geprüft,
-Ergebnisse sind `fact`-Events. LLM standardmäßig lokal über Ollama; optional OpenAI-kompatibel.
+Ergebnisse sind `fact`-Events. LLM standardmäßig Gemini (Cloud), konfigurierbar
+über `LLM_BASE_URL`/`LLM_MODEL`; kein lokales Ollama mehr im Projekt.
 Der Frage-Simulator ist umgesetzt (`backend/app/questions/`, `POST /questions`,
 `POST /questions/answers`, Panel in `/live/[id]/review`): Fragen aus
 Fact-Check-Funden (Widerspruch, nicht belegt), Lücken gegenüber den Quellen und

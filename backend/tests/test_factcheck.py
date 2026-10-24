@@ -112,14 +112,14 @@ def test_openai_compatible_contract(monkeypatch):
 
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
-    from app.factcheck.local import LocalOllamaChat
-    assert isinstance(configured_llm(), LocalOllamaChat)
-    monkeypatch.setenv("LLM_BASE_URL", "http://localhost:11434/v1")
-    monkeypatch.setenv("LLM_MODEL", "local")
+    with pytest.raises(ValueError):
+        configured_llm()
+    monkeypatch.setenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai")
+    monkeypatch.setenv("LLM_MODEL", "gemini-3.1-flash-lite")
     monkeypatch.setenv("LLM_JSON_MODE", "false")
     monkeypatch.setenv("LLM_TEMPERATURE", "0")
-    local = configured_llm()
-    assert (local.json_mode, local.temperature, local.api_key) == (False, 0.0, "")
+    cloud = configured_llm()
+    assert (cloud.json_mode, cloud.temperature) == (False, 0.0)
 
 
 def test_uploads_first_quotes_verified_and_web_second():

@@ -50,7 +50,8 @@ def main():
         try:
             client.get("/health/ready").raise_for_status()
             created = post("/sessions", {"title": "Synthetischer Backend-Smoke", "consent": {
-                "granted": True, "at": datetime.now(timezone.utc).isoformat(), "version": "smoke.v1", "scope": "local-analysis"}})
+                "granted": True, "at": datetime.now(timezone.utc).isoformat(), "version": "smoke.v1",
+                "scope": "local-and-cloud-analysis" if args.llm else "local-analysis"}})
             session_id = created.json()["session"]["sessionId"]
             take = post(f"/sessions/{session_id}/takes", {"durationMs": 8000, "mimeType": "audio/wav",
                 "timebase": {"onstartPerfMs": 0, "firstVideoPtsMs": 0, "audioStartMs": 0, "avOffsetMs": 0},

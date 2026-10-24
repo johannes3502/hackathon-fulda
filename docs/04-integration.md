@@ -17,8 +17,8 @@ HTTP-Verträge: <http://localhost:8000/docs>. Der Browser nutzt den `/api`-Proxy
 
 Ohne Docker: Node.js 22.12+, `npm ci` und `npm run dev` im Repo; Python 3.12 mit
 `backend/requirements.txt`, dann `uvicorn app.main:app` aus `backend/`.
-Dienste und lokale Modelle: [Backend](../backend/README.md),
-[Whisper/Ollama-Coaching](06-local-coaching.md).
+Dienste und Modelle: [Backend](../backend/README.md),
+[Whisper/Gemini-Coaching](06-local-coaching.md).
 Nach HTTP-API-Änderungen `npm run api:generate`, danach `npm run api:check`.
 
 ## Kamera, lokale Hinweise und Aufnahme
