@@ -191,7 +191,8 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    IDX["index - Home<br/>Takes-Liste"] --> STU["studio - Aufnahme<br/>Vision Camera 720p/30fps,<br/>max 3 Min, Permissions,<br/>Pose-Toggle, Backend-Toggle"]
+    IDX["index - Rehearsals<br/>native iOS-Liste"] --> STU["studio - Aufnahme<br/>Vision Camera 720p/30fps,<br/>max 3 Min, Permissions"]
+    STU <--> OPT["settings - Recording Options<br/>native iOS-Form-Sheet,<br/>Titel, Pose, Backend-URL,<br/>State für die App-Sitzung"]
     IDX --> DEM["demo - Sample Rehearsal<br/>MockCoachGateway,<br/>Frage-Simulator"]
     STU --> REV["review - Playback<br/>expo-video, Timestamp-Feedback<br/>Klick spult ±2s zurück,<br/>Upload + Wort-Import,<br/>Sharing (Video, Pose-JSONL)"]
     REV -->|"GET /health/ready,<br/>POST /speech/analyze,<br/>GET /speech/jobs/id,<br/>POST /transcription/analyze-words"| BE(("FastAPI<br/>Backend"))

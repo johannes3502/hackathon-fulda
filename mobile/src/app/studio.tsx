@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, AppState, Linking, Switch, View } from "react-native";
-import { router } from "expo-router";
+import { Alert, AppState, Linking, Platform, View } from "react-native";
+import { router, Stack } from "expo-router";
 import { useIsFocused, usePreventRemove } from "expo-router/react-navigation";
 import {
   Camera,
@@ -11,12 +11,23 @@ import {
   type VideoFile,
 } from "react-native-vision-camera";
 import { randomUUID } from "expo-crypto";
-import { Action, Columns, Copy, Field, Page, Panel, time } from "../ui";
+import {
+  Action,
+  Columns,
+  Copy,
+  Page,
+  Section,
+  Symbol,
+  time,
+  useColors,
+} from "../ui";
 import { useSessions, writePose, type Take } from "../session";
 import { useNativePose } from "../useNativePose";
 import { api, endpoint } from "../api";
 export default function Studio() {
-  const { save } = useSessions();
+  const { save, options } = useSessions();
+  const { title, poseEnabled, backend, url } = options;
+  const colors = useColors();
   const camera = useRef<Camera>(null);
   const device = useCameraDevice("front");
   const format = useCameraFormat(device, [
@@ -28,10 +39,6 @@ export default function Studio() {
   const mic = useMicrophonePermission();
   const [enabled, setEnabled] = useState(false);
   const [ready, setReady] = useState(false);
-  const [poseEnabled, setPoseEnabled] = useState(true);
-  const [title, setTitle] = useState("My pitch rehearsal");
-  const [backend, setBackend] = useState(false);
-  const [url, setUrl] = useState(process.env.EXPO_PUBLIC_API_URL ?? "");
   const [preparing, setPreparing] = useState(false);
   const recordingActive = useRef(false);
   const [recording, setRecording] = useState(false);
@@ -214,163 +221,183 @@ export default function Studio() {
     }
   }
   return (
-    <Page>
-      <Columns
-        main={
-          <>
-            <View
-              style={{
-                height: 360,
-                borderRadius: 16,
-                overflow: "hidden",
-                backgroundColor: "#111827",
-                justifyContent: "center",
-              }}
-            >
-              {enabled && device ? (
-                <Camera
-                  ref={camera}
-                  style={{ flex: 1 }}
-                  device={device}
-                  format={format}
-                  fps={30}
-                  isActive={focused && foreground}
-                  video
-                  audio
-                  pixelFormat="yuv"
-                  frameProcessor={poseEnabled ? pose.frameProcessor : undefined}
-                  onInitialized={() => setReady(true)}
-                  onError={(e) => setError(e.message)}
+    <>
+      <Page>
+        <Columns
+          main={
+            <>
+              <View
+                style={{
+                  width: "100%",
+                  aspectRatio: 3 / 4,
+                  maxHeight: 520,
+                  borderRadius: 24,
+                  borderCurve: "continuous",
+                  overflow: "hidden",
+                  backgroundColor: "#171719",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                {enabled && device ? (
+                  <Camera
+                    ref={camera}
+                    style={{ width: "100%", height: "100%" }}
+                    device={device}
+                    format={format}
+                    fps={30}
+                    isActive={focused && foreground}
+                    video
+                    audio
+                    pixelFormat="yuv"
+                    frameProcessor={
+                      poseEnabled ? pose.frameProcessor : undefined
+                    }
+                    onInitialized={() => setReady(true)}
+                    onError={(e) => setError(e.message)}
+                  />
+                ) : (
+                  <View style={{ alignItems: "center", padding: 28, gap: 16 }}>
+                    <Symbol name="video" size={44} muted />
+                    <Copy title style={{ color: "white", textAlign: "center" }}>
+                      {device ? "Ready when you are" : "Camera Unavailable"}
+                    </Copy>
+                    <Copy style={{ color: "#b4b4bb", textAlign: "center" }}>
+                      {device
+                        ? "Keep your upper body in view."
+                        : "Use a physical device to record, or explore the sample rehearsal."}
+                    </Copy>
+                  </View>
+                )}
+              </View>
+              <View style={{ alignItems: "center", gap: 8 }}>
+                <Copy
+                  style={{
+                    fontSize: 40,
+                    lineHeight: 48,
+                    fontWeight: "300",
+                    fontVariant: ["tabular-nums"],
+                  }}
+                >
+                  {time(elapsed)}
+                </Copy>
+                <Copy caption muted>
+                  {recording
+                    ? "Recording"
+                    : finishing
+                      ? "Saving recording…"
+                      : "Up to 3 minutes"}
+                </Copy>
+              </View>
+              {!enabled ? (
+                <Action
+                  label="Enable Camera & Microphone"
+                  icon="video.fill"
+                  disabled={!device}
+                  onPress={() => void enable()}
+                />
+              ) : recording || finishing ? (
+                <Action
+                  label={finishing ? "Saving…" : "Stop Recording"}
+                  icon="stop.circle.fill"
+                  recording
+                  disabled={finishing}
+                  onPress={() => void stop()}
                 />
               ) : (
-                <Copy style={{ color: "white", textAlign: "center" }}>
-                  {device
-                    ? "Camera preview is off."
-                    : "No camera available. Try the sample rehearsal on a simulator."}
+                <Action
+                  label={preparing ? "Connecting…" : "Start Recording"}
+                  icon="record.circle"
+                  recording
+                  disabled={!ready || preparing}
+                  onPress={() => void start()}
+                />
+              )}
+              <Copy caption muted style={{ textAlign: "center" }}>
+                Your recording stays on this device until you choose to share or
+                upload it.
+              </Copy>
+              {error && (
+                <Copy accessibilityRole="alert" style={{ color: colors.error }}>
+                  {error}
                 </Copy>
               )}
-            </View>
-            <Copy title>{time(elapsed)} · 3-minute limit</Copy>
-            {!enabled ? (
-              <Action
-                label="Enable camera & microphone"
-                onPress={() => void enable()}
-              />
-            ) : recording || finishing ? (
-              <Action
-                label={finishing ? "Saving take…" : "Finish & review"}
-                disabled={finishing}
-                onPress={() => void stop()}
-              />
-            ) : (
-              <Action
-                label={preparing ? "Checking backend…" : "Start recording"}
-                disabled={!ready || preparing}
-                onPress={() => void start()}
-              />
-            )}
-            <Copy muted>
-              {backend
-                ? "Recording stays local until you explicitly upload it from review."
-                : "Local capture. Nothing is uploaded."}
-            </Copy>
-            {error && (
-              <Copy accessibilityRole="alert" style={{ color: "#a3261f" }}>
-                {error}
-              </Copy>
-            )}
-            {(!cam.hasPermission || !mic.hasPermission) && (
-              <Action
-                secondary
-                label="Open permission settings"
-                onPress={() => void Linking.openSettings()}
-              />
-            )}
-          </>
-        }
-        side={
-          <>
-            <Panel>
-              <Field
-                label="Recording title"
-                value={title}
-                maxLength={100}
-                editable={!recording && !finishing && !preparing}
-                onChangeText={setTitle}
-              />
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 10,
-                }}
-              >
-                <Copy>Native pose capture</Copy>
-                <Switch
-                  accessibilityLabel="Native pose capture"
-                  value={poseEnabled}
-                  disabled={recording || finishing || preparing}
-                  onValueChange={setPoseEnabled}
+              {!device && (
+                <Action
+                  secondary
+                  label="Try Sample Rehearsal"
+                  onPress={() => router.push("/demo")}
                 />
-              </View>
-              <Copy muted>
-                {poseEnabled ? pose.status : "Pose capture off"}
-              </Copy>
-              <Copy>{pose.count} pose samples</Copy>
-              <Copy muted>
-                Pose stays on this device. Head angles are uncalibrated
-                heuristics, not gaze or performance scores.
-              </Copy>
-            </Panel>
-            <Panel>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 10,
-                }}
-              >
-                <Copy>Backend audio analysis</Copy>
-                <Switch
-                  accessibilityLabel="Backend audio analysis"
-                  value={backend}
-                  disabled={recording || finishing || preparing}
-                  onValueChange={setBackend}
-                />
-              </View>
-              {backend && (
-                <>
-                  <Field
-                    label="Backend API URL"
-                    placeholder="https://your-server.example"
-                    value={url}
-                    editable={!recording && !finishing && !preparing}
-                    onChangeText={setUrl}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="url"
-                  />
-                  <Copy muted>
-                    Use a reachable LAN or HTTPS address. Localhost on a phone
-                    refers to the phone, not your laptop.
-                  </Copy>
-                  <Copy muted>
-                    Uploading from review sends the full video and audio. The
-                    backend stores the upload until processing and retains
-                    results. This mode does not request paid ASR.
-                  </Copy>
-                </>
               )}
-              <Copy muted>
-                Automatic transcription, fact-checking and questions remain
-                scripted in the sample rehearsal.
-              </Copy>
-            </Panel>
-          </>
-        }
-      />
-    </Page>
+              {error && (!cam.hasPermission || !mic.hasPermission) && (
+                <Action
+                  secondary
+                  label="Open Settings"
+                  onPress={() => void Linking.openSettings()}
+                />
+              )}
+            </>
+          }
+          side={
+            <>
+              <Section title="Recording">
+                <Copy title>{title}</Copy>
+                <Copy caption muted>
+                  {backend
+                    ? "Server analysis available after recording"
+                    : "On-device recording"}
+                </Copy>
+                <Action
+                  secondary
+                  label="Recording Options"
+                  icon="slider.horizontal.3"
+                  disabled={recording || finishing || preparing}
+                  onPress={() => router.push("/settings")}
+                />
+              </Section>
+              <Section
+                title="Pose tracking"
+                footer="Landmarks stay on your device. No scores or ratings."
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <Symbol name="figure.stand" />
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Copy>
+                      {poseEnabled ? "On-device tracking" : "Tracking Off"}
+                    </Copy>
+                    <Copy caption muted>
+                      {poseEnabled
+                        ? pose.status
+                        : "Turn on tracking in Recording Options."}
+                    </Copy>
+                  </View>
+                </View>
+                {poseEnabled && (
+                  <Copy caption muted>
+                    {pose.count} samples captured
+                  </Copy>
+                )}
+              </Section>
+            </>
+          }
+        />
+      </Page>
+      {Platform.OS === "ios" && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            icon="slider.horizontal.3"
+            accessibilityLabel="Recording options"
+            disabled={recording || finishing || preparing}
+            onPress={() => router.push("/settings")}
+          />
+        </Stack.Toolbar>
+      )}
+    </>
   );
 }

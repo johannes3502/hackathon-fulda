@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { Alert, Platform, View } from "react-native";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
-import { Action, Columns, Copy, Page, Panel, time } from "../ui";
+import {
+  Action,
+  Columns,
+  Copy,
+  Page,
+  Section,
+  Divider,
+  time,
+  useColors,
+} from "../ui";
 import { shareFile, useSessions, type Take } from "../session";
 import { analyzeTake, analyzeTranscript } from "../api";
 export default function Review() {
@@ -22,6 +31,7 @@ export default function Review() {
 }
 function TakeReview({ take }: { take: Take }) {
   const { save, remove } = useSessions();
+  const colors = useColors();
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -108,153 +118,226 @@ function TakeReview({ take }: { take: Take }) {
       setBusy(false);
     }
   }
+  function deleteTake() {
+    Alert.alert(
+      "Delete local recording?",
+      "This removes the video and pose log from this device.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            try {
+              remove(take.id);
+              router.replace("/");
+            } catch (e) {
+              setError(`Could not delete all files: ${String(e)}`);
+            }
+          },
+        },
+      ],
+    );
+  }
   return (
-    <Page>
-      <Copy title>{take.title}</Copy>
-      <Copy muted>
-        {time(take.durationMs)} · Local recording · {take.poseCount} pose
-        samples
-      </Copy>
-      {take.notice && <Copy accessibilityRole="alert">{take.notice}</Copy>}
-      <Columns
-        main={
-          <>
-            <VideoView
-              player={player}
-              style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 12 }}
-              nativeControls
-              fullscreenOptions={{ enable: true }}
-            />
-            <Panel>
-              <Copy title>Timestamp review</Copy>
-              {take.feedback.length === 0 ? (
-                <Copy muted>
-                  No analysis events yet. Your original recording is available
-                  above.
-                </Copy>
-              ) : (
-                take.feedback.map((f) => (
-                  <Panel key={f.id}>
-                    <Action
-                      secondary
-                      label={`${time(f.startMs)} · ${f.title}`}
-                      onPress={() => {
-                        player.pause();
-                        player.currentTime = Math.max(0, f.startMs / 1000 - 2);
-                        clipEnd.current = Math.min(
-                          take.durationMs / 1000,
-                          f.endMs / 1000 + 2,
-                        );
-                        player.play();
-                      }}
-                    />
-                    <Copy>{f.detail}</Copy>
-                    <Copy muted>{f.action}</Copy>
-                  </Panel>
-                ))
-              )}
-            </Panel>
-          </>
-        }
-        side={
-          <>
-            <Panel>
-              <Copy title>Keep or share</Copy>
-              <Copy muted>
-                These files are temporary. Share them before closing the app;
-                the session list is kept only while the app is open.
-              </Copy>
-              <Action
-                secondary
-                label="Share recording"
-                onPress={() => void share(take.uri)}
+    <>
+      <Page>
+        <View style={{ gap: 6 }}>
+          <Copy title>{take.title}</Copy>
+          <Copy caption muted>
+            {time(take.durationMs)} · On this device · {take.poseCount} pose
+            samples
+          </Copy>
+        </View>
+        {take.notice && <Copy accessibilityRole="alert">{take.notice}</Copy>}
+        <Columns
+          main={
+            <>
+              <VideoView
+                player={player}
+                style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 20 }}
+                nativeControls
+                fullscreenOptions={{ enable: true }}
               />
-              {take.poseUri && (
-                <Action
-                  secondary
-                  label="Share pose JSONL"
-                  onPress={() => void share(take.poseUri!)}
-                />
-              )}
-              <Copy muted>
-                Native pose times start at the recording request. Camera startup
-                can introduce an offset; exact video alignment is not yet
-                verified.
-              </Copy>
-            </Panel>
-            {take.mode === "backend" && (
-              <Panel>
-                <Copy title>Backend analysis</Copy>
-                <Copy muted>
-                  Uploading sends the full recording to {take.endpoint}. Audio
-                  signal analysis does not request automatic transcription.
-                </Copy>
-                <Action
-                  label="Upload & analyze audio"
-                  disabled={busy}
-                  onPress={() => void analyze()}
-                />
-                <Action
-                  secondary
-                  label="Import word timestamps (JSON)"
-                  disabled={busy}
-                  onPress={() => void analyze(true)}
-                />
-                {busy && (
+              <Section
+                title="Moments"
+                footer="Tap a timestamp to play the surrounding part of your recording."
+              >
+                {take.feedback.length === 0 ? (
+                  <Copy muted>
+                    No moments yet. Analyze your recording to find places to
+                    revisit.
+                  </Copy>
+                ) : (
+                  take.feedback.map((f, index) => (
+                    <View key={f.id} style={{ gap: 10 }}>
+                      {index > 0 && <Divider />}
+                      <Copy style={{ fontWeight: "600" }}>{f.title}</Copy>
+                      <Copy>{f.detail}</Copy>
+                      <Copy caption muted>
+                        {f.action}
+                      </Copy>
+                      <Action
+                        secondary
+                        icon="play.fill"
+                        label={time(f.startMs)}
+                        onPress={() => {
+                          player.pause();
+                          player.currentTime = Math.max(
+                            0,
+                            f.startMs / 1000 - 2,
+                          );
+                          clipEnd.current = Math.min(
+                            take.durationMs / 1000,
+                            f.endMs / 1000 + 2,
+                          );
+                          player.play();
+                        }}
+                      />
+                    </View>
+                  ))
+                )}
+              </Section>
+            </>
+          }
+          side={
+            <>
+              {take.mode === "backend" && (
+                <Section
+                  title="Analysis"
+                  footer={`The full video and audio will be uploaded to ${take.endpoint}. Automatic transcription is off.`}
+                >
+                  <Action
+                    label="Upload & Analyze"
+                    icon="waveform"
+                    disabled={busy}
+                    onPress={() => void analyze()}
+                  />
                   <Action
                     secondary
-                    label="Cancel request"
-                    onPress={() => controller.current?.abort()}
+                    label="Import Word Timestamps"
+                    icon="doc.badge.plus"
+                    disabled={busy}
+                    onPress={() => void analyze(true)}
+                  />
+                  {busy && (
+                    <Action
+                      secondary
+                      label="Cancel Request"
+                      onPress={() => controller.current?.abort()}
+                    />
+                  )}
+                  {!!status && (
+                    <Copy caption muted accessibilityLiveRegion="polite">
+                      {status}
+                    </Copy>
+                  )}
+                </Section>
+              )}
+              {take.metrics.length > 0 && (
+                <Section
+                  title="Audio & words"
+                  footer="Measured values, without a performance score."
+                >
+                  {take.metrics.map((m, index) => (
+                    <View key={m.id} style={{ gap: 12 }}>
+                      {index > 0 && <Divider />}
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          flexWrap: "wrap",
+                          justifyContent: "space-between",
+                          gap: 8,
+                        }}
+                      >
+                        <Copy>{m.label}</Copy>
+                        <Copy muted style={{ fontVariant: ["tabular-nums"] }}>
+                          {m.value ?? "Unavailable"} {m.unit}
+                        </Copy>
+                      </View>
+                    </View>
+                  ))}
+                </Section>
+              )}
+              {!!error && (
+                <Copy accessibilityRole="alert" style={{ color: colors.error }}>
+                  {error}
+                </Copy>
+              )}
+              <Section
+                title="Keep your recording"
+                footer="The recording list lasts only while the app is open. Share your files before closing it."
+              >
+                <Action
+                  secondary
+                  label="Share Recording"
+                  icon="square.and.arrow.up"
+                  onPress={() => void share(take.uri)}
+                />
+                {take.poseUri && (
+                  <Action
+                    secondary
+                    label="Share Pose Data"
+                    icon="figure.stand"
+                    onPress={() => void share(take.poseUri!)}
                   />
                 )}
-                <Copy accessibilityLiveRegion="polite">{status}</Copy>
-              </Panel>
+              </Section>
+              {take.poseCount > 0 && (
+                <Copy caption muted>
+                  Pose timing starts at the recording request. Camera startup
+                  may introduce an offset; exact alignment is not yet verified.
+                </Copy>
+              )}
+              <Action
+                secondary
+                label="Explore Sample Questions"
+                icon="text.bubble"
+                onPress={() => router.push("/demo")}
+              />
+              {Platform.OS !== "ios" && (
+                <Action
+                  destructive
+                  label="Delete Recording"
+                  disabled={busy}
+                  onPress={deleteTake}
+                />
+              )}
+            </>
+          }
+        />
+      </Page>
+      {Platform.OS === "ios" && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Menu
+            icon="ellipsis"
+            accessibilityLabel="Recording actions"
+          >
+            <Stack.Toolbar.MenuAction
+              icon="square.and.arrow.up"
+              onPress={() => void share(take.uri)}
+            >
+              Share Recording
+            </Stack.Toolbar.MenuAction>
+            {take.poseUri && (
+              <Stack.Toolbar.MenuAction
+                icon="figure.stand"
+                onPress={() => void share(take.poseUri!)}
+              >
+                Share Pose Data
+              </Stack.Toolbar.MenuAction>
             )}
-            {take.metrics.length > 0 && (
-              <Panel>
-                <Copy title>Measured audio & words</Copy>
-                {take.metrics.map((m) => (
-                  <Copy key={m.id}>
-                    {m.label}: {m.value ?? "Unavailable"} {m.unit}
-                  </Copy>
-                ))}
-              </Panel>
-            )}
-            {error && <Copy accessibilityRole="alert">{error}</Copy>}
-            <Action
-              secondary
-              label="Sample questions (scripted)"
-              onPress={() => router.push("/demo")}
-            />
-            <Action
+            <Stack.Toolbar.MenuAction
+              icon="trash"
               destructive
-              label="Delete this local take"
               disabled={busy}
-              onPress={() =>
-                Alert.alert(
-                  "Delete local recording?",
-                  "This removes the video and pose log from this device.",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Delete",
-                      style: "destructive",
-                      onPress: () => {
-                        try {
-                          remove(take.id);
-                          router.replace("/");
-                        } catch (e) {
-                          setError(`Could not delete all files: ${String(e)}`);
-                        }
-                      },
-                    },
-                  ],
-                )
-              }
-            />
-          </>
-        }
-      />
-    </Page>
+              onPress={deleteTake}
+            >
+              Delete Recording
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
+      )}
+    </>
   );
 }

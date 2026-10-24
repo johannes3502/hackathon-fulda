@@ -23,7 +23,15 @@ export type Take = {
   endpoint: string;
   notice?: string;
 };
+export type CaptureOptions = {
+  title: string;
+  poseEnabled: boolean;
+  backend: boolean;
+  url: string;
+};
 type Store = {
+  options: CaptureOptions;
+  setOptions: (patch: Partial<CaptureOptions>) => void;
   takes: Take[];
   save: (take: Take) => void;
   remove: (id: string) => void;
@@ -31,10 +39,18 @@ type Store = {
 const Context = createContext<Store | null>(null);
 export function Sessions({ children }: PropsWithChildren) {
   const [takes, set] = useState<Take[]>([]);
+  const [options, setOptions] = useState<CaptureOptions>({
+    title: "My rehearsal",
+    poseEnabled: true,
+    backend: false,
+    url: process.env.EXPO_PUBLIC_API_URL ?? "",
+  });
   return (
     <Context.Provider
       value={{
         takes,
+        options,
+        setOptions: (patch) => setOptions((old) => ({ ...old, ...patch })),
         save: (take) =>
           set((old) => [take, ...old.filter((t) => t.id !== take.id)]),
         remove: (id) => {

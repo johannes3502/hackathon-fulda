@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
+import { Platform, View } from "react-native";
+import { Stack } from "expo-router";
 import { randomUUID } from "expo-crypto";
-import { Action, Columns, Copy, Page, Panel, time } from "../ui";
+import {
+  Action,
+  Columns,
+  Copy,
+  Page,
+  Section,
+  Divider,
+  time,
+  useColors,
+} from "../ui";
 import { MockCoachGateway } from "../../../frontend/src/features/coach/mock/MockCoachGateway";
 import { defaults } from "../../../frontend/src/features/coach/mock/fixtures/scenario";
 import type {
@@ -50,157 +61,246 @@ export default function Demo() {
       setBusy(false);
     }
   }
+  const colors = useColors();
   const report = state?.completedReports.at(-1);
+  const restart = () => {
+    setEvidence("");
+    void send("reset");
+  };
   return (
-    <Page>
-      <Panel>
-        <Copy title>Synthetic sample rehearsal</Copy>
-        <Copy>
-          This deterministic example reuses the web demo. Transcription,
-          questions and feedback here are scripted, not an analysis of your
-          recording.
-        </Copy>
-      </Panel>
-      {error && <Copy accessibilityRole="alert">{error}</Copy>}
-      {!state ? (
-        <Copy>Loading sample…</Copy>
-      ) : (
-        <Columns
-          main={
-            <>
-              <Copy title>{state.config.title}</Copy>
-              <Copy muted>
-                {state.phase.replaceAll("_", " ")} ·{" "}
-                {time(state.presentationMs)}
-              </Copy>
-              {state.activeCue && (
-                <Panel>
-                  <Copy>{state.activeCue.message}</Copy>
-                </Panel>
-              )}
-              <Panel>
-                <Copy title>Transcript</Copy>
-                {state.transcript.length === 0 ? (
-                  <Copy muted>Start the sample to follow its transcript.</Copy>
-                ) : (
-                  state.transcript.map((s) => (
-                    <Copy key={s.id}>
-                      {time(s.startMs)} · {s.speaker}: {s.text}
-                    </Copy>
-                  ))
+    <>
+      <Page>
+        <View style={{ gap: 6 }}>
+          <Copy style={{ fontWeight: "600" }}>Scripted Sample</Copy>
+          <Copy caption muted>
+            Explore transcript, feedback, and questions. This is not an analysis
+            of your recording.
+          </Copy>
+        </View>
+        {!!error && (
+          <Copy accessibilityRole="alert" style={{ color: colors.error }}>
+            {error}
+          </Copy>
+        )}
+        {!state ? (
+          <Copy>Loading sample…</Copy>
+        ) : (
+          <Columns
+            sideFirst
+            main={
+              <>
+                <View style={{ gap: 6 }}>
+                  <Copy title>{state.config.title}</Copy>
+                  <Copy caption muted>
+                    {state.phase.replaceAll("_", " ")} ·{" "}
+                    {time(state.presentationMs)}
+                  </Copy>
+                </View>
+                {state.activeCue && (
+                  <Section title="Live hint">
+                    <Copy>{state.activeCue.message}</Copy>
+                  </Section>
                 )}
-              </Panel>
-              {report && (
-                <Panel>
-                  <Copy title>Sample feedback</Copy>
-                  {report.strengths.map((s) => (
-                    <Copy key={s}>{s}</Copy>
-                  ))}
-                  {report.findings.map((f) => (
-                    <Panel key={f.id}>
-                      <Action
-                        secondary
-                        label={`${time(f.evidence.startMs)} · ${f.title}`}
-                        onPress={() =>
-                          setEvidence(
-                            f.evidence.quote ??
-                              report.transcript
-                                .filter((t) =>
-                                  f.evidence.segmentIds.includes(t.id),
-                                )
-                                .map((t) => t.text)
-                                .join(" "),
-                          )
-                        }
-                      />
-                      <Copy>{f.observation}</Copy>
-                      <Copy muted>{f.nextAction}</Copy>
-                    </Panel>
-                  ))}
-                  {evidence && <Copy>Transcript evidence: {evidence}</Copy>}
-                </Panel>
-              )}
-            </>
-          }
-          side={
-            <>
-              <Panel>
-                <Copy title>Sample controls</Copy>
-                {state.phase === "preflight" ? (
-                  <Action
-                    label="Start sample"
-                    disabled={busy}
-                    onPress={() => void send({ type: "start" })}
-                  />
-                ) : (
+                <Section title="Transcript">
+                  {state.transcript.length === 0 ? (
+                    <Copy muted>
+                      Start the sample to follow its transcript.
+                    </Copy>
+                  ) : (
+                    state.transcript.map((s, index) => (
+                      <View key={s.id} style={{ gap: 8 }}>
+                        {index > 0 && <Divider />}
+                        <Copy
+                          caption
+                          muted
+                          style={{ fontVariant: ["tabular-nums"] }}
+                        >
+                          {time(s.startMs)} · {s.speaker}
+                        </Copy>
+                        <Copy>{s.text}</Copy>
+                      </View>
+                    ))
+                  )}
+                </Section>
+                {report && (
                   <>
-                    <Action
-                      label="Next sample moment"
-                      disabled={busy || state.phase === "review"}
-                      onPress={() => void send("next")}
-                    />
-                    <Action
-                      secondary
-                      label="Show sample questions"
-                      disabled={busy || state.phase === "review"}
-                      onPress={() => void send("qa")}
-                    />
-                    <Action
-                      secondary
-                      label="Show sample report"
-                      disabled={busy || state.phase === "review"}
-                      onPress={() => void send("review")}
-                    />
-                    <Action
-                      secondary
-                      label="Restart sample"
-                      disabled={busy}
-                      onPress={() => {
-                        setEvidence("");
-                        void send("reset");
-                      }}
-                    />
+                    <Section title="What worked">
+                      {report.strengths.map((s) => (
+                        <Copy key={s}>{s}</Copy>
+                      ))}
+                    </Section>
+                    <Section
+                      title="Places to revisit"
+                      footer="Feedback and source excerpts in this sample are scripted."
+                    >
+                      {report.findings.map((f, index) => (
+                        <View key={f.id} style={{ gap: 10 }}>
+                          {index > 0 && <Divider />}
+                          <Copy style={{ fontWeight: "600" }}>{f.title}</Copy>
+                          <Copy>{f.observation}</Copy>
+                          <Copy caption muted>
+                            {f.nextAction}
+                          </Copy>
+                          <Action
+                            secondary
+                            icon="text.quote"
+                            label={`View Excerpt · ${time(f.evidence.startMs)}`}
+                            onPress={() =>
+                              setEvidence(
+                                f.evidence.quote ??
+                                  report.transcript
+                                    .filter((t) =>
+                                      f.evidence.segmentIds.includes(t.id),
+                                    )
+                                    .map((t) => t.text)
+                                    .join(" "),
+                              )
+                            }
+                          />
+                        </View>
+                      ))}
+                    </Section>
+                    {!!evidence && (
+                      <Section title="Transcript excerpt">
+                        <Copy>{evidence}</Copy>
+                      </Section>
+                    )}
                   </>
                 )}
-              </Panel>
-              {state.question && state.phase !== "review" && (
-                <Panel>
-                  <Copy title>Question simulator</Copy>
-                  <Copy>{state.question.text}</Copy>
-                  {state.phase === "judge_question" && (
+              </>
+            }
+            side={
+              <>
+                <Section
+                  title="Sample playback"
+                  footer="Advance through this prepared rehearsal at your own pace."
+                >
+                  {state.phase === "preflight" ? (
                     <Action
-                      label="Choose a sample answer"
+                      label="Start Sample"
+                      icon="play.fill"
                       disabled={busy}
-                      onPress={() =>
-                        void send({
-                          type: "start_answer",
-                          turnId: state.question!.turnId,
-                        })
-                      }
+                      onPress={() => void send({ type: "start" })}
                     />
-                  )}{" "}
-                  {state.phase === "answering" &&
-                    state.answerChoices.map((a) => (
+                  ) : state.phase === "review" ? (
+                    <Action
+                      label="Play Again"
+                      icon="arrow.counterclockwise"
+                      disabled={busy}
+                      onPress={restart}
+                    />
+                  ) : (
+                    <Action
+                      label="Next Moment"
+                      icon="forward.end.fill"
+                      disabled={busy}
+                      onPress={() => void send("next")}
+                    />
+                  )}
+                  {Platform.OS !== "ios" && state.phase !== "preflight" && (
+                    <>
                       <Action
-                        key={a.id}
                         secondary
-                        label={a.text}
+                        label="Sample Questions"
+                        disabled={busy || state.phase === "review"}
+                        onPress={() => void send("qa")}
+                      />
+                      <Action
+                        secondary
+                        label="Sample Report"
+                        disabled={busy || state.phase === "review"}
+                        onPress={() => void send("review")}
+                      />
+                      <Action
+                        secondary
+                        label="Restart Sample"
+                        disabled={busy}
+                        onPress={restart}
+                      />
+                    </>
+                  )}
+                </Section>
+                {state.question && state.phase !== "review" && (
+                  <Section
+                    title="Practice question"
+                    footer="Choose a prepared answer to explore the sample response."
+                  >
+                    <Copy>{state.question.text}</Copy>
+                    {state.phase === "judge_question" && (
+                      <Action
+                        label="Choose an Answer"
                         disabled={busy}
                         onPress={() =>
                           void send({
-                            type: "submit_answer",
+                            type: "start_answer",
                             turnId: state.question!.turnId,
-                            text: a.text,
                           })
                         }
                       />
-                    ))}
-                </Panel>
-              )}
-            </>
-          }
-        />
+                    )}
+                    {state.phase === "answering" &&
+                      state.answerChoices.map((a) => (
+                        <Action
+                          key={a.id}
+                          secondary
+                          label={a.text}
+                          disabled={busy}
+                          onPress={() =>
+                            void send({
+                              type: "submit_answer",
+                              turnId: state.question!.turnId,
+                              text: a.text,
+                            })
+                          }
+                        />
+                      ))}
+                  </Section>
+                )}
+              </>
+            }
+          />
+        )}
+      </Page>
+      {Platform.OS === "ios" && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Menu
+            icon="ellipsis"
+            accessibilityLabel="Sample options"
+          >
+            <Stack.Toolbar.MenuAction
+              icon="text.bubble"
+              disabled={
+                !state ||
+                busy ||
+                state.phase === "preflight" ||
+                state.phase === "review"
+              }
+              onPress={() => void send("qa")}
+            >
+              Sample Questions
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="doc.text"
+              disabled={
+                !state ||
+                busy ||
+                state.phase === "preflight" ||
+                state.phase === "review"
+              }
+              onPress={() => void send("review")}
+            >
+              Sample Report
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="arrow.counterclockwise"
+              disabled={!state || busy}
+              onPress={restart}
+            >
+              Restart Sample
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
       )}
-    </Page>
+    </>
   );
 }

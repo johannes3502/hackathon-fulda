@@ -14,7 +14,7 @@ npm run mobile:android
 
 Xcode and CocoaPods are required for iOS; Android Studio, an Android SDK and JDK 17 for Android. `npm run mobile` starts Metro for an already installed development client. **Expo Go cannot load the native camera/MediaPipe modules.** Scene support is explicitly enabled for iOS/iPadOS 27 compatibility. iPad is enabled; review and sample screens use two columns when enough space is available, including after rotation or Split View resizing. Larger accessibility text returns to a single column.
 
-Set `EXPO_PUBLIC_API_URL` in `mobile/.env.local` or enter an address in the recording screen. Use a reachable HTTPS/LAN address (e.g. `http://192.168.1.42:8000` during development), not a physical phone's `localhost`. Release builds should use HTTPS; platform network policies may reject plain HTTP. Never put secrets in `EXPO_PUBLIC_*` variables.
+Set `EXPO_PUBLIC_API_URL` in `mobile/.env.local` or enter an address in Recording Options. Use a reachable HTTPS/LAN address (e.g. `http://192.168.1.42:8000` during development), not a physical phone's `localhost`. Release builds should use HTTPS; platform network policies may reject plain HTTP. Never put secrets in `EXPO_PUBLIC_*` variables.
 
 ```sh
 npm run typecheck --workspace mobile
@@ -41,7 +41,7 @@ npm run export --workspace mobile
 
 ## Still mocked / needed from the backend
 
-See the [integration handoff](../docs/pitch-coach-handoff.md) for the endpoint inventory and [`frontend/DATA_POINTS.md`](../frontend/DATA_POINTS.md) for pose fields. Native does not invent new endpoints. Source ingestion/RAG fact-check, real question generation and answer evaluation, session/report persistence, presigned uploads and server-cut clips remain unavailable to this UI. Automatic ASR is not requested by this native path; import word timestamps instead. The sample is not a fallback that silently replaces failed real analysis.
+See the [integration handoff](../docs/pitch-coach-handoff.md) for the endpoint inventory and [`frontend/DATA_POINTS.md`](../frontend/DATA_POINTS.md) for pose fields. Native does not invent new endpoints. Source upload and retrieval now exist in the backend and web app; a native sources screen is not connected yet. RAG fact-check, real question generation and answer evaluation, session/report persistence, presigned uploads and server-cut clips remain unavailable to this UI. Automatic ASR is not requested by this native path; import word timestamps instead. The sample is not a fallback that silently replaces failed real analysis.
 
 ## Verification (24 October 2026)
 
@@ -50,3 +50,21 @@ See the [integration handoff](../docs/pitch-coach-handoff.md) for the endpoint i
 - iOS/Android JavaScript exports, lint, TypeScript, 12 mobile tests and 35 existing web tests passed. Expo dependency check passed.
 - The web-only clean npm install passed with the shared lockfile; Docker image execution was not checked because the local Docker daemon was unavailable.
 - Not yet verified: physical-device camera/microphone capture, pose accuracy/orientation and video timing, real native-to-backend uploads, file sharing on devices, Android runtime interaction, signed release or store distribution. The simulator checks establish launch, not hardware acceptance.
+
+## Native interface
+
+The iOS library uses SwiftUI `List` and `ContentUnavailableView`. Recording Options uses a native `Form`, `TextField`, and switches in a system sheet. Actions are SwiftUI buttons; navigation, menus, and video controls use the platform implementations. System colors, SF Symbols, scalable text, and grouped sections follow Apple's [iOS guidance](https://developer.apple.com/design/human-interface-guidelines/designing-for-ios), [typography](https://developer.apple.com/design/human-interface-guidelines/typography), and [accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility). Android uses platform-specific alternatives; SwiftUI imports stay in `.ios.tsx` components outside the route directory.
+
+On iPad, recording, review, and sample pages use two columns when width and text size permit. Compact sample layouts put playback and question controls before the transcript. Recording options persist during the app session, including after the sheet closes; they are not saved across launches.
+
+### Repeatable native visual checks
+
+Run these on a development build connected to Metro. Use synthetic recordings only. These are manual UI regression tests, separate from the automated API/pose tests.
+
+1. **Library and navigation:** cold-launch, verify the large Rehearsals title, empty state, sample row, and labeled New Recording toolbar button. Open and close recording and sample screens. Repeat in light and dark appearance.
+2. **Settings round trip:** open Recording Options, set the name to `Design rehearsal`, turn pose off and server analysis on, and enter `https://example.invalid`. Close and reopen the sheet. Expect the full name, URL, and both switches to persist. Do not upload to this test address. Turn server analysis off before recording.
+3. **Sample flow:** Start Sample, advance, open the native menu, choose Sample Questions, and choose an answer. Expect the question and complete multiline answers to remain readable. Open Sample Report, inspect excerpts, then restart. No synthetic response should be presented as analysis of a real take.
+4. **Largest text:** on iPad set `simctl ui <device> content_size accessibility-extra-extra-extra-large`; open the sample and scroll. Expect one column, readable sample disclosure, wrapping text, and reachable native controls. Restore `large`. Repeat at default size: expect two columns.
+5. **Review:** with a synthetic local take, inspect native video playback, timestamp actions, analysis disclosure, measured values, sharing, and the destructive action in the toolbar menu. Cancel the delete confirmation. No upload should occur without pressing Upload & Analyze.
+
+Redesign checks on 24 October 2026: iPhone 17 Pro/iOS 26.5 dark-mode library, sample menu and multiline answers; iPad Pro 11-inch/iPadOS 27 light-mode recording, settings round trip, two-column sample, and largest-text single-column sample; iPhone review layout with a temporary generated solid-color video and synthetic feedback. Temporary review seed code was removed. Direct `simctl io <device> screenshot <file>` captures were used to resolve Device Hub's stale/partially blank display artifacts. Physical-device recording, VoiceOver traversal, Android interaction, sharing, and actual analysis uploads still require device testing.

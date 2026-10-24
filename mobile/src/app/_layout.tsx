@@ -12,15 +12,26 @@ export default function Layout() {
         <StatusBar style="auto" />
         <Stack
           screenOptions={{
-            headerTintColor: c.tint,
             contentStyle: { backgroundColor: c.bg },
             headerBackButtonDisplayMode: "minimal",
           }}
         >
-          <Stack.Screen name="index" options={{ title: "Pitch Coach" }} />
-          <Stack.Screen name="studio" options={{ title: "Record a take" }} />
-          <Stack.Screen name="review" options={{ title: "Review your take" }} />
-          <Stack.Screen name="demo" options={{ title: "Sample rehearsal" }} />
+          <Stack.Screen
+            name="index"
+            options={{ title: "Rehearsals", headerLargeTitle: true }}
+          />
+          <Stack.Screen name="studio" options={{ title: "New Recording" }} />
+          <Stack.Screen name="review" options={{ title: "Review" }} />
+          <Stack.Screen name="demo" options={{ title: "Sample Rehearsal" }} />
+          <Stack.Screen
+            name="settings"
+            options={{
+              title: "Recording Options",
+              presentation: "formSheet",
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: [0.75, 1],
+            }}
+          />
         </Stack>
       </Sessions>
     </ThemeProvider>
