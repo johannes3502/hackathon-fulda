@@ -2,7 +2,8 @@
   "name": "hackathon-fulda",
   "private": true,
   "workspaces": [
-    "frontend"
+    "frontend",
+    "mobile"
   ],
   "scripts": {
     "dev": "npm run dev --workspace frontend",
@@ -15,7 +16,11 @@
     "api:export": "node scripts/export-openapi.mjs",
     "api:types": "openapi-typescript api/openapi.json -o api/schema.d.ts",
     "api:generate": "npm run api:export && npm run api:types",
-    "api:check": "npm run api:export -- --check && npm run api:types -- --check"
+    "api:check": "npm run api:export -- --check && npm run api:types -- --check",
+    "mobile": "npm run start --workspace mobile",
+    "mobile:ios": "npm run ios --workspace mobile",
+    "mobile:android": "npm run android --workspace mobile",
+    "postinstall": "node -e \"if(require('node:fs').existsSync('mobile/scripts/patch-native.cjs'))require('./mobile/scripts/patch-native.cjs')\""
   },
   "devDependencies": {
     "openapi-typescript": "^7.10.1"

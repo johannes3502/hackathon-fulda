@@ -74,3 +74,10 @@ For local browser tests: `npx playwright install chromium`, then
 
 [Design notes](DESIGN.md) · [Implementation decisions](../docs/pitch-coach-ai-decision-log.md).
 Real camera hardware, Safari/iOS and public deployment still need acceptance.
+
+## Native app
+
+The [React Native companion](../mobile/README.md) supports iPhone, iPad and Android,
+including native on-device pose capture. Run `npm run mobile:ios` or
+`npm run mobile:android` from the repository root to build a development client.
+Expo Go cannot load its native pose modules.

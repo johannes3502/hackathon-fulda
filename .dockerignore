@@ -3,6 +3,8 @@
 !package-lock.json
 !frontend/
 !frontend/**
+!mobile/
+!mobile/package.json
 !api/
 !api/**
 **/node_modules

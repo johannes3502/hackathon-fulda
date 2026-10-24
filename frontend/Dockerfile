@@ -9,7 +9,8 @@ USER node
 # npm workspaces use the repository's shared lockfile.
 COPY --chown=node:node package.json package-lock.json ./
 COPY --chown=node:node frontend/package.json ./frontend/package.json
-RUN npm ci && mkdir -p frontend/.next
+COPY --chown=node:node mobile/package.json ./mobile/package.json
+RUN npm ci --workspace frontend --include-workspace-root && mkdir -p frontend/.next
 
 COPY --chown=node:node frontend/ ./frontend/
 COPY --chown=node:node api/ ./api/

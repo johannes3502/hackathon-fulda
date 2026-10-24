@@ -55,3 +55,13 @@ Pose/gesture/gaze feedback rules, source ingest/fact-check, judge questions and
 answer evaluation still use sample data. Session persistence, presigned uploads
 and event-clip retrieval are also pending. Keep these boundaries visible when
 connecting new services; no fabricated scores or model results.
+
+## Native companion (phones and iPad)
+
+[`mobile/`](../mobile/README.md) is an Expo/React Native development client with
+native camera/audio recording, on-device MediaPipe pose capture, JSONL/video
+sharing and timestamp review. It uses the existing HTTP analysis endpoints above;
+questions and sample reports reuse `MockCoachGateway`. No backend implementation
+is added by this client. Native pose logs explicitly mark recording-request timing
+as approximate, and take files are temporary local cache data. See the mobile
+README for build commands, validation and remaining device checks.
