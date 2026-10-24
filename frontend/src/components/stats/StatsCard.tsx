@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, BarChart3, FileText, Video } from "lucide-react";
+import { ArrowRight, BarChart3, FileText, LineChart, Video } from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { time } from "@/lib/utils";
@@ -38,6 +38,9 @@ export function StatsDashboard() {
               </Link>
               <Link href="/sources" className="button button-outline">
                 <FileText size={16} /> Quellen
+              </Link>
+              <Link href="/progress" className="button button-outline">
+                <LineChart size={16} /> Fortschritt
               </Link>
             </div>
             <p className="stats418-retention">
