@@ -241,7 +241,7 @@ test("large view scales feedback and preserves an active recording", async ({
   await enable(page);
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
-  const originalWidth = (await video.boundingBox())!.width;
+  const originalHeight = (await video.boundingBox())!.height;
   await page
     .getByRole("button", { name: "Start recording", exact: true })
     .click();
@@ -257,7 +257,17 @@ test("large view scales feedback and preserves an active recording", async ({
     await cue.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
   ).toBeGreaterThan(originalFontSize * 1.5);
   if (info.project.name === "desktop") {
-    expect((await video.boundingBox())!.width).toBeGreaterThan(originalWidth);
+    const camera = (await page.locator(".live-camera-stage").boundingBox())!;
+    const feedback = (await page.locator(".cue-panel").boundingBox())!;
+    expect(camera.height).toBeGreaterThan(originalHeight);
+    expect(feedback.x).toBeGreaterThanOrEqual(camera.x + camera.width);
+    expect(feedback.y).toBeCloseTo(camera.y, 0);
+    expect(feedback.height).toBeCloseTo(camera.height, 0);
+    expect(feedback.width / camera.width).toBeCloseTo(1, 1);
+  } else {
+    const camera = (await page.locator(".live-camera-stage").boundingBox())!;
+    const feedback = (await page.locator(".cue-panel").boundingBox())!;
+    expect(feedback.y).toBeGreaterThanOrEqual(camera.y + camera.height);
   }
   await startPoseSequence(page);
   await expect(cue).toHaveText("Hand above shoulder", {

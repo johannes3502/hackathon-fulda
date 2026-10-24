@@ -34,7 +34,9 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
 - **Studio:** normal view is the default, with visible navigation, speech choice,
   timer, and camera stage. Before feedback exists, the stage uses the available
   width. Large view is optional and preserves the active camera and recording;
-  Escape returns to normal view. Recording options and diagnostics are disclosures.
+  Escape returns to normal view. Large view fills the available height with the
+  camera on the left and an equally wide feedback panel on the right, with shared
+  controls above. Below 1001px they stack. Recording options and diagnostics are disclosures.
 - **Review:** use the same type scale, controls, and surfaces as the studio.
   Video, timeline, selected observation, and moment list remain connected to the
   existing video clock. On phones, playback and timeline precede the observation.

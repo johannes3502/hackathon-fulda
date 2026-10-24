@@ -23,7 +23,7 @@
   max-width: var(--content-width);
 }
 .live-studio-grid {
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
 }
 .studio-session-status {
   display: flex;
@@ -107,17 +107,21 @@ body:has(.live-workspace-large) .app-footer,
   padding: 12px 20px;
 }
 .live-workspace-large .live-studio-grid {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(240px, 1fr) auto auto;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto minmax(240px, 1fr) auto;
+  gap: 16px;
   height: calc(100dvh - 24px);
   align-items: stretch;
+}
+.live-workspace-large .live-studio-grid:not(:has(.coaching-column)) {
+  grid-template-columns: minmax(0, 1fr);
 }
 .live-workspace-large .studio-main,
 .live-workspace-large .coaching-column {
   display: contents;
 }
 .live-workspace-large .live-camera-stage {
+  grid-column: 1;
   grid-row: 2;
   height: 100%;
   min-height: 240px;
@@ -128,43 +132,67 @@ body:has(.live-workspace-large) .app-footer,
   object-fit: contain;
 }
 .live-workspace-large .cue-panel {
-  grid-row: 3;
-  padding: 16px 24px;
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
 }
 .live-workspace-large .cue-panel [aria-live] {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  gap: 20px;
+  padding: 24px 0;
 }
 .live-workspace-large .cue-message {
   font-size: 3rem;
   font-weight: 600;
   line-height: 1.15;
-  margin-top: 12px;
+  margin-top: 0;
   overflow-wrap: anywhere;
 }
 .live-workspace-large .live-cue-detail {
   font-size: 1.75rem;
   line-height: 1.35;
   color: var(--foreground);
+  margin: 0;
 }
 .live-workspace-large .cue-caption,
 .live-workspace-large .cue-panel .panel-title-row > span {
   font-size: 0.9375rem;
 }
 .live-workspace-large .studio-main > .live-control-bar {
+  grid-column: 1 / -1;
   grid-row: 1;
   margin: 0;
 }
 .live-workspace-large .camera-message {
-  grid-row: 4;
+  grid-column: 1 / -1;
+  grid-row: 3;
   margin: 0;
+}
+@media (max-width: 1000px) {
+  .live-workspace-large .live-studio-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(240px, 50dvh) auto auto;
+    height: auto;
+    min-height: calc(100dvh - 24px);
+  }
+  .live-workspace-large .cue-panel {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .live-workspace-large .camera-message {
+    grid-row: 4;
+  }
 }
 @media (max-width: 760px) {
   .live-workspace-large .cue-panel [aria-live] {
-    grid-template-columns: 1fr;
-    gap: 0;
+    gap: 12px;
   }
   .live-workspace-large .cue-message {
     font-size: 2rem;
