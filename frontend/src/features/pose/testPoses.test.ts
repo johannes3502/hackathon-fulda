@@ -48,7 +48,7 @@ const evaluate = (
   id: PoseTestId,
   points = base(),
   hands: HandSample[] = [],
-) => POSE_TESTS.find((test) => test.id === id)!.evaluate(sample(points), hands);
+) => POSE_TESTS.find((test) => test.id === id)!.check(sample(points), hands);
 
 function lean(): Landmark[] {
   const p = base();
@@ -67,6 +67,13 @@ function shoulderTilt(): Landmark[] {
 function headTilt(): Landmark[] {
   const p = base();
   Object.assign(p[5], { y: 0.25 });
+  return p;
+}
+
+function crossedLegs(): Landmark[] {
+  const p = base();
+  Object.assign(p[27], { x: 0.75, y: 0.95 });
+  Object.assign(p[28], { x: 0.25, y: 0.95 });
   return p;
 }
 
@@ -154,12 +161,37 @@ it("evaluates each fixed test pose", () => {
   expect(evaluate("torso-lean", lean()).pass).toBe(true);
   expect(evaluate("shoulder-tilt", shoulderTilt()).pass).toBe(true);
   expect(evaluate("head-tilt", headTilt()).pass).toBe(true);
+  expect(evaluate("crossed-legs", crossedLegs()).pass).toBe(true);
   expect(evaluate("arms-crossed", crossed()).pass).toBe(true);
   expect(evaluate("self-touch", selfTouch()).pass).toBe(true);
   expect(evaluate("look-away", lookAway()).pass).toBe(true);
   expect(evaluate("hands-up", handsUp()).pass).toBe(true);
   expect(evaluate("hips-out", hipsOut()).pass).toBe(true);
   expect(evaluate("hands-hidden", handsHidden()).pass).toBe(true);
+});
+
+it("detects crossed legs from intersecting lower-leg segments", () => {
+  expect(evaluate("crossed-legs", crossedLegs()).pass).toBe(true);
+  expect(evaluate("crossed-legs").pass).toBe(false);
+  const hidden = base();
+  hidden[27].visibility = 0;
+  expect(evaluate("crossed-legs", hidden).pass).toBeNull();
+});
+
+it("reports which condition failed", () => {
+  const check = evaluate("torso-lean");
+  expect(check.pass).toBe(false);
+  expect(check.failing).toContain("torso lean");
+  expect(check.values.torso_lean_deg).not.toBeNull();
+  expect(evaluate("arms-crossed", crossed()).failing).toEqual([]);
+});
+
+it("reports values and failing conditions for every pose", () => {
+  for (const test of POSE_TESTS) {
+    const result = test.check(sample(base()), []);
+    expect(result.values).toBeTypeOf("object");
+    expect(Array.isArray(result.failing)).toBe(true);
+  }
 });
 
 it("does not recognize the neutral pose while off baseline", () => {

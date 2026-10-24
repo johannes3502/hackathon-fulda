@@ -290,6 +290,8 @@ export function LiveStudio() {
                   <PoseOverlay
                     sample={pose.state.latest}
                     largeView={largeView}
+                    hands={pose.state.hands}
+                    showHands={poseLab}
                   />
                 )}
               {cameraStatus === "active" && (
@@ -317,6 +319,8 @@ export function LiveStudio() {
                   <PoseDevMode
                     results={pose.state.tests}
                     handModel={pose.state.handModel}
+                    handError={pose.state.handError}
+                    hands={pose.state.hands.length}
                     view={poseView}
                   />
                 )}

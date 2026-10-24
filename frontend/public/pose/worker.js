@@ -4,19 +4,6 @@ let landmarker;
 let handLandmarker;
 let frame = 0;
 
-function nearHip(points) {
-  const shoulderSpan = Math.hypot(
-    (points[11]?.x ?? 0) - (points[12]?.x ?? 0),
-    (points[11]?.y ?? 0) - (points[12]?.y ?? 0),
-  );
-  if (shoulderSpan < 1e-6) return false;
-  return [15, 16].some((wristIndex) => {
-    const wrist = points[wristIndex];
-    const hip = points[wristIndex === 15 ? 23 : 24];
-    return !!wrist && !!hip && wrist.y > hip.y - 0.35 * shoulderSpan;
-  });
-}
-
 globalThis.onmessage = async ({ data }) => {
   try {
     if (data.type === "init") {
@@ -46,14 +33,14 @@ globalThis.onmessage = async ({ data }) => {
         handLandmarker =
           await globalThis.Vision.HandLandmarker.createFromOptions(files, {
             baseOptions: {
-              modelAssetPath: "/pose/hand_landmarker.task",
+              modelAssetPath: "/pose/hand_landmarker.task?v=1",
               delegate: "CPU",
             },
             runningMode: "IMAGE",
             numHands: 2,
-            minHandDetectionConfidence: 0.5,
-            minHandPresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
+            minHandDetectionConfidence: 0.3,
+            minHandPresenceConfidence: 0.3,
+            minTrackingConfidence: 0.3,
           });
         hands = true;
       } catch (error) {
@@ -64,10 +51,9 @@ globalThis.onmessage = async ({ data }) => {
     } else if (data.type === "frame") {
       const result = landmarker.detect(data.frame);
       const points = result.landmarks[0] ?? [];
-      // Fingertracking is only needed around the hips. Elsewhere, probe rarely.
-      const shouldDetectHands =
-        !!handLandmarker &&
-        (nearHip(points) ? frame % 2 === 0 : frame % 6 === 0);
+      // Hands move in and out of frame; run the lighter hand model at ~5 Hz
+      // instead of gating on a pose wrist that may be hidden in a pocket.
+      const shouldDetectHands = !!handLandmarker && frame % 2 === 0;
       frame += 1;
       let hands = null;
       if (shouldDetectHands) {

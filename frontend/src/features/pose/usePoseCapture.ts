@@ -46,7 +46,7 @@ export function usePoseCapture(
       owner.current.beginRecording(timestamp);
       setState((previous) =>
         previous
-          ? { ...previous, count: 0, latest: null, tests: [] }
+          ? { ...previous, count: 0, latest: null, hands: [], tests: [] }
           : previous,
       );
       setDownload(undefined);

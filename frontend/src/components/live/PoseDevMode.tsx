@@ -12,26 +12,37 @@ export type PoseView = "coach" | "status";
 export function PoseDevMode({
   results,
   handModel,
+  handError,
+  hands,
   view,
 }: {
   results: PoseTestResult[];
   handModel: boolean | null;
+  handError: string | null;
+  hands: number;
   view: PoseView;
 }) {
-  const { state, id, label, detail } = poseFeedback(results);
+  const { state, id, label, detail, failing } = poseFeedback(results);
+  const failingText = failing.join(", ");
   const logged = useRef("");
   // Console trace for tuning: log each new dominant pose once.
   useEffect(() => {
-    const key = `${state}|${id}|${detail}`;
+    const key = `${state}|${id}|${detail}|${failingText}|${hands}`;
     if (key === logged.current) return;
     logged.current = key;
-    console.log(`[pose] ${state} ${label} (${detail})`);
-  }, [state, id, label, detail]);
+    console.log(
+      `[pose] ${state} ${label} (${detail}) failing=[${failingText}] hands=${hands}`,
+    );
+  }, [state, id, label, detail, failingText, hands]);
   if (view === "coach")
     return (
       <CoachCue
         message={coachMessage(id)}
-        detail={handModel === false ? "hand model unavailable" : detail}
+        detail={
+          handModel === false
+            ? `hand model unavailable${handError ? `: ${handError}` : ""}`
+            : `${detail} · ${hands} hands`
+        }
         state={state}
         className="live-pose-cue-lab"
       />
@@ -46,9 +57,18 @@ export function PoseDevMode({
       <span className="pose-status-kicker">Pose lab</span>
       <strong>{label}</strong>
       <span className="pose-status-detail">{detail}</span>
-      {handModel === false && (
-        <span className="pose-status-warning">Hand model unavailable</span>
+      {!!failing.length && (
+        <span className="pose-status-failing">
+          failing: {failingText}
+        </span>
       )}
+      <span className="pose-status-hands">
+        {handModel === null
+          ? "Hand model loading"
+          : handModel
+            ? `Hands detected: ${hands}`
+            : `Hand model unavailable${handError ? `: ${handError}` : ""}`}
+      </span>
       <small>Dev only · heuristics, not validated · no events</small>
     </div>
   );

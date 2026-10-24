@@ -37,6 +37,7 @@ export const POINTS = {
 // Prototype heuristics, not validated thresholds or assessments.
 export const HEURISTICS = {
   confidence: 0.5,
+  handConfidence: 0.3,
   eyeWidthRatio: 0.65,
   eyeDepthRatio: 0.35,
 };

@@ -15,8 +15,9 @@ Iris/Pupille, keine Finger im JSONL-Log.
 **MediaPipe Pose Landmarker** (33 Punkte) für das Logging.
 
 **MediaPipe Hand Landmarker** (21 Punkte pro Hand) läuft zusätzlich live im
-selben Worker, nur für den Dev-Pocket-Check. Seine Landmarks werden nicht
-geloggt und nicht an das Backend geschickt.
+selben Worker, ca. 5 Hz und mit Confidence 0,3, nur für den Dev-Pocket-Check.
+Seine Landmarks werden nicht geloggt und nicht an das Backend geschickt; im
+Pose-Lab-Overlay erscheinen sie als pinke Punkte und Linien.
 
 - Augen kommen aus den Pose-Punkten.
 - Kopfwinkel kommen aus Nase, Augen und Ohren.
@@ -158,7 +159,16 @@ erscheinen nicht im JSONL.
   vollständig verdeckte Hand).
 - Eine locker hängende, offene Hand (max. Reach > 0,24) zählt nicht.
 - Ein gerader Arm an der Hüfte (Ellbogen > 120°) zählt nicht als Tasche.
+- Im Pose-Lab-Overlay werden alle 21 Hand-Landmarks pink gezeichnet; das
+  hilft beim Prüfen, ob das Hand-Modell die Hand überhaupt sieht.
 - Keine Sicherheit, kein Event, kein Backend-Payload.
+
+## Crossed legs (Dev, live-only)
+
+`crossedLegsCheck` prüft, ob sich die Unterschenkel schneiden: linkes Knie →
+linker Knöchel und rechtes Knie → rechter Knöchel. Knie und Knöchel müssen
+sichtbar sein; sonst ist das Ergebnis `null` (grau). Kein Event, keine Aussage
+über Sitzhaltung.
 
 ## Implementierter Frontend-Vertrag (24.10.2026)
 

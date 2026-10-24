@@ -1,11 +1,14 @@
-import { armsCrossed } from "./cues";
-import type {
-  HandLandmark,
-  HandSample,
-  PoseSample,
+import { crossArmsCheck, passes } from "./cues";
+import {
+  HEURISTICS,
+  type HandLandmark,
+  type HandSample,
+  type PoseSample,
 } from "./sample";
 
 type RawPoint = [number, number, number, number | null, number | null];
+type Point = { x: number; y: number };
+type PoseValue = number | boolean | string | null;
 
 const usable = (p: RawPoint | null | undefined): p is RawPoint =>
   !!p && (p[3] ?? 0) >= 0.5;
@@ -32,7 +35,7 @@ export function faceDistance(
   const handPoints = wrists.map((wrist) => px(wrist, image));
   // Fingertips are closer to the face than the pose wrist on a chin touch.
   for (const hand of hands) {
-    if (hand.score < 0.5) continue;
+    if (hand.score < HEURISTICS.handConfidence) continue;
     for (const index of [8, 12]) {
       const tip = hand.landmarks[index];
       if (tip)
@@ -72,6 +75,7 @@ export type PoseTestId =
   | "torso-lean"
   | "shoulder-tilt"
   | "head-tilt"
+  | "crossed-legs"
   | "arms-crossed"
   | "self-touch"
   | "look-away"
@@ -80,11 +84,32 @@ export type PoseTestId =
   | "hands-hidden"
   | "pocket";
 
-export type PoseTestEvaluation = {
+export type PoseCheck = {
   pass: boolean | null;
   value: number | null;
   display: string;
+  values: Record<string, PoseValue>;
+  failing: string[];
 };
+
+const check = (
+  pass: boolean | null,
+  display: string,
+  values: Record<string, PoseValue> = {},
+  failing: string[] = [],
+  value: number | null = null,
+): PoseCheck => ({ pass, value, display, values, failing });
+
+const missing = (display: string, failing: string[] = []): PoseCheck =>
+  check(null, display, {}, failing);
+
+const measured = (
+  value: number,
+  pass: boolean,
+  display: string,
+  values: Record<string, PoseValue> = {},
+  failing: string[] = [],
+): PoseCheck => check(pass, display, { value, ...values }, failing, value);
 
 export type PoseTestDefinition = {
   id: PoseTestId;
@@ -95,10 +120,7 @@ export type PoseTestDefinition = {
   holdMs: number;
   releaseMs: number;
   unknownReleaseMs: number;
-  evaluate: (
-    sample: PoseSample | null,
-    hands: HandSample[],
-  ) => PoseTestEvaluation;
+  check: (sample: PoseSample | null, hands: HandSample[]) => PoseCheck;
 };
 
 const HAND = {
@@ -134,6 +156,8 @@ export type PocketCheck = {
   evaluable: boolean;
   kind: "fingers" | "hidden" | null;
   display: string;
+  values: Record<string, PoseValue>;
+  failing: string[];
 };
 
 const inPocket = (
@@ -157,7 +181,14 @@ export function handAtPocket(
   sample: PoseSample | null,
   hands: HandSample[],
 ): PocketCheck {
-  if (!sample) return { evaluable: false, kind: null, display: "no pose" };
+  if (!sample)
+    return {
+      evaluable: false,
+      kind: null,
+      display: "no pose",
+      values: {},
+      failing: ["pose"],
+    };
   const { image, pose } = sample;
   if (
     !usable(pose.left_shoulder) ||
@@ -168,12 +199,20 @@ export function handAtPocket(
       evaluable: false,
       kind: null,
       display: "no hips/hands",
+      values: {},
+      failing: ["hips/hands"],
     };
   const left = px(pose.left_shoulder, image);
   const right = px(pose.right_shoulder, image);
   const span = Math.hypot(left.x - right.x, left.y - right.y);
   if (span < 1e-6)
-    return { evaluable: false, kind: null, display: "no shoulders" };
+    return {
+      evaluable: false,
+      kind: null,
+      display: "no shoulders",
+      values: {},
+      failing: ["shoulders"],
+    };
   const hips = [pose.left_hip, pose.right_hip]
     .filter(usable)
     .map((hip) => px(hip, image));
@@ -187,7 +226,13 @@ export function handAtPocket(
     )
     .map(({ point, elbow }) => ({ ...px(point, image), elbow }));
   if (!hips.length || !wrists.length)
-    return { evaluable: false, kind: null, display: "no hips" };
+    return {
+      evaluable: false,
+      kind: null,
+      display: "no hips",
+      values: {},
+      failing: ["hips"],
+    };
   const inZone = (p: { x: number; y: number }) =>
     hips.some((hip) => inPocket(p.x, p.y, hip, span));
   const elbowFor = (p: { x: number; y: number }) =>
@@ -201,15 +246,14 @@ export function handAtPocket(
       { distance: Infinity, elbow: null as number | null },
     ).elbow;
 
+  let fallback: PocketCheck | null = null;
   for (const hand of hands) {
-    if (hand.score < 0.5) continue;
+    if (hand.score < HEURISTICS.handConfidence) continue;
     const wrist = hand.landmarks[HAND.wrist];
     if (!wrist) continue;
     const w = { x: wrist[0] * image.width, y: wrist[1] * image.height };
     if (!inZone(w)) continue;
     const elbow = elbowFor(w);
-    // A straight arm at the hip is a relaxed hand, not a pocket.
-    if (elbow === null || elbow > POCKET.maxElbowDeg) continue;
     const tips = FINGER_TIPS.map((index) => hand.landmarks[index])
       .filter((tip): tip is HandLandmark => !!tip)
       .map((tip) => ({
@@ -223,24 +267,75 @@ export function handAtPocket(
       ) / span;
     const down = tips.filter((tip) => tip.y > w.y).length;
     const tipsInZone = tips.filter((tip) => inZone(tip)).length;
-    // Compressed fingertips prove that the hand is tucked in, not hanging.
-    if (
-      reach <= POCKET.maxReach &&
-      (down >= POCKET.minDownTips || tipsInZone >= POCKET.minTipsInZone)
-    )
-      return {
+    const values = {
+      hand_score: hand.score,
+      wrist_in_zone: true,
+      elbow,
+      reach,
+      down_tips: down,
+      tips_in_zone: tipsInZone,
+    };
+    // A straight arm at the hip is a relaxed hand, not a pocket.
+    if (elbow === null || elbow > POCKET.maxElbowDeg) {
+      fallback ??= {
         evaluable: true,
-        kind: "fingers",
-        display: `${reach.toFixed(2)}×SW`,
+        kind: null,
+        display: "arm straight",
+        values,
+        failing: ["elbow"],
       };
+      continue;
+    }
+    if (reach > POCKET.maxReach) {
+      fallback ??= {
+        evaluable: true,
+        kind: null,
+        display: "hand open",
+        values,
+        failing: ["fingertips"],
+      };
+      continue;
+    }
+    if (
+      down < POCKET.minDownTips &&
+      tipsInZone < POCKET.minTipsInZone
+    ) {
+      fallback ??= {
+        evaluable: true,
+        kind: null,
+        display: "fingers up",
+        values,
+        failing: ["tips"],
+      };
+      continue;
+    }
+    return {
+      evaluable: true,
+      kind: "fingers",
+      display: `${reach.toFixed(2)}×SW`,
+      values,
+      failing: [],
+    };
   }
+  if (fallback) return fallback;
 
+  let hiddenFallback: PocketCheck | null = null;
   for (const wrist of wrists) {
     if (!inZone(wrist)) continue;
+    const values = { wrist_in_zone: true, elbow: wrist.elbow };
     // Straight arms hang at the hip in the neutral pose; do not call that a pocket.
-    if (wrist.elbow === null || wrist.elbow > POCKET.maxElbowDeg) continue;
+    if (wrist.elbow === null || wrist.elbow > POCKET.maxElbowDeg) {
+      hiddenFallback ??= {
+        evaluable: true,
+        kind: null,
+        display: "arm straight",
+        values,
+        failing: ["elbow"],
+      };
+      continue;
+    }
     const covered = hands.every((hand) => {
-      if (hand.score < 0.5) return true;
+      if (hand.score < HEURISTICS.handConfidence) return true;
       const p = hand.landmarks[HAND.wrist];
       if (!p) return true;
       const h = { x: p[0] * image.width, y: p[1] * image.height };
@@ -249,24 +344,305 @@ export function handAtPocket(
         POCKET.hiddenRadius * span
       );
     });
-    if (covered)
-      return { evaluable: true, kind: "hidden", display: "hand hidden at hip" };
+    if (!covered) {
+      hiddenFallback ??= {
+        evaluable: true,
+        kind: null,
+        display: "hand visible",
+        values,
+        failing: ["hand"],
+      };
+      continue;
+    }
+    return {
+      evaluable: true,
+      kind: "hidden",
+      display: "hand hidden at hip",
+      values,
+      failing: [],
+    };
   }
-
-  return { evaluable: true, kind: null, display: "visible" };
+  return (
+    hiddenFallback ?? {
+      evaluable: true,
+      kind: null,
+      display: "visible",
+      values: {},
+      failing: ["no pocket"],
+    }
+  );
 }
 
-const missing = (display: string): PoseTestEvaluation => ({
-  pass: null,
-  value: null,
-  display,
-});
+const orientation = (a: Point, b: Point, c: Point) =>
+  (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 
-const measured = (
-  value: number | null,
-  pass: boolean | null,
-  display: string,
-): PoseTestEvaluation => ({ value, pass, display });
+const segmentsIntersect = (a: Point, b: Point, c: Point, d: Point) => {
+  const o1 = orientation(a, b, c);
+  const o2 = orientation(a, b, d);
+  const o3 = orientation(c, d, a);
+  const o4 = orientation(c, d, b);
+  return o1 * o2 < 0 && o3 * o4 < 0;
+};
+
+export type CrossedLegsCheck = {
+  crossed: boolean | null;
+  values: Record<string, PoseValue>;
+};
+
+export function crossedLegsCheck(
+  sample: PoseSample | null,
+): CrossedLegsCheck {
+  if (!sample) return { crossed: null, values: {} };
+  const { image, pose } = sample;
+  const point = (p: RawPoint | null) => (usable(p) ? px(p, image) : null);
+  const leftKnee = point(pose.left_knee);
+  const rightKnee = point(pose.right_knee);
+  const leftAnkle = point(pose.left_ankle);
+  const rightAnkle = point(pose.right_ankle);
+  if (!leftKnee || !rightKnee || !leftAnkle || !rightAnkle)
+    return {
+      crossed: null,
+      values: {
+        left_knee: !!leftKnee,
+        right_knee: !!rightKnee,
+        left_ankle: !!leftAnkle,
+        right_ankle: !!rightAnkle,
+      },
+    };
+  const crossed = segmentsIntersect(
+    leftKnee,
+    leftAnkle,
+    rightKnee,
+    rightAnkle,
+  );
+  return {
+    crossed,
+    values: {
+      left_knee_x: leftKnee.x,
+      right_knee_x: rightKnee.x,
+      left_ankle_x: leftAnkle.x,
+      right_ankle_x: rightAnkle.x,
+      crossed,
+    },
+  };
+}
+
+function neutralCheck(sample: PoseSample | null): PoseCheck {
+  const torso = sample?.derived.torso_lean_deg ?? null;
+  const shoulder = sample?.derived.shoulder_tilt_deg ?? null;
+  const head = sample?.head.roll_deg ?? null;
+  const arms = crossArmsCheck(sample).crossed;
+  const values = {
+    torso_lean_deg: torso,
+    shoulder_tilt_deg: shoulder,
+    head_roll_deg: head,
+    arms_crossed: arms,
+  };
+  const absent: string[] = [];
+  if (torso === null) absent.push("torso");
+  if (shoulder === null) absent.push("shoulder");
+  if (head === null) absent.push("head");
+  if (arms === null) absent.push("arms");
+  if (torso === null || shoulder === null || head === null || arms === null)
+    return check(null, "incomplete", values, absent);
+  const failing: string[] = [];
+  if (Math.abs(torso) > 8) failing.push("torso");
+  if (Math.abs(shoulder) > 6) failing.push("shoulder");
+  if (Math.abs(head) > 8) failing.push("head");
+  if (arms) failing.push("arms crossed");
+  return check(failing.length === 0, failing.length ? "off baseline" : "centered", values, failing);
+}
+
+function torsoLeanCheck(sample: PoseSample | null): PoseCheck {
+  const value = sample?.derived.torso_lean_deg ?? null;
+  if (value === null) return missing("hips missing", ["torso"]);
+  const pass = Math.abs(value) >= 20;
+  return measured(
+    value,
+    pass,
+    `${value.toFixed(0)}°`,
+    { torso_lean_deg: value, threshold: 20 },
+    pass ? [] : ["torso lean"],
+  );
+}
+
+function shoulderTiltCheck(sample: PoseSample | null): PoseCheck {
+  const value = sample?.derived.shoulder_tilt_deg ?? null;
+  if (value === null) return missing("shoulders missing", ["shoulder"]);
+  const pass = Math.abs(value) >= 10;
+  return measured(
+    value,
+    pass,
+    `${value.toFixed(0)}°`,
+    { shoulder_tilt_deg: value, threshold: 10 },
+    pass ? [] : ["shoulder tilt"],
+  );
+}
+
+function headTiltCheck(sample: PoseSample | null): PoseCheck {
+  const value = sample?.head.roll_deg ?? null;
+  if (value === null) return missing("eyes missing", ["head"]);
+  const pass = Math.abs(value) >= 12;
+  return measured(
+    value,
+    pass,
+    `${value.toFixed(0)}°`,
+    { head_roll_deg: value, threshold: 12 },
+    pass ? [] : ["head tilt"],
+  );
+}
+
+function crossedLegsPoseCheck(sample: PoseSample | null): PoseCheck {
+  const result = crossedLegsCheck(sample);
+  if (result.crossed === null)
+    return missing("legs not visible", ["legs"]);
+  return check(
+    result.crossed,
+    result.crossed ? "legs crossed" : "open",
+    result.values,
+    result.crossed ? [] : ["legs crossed"],
+  );
+}
+
+function armsCrossedCheck(sample: PoseSample | null): PoseCheck {
+  const result = crossArmsCheck(sample);
+  const values = {
+    left_cross: result.cross[0],
+    right_cross: result.cross[1],
+    left_height: result.height[0],
+    right_height: result.height[1],
+    left_elbow: result.elbow[0],
+    right_elbow: result.elbow[1],
+    left_forearm: result.forearm[0],
+    right_forearm: result.forearm[1],
+  };
+  const conditions: [string, (number | null)[], (value: number) => boolean][] =
+    [
+      ["cross", result.cross, passes.cross],
+      ["height", result.height, passes.height],
+      ["elbow", result.elbow, passes.elbow],
+      ["forearm", result.forearm, passes.forearm],
+    ];
+  const failing: string[] = [];
+  for (const [name, pair, pass] of conditions) {
+    if (pair.includes(null)) failing.push(`${name} missing`);
+    else if (!pair.every((value) => value !== null && pass(value)))
+      failing.push(name);
+  }
+  if (result.crossed === null)
+    return check(null, "wrists hidden", values, failing);
+  return check(
+    result.crossed,
+    result.crossed ? "crossed" : "open",
+    values,
+    result.crossed ? [] : failing,
+  );
+}
+
+function selfTouchCheck(
+  sample: PoseSample | null,
+  hands: HandSample[],
+): PoseCheck {
+  const distance = faceDistance(sample, hands);
+  const model = hands.some(
+    (hand) => hand.score >= HEURISTICS.handConfidence,
+  );
+  if (distance === null) return missing("no hand/face", ["hand", "face"]);
+  const pass = distance <= 0.6;
+  return measured(
+    distance,
+    pass,
+    `${distance.toFixed(2)}×SW`,
+    { distance, threshold: 0.6, hand_model: model },
+    pass ? [] : ["hand near face"],
+  );
+}
+
+function lookAwayCheck(sample: PoseSample | null): PoseCheck {
+  const turn = headTurn(sample);
+  const eyes = sample?.head.eyes_forward ?? null;
+  const values = { head_turn: turn, eyes_forward: eyes, threshold: 0.35 };
+  if (turn !== null) {
+    const pass = Math.abs(turn) >= 0.35;
+    return measured(
+      turn,
+      pass,
+      turn.toFixed(2),
+      values,
+      pass ? [] : ["head turn"],
+    );
+  }
+  if (eyes === false && sample?.derived.shoulder_tilt_deg !== null)
+    return check(true, "eyes not forward", values, []);
+  return missing("no head", ["head"]);
+}
+
+function handsUpCheck(sample: PoseSample | null): PoseCheck {
+  const left = sample?.derived.left_wrist_height ?? null;
+  const right = sample?.derived.right_wrist_height ?? null;
+  const values = {
+    left_wrist_height: left,
+    right_wrist_height: right,
+    threshold: 0.2,
+  };
+  if (left === null || right === null)
+    return missing("hand hidden", ["left hand", "right hand"]);
+  const low = Math.min(left, right);
+  const failing = [
+    left <= 0.2 ? "left hand" : null,
+    right <= 0.2 ? "right hand" : null,
+  ].filter((value): value is string => !!value);
+  return measured(low, low > 0.2, `${low.toFixed(2)}×SW`, values, failing);
+}
+
+function hipsOutCheck(sample: PoseSample | null): PoseCheck {
+  const shoulders = sample?.derived.shoulder_tilt_deg ?? null;
+  const torso = sample?.derived.torso_lean_deg ?? null;
+  if (shoulders === null) return missing("no shoulders", ["shoulders"]);
+  const pass = torso === null;
+  return check(
+    pass,
+    pass ? "torso n/a" : "hips visible",
+    { shoulder_tilt_deg: shoulders, torso_lean_deg: torso },
+    pass ? [] : ["hips visible"],
+  );
+}
+
+function handsHiddenCheck(
+  sample: PoseSample | null,
+  hands: HandSample[],
+): PoseCheck {
+  const shoulders = sample?.derived.shoulder_tilt_deg ?? null;
+  const left = sample?.derived.left_wrist_height ?? null;
+  const right = sample?.derived.right_wrist_height ?? null;
+  if (shoulders === null) return missing("no shoulders", ["shoulders"]);
+  const detected = hands.filter(
+    (hand) => hand.score >= HEURISTICS.handConfidence,
+  ).length;
+  const failing: string[] = [];
+  if (left !== null) failing.push("left wrist visible");
+  if (right !== null) failing.push("right wrist visible");
+  if (detected > 0) failing.push("hand detected");
+  return check(
+    failing.length === 0,
+    failing.length ? "visible" : "both hidden",
+    { left_wrist_height: left, right_wrist_height: right, hands: detected },
+    failing,
+  );
+}
+
+function pocketPoseCheck(
+  sample: PoseSample | null,
+  hands: HandSample[],
+): PoseCheck {
+  const result = handAtPocket(sample, hands);
+  return check(
+    result.evaluable ? result.kind !== null : null,
+    result.display,
+    result.values,
+    result.failing,
+  );
+}
 
 export const POSE_TESTS: PoseTestDefinition[] = [
   {
@@ -278,20 +654,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample) {
-      const torso = sample?.derived.torso_lean_deg ?? null;
-      const shoulder = sample?.derived.shoulder_tilt_deg ?? null;
-      const head = sample?.head.roll_deg ?? null;
-      const crossed = armsCrossed(sample);
-      if (torso === null || shoulder === null || head === null || crossed === null)
-        return missing("incomplete");
-      const pass =
-        Math.abs(torso) <= 8 &&
-        Math.abs(shoulder) <= 6 &&
-        Math.abs(head) <= 8 &&
-        !crossed;
-      return measured(null, pass, pass ? "centered" : "off baseline");
-    },
+    check: neutralCheck,
   },
   {
     id: "torso-lean",
@@ -302,12 +665,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample) {
-      const value = sample?.derived.torso_lean_deg ?? null;
-      return value === null
-        ? missing("hips missing")
-        : measured(value, Math.abs(value) >= 20, `${value.toFixed(0)}°`);
-    },
+    check: torsoLeanCheck,
   },
   {
     id: "shoulder-tilt",
@@ -318,12 +676,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample) {
-      const value = sample?.derived.shoulder_tilt_deg ?? null;
-      return value === null
-        ? missing("shoulders missing")
-        : measured(value, Math.abs(value) >= 10, `${value.toFixed(0)}°`);
-    },
+    check: shoulderTiltCheck,
   },
   {
     id: "head-tilt",
@@ -334,12 +687,18 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample) {
-      const value = sample?.head.roll_deg ?? null;
-      return value === null
-        ? missing("eyes missing")
-        : measured(value, Math.abs(value) >= 12, `${value.toFixed(0)}°`);
-    },
+    check: headTiltCheck,
+  },
+  {
+    id: "crossed-legs",
+    label: "Crossed legs",
+    instruction: "Cross one leg over the other; keep both feet and hips in frame.",
+    kind: "alert",
+    priority: 25,
+    holdMs: 0,
+    releaseMs: 500,
+    unknownReleaseMs: 800,
+    check: crossedLegsPoseCheck,
   },
   {
     id: "arms-crossed",
@@ -350,12 +709,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 500,
     unknownReleaseMs: 1500,
-    evaluate(sample) {
-      const value = armsCrossed(sample);
-      return value === null
-        ? missing("wrists hidden")
-        : measured(null, value, value ? "crossed" : "open");
-    },
+    check: armsCrossedCheck,
   },
   {
     id: "self-touch",
@@ -366,12 +720,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample) {
-      const value = faceDistance(sample);
-      return value === null
-        ? missing("no hand/face")
-        : measured(value, value <= 0.6, `${value.toFixed(2)}×SW`);
-    },
+    check: selfTouchCheck,
   },
   {
     id: "look-away",
@@ -382,21 +731,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample) {
-      const value = headTurn(sample);
-      if (value !== null)
-        return measured(
-          value,
-          Math.abs(value) >= 0.35,
-          `${value.toFixed(2)}`,
-        );
-      if (
-        sample?.head.eyes_forward === false &&
-        sample.derived.shoulder_tilt_deg !== null
-      )
-        return measured(null, true, "eyes not forward");
-      return missing("no head");
-    },
+    check: lookAwayCheck,
   },
   {
     id: "hands-up",
@@ -407,13 +742,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample) {
-      const left = sample?.derived.left_wrist_height ?? null;
-      const right = sample?.derived.right_wrist_height ?? null;
-      if (left === null || right === null) return missing("hand hidden");
-      const low = Math.min(left, right);
-      return measured(low, low > 0.2, `${low.toFixed(2)}×SW`);
-    },
+    check: handsUpCheck,
   },
   {
     id: "hips-out",
@@ -424,16 +753,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample) {
-      const shoulders = sample?.derived.shoulder_tilt_deg ?? null;
-      const torso = sample?.derived.torso_lean_deg ?? null;
-      if (shoulders === null) return missing("no shoulders");
-      return measured(
-        null,
-        torso === null,
-        torso === null ? "torso n/a" : "hips visible",
-      );
-    },
+    check: hipsOutCheck,
   },
   {
     id: "hands-hidden",
@@ -444,19 +764,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample, hands) {
-      const shoulders = sample?.derived.shoulder_tilt_deg ?? null;
-      const left = sample?.derived.left_wrist_height ?? null;
-      const right = sample?.derived.right_wrist_height ?? null;
-      if (shoulders === null) return missing("no shoulders");
-      const visibleHand = hands.some((hand) => hand.score >= 0.5);
-      const pass = left === null && right === null && !visibleHand;
-      return measured(
-        null,
-        pass,
-        pass ? "both hidden" : visibleHand ? "hand detected" : "visible",
-      );
-    },
+    check: handsHiddenCheck,
   },
   {
     id: "pocket",
@@ -468,12 +776,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     holdMs: 0,
     releaseMs: 500,
     unknownReleaseMs: 1200,
-    evaluate(sample, hands) {
-      const check = handAtPocket(sample, hands);
-      return check.evaluable
-        ? measured(null, check.kind !== null, check.display)
-        : missing(check.display);
-    },
+    check: pocketPoseCheck,
   },
 ];
 
@@ -494,6 +797,8 @@ export type PoseTestResult = {
   holdMs: number;
   value: number | null;
   display: string;
+  values: Record<string, PoseValue>;
+  failing: string[];
 };
 
 type Track = {
@@ -515,7 +820,7 @@ export class PoseTestTracker {
     hands: HandSample[] = [],
   ): PoseTestResult[] {
     return POSE_TESTS.map((test) => {
-      const evaluation = test.evaluate(sample, hands);
+      const evaluation = test.check(sample, hands);
       const track = this.tracks.get(test.id) ?? {
         since: null,
         lastTrue: -Infinity,
@@ -561,6 +866,8 @@ export class PoseTestTracker {
         holdMs: test.holdMs,
         value: evaluation.value,
         display: evaluation.display,
+        values: evaluation.values,
+        failing: evaluation.failing,
       };
     });
   }
@@ -571,6 +878,7 @@ export type PoseFeedback = {
   id: PoseTestId | null;
   label: string;
   detail: string;
+  failing: string[];
 };
 
 export function poseFeedback(results: PoseTestResult[]): PoseFeedback {
@@ -584,6 +892,7 @@ export function poseFeedback(results: PoseTestResult[]): PoseFeedback {
       id: top.id,
       label: top.label,
       detail: top.display,
+      failing: top.failing,
     };
   const neutral = results.find((result) => result.id === "neutral");
   if (neutral?.state === "recognized")
@@ -592,6 +901,7 @@ export function poseFeedback(results: PoseTestResult[]): PoseFeedback {
       id: "neutral",
       label: "OK",
       detail: "posture neutral",
+      failing: [],
     };
   const framing = results.find(
     (result) => result.kind === "framing" && result.state === "recognized",
@@ -602,8 +912,15 @@ export function poseFeedback(results: PoseTestResult[]): PoseFeedback {
       id: framing.id,
       label: "—",
       detail: framing.label,
+      failing: framing.failing,
     };
-  return { state: "idle", id: null, label: "—", detail: "hold a test pose" };
+  return {
+    state: "idle",
+    id: null,
+    label: "—",
+    detail: "hold a test pose",
+    failing: [],
+  };
 }
 
 const COACH_MESSAGES: Record<PoseTestId, string> = {
@@ -611,6 +928,7 @@ const COACH_MESSAGES: Record<PoseTestId, string> = {
   "torso-lean": "Straighten up a little.",
   "shoulder-tilt": "Level your shoulders.",
   "head-tilt": "Keep your head upright.",
+  "crossed-legs": "Uncross your legs.",
   "arms-crossed": "Try uncrossing your arms!",
   "self-touch": "Hands away from your face.",
   "look-away": "Look back toward the camera.",

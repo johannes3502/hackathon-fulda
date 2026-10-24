@@ -310,7 +310,13 @@ Ferne lesbar ist.
 
 **MUSS:** Bei mehreren erkannten Abweichungen gewinnt die höchste Priorität:
 Pocket > Arme verschränkt > Hände verdeckt > Hand im Gesicht > Rumpf-Neigung >
-Schultertilt > Kopflateral > Hände hoch > Kopf weg.
+Schultertilt > Beine gekreuzt > Kopflateral > Hände hoch > Kopf weg.
+
+**MUSS:** Im Pose Lab zeichnet das Overlay zusätzlich die Hand-Landmarks
+(21 Punkte pro Hand, pink) und zeigt die Zahl erkannter Hände. Das ist
+Dev-only und wird nicht geloggt. Jede Testpose liefert `values` (alle
+Rohbedingungen) und `failing` (die fehlgeschlagenen Bedingungen); das
+Statusfeld und der Console-Trace nennen sie.
 
 **MUSS:** `recognized` erscheint im Dev-Modus sofort (`holdMs` 0); nur der
 Release-/Unknown-Grace bleibt. Die Anzeige ist rein lokal, erzeugt keine
@@ -329,10 +335,13 @@ Events, keine Scores und keine Backend-Aufrufe.
 | T09 | Hüften außerhalb | Schultern sichtbar, `trunkLean` nicht auswertbar | sofort |
 | T10 | Hände verdeckt | beide Handgelenkhöhen nicht messbar | sofort |
 | T11 | Hand in der Hosentasche | Fingerspitzen komprimiert + Ellbogen ≤ 120° (FR-POSE-20) | sofort |
+| T12 | Beine gekreuzt | Unterschenkel schneiden sich (Knie + Knöchel sichtbar) | sofort |
 
 **MUSS:** T10 ist ein **Sichtbarkeitstest**, kein Taschenbeweis. T07 ist ein
 **Kopforientierungs-Proxy**, kein Gaze. T11 ist eine Heuristik, kein Beweis
-für eine Hosentasche. Die UI muss das so benennen.
+für eine Hosentasche. T12 erkennt nur gekreuzte Unterschenkel, wenn Knie und
+Knöchel im Bild sind; es ist keine Aussage über Sitzhaltung. Die UI muss das
+so benennen.
 
 **MUSS:** Der Dev mode ist nicht die Produkt-UI. Er dient nur zum Testen der
 Heuristiken und wird nicht als Event, Clip oder Backend-Payload gespeichert.
@@ -340,9 +349,11 @@ Heuristiken und wird nicht als Event, Clip oder Backend-Payload gespeichert.
 ### FR-POSE-20 — Pocket-Check (Dev-Heuristik)
 
 **MUSS:** Der MediaPipe Hand Landmarker läuft lokal im selben Worker wie Pose
-(CPU, `IMAGE`, max. 2 Hände, 21 Landmarks pro Hand). Er läuft ca. 5 Hz, wenn
-ein Pose-Handgelenk in Hüftnähe ist, sonst ca. 1,6 Hz. Hand-Landmarks werden
-nicht in das JSONL-Log geschrieben.
+(CPU, `IMAGE`, max. 2 Hände, 21 Landmarks pro Hand, Confidence 0,3). Er läuft
+ca. 5 Hz, unabhängig von der Pose-Handgelenk-Position, damit eine Hand in der
+Tasche auch bei verdecktem Pose-Wrist erkannt wird. Hand-Landmarks werden
+nicht in das JSONL-Log geschrieben, aber im Pose-Lab-Overlay als pinke Punkte
+und Linien gezeigt.
 
 **MUSS:** `handAtPocket` prüft zwei Fälle:
 1. **Fingers:** Eine erkannte Hand hat das Handgelenk in der Hüftzone, der
@@ -843,6 +854,8 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
     Event.
 12. **Datenschutz:** Ohne Consent startet keine Kamera; Video bleibt lokal;
     Löschung funktioniert.
+13. **Beine:** T12 erkennt gekreuzte Unterschenkel nur, wenn Knie und Knöchel
+    sichtbar sind; ohne Beine bleibt die Anzeige grau. Kein Event.
 
 ## 10. Offene Entscheidungen
 
@@ -850,7 +863,7 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 |---|---|---|---|
 | OD-1 | Face Landmarker + Iris für echtes Gaze? | Nein im MVP; nur als separates Feature mit Consent, Kalibrierung und „Kamera-Blick“, nie „Eye Contact“ | offen |
 | OD-2 | `full-body` standardmäßig? | Nein, opt-in und experimentell | entschieden |
-| OD-3 | Hand Landmarker für Gesten? | Für Produktions-Gesten nein; im Dev-Modus für den Pocket-Check aktiviert (24.10.2026) | entschieden |
+| OD-3 | Hand Landmarker für Gesten? | Für Produktions-Gesten nein; im Dev-Modus für den Pocket-Check aktiviert (24.10.2026), 5 Hz, Confidence 0,3 | entschieden |
 | OD-4 | Live-Gestenhinweise? | Nein, nur Review | entschieden |
 | OD-5 | Kalibrierungs-Set | 10–20 Personen, 0,5/1/2 m, Brille, Licht, Hauttöne; Precision/Recall berichten | offen |
 | OD-6 | Default `audienceMode` | Kein stiller Default; Demo `camera` | entschieden |
@@ -866,10 +879,12 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 - **Kopforientierung:** Pose-only liefert einen Kopfrichtungs-Proxy, keinen
   Blickkontakt. Face/Iris wäre ein Scope- und Datenschutzwechsel. `camera` und
   `room` sind getrennte Modi; „Scanning“ ist keine validierte Wirkung.
-- **Hände:** Fingertracking erkennt sichtbare, komprimierte Finger am
-  Taschenrand; eine vollständig verdeckte Hand sieht es nicht. Der
-  Dev-Pocket-Check kombiniert beides als Heuristik; Produktions-Events bleiben
-  bei `hand-hidden-near-torso` (post-hoc, low confidence).
+- **Hände:** Der Hand Landmarker lädt lokal (5 Hz, Confidence 0,3) und
+  zeichnet die 21 Landmarks im Pose-Lab-Overlay. Fingertracking erkennt
+  sichtbare, komprimierte Finger am Taschenrand; eine vollständig verdeckte
+  Hand sieht er nicht. Der Dev-Pocket-Check kombiniert beides als Heuristik;
+  Produktions-Events bleiben bei `hand-hidden-near-torso` (post-hoc, low
+  confidence).
 - **Füße:** Frontale Fuß-Landmarks sind ungenau und oft verdeckt. Nur
   Full-Body opt-in, deskriptiv, keine Qualitätsaussage.
 - **Gesten:** Pose-only reicht für GPM, Amplitude, Zwei-Hand-Anteil und
@@ -908,3 +923,4 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 | 24.10.2026 | Pose-Lab ergänzt | Zehn feste Testposen für den lokalen Debug-Modus; keine Events, kein Backend-Streaming, keine Scores. |
 | 24.10.2026 | Pose-Lab auf ein Output-Feld umgestellt; Pocket-Check per Hand-Landmarker | Nutzerentscheidung: falsche Pose live rot aus der Ferne erkennbar; Hosentaschen-Erkennung über Fingertracking. |
 | 24.10.2026 | Hassan-Crossed-Logik übernommen; Coach-/Status-Umschalter; Fingerspitzen-Pocket | Handgelenke an der Mittellinie und Unterarmwinkel ≤ 40°; Coach-Sprechblase als Standard, großes Statusfeld umschaltbar; Pocket prüft Fingerspitzen 8/12/16/20 und Ellbogen ≤ 120°. |
+| 24.10.2026 | Hand-Landmarks sichtbar, 5 Hz, einheitliches Check-Muster, T12 | Hand-Modell lädt nachweislich mit Confidence 0,3; pinke Hand-Landmarks im Pose-Lab-Overlay; alle Posen liefern `values`/`failing`; T12 erkennt gekreuzte Unterschenkel. |

@@ -13,6 +13,8 @@ export type PoseState = {
   latest: PoseSample | null;
   armsCrossed: boolean;
   handModel: boolean | null;
+  handError: string | null;
+  hands: HandSample[];
   tests: PoseTestResult[];
 };
 export class PoseCapture {
@@ -20,6 +22,7 @@ export class PoseCapture {
   private crossArms = new CrossArmsCue();
   private armsCrossed = false;
   private handModel: boolean | null = null;
+  private handError: string | null = null;
   private hands: HandSample[] = [];
   private tests = new PoseTestTracker();
   private testResults: PoseTestResult[] = [];
@@ -42,13 +45,15 @@ export class PoseCapture {
       latest: this.latest,
       armsCrossed: this.armsCrossed,
       handModel: this.handModel,
+      handError: this.handError,
+      hands: this.hands,
       tests: this.testResults,
     });
   }
   start() {
     this.publish("loading", "Loading the local pose model…");
     try {
-      const worker = (this.worker = new Worker("/pose/worker.js?v=2"));
+      const worker = (this.worker = new Worker("/pose/worker.js?v=3"));
       this.timeout = setTimeout(
         () => this.fail("Pose model loading timed out. Try again."),
         30000,
@@ -62,9 +67,13 @@ export class PoseCapture {
         if (data.type === "ready") {
           clearTimeout(this.timeout);
           this.handModel = data.hands === true;
+          this.handError =
+            typeof data.handError === "string" ? data.handError : null;
           this.publish(
             "running",
-            "Waiting for a visible pose. Keep your upper body in frame.",
+            this.handModel
+              ? "Waiting for a visible pose. Keep your upper body in frame."
+              : "Pose ready. Hand model unavailable; pocket check is off.",
           );
           this.tick();
         } else if (data.type === "error") {

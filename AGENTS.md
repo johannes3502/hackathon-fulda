@@ -159,12 +159,13 @@ Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
 die Live-Regel „Arme verschränkt“ zeigt eine Coach-Sprechblase mit
 Cockatoo-Avatar (Handgelenke an/nahe der Körpermitte, Unterarm ≤ 40° zur
 Schulterlinie, sofort). Im `/live`-Workspace zeigt der Dev-Toggle „Pose lab“
-elf Testposen in zwei umschaltbaren Darstellungen: Coach-Sprechblase
-(Standard) oder großes Statusfeld (grün/rot/grau) mit Pose und Messwert. Der
-Hand Landmarker prüft für die Pocket-Heuristik die Fingerspitzen
-(8/12/16/20) und den Ellbogen; Treffer bleiben Dev-only, ohne Event. Die
-finalen Pose-/Feedback-Regeln stehen in
-`docs/04-pose-tracking-requirements.md`; die Umsetzung ist noch offen
+zwölf Testposen in zwei umschaltbaren Darstellungen: Coach-Sprechblase
+(Standard) oder großes Statusfeld (grün/rot/grau) mit Pose, Messwert und
+fehlgeschlagenen Bedingungen. Der Hand Landmarker läuft mit 5 Hz und zeichnet
+die Hand-Landmarks pink ins Overlay; für die Pocket-Heuristik prüft er
+Fingerspitzen (8/12/16/20) und Ellbogen. T12 erkennt gekreuzte Unterschenkel.
+Treffer bleiben Dev-only, ohne Event. Die finalen Pose-/Feedback-Regeln stehen
+in `docs/04-pose-tracking-requirements.md`; die Umsetzung ist noch offen
 (`frontend/DATA_POINTS.md` beschreibt das Roh-Logging).
 Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
