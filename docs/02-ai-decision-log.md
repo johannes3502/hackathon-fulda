@@ -494,3 +494,84 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
 - Lokaler Docker-Engine-Zugriff bleibt nicht verfügbar, auch nach Startversuch
   von Docker Desktop. Vollständiger Compose-/Whisper-/Ollama-Lauf sowie echtes
   Mikrofon und Safari wurden in dieser Integration nicht verifiziert.
+
+## Lokalen Backend-Start wiederherstellen (24.10.2026)
+
+- Beobachteter Fehler: `/api/health/live` lieferte HTTP 500, weil kein Dienst
+  auf Port 8000 lief. Docker Desktop 4.44.3 stürzte bereits bei `--help` in
+  `go-m1cpu` mit SIGSEGV ab; lokales `.env` fehlte. Vorhandenes Colima gestartet
+  (ohne den globalen Docker-Kontext zu wechseln), lokale Konfiguration aus
+  `.env.example` erstellt und Backend, Worker, Postgres, Redis und S3 gestartet.
+- Der erste Compose-Build scheiterte an parallelen Exporten desselben
+  `hackathon-fulda-backend`-Tags. Nur der Backend-Service baut das gemeinsame
+  Image; der Worker verwendet es ohne Pull und wartet auf Backend-Readiness.
+  `npm run test:compose` prüft eindeutige Builder und diese Startabhängigkeit.
+- Aufnahmebeginn prüft nun `/health/ready` mit 10-s-Frist. Bei Ausfall wird
+  korrekt „Nothing has been recorded“ samt lokaler Ausweichmöglichkeit angezeigt.
+  Der allgemeine HTTP-Helfer behauptet nicht mehr, dass vor Aufnahmebeginn
+  bereits eine Aufnahme gesichert sei. Drei Unit-Fälle (500, 503, Netzfehler)
+  und Browser-Retry von Backendfehler zu lokaler Aufnahme ergänzen die Regression.
+- Ollama lokal gestartet, konfiguriertes Qwen-Modell geladen. Für Colima nutzt
+  `.env` `host.lima.internal`; dieser konkrete lokale Host wurde im Adapter
+  zugelassen und mit Settings-/Host-Prüfung getestet. Kein Cloud-Fallback.
+- Verifiziert: fünf Backend-Dienste healthy; `/api/health/ready` HTTP 200 mit
+  Postgres/Redis/S3 ok; `/api/factcheck/settings` verfügbar. Reale synthetische
+  WAV über den Frontend-Proxy → Queue → Silero/Whisper → Ergebnis und Löschung
+  der Originaldatei bestanden. 97 Frontend-Unit-Tests, sechs Browserfälle,
+  Typecheck/Lint, zwei Compose-Tests und 14 Fact-Check-/Adapter-Tests bestanden.
+- Zusätzlicher echter Coaching-Smoke erreichte das lokale Modell und bestätigte
+  eine Aussage mit geprüftem Quellenzitat. Ein anderes Urteil enthielt ungültiges
+  JSON und wurde korrekt als `unchecked` ausgegeben; der strikte Drei-Urteile-
+  Smoke schlug deshalb fehl. Modellqualität und vollständige echte Fragerunde
+  bleiben ungeprüft; dies ist vom behobenen Verbindungs-/Startfehler getrennt.
+
+## Gemeinsamer Integrationsbranch mit Analyse-Schaltern (24.10.2026)
+
+- Nutzerauftrag: alle Teamfeatures auf einem eigenen Branch zusammenführen,
+  IMAGE/VIDEO und Lite/Heavy umschaltbar machen, VIDEO als Standard und
+  GPU-first mit CPU-Fallback verwenden. Sprach-/Pausenfeedback soll separat
+  schaltbar sein. Branch: `feat/integrated-coach-flags`; kein Merge nach `main`.
+- Integrierte Remote-Stände: `main` (`0fb7dfc`, inklusive Start-/Readiness-Fix),
+  `goal` (`3b1ee02`), `feat/local-whisper-asr` (`4c697c0`),
+  `feat/johannes-pose-requirements` (`b22102b`, inklusive T12),
+  `hassan-poselog` (`67d1c8f`) und `bench/embedding-benchmark` (`ab8fd8a`).
+- Der Web-Worker verwendet standardmäßig Lite/VIDEO, alternativ Heavy und/oder
+  IMAGE. Beide Pose-Assets liegen lokal, float16/v1. VIDEO bekommt monoton
+  steigende Timestamps. GPU-Probe, Warm-up und Runtime-Fallback erhalten Modell
+  und Modus; Software-WebGL führt direkt zu CPU. Diagnose und JSONL/Event-Payload
+  enthalten Modell, Modus und tatsächlichen Delegate. Höchstens 10 Hz, ein Frame
+  gleichzeitig, Stale-Handling und Inferenz-Timeout bleiben erhalten.
+- Die kalibrierte Event-/Review-Pipeline aus `goal` bleibt maßgeblich. Regelversion
+  `pose-rules-v4` übernimmt die tolerantere Arme-verschränkt-Geometrie samt
+  Unterarmwinkel, weiterhin mit 2 s Mindestdauer und 20 s Cooldown. Ein Test
+  zeigte eine Überschneidung mit „Hände zusammen“: eng beieinanderliegende Hände
+  auf den eigenen Körperseiten bleiben bei dieser Regel, statt als verschränkte
+  Arme zu gelten. Baseline, Hysterese, Lückenbehandlung und gemeinsame Zeitachse
+  bleiben erhalten. Keine Gaze-, Pocket- oder Bein-Produktionsereignisse.
+- Pose Lab mit T1–T12 bleibt ein ausgeschaltetes Dev-Werkzeug. Nur dort wird
+  Hand Landmarker geladen und bei sichtbarer Pose ausgeführt. Ein Handmodellfehler
+  beendet nicht die Poseauswertung. Die Research-Anforderungen in `docs/04-pose-tracking-requirements.md`
+  trennen nun den implementierten Stand von weiterführenden Zielentwürfen.
+- **Analysis features** enthält Modell/Modus, einen Sprachfeedback-Hauptschalter
+  und einzelne Schalter für Pausen, Tempo, Füllwörter, Lautstärke und Tonhöhe.
+  Diese filtern Feedback-Marker, auch beim Wort-Import; Messwerte und Transkript
+  bleiben erhalten. Die Analyse selbst bleibt opt-in. Optionen werden pro Take
+  festgehalten, während Aufnahme/Analyse gesperrt und bis zum Reload im Workspace
+  behalten. Sprachmarker kommen nach Stop; Live-Captions bleiben separat.
+- Verifiziert: 147 Web- und 18 Mobile-Unit-Tests, 68 Playwright-Fälle auf Desktop
+  und 375 px, 84 Backend-Tests im lokalen Python-3.12-Container. Ein PostgreSQL-
+  Roundtrip-Test ohne `POSTGRES_HOST` übersprungen. Zwei Compose-Strukturtests,
+  Lint und Typecheck beider Workspaces, Next.js-Produktionsbuild und API-Schema-
+  Aktualität bestanden. Alle elf Architekturdiagramme mit Mermaid gerendert;
+  Analyse-Schalter auf Desktop und mobiler Breite visuell geprüft.
+- Browserfälle prüfen Aufnahme, Optionssperre, Pausenfilter inklusive Wort-Import,
+  Review/Navigation, Pose-Export und Fehlerpfade. Alle vier Modell-/Modus-
+  Kombinationen führen den echten lokalen Worker auf synthetischen Bildern aus;
+  API-Antworten und Bewegungs-Landmarks in den UI-Tests sind deterministische
+  Fixtures. GPU-Ausfälle werden im Worker-Test injiziert. Das belegt Datenfluss
+  und Fehlerbehandlung, keine Erkennungsqualität oder echte Hardware-GPU-Abnahme.
+- Vor Ort offen: Kamera-/Audio-Last, Heavy-Durchsatz, VIDEO-Verzögerung,
+  Erkennungsqualität der zusammengeführten Regeln und Safari/iPhone.
+  Dieser Integrationslauf hat keinen vollständigen Compose-/Whisper-/Ollama-
+  End-to-End-Lauf wiederholt; frühere Ergebnisse oben gelten für deren jeweiligen
+  Stand. Aktuelle Geräte-Checkliste: `docs/05-jury-demo.md`.

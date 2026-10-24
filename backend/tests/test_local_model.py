@@ -48,3 +48,21 @@ def test_local_asr_requirement_rejects_hosted_and_synthetic_before_upload(monkey
                                      files={"recording": ("synthetic.wav", b"synthetic", "audio/wav")})
         assert result.status_code == 503
     store.assert_not_called()
+
+
+def test_colima_host_is_local_and_settings_remain_available(monkeypatch):
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.setenv("OLLAMA_URL", "http://host.lima.internal:11434")
+    def handler(request):
+        assert request.url.host == "host.lima.internal"
+        assert request.url.path == "/api/tags"
+        return httpx.Response(200, json={"models": [{"name": "qwen3.5:4b-q4_K_M"}]})
+    assert LocalOllamaChat(transport=httpx.MockTransport(handler)).available()
+    monkeypatch.setattr(LocalOllamaChat, "available", lambda self: True)
+    response = TestClient(app).get("/factcheck/settings")
+    assert response.status_code == 200
+    assert response.json()["available"] is True
+    assert response.json()["llm_host"] == "host.lima.internal"
+    with pytest.raises(ValueError):
+        LocalOllamaChat(endpoint="http://host.lima.internal.example.com:11434")

@@ -21,22 +21,50 @@ it("forwards selected model/mode and exports the actual delegate per recording f
   vi.stubGlobal("Worker", FakeWorker);
   vi.stubGlobal("requestAnimationFrame", vi.fn());
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
-  const video = { paused: false, ended: false, readyState: 0, srcObject: { getVideoTracks: () => [{ readyState: "live" }] } } as unknown as HTMLVideoElement;
-  const options = { model: "heavy", runningMode: "IMAGE", devMode: false } as const;
+  const video = {
+    paused: false,
+    ended: false,
+    readyState: 0,
+    srcObject: { getVideoTracks: () => [{ readyState: "live" }] },
+  } as unknown as HTMLVideoElement;
+  const options = {
+    model: "heavy",
+    runningMode: "IMAGE",
+    devMode: false,
+  } as const;
   const capture = new PoseCapture(video, vi.fn(), options);
   capture.start();
   const worker = FakeWorker.latest;
   expect(worker.postMessage).toHaveBeenCalledWith({ type: "init", options });
-  const backend = { pose: "GPU", hand: null, model: "heavy", runningMode: "IMAGE" };
+  const backend = {
+    pose: "GPU",
+    hand: null,
+    model: "heavy",
+    runningMode: "IMAGE",
+  };
   worker.onmessage?.({ data: { type: "ready", backend, hands: false } });
   capture.beginRecording(1000, "take-config");
-  const message = { type: "sample", width: 640, height: 360, points: syntheticPoints("neutral"), hands: null };
+  const message = {
+    type: "sample",
+    width: 640,
+    height: 360,
+    points: syntheticPoints("neutral"),
+    hands: null,
+  };
   worker.onmessage?.({ data: { ...message, timestamp: 1100 } });
-  worker.onmessage?.({ data: { type: "backend", backend: { ...backend, pose: "CPU", runtimeFallback: true } } });
+  worker.onmessage?.({
+    data: {
+      type: "backend",
+      backend: { ...backend, pose: "CPU", runtimeFallback: true },
+    },
+  });
   worker.onmessage?.({ data: { ...message, timestamp: 1200 } });
-  const samples = (await capture.log.blob()!.text()).trim().split("\n").map(line => JSON.parse(line));
-  expect(samples.map(s => s.t_ms)).toEqual([100, 200]);
-  expect(samples.map(s => s.runtime)).toEqual([
+  const samples = (await capture.log.blob()!.text())
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(samples.map((s) => s.t_ms)).toEqual([100, 200]);
+  expect(samples.map((s) => s.runtime)).toEqual([
     { model: "heavy", runningMode: "IMAGE", delegate: "GPU" },
     { model: "heavy", runningMode: "IMAGE", delegate: "CPU" },
   ]);

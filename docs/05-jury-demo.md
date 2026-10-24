@@ -105,8 +105,10 @@ Der Kamerapfad erzeugt lokale Gesten-/Haltungsereignisse und spielt das komplett
 Video im Browser ab. Er erstellt noch keine dauerhaft gespeicherten Server-Clips.
 Audioanalyse, lokale Whisper-Transkription, Quellen-Ingest/Hybrid-Retrieval,
 Ollama-Quellenvergleich und Text-Frage-/Antwortanalyse sind im Web angebunden.
-Web-Fetch, Live-Transkript, Blickkontakt-Auswertung und dauerhafte Server-Clips
-sind nicht Teil des aktuellen vorführbaren Pfads. Die native App behält ihren
+Optionale Live-Captions liefern während der Aufnahme eine Textvorschau;
+die vollständige Transkription nach dem Stoppen bleibt die Review-Zeitbasis.
+Web-Fetch, Blickkontakt-Auswertung und dauerhafte Server-Clips sind nicht Teil
+des aktuellen vorführbaren Pfads. Die native App behält ihren
 bisherigen Funktionsumfang; die neue lokale Fragerunde ist im Web verfügbar.
 Die bestehende Sample-Session zeigt den angestrebten Gesamtfluss mit vorbereiteten
 Daten. Das Team darf sie nicht als Analyse der Live-Aufnahme vorstellen.
