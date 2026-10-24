@@ -4,7 +4,6 @@ import {
   POCKET,
   CrossArmsCue,
   armsCrossed,
-  handsInPockets,
   pocketCheck,
 } from "./cues";
 import { poseSample, type HandSample, type Landmark } from "./sample";
@@ -187,13 +186,13 @@ it("detects one hand in a front pocket when no hand is found near the hip", () =
   expect(s.derived.left_hand_found).toBe(false);
   expect(s.derived.right_hand_found).toBe(true);
   expect(pocketCheck(s).side).toEqual([true, false]);
-  expect(handsInPockets(s)).toBe(true);
+  expect(pocketCheck(s).inPocket).toBe(true);
 });
 it("ignores hanging arms and detected hands resting on the hips", () => {
   const hang = standing(pocketPose("hang", "hang"))!;
   expect(hang.derived.left_wrist_hip_dist).toBeGreaterThan(POCKET.maxHipDist);
-  expect(handsInPockets(hang)).toBe(false);
-  expect(handsInPockets(standing(pocketPose("hip", "hang")))).toBe(false);
+  expect(pocketCheck(hang).inPocket).toBe(false);
+  expect(pocketCheck(standing(pocketPose("hip", "hang"))).inPocket).toBe(false);
 });
 it("assigns each detected hand to its nearest wrist only", () => {
   const pose = pocketPose("hang", "hang");
@@ -214,17 +213,17 @@ it("assigns each detected hand to its nearest wrist only", () => {
 });
 it("stays undecided without the hand model, hips or an in-frame hand", () => {
   expect(
-    handsInPockets(standing(pocketPose("pocket", "hang"), null)),
+    pocketCheck(standing(pocketPose("pocket", "hang"), null)).inPocket,
   ).toBeNull();
   const hips = pocketPose("pocket", "pocket");
   hips.p[23].visibility = 0;
   hips.p[24].visibility = 0;
   const hidden = standing(hips)!;
   expect(hidden.quality.hips_visible).toBe(false);
-  expect(handsInPockets(hidden)).toBeNull();
+  expect(pocketCheck(hidden).inPocket).toBeNull();
   const cropped = pocketPose("hang", "hang");
   [17, 19, 21].forEach((i) => (cropped.p[i].y = 1.05));
   const out = standing(cropped, [cropped.hands[1]!])!;
   expect(out.derived.left_hand_found).toBeNull();
-  expect(handsInPockets(out)).toBeNull();
+  expect(pocketCheck(out).inPocket).toBeNull();
 });

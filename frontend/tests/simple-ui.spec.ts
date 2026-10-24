@@ -127,9 +127,7 @@ test("recording consent stays visible while diagnostics and server details are o
   await expect(
     page.getByText("By starting, you agree", { exact: false }),
   ).toBeVisible();
-  await expect(
-    page.getByLabel("Create a transcript with local Whisper"),
-  ).toBeVisible();
+  await expect(page.getByLabel("Create a transcript")).toBeVisible();
   await expect(page.getByLabel("Backend API URL")).toBeHidden();
   await page.getByText("Server connection", { exact: true }).click();
   await expect(page.getByLabel("Backend API URL")).toBeVisible();
@@ -147,6 +145,7 @@ test("recording consent stays visible while diagnostics and server details are o
   await expect(page.getByRole("dialog")).toContainText(
     "captures video and microphone audio",
   );
+  await expect(page.getByRole("dialog")).toContainText("Deepgram’s EU endpoint");
   await expect(page.getByRole("dialog")).not.toContainText(
     "No microphone is captured",
   );

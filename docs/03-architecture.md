@@ -56,7 +56,6 @@ flowchart TB
     WEB -- "Aufnahme" --> MR
     WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>Live-Sprechfeedback im Backend-Modus"]
     PCM -- "WS /api/speech/live: PCM" --> SP
-    SP -- "kumulativer Vorschautext" --> WEB
     FLAGS["FeatureFlags pro Take<br/>Modell, Modus, Pose Lab,<br/>Sprachfeedback pro Typ"] --> MP_W
     MP_W -. "Track fingers, bis 5 Hz" .-> HAND["Hand Landmarker: 21 Punkte pro Hand<br/>auch ohne Torso, kein Upload"]
     HAND -. "Pose Lab" .-> LAB["T1–T12, Pocket<br/>lokale Diagnose, keine Events"]
@@ -64,6 +63,9 @@ flowchart TB
     DSP --> LOCAL_SPEECH["SpeechEvaluator: 3 s normales Sprechen<br/>Pausen, Pegel, Pitch, Rhythmus<br/>ein Live-Hinweis + Review-Marker"]
     LOCAL_SPEECH --> WEB
 
+    SP -- "finale Wörter + Text; vorher vorläufiger Text" --> WEB
+    SP -- "nur bei provider=deepgram; PCM, serverseitiger Schlüssel" --> DG["Deepgram EU Nova-3<br/>Deutsch, live + Wort-Timestamps"]
+    DG -- "vorläufig/final, CloseStream-Abschluss" --> SP
     PCM -- "WS /api/speech/feedback: PCM" --> SP
     SP --> LIVE_SIG["API-Thread: gleiche Signalregeln alle 5 s<br/>3-s-Baseline, maximal 5 min, ein Live-Slot<br/>PCM nur im RAM; unabhängig von Whisper"]
     LIVE_SIG -- "feedback: position_ms + Events<br/>ein Hinweis, 15-s-Cooldown pro Typ" --> WEB
@@ -105,7 +107,7 @@ flowchart TB
     FACT -. "Suchanfragen, nur wenn<br/>Quellen nichts belegen" .-> WEBS
     FACT -- "Ergebnis, Request löschen" --> S3
     INGEST --> EMB
-    WORDS -. "optional, transcribe=true" .-> EXT
+    WORDS -. "nur ohne finales live_transcript; transcribe=true" .-> EXT
     SIG --> S3
     WORDS --> S3
     INGEST --> PG
@@ -152,7 +154,8 @@ sequenceDiagram
     participant S3 as SeaweedFS (S3)
     participant R as Redis
     participant W as Celery Worker
-    participant ASR as Whisper lokal (optional)
+    participant ASR as Whisper lokal (Ersatzweg)
+    participant DG as Deepgram EU (optional)
 
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
     FE->>BE: GET /health/ready (10-s-Startfrist)
@@ -169,14 +172,25 @@ sequenceDiagram
         FE->>FE: Zeitoffset zu MediaRecorder.onstart, ein Hinweis, Cooldown
     end
     Note over FE,BE: Mehr als 15 s Analyse-Rückstand: Vorschau stoppen, Aufnahme erhalten
-    opt Live captions aktiviert
-        FE->>BE: WS /speech/live: start, PCM nach ready
-        BE-->>FE: Kumulativer Text als Vorschau (kein Review-Transkript)
-        Note over FE,BE: Abbruch oder Überlast: Aufnahme läuft weiter
+    opt Deepgram live aktiviert (vor MediaRecorder.start verbinden)
+        FE->>BE: WS /speech/live: start, provider=deepgram
+        BE->>DG: WSS mit serverseitigem Schlüssel, Nova-3, Deutsch
+        BE-->>FE: ready, provider=deepgram
+        FE->>BE: PCM ab MediaRecorder.onstart
+        BE->>DG: PCM fortlaufend, 16 kHz mono Int16
+        DG-->>BE: Vorläufige und finale Abschnitte
+        BE-->>FE: Kumulativer Text
+        Note over FE,BE: Abbruch oder Überlast: Aufnahme läuft weiter; lokaler Ersatzweg
     end
     U->>FE: Stop
-    FE->>BE: WS stop, AudioWorklet schließen
-    FE->>BE: POST /speech/analyze (recording, transcribe = Checkbox, standardmäßig an, local_only=true)
+    FE->>BE: Letztes PCM-Paket flushen, danach WS stop
+    opt Vollständiger Deepgram-Stream
+        BE->>DG: CloseStream
+        DG-->>BE: Restwörter und Abschlussmetadaten, Verbindung schließen
+        BE-->>FE: Finale words, text, done
+    end
+    FE->>BE: POST /speech/analyze (recording, transcribe, optional live_transcript)
+    Note over FE,BE: Mit finalem Cloud-Transkript local_only=false; sonst true
     BE->>S3: Original speichern
     BE->>R: Task analyze_speech einreihen
     BE-->>FE: 202 {job_id, status_url}
@@ -186,8 +200,12 @@ sequenceDiagram
     W->>W: FFmpeg -> 16kHz mono, Frames 40ms/10ms
     W->>W: RMS-Pegel, YIN-Pitch, Silero VAD, Silben-Peaks
     opt transcribe=true
-        W->>ASR: faster-whisper small (de, word_timestamps=true)
-        ASR-->>W: Text und Wort-Timestamps
+        alt Vollständiges live_transcript vorhanden
+            W->>W: Finale Wörter prüfen und wiederverwenden; keine erneute ASR
+        else Stream aus oder fehlgeschlagen
+            W->>ASR: faster-whisper small (de, word_timestamps=true)
+            ASR-->>W: Text und Wort-Timestamps
+        end
         W->>W: Füller, Pausen, Tempo (Wort-Analyse)
     end
     W->>W: merge_timeline (Events deduplizieren)

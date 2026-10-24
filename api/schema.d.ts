@@ -485,6 +485,11 @@ export interface components {
              */
             config?: string | null;
             /**
+             * Live Transcript
+             * @description Final Deepgram live transcript JSON with recording-relative word timestamps; skips repeat ASR
+             */
+            live_transcript?: string | null;
+            /**
              * Local Only
              * @description Require local Whisper; reject hosted or synthetic ASR before storing the recording
              * @default false

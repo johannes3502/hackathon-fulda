@@ -274,3 +274,57 @@ def test_concurrent_redelivery_retries_without_processing(monkeypatch):
         analyze_speech.run(str(uuid4()))
     analyze.assert_not_called()
     lock.release.assert_not_called()
+
+
+def test_completed_live_transcript_skips_batch_asr_and_preserves_word_events(monkeypatch):
+    from app.speech.job_models import StreamedTranscript
+    from app.transcription.models import Word
+
+    monkeypatch.setattr("app.speech.pipeline.configured_transcriber", Mock(side_effect=AssertionError("must not run ASR twice")))
+    monkeypatch.setattr("app.speech.pipeline.run_transcription_pipeline", Mock(side_effect=AssertionError("must not decode again")))
+    words = [Word(word="Ähm", start_ms=100, end_ms=250), Word(word="Hallo.", start_ms=300, end_ms=500)]
+    result = run_analysis(FIXTURE, AnalysisOptions(
+        audio=AudioConfig(activity_detector="energy"),
+        live_transcript=StreamedTranscript(provider="deepgram", words=words),
+    ))
+    assert result.words == words
+    assert result.asr_provider == "deepgram" and not result.synthetic_demo
+    assert result.transcription.summary.filler_count == 1
+    assert result.text == "Ähm Hallo."
+    assert any(event.type == "filler" and event.t_ms == 100 for event in result.events)
+
+
+def test_live_transcript_job_roundtrip_without_provider_credentials(monkeypatch, fake_storage):
+    import json
+    from app.tasks import analyze_speech
+
+    monkeypatch.delenv("DEEPGRAM_API_KEY", raising=False)
+    monkeypatch.setenv("ASR_PROVIDER", "deepgram")
+    monkeypatch.setattr("app.speech.router.enqueue_task", AsyncMock(return_value="celery-id"))
+    monkeypatch.setattr("app.speech.router.configured_transcriber", Mock(side_effect=AssertionError("must reuse words")))
+    words = [{"word": "Hallo.", "start_ms": 100, "end_ms": 400}]
+    client = TestClient(app)
+    response = client.post("/speech/analyze", files={"recording": ("synthetic.wav", FIXTURE.read_bytes())}, data={
+        "transcribe": "true", "local_only": "false", "config": '{"activity_detector":"energy"}',
+        "live_transcript": json.dumps({"provider": "deepgram", "words": words}),
+    })
+    assert response.status_code == 202
+    analyze_speech.run(response.json()["job_id"])
+    status = client.get(response.json()["status_url"]).json()
+    assert status["status"] == "completed"
+    assert status["result"]["words"] == words
+    assert status["result"]["asr_provider"] == "deepgram"
+    assert storage.key(response.json()["job_id"], "recording") not in fake_storage
+
+
+@pytest.mark.parametrize("data", [
+    {"local_only": "true", "live_transcript": '{"provider":"deepgram","words":[]}'},
+    {"transcribe": "false", "live_transcript": '{"provider":"deepgram","words":[]}'},
+    {"live_transcript": '{"provider":"whisper","words":[]}'},
+    {"live_transcript": '{"provider":"deepgram","words":[{"word":"a","start_ms":2,"end_ms":3},{"word":"b","start_ms":0,"end_ms":1}]}'},
+    {"live_transcript": 'not-json'},
+])
+def test_invalid_or_unconsented_live_transcript_is_rejected_before_storage(data, fake_storage):
+    response = TestClient(app).post("/speech/analyze", files={"recording": ("synthetic.wav", b"data")}, data=data)
+    assert response.status_code == 422
+    assert fake_storage == {}

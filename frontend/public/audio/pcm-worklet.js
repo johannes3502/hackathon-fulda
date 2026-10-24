@@ -4,6 +4,15 @@ class CaptionPCM extends AudioWorkletProcessor {
     this.buffer = new ArrayBuffer(3200);
     this.view = new DataView(this.buffer);
     this.index = 0;
+    this.port.onmessage = ({ data }) => {
+      if (data?.type !== "flush") return;
+      if (this.index) {
+        const tail = this.buffer.slice(0, this.index * 2);
+        this.port.postMessage(tail, [tail]);
+        this.index = 0;
+      }
+      this.port.postMessage({ type: "flushed" });
+    };
   }
   process(inputs) {
     const samples = inputs[0]?.[0];

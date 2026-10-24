@@ -94,14 +94,42 @@ folgenden Fenster — dedupliziert, können dadurch leicht verzögert abschließ
 Realzeit und meldet Fenster-Latenz (p50/p95/max) — siehe
 `backend/README.md`.
 
-### Offen (Frontend)
+### Deepgram live und Übergabe ans Review (24.10.2026)
 
-- Browser-Sender aus dem `AudioWorklet` fehlt; natürlicher Ort ist
-  `frontend/src/features/live/transport.ts`.
-- Live-Zeiten laufen auf der Sessionzeitachse; für Alignment mit dem Video muss
-  der Browser `performance.now()`-Offset selbst anrechnen.
-- Bricht der Live-Stream ab, läuft die Aufnahme weiter; Stufe A liefert
-  trotzdem das vollständige Transkript.
-- Datenschutzhinweis in der Oberfläche: Audio wird während der Aufnahme an
-  das Backend geschickt (lokal, kein Cloudanbieter).
-- Füllwortqualität ist modellabhängig und ungeprüft.
+Im Web-Backend-Modus ist **Stream transcription with Deepgram (EU)** standardmäßig
+angeschaltet und abschaltbar. `DEEPGRAM_API_KEY` in der Projekt-`.env` setzen
+(nicht committen), danach `docker compose up -d --build frontend backend worker`.
+`ASR_PROVIDER=whisper` bleibt für den lokalen Ersatzweg erhalten; der Schlüssel
+wird weder an den Browser noch an Redis gegeben.
+
+- Browser startet `WS /speech/live` mit
+  `{"type":"start","sample_rate":16000,"provider":"deepgram"}`.
+- Backend öffnet `wss://api.eu.deepgram.com/v1/listen` mit Nova-3, `language=de`,
+  `encoding=linear16`, 16 kHz mono und vorläufigen Ergebnissen. Es antwortet
+  `{"type":"ready","sample_rate":16000,"provider":"deepgram"}`.
+- Die Verbindung wird **vor** `MediaRecorder.start` vorbereitet; PCM beginnt
+  bei `onstart`. Video und Wörter haben denselben Zeitursprung.
+- `text` enthält den kumulativen Text einschließlich des aktuellen vorläufigen
+  Abschnitts. Bei Stop liefert das Worklet zuerst sein letztes, ggf. kürzeres
+  PCM-Paket. Danach kommt `stop`, das Backend sendet Deepgram `CloseStream` und
+  wartet begrenzt auf finale Ergebnisse und Abschlussmetadaten.
+- Nur nach erfolgreichem Abschluss kommen vollständige `words` mit `final=true`,
+  finales `text` und `done`. Abbruch, Überlast, fehlender Schlüssel, fehlendes Audio
+  oder fehlender Abschluss führen zu lokalem Whisper auf der vollständigen Aufnahme.
+  Es gibt keine automatischen bezahlten Cloud-Retries.
+- Das Frontend schickt ein erfolgreiches finales Ergebnis als Formfeld
+  `live_transcript={"provider":"deepgram","words":[...]}` zusammen mit der
+  Aufnahme an `POST /speech/analyze`, `transcribe=true`, `local_only=false`.
+  Der Worker prüft und analysiert diese Wörter; er startet **keine erneute ASR**.
+  Ohne finales Live-Ergebnis: kein `live_transcript`, `local_only=true`, bisheriger
+  Batch-Pfad. Signal-Analyse, Upload und Queue benötigen weiterhin Zeit nach Stop.
+- `local_only=true` oder `transcribe=false` zusammen mit Cloud-Wörtern wird vor
+  dem Speichern mit 422 abgelehnt. Leere, erfolgreich abgeschlossene Transkripte
+  sind zulässig. Wörter sind begrenzt, zeitlich geordnet und an die Aufnahme gebunden.
+
+Füllwortqualität, echte Mikrofonlatenz und Safari-Verhalten sind ungeprüft.
+Die Protokolltests nutzen ausschließlich synthetisches PCM und simulierte
+Deepgram-Antworten; kein echter Anbieteraufruf ohne eingerichteten Schlüssel.
+
+Quellen: [Streaming-Referenz](https://developers.deepgram.com/reference/speech-to-text/listen-streaming),
+[CloseStream](https://developers.deepgram.com/docs/close-stream).

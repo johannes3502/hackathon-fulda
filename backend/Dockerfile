@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# FFmpeg handles browser media formats; MediaPipe/OpenCV need these libraries.
+# Pose/hand tracking runs in the clients; the backend only decodes media.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg libgl1 libglib2.0-0 libportaudio2 \
+    && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 app
 

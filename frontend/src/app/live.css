@@ -916,10 +916,6 @@ body:has(.live-workspace-large) .app-footer,
   }
 }
 @media (max-width: 760px) {
-  .live-entry {
-    align-items: flex-start;
-    flex-direction: column;
-  }
   .live-camera-stage {
     aspect-ratio: auto;
   }

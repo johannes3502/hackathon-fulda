@@ -39,11 +39,11 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker und optionaler HandLandmarker für Fingertracking; Pocket nur Dev; FaceLandmarker (Iris) nicht MVP |
 | Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
 | Medien-Verarbeitung | `ffmpeg` im Backend: Clips schneiden, WebM/MP4 remuxen (seekbar machen) |
-| Transkription | Lokales Whisper (`faster-whisper`) hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}` + Text), Deepgram optional; Anbieter bleibt austauschbar |
+| Transkription | Lokales Whisper (`faster-whisper`) hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}` + Text), Deepgram EU als wählbarer Live-Stream mit Wiederverwendung der finalen Wörter; Anbieter bleibt austauschbar |
 
 **Vorschläge, noch zu bestätigen** (Bestätigung im `docs/02-ai-decision-log.md` festhalten; Vorlage: `templates/ai-decision-log.md`)
 
-- **Transkription:** Stufe A (umgesetzt): Audio nach dem Stoppen hochladen, Wort-Timestamps und Text zurück. Standard ist lokales `faster-whisper` (deutsch), damit keine Audiodaten an einen Cloudanbieter gehen; Deepgram bleibt als optionaler Adapter verfügbar. Stufe B: optionale Live-Transkript-Vorschau im Web umgesetzt (`WS /speech/live` mit PCM aus dem `AudioWorklet`, ein Live-Slot pro Prozess, `WHISPER_LIVE_*`-Konfiguration); Browser-Sender in `frontend/src/features/live/captions.ts`, aktivierbar unter Recording options. Die Vorschau ersetzt keine Batch-Wort-Timestamps. Whisper lässt Füllwörter oft weg; deutsche Füllwortqualität ist ungeprüft. Wort-Timestamps sind vorhanden.
+- **Transkription:** Stufe A (umgesetzt): Audio nach dem Stoppen hochladen, Wort-Timestamps und Text zurück. Standard ist lokales `faster-whisper` (deutsch), damit keine Audiodaten an einen Cloudanbieter gehen; Deepgram bleibt als optionaler Adapter verfügbar. Stufe B: optionale Live-Transkript-Vorschau im Web umgesetzt (`WS /speech/live` mit PCM aus dem `AudioWorklet`, ein Live-Slot pro Prozess, `WHISPER_LIVE_*`-Konfiguration); Browser-Sender in `frontend/src/features/live/captions.ts`, aktivierbar unter Recording options. Im Web ist zusätzlich Deepgram EU live wählbar (im Backend-Modus standardmäßig an, `DEEPGRAM_API_KEY` erforderlich): finales Live-Transkript mit Wort-Timestamps wird ohne erneute ASR im Review verwendet; bei Ausfall weiterhin lokaler Batch-Pfad. Der Datenschutzhinweis benennt Deepgram. Die lokale Whisper-Vorschau ersetzt keine Batch-Wort-Timestamps. Whisper lässt Füllwörter oft weg; deutsche Füllwortqualität ist ungeprüft. Wort-Timestamps sind vorhanden.
 - **Embeddings:** umgesetzt mit lokalem `jinaai/jina-embeddings-v2-base-de` (Deutsch/Englisch, FastEmbed/ONNX) hinter einem austauschbaren `Embedder`-Interface; Retrieval-Qualität mit echten Dokumenten noch nicht gemessen.
 - **Fact-Check und Frage-Agent:** auf Nutzerwunsch lokal und ohne API-Schlüssel: Ollama mit `qwen3.5:4b-q4_K_M` für beide Aufgaben. JSON-Schema, Satzverweis-/Zitatprüfung im Code; Details in `docs/06-local-coaching.md`. Web-Zweitquelle über Team-API vorhanden, für den lokalen Standard aus; kein eigenes Scraping.
 - **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
@@ -127,7 +127,7 @@ Event {
 AGENTS.md                          # Einstiegspunkt und Zielarchitektur
 compose.yaml                       # Frontend + Backend + Celery + Redis + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
-backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
+backend/                           # FastAPI, Audio-/Quellenanalyse, Setup und Smoke-Test
 frontend/                          # Next.js-App, eigener Entwicklungscontainer
 .run/                              # geteilte IntelliJ-Run-Konfigurationen
 .vscode/                           # geteilte VS-Code-Tasks für Docker Compose
@@ -145,7 +145,7 @@ templates/
   team-roles.md                    # Rollen, Gates, RACI
 ```
 
-Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
+Das lokale Grundgerüst startet aktuell FastAPI mit FFmpeg,
 einen separaten Celery-Worker, Redis, PostgreSQL **mit pgvector** und
 **SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job geprüft; Audio-/ASR-Jobs und
 Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO und
@@ -247,3 +247,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Deepgram-Live-Transkription (24.10.2026)
+
+Nutzer hat Cloud-Streaming zum Verkürzen der Wartezeit nach Stop beauftragt und
+Deepgram als einfachsten Integrationspfad bestätigt. Web: Verbindung vor
+Aufnahmestart, finales PCM-Paket flushen, auf finales `words` + `done` warten;
+`live_transcript` im Analyse-Upload spart die erneute Batch-ASR. Schlüssel nur
+serverseitig in `.env`; ohne Schlüssel oder bei unvollständigem Stream bleibt
+Whisper der lokale Ersatzweg. Signal-Analyse und Upload bleiben nach Stop nötig.
+Details: `backend/app/transcription/README.md`. Keine Genauigkeits- oder
+Latenzzusage aus den synthetischen Protokolltests ableiten.

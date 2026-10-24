@@ -51,6 +51,13 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
 Camera permission is requested only on an explicit click. Consent, destination,
 retention information, unavailable services, and retry paths must remain readable.
 The interface must not imply that missing observations mean good performance.
+Pose and voice calibration, tracking status, and errors stay visible. Model, mode,
+finger tracking, and speech features lock during a take; Pose Lab is diagnostic.
+Camera and skeleton use the same crop and mirror projection. Live review shows
+observed events and source-backed findings, without a performance score.
+Local media stays in browser memory, with download and retention guidance.
+Backend transcription names Deepgram EU when streaming is enabled and explains
+the local Whisper fallback. A completed stream supplies the review transcript.
 
 ## References
 
@@ -58,6 +65,12 @@ The interface must not imply that missing observations mean good performance.
 - [Apple: Typography](https://developer.apple.com/design/human-interface-guidelines/typography)
 - [Apple: Color](https://developer.apple.com/design/human-interface-guidelines/color)
 - [Apple: Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)
+
+Earlier layout references inspected by the team on 2026-10-24:
+
+- [Riverside studio](https://mobbin.com/screens/57ce5e02-c5ef-4349-8a2f-9dce51cc8315): stage beside secondary feedback.
+- [VEED recording](https://mobbin.com/screens/dde42152-7be1-49c9-8311-6390504a2ef5): visible timer and session actions.
+- [Typeform report](https://mobbin.com/screens/71dbe2c0-580a-4814-a068-2e13cb4a5559): quiet report typography and separation between findings.
 
 Browser checks cover desktop and mobile layouts, light and dark appearance,
 enlarged text, keyboard navigation, synthetic recording, review, and source flows.

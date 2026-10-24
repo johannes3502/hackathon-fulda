@@ -10,7 +10,7 @@ from app.connections import s3_client
 from app.jobs import QueueUnavailable, enqueue_task
 from app.speech import storage
 from app.speech.config import AudioConfig
-from app.speech.job_models import AcceptedJob, AnalysisJob, AnalysisOptions
+from app.speech.job_models import AcceptedJob, AnalysisJob, AnalysisOptions, StreamedTranscript
 from app.tasks import analyze_speech
 from app.transcription.transcriber import configured_transcriber
 
@@ -33,6 +33,7 @@ async def analyze(
     recording: UploadFile = File(description="Synthetic audio/video recording (WebM, MP4, WAV, ...)"),
     config: str | None = Form(default=None, description="AudioConfig JSON; first 3000 ms are calibration"),
     local_only: bool = Form(default=False, description="Require local Whisper; reject hosted or synthetic ASR before storing the recording"),
+    live_transcript: str | None = Form(default=None, description="Final Deepgram live transcript JSON with recording-relative word timestamps; skips repeat ASR"),
     transcribe: bool = Form(default=True, description="Run configured ASR (default: local Whisper). false = local signal analysis only"),
 ) -> AcceptedJob:
     """Store in S3 and enqueue analysis. Poll status_url for the result.
@@ -42,9 +43,12 @@ async def analyze(
     """
     try:
         parsed = AudioConfig.model_validate_json(config) if config else AudioConfig()
+        streamed = StreamedTranscript.model_validate_json(live_transcript) if live_transcript is not None else None
     except ValidationError as error:
         raise HTTPException(422, error.errors(include_url=False, include_context=False)) from error
-    if transcribe:
+    if streamed is not None and (local_only or not transcribe):
+        raise HTTPException(422, "A cloud live transcript requires transcribe=true and local_only=false")
+    if transcribe and streamed is None:
         if local_only and os.getenv("ASR_PROVIDER", "whisper").strip().lower() not in {"whisper", "faster-whisper"}:
             raise HTTPException(503, "This recording requires local Whisper; configure ASR_PROVIDER=whisper")
         try:
@@ -53,7 +57,7 @@ async def analyze(
             raise HTTPException(503, "ASR is not configured; check ASR_PROVIDER/WHISPER_* or DEEPGRAM_API_KEY, or submit transcribe=false") from error
     job_id = str(uuid4())
     try:
-        await run_in_threadpool(_store_upload, job_id, recording.file, AnalysisOptions(audio=parsed, transcribe=transcribe))
+        await run_in_threadpool(_store_upload, job_id, recording.file, AnalysisOptions(audio=parsed, transcribe=transcribe, live_transcript=streamed))
         await enqueue_task(analyze_speech, job_id)
     except (QueueUnavailable, BotoCoreError, ClientError) as error:
         try:

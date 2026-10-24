@@ -15,33 +15,39 @@ rebuild after changing dependencies or configuration.
   is linked from live review and uses the actual recording and feedback events.
   Completed fact-check results also supply transcript quotes and source excerpts
   to its annotation panel (including links for web evidence).
-  Live scores/curves stay unavailable until a scoring pipeline exists; scripted
-  feedback on real recordings is explicitly disclosed. Video remains in memory.
+  Live recordings expose captured observations; synthetic scores/curves belong
+  only to the design preview. Video remains in memory.
 
-- **418 stats card**: on the start page and at `/stats-preview` (with replay).
-  Animated Three.js ring, 2×2 criteria, count-up and subtle pointer tilt.
+- **418 stats card**: synthetic design preview at `/stats-preview` (with replay).
+  SVG ring, 2×2 criteria and a brief count-up, using the shared design system.
   `StatsCard` accepts `gesture`, `knowledge`, `flow`, `structure` values from
   1–100; the overall value is their rounded arithmetic mean. Invalid or missing
-  values produce an unavailable overall value. The homepage currently passes
-  explicitly labeled synthetic demo values; no backend scoring is implemented.
-  Reduced motion shows final values immediately; SVG supports unavailable WebGL.
+  values produce an unavailable overall value. These are explicitly labeled
+  synthetic demo values; no backend scoring is implemented.
+  Reduced motion shows final values immediately.
 
-- **418 loading preview** (`/loading-preview`): white background, #3803bf rotating
-  Three.js disc and locally hosted Open Sans. The reusable
+- **418 loading preview** (`/loading-preview`): system typography, a small wordmark
+  and an announced status with a subtle activity dot. The reusable
   `LoadingScreen` also supplies the App Router loading fallback (`app/loading.tsx`).
   Mount it during pending work with an optional `label`; no simulated percentage
-  or artificial delay. Reduced motion and unavailable WebGL use a static logo.
+  or artificial delay. Appearance follows the system; reduced motion stops the dot.
 
 - **Sample demo** (`/demo`): deterministic rehearsal, sample transcript, judge questions
   and review. Works without camera, microphone or backend credentials.
-- **Monitoring studio** (`/` and `/live`): Large view opens by default. Choose **Enable camera**, then **Start recording**. Local gesture observations replace scripted markers; hold a neutral position for 3 seconds first.
+- **Monitoring studio** (`/` and `/live`): navigation and settings are visible by default; **Large view** is optional. Choose **Enable camera**, then **Start recording**. Local gesture observations replace scripted markers; hold a neutral position for 3 seconds first.
 - **See gestures in 22 seconds** (`/gestures`): synthetic walkthrough using the real observation rules.
-- **Speech analysis → On · local speech analysis:** enable camera and microphone,
-  then **Start recording**. Speak normally for the first three seconds
-  of calibration. After stopping, local Silero/RMS/YIN analysis runs in Celery;
-  feedback and measurements appear in review. Local Whisper transcription is on
-  by default; turn it off for signal analysis only. `local_only=true` prevents
-  a hosted or synthetic ASR provider from silently replacing local Whisper.
+- **Speech analysis:** **Live · in browser** is the default, with local microphone
+  hints for pauses, volume, pitch variation and speaking rhythm. **Off · gestures
+  only** uses no microphone. **Live + full backend analysis** adds the server's
+  Silero/RMS/YIN signal stream and uploads the take after stopping. Speak normally
+  for three seconds to calibrate. Transcription is on by default within backend
+  mode, with Deepgram EU streaming enabled (requires a server-side API key).
+  Completed stream words are reused in review; otherwise local Whisper runs
+  after stopping. Turn transcription off for signal analysis only. The batch
+  fallback uses `local_only=true` to prevent an unintended hosted ASR provider.
+- **Analysis features:** choose Lite/Heavy, VIDEO/IMAGE and individual speech
+  feedback types. **Track fingers** is independent of the diagnostic **Pose lab**.
+  Filler words and word-based pace require the transcript after stopping.
 - **Source review and questions:** upload sources under `/sources`, then in a
   recorded take choose **Check facts**. Local Ollama selects claims,
   compares retrieved passages. **Start question round** asks follow-up questions;
@@ -62,7 +68,7 @@ Failed analysis preserves the local recording. Sample findings are simulated.
 ## Local pose capture
 
 Landmarks and logging start automatically with the camera. A local MediaPipe
-worker draws visible pose points and skeleton connections over the mirrored
+worker draws visible pose/finger points and skeleton connections over the mirrored
 video in standard and large views. Low-confidence points are hidden. The overlay
 is preview-only and is not burned into recordings.
 
@@ -81,7 +87,7 @@ deploy `public/pose` with the frontend. Model failures leave recording available
 
 Compose sets `NEXT_PUBLIC_API_URL=/api`. Next.js forwards requests to
 `API_INTERNAL_URL=http://backend:8000`; the browser uses its current origin.
-Upload and polling endpoints are described in the [integration handoff](../docs/pitch-coach-handoff.md).
+Upload and polling endpoints are described in the [integration handoff](../docs/04-integration.md).
 
 For optional local frontend development, install Node.js 22.12+ and run from
 the repository root:
@@ -91,7 +97,8 @@ npm ci
 npm run dev
 ```
 
-The API defaults to `http://localhost:8000`. To override it, copy
+The browser defaults to `/api`; Next.js forwards to `http://localhost:8000`
+outside Compose. To override it, copy
 `frontend/.env.example` to `frontend/.env.local`. A separate API origin needs
 matching backend CORS configuration and HTTPS when the frontend uses HTTPS.
 
@@ -112,7 +119,7 @@ docker compose exec frontend npm test
 For local browser tests: `npx playwright install chromium`, then
 `npm run test:e2e`. Production build: `npm run build`.
 
-[Design notes](DESIGN.md) · [Implementation decisions](../docs/pitch-coach-ai-decision-log.md).
+[Design notes](DESIGN.md) · [Implementation decisions](../docs/02-ai-decision-log.md).
 The user confirmed three camera gestures. Safari/iOS and microphone transcription
 still need physical-device acceptance; public deployment is outside the local demo scope.
 

@@ -79,7 +79,7 @@ smoke command above to check the running containers.
 | FastAPI + Uvicorn | API; connection helpers and health endpoints | `http://localhost:8000` |
 | Celery worker | Background jobs in separate Python processes | Internal; no host port |
 | Redis | Celery broker (DB 0) and temporary task results (DB 1) | Internal `redis:6379`; no host port |
-| MediaPipe | Python Tasks library in the shared backend/worker image | No separate service |
+| MediaPipe | Pose/hand tracking in the browser and native app | Client-side; no Python package in the backend image |
 | PostgreSQL + pgvector | Source metadata, text chunks and embeddings; later transcripts and timestamps | `localhost:5432` |
 | SeaweedFS | S3-compatible object storage for audio/video and uploaded files | `http://localhost:8333` |
 | OpenAI-compatible LLM (external or local) | Fact-check: claim extraction and judgments; optional | `LLM_BASE_URL` in `.env` |
@@ -613,8 +613,8 @@ their contents are disposable.
   bucket and pings Redis; returns HTTP 503 with the failing dependency marked
   unavailable. Worker availability is checked separately by its Compose
   health check; jobs can queue while the worker is stopped or busy.
-- `python -m scripts.smoke`: checks readiness, MediaPipe Tasks imports,
-  FFmpeg, a database round trip, synthetic S3 upload/read/range/delete and
+- `python -m scripts.smoke`: checks readiness, FFmpeg,
+  a database round trip, synthetic S3 upload/read/range/delete and
   rejection of anonymous object access. It also publishes a five-second job,
   checks that both API health routes respond while that job is running in a
   separate worker container, verifies the result and deletes it.
@@ -637,8 +637,6 @@ recreation. Those fixtures were removed too.
 ## References
 
 - [FastAPI Docker setup](https://fastapi.tiangolo.com/deployment/docker/)
-- [MediaPipe Python setup](https://developers.google.com/edge/mediapipe/solutions/setup_python)
-- [MediaPipe package and platform wheels](https://pypi.org/project/mediapipe/1.1.1/)
 - [SeaweedFS quick start](https://github.com/seaweedfs/seaweedfs#quick-start)
 - [PostgreSQL Docker image and volume location](https://hub.docker.com/_/postgres)
 - [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder)

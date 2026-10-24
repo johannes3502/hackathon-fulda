@@ -1,4 +1,4 @@
-# AI Decision Log — Backend-Grundgerüst
+# AI Decision Log — Presentation Trainer
 
 Datum: 24.10.2026. Tatsächliche Schritte aus dem Compose-Auftrag.
 Tool: Codex mit Shell, Docker und offiziellen Projektquellen.
@@ -667,3 +667,99 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
   Lint/Typecheck beider Workspaces, Next.js-Produktionsbuild, API-Schema-Aktualität und alle elf Mermaid-Diagramme
   bestanden. Reale Finger-/Sprachqualität, Raumgeräusche, Safari-Mikro und
   längere gemeinsame Kamera-/Audio-Last sind dadurch nicht qualifiziert.
+
+
+## Frühe UI-/Mock-Entscheidungen (historisch, konsolidiert)
+
+Diese Einträge stammen aus dem frühen synthetischen UI-Prototyp. Sie dokumentieren
+die damaligen Entscheidungen; den aktuellen Integrationsstand beschreiben die
+neueren Einträge oben und `docs/04-integration.md`. Der separate alte UI-Log
+wurde bei der Bereinigung hier zusammengeführt.
+
+| Task | Agent output / risk | Decision or correction | Evidence |
+|---|---|---|---|
+| UI inspiration | Recording products can imply actual capture | Used Mobbin’s stage/sidebar hierarchy; kept camera optional and labeled preview separate from simulated analysis | `frontend/DESIGN.md`, `PracticeStudio.tsx` |
+| Live simulation | Independent screen timers could drift or continue during pause | One monotonic mock clock and one provider subscription; pauses freeze event delivery and cue expiry | Clock and lifecycle tests in `coach.test.ts` |
+| Report consistency | A prewritten report could cite a claim never delivered | Construct findings from finalized, delivered transcript segments | Early-finish and evidence-membership tests |
+| Retry | Initial implementation repeated the whole pitch instead of focusing on the answer | Retry now carries prior evidence as judge context and returns directly to the evidence question | Focused-retry regression in `coach.test.ts` |
+| Responsive preview | Browser testing found an aspect-ratio/minimum-height combination overflowing 375px | Explicit width bounds and independent mobile stage height | `noOverflow` assertions throughout `practice.spec.ts` |
+| Demo controls | Local speed selection could disagree with the simulator after jumps or route changes | Synchronize displayed speed through session orchestration | Playback-speed regression in `practice.spec.ts` |
+| Camera permissions | A delayed permission response could leak tracks after exit | Invalidate pending requests and stop returned tracks on stale completion | Late-camera cleanup browser test |
+| Camera extension | A new request needs actual video while the original rehearsal only has transcript fixtures | Added a separate `/live` workspace; real silent capture with clearly labeled scripted markers or backend feedback | `frontend/tests/live.spec.ts` |
+| Original backend contract (superseded) | The real endpoint was not available; the user requested a replaceable proposal | Encoded chunks over WebSocket with session acknowledgement, monotonic ranges and validated feedback; preserved local video on disconnect | Original prototype in Git history; replaced by HTTP upload/status in `docs/04-integration.md` |
+| Replay meaning | Feedback counts or example markers could be mistaken for measured quality | Label frequencies and scripted examples; no invented performance score | Live review and category filter screens |
+| Last-section looping | Encoded video can end slightly before the capture-clock duration, leaving the last section stopped | Handle the native video end event as well as the selected range boundary | End-of-file looping regression in `frontend/tests/live.spec.ts` |
+
+## Repository-Bereinigung nach der Integration (24.10.2026)
+
+- Nutzerauftrag: alte und ungenutzte Dateien allgemein bereinigen. Vor dem
+  Entfernen wurden Imports, Next-/Expo-Routen, Plattformvarianten, Tests,
+  Skripte, Assets und Dokumentverweise geprüft. Alle App-Komponenten haben
+  weiterhin Aufrufer; iOS-Varianten, synthetische Demos, Modell-Assets und die
+  neu hinzugefügten Review-Zielentwürfe sind bewusst weiter vorhanden.
+- Die zwei alten separaten UI-/Handoff-Dokumente wurden entfernt. Die
+  historischen Implementierungsentscheidungen stehen oben, der gemeinsame
+  aktuelle Integrationsvertrag in `docs/04-integration.md`. Links in Web-/
+  Native-README zeigen auf diese Dokumente. Veraltete Font-/Farbvorgaben und
+  Beschreibungen des früheren Homepage-/Sprachmodus wurden aktualisiert.
+- Entfernt: drei nicht referenzierte CSS-Klassen und der nur noch in Tests
+  verwendete `handsInPockets`-Wrapper. Die bestehenden Geometrietests prüfen
+  direkt das weiterhin verwendete `pocketCheck(...).inPocket`.
+- Python-MediaPipe wurde nur im alten Setup-Smoke importiert. Pose und Hände
+  laufen in den Clients. Das Backend benötigt diese Python-Abhängigkeit und
+  die dafür explizit installierten GL-/Audio-Pakete nicht mehr. Neues Image
+  ohne MediaPipe gebaut, Abwesenheit geprüft, `pip check` erfolgreich; gemessene
+  Image-Größe 2.890 statt 3.238 GB. Aktive Dienste wurden nicht ersetzt.
+- Verifiziert: 166 Web-/18 Mobile-Unit-Tests, 74 Browserfälle, 92 Backendtests
+  im neuen Image; ein PostgreSQL-Retrievaltest ohne `POSTGRES_HOST` übersprungen.
+  Der separate Smoke mit neuem Image prüfte gegen die laufenden Abhängigkeiten
+  API/FFmpeg, PostgreSQL, S3-Roundtrip/Range/Löschung und Celery mit paralleler
+  API-Antwort. Seine synthetischen Objekte und sein temporärer Container wurden
+  entfernt. Zusätzlich echte Silero-/Whisper-Auswertung der synthetischen WAV
+  im neuen Image: Wörter vorhanden, alle Wortzeiten innerhalb der Aufnahme;
+  keine Qualitätsmessung. API-Vertrag unverändert, lokale Markdown-Ziele gültig.
+  Lint und Typecheck beider Workspaces sowie Next.js-Produktionsbuild bestanden.
+- 18 alte Task-Logs, generierte Diagramm-Ausgaben und das alte Overflow-Bild
+  aus dem ignorierten Arbeitsbereich entfernt. Keine neuen Tests für die
+  rein strukturelle Bereinigung; bestehende Funktionsprüfungen bleiben erhalten.
+
+## Deepgram EU live und Wiederverwendung im Review (24.10.2026)
+
+- Nutzerauftrag: Transkription am Ende beschleunigen; Cloud-Streaming gewünscht,
+  Deepgram nach Preis-/Integrationsvergleich bestätigt. Bestehender EU-Batchadapter
+  und 16-kHz-PCM-WebSocket waren der Integrationsgrund.
+- Implementiert: `provider=deepgram` auf `/speech/live`, Nova-3 Deutsch über
+  EU-Endpunkt; Schlüssel nur im Backend. Browser verbindet vor Aufnahmestart,
+  zeigt vorläufigen Text und flush't den Audio-Rest vor Stop.
+- Nur vollständige, bestätigte Abschlusswörter gelangen als `live_transcript`
+  mit dem Upload zum Worker. Signal- und Wortanalyse bleiben erhalten; eine
+  zweite Batch-ASR entfällt. Bei Streamfehlern lokaler Whisper-Ersatzweg; keine
+  automatischen bezahlten Cloud-Retries. Audio-Cloudversand im UI benannt und
+  abschaltbar; `local_only=true` lehnt Cloud-Wörter weiterhin ab.
+- Grenzen: Upload, Signal-Analyse und Queue bleiben nach Stop. Kein API-Schlüssel
+  eingerichtet, daher kein echter Deepgram-Aufruf oder Latenz-/Qualitätsvergleich.
+  Füllwortqualität und echtes Mikrofon/Safari müssen gesondert geprüft werden.
+- Prüfung: synthetische PCM-/Provider-Tests für Zwischenstände, letzten Abschnitt,
+  leere Transkripte, Disconnect, Fehlkonfiguration, Limits und geheime Fehlertexte;
+  Job-Roundtrip und Nachweis, dass finale Wörter keine zweite ASR auslösen.
+  Frontend-Tests prüfen PCM-Flush-Reihenfolge, Finalisierung, Timeout und Ersatzweg.
+- Quellen: [Live-Protokoll](https://developers.deepgram.com/reference/speech-to-text/listen-streaming),
+  [CloseStream](https://developers.deepgram.com/docs/close-stream).
+
+Prüfergebnis: 106 Backend-Tests bestanden, zwei lokale Modell-/Datenbanktests
+übersprungen; nach Integration von Team-main 174 Frontend-Tests bestanden;
+Typecheck und ESLint bestanden; OpenAPI und
+TypeScript-Vertrag regeneriert und auf Aktualität geprüft.
+
+Abschlussprüfung im tatsächlichen Projektordner: 106 Backend-Tests bestanden,
+zwei übersprungen; 174 Web-Unit-Tests, Typecheck, OpenAPI-Aktualität und zwei
+Compose-Konfigurationstests bestanden. ESLint für Quellen bestanden mit
+`--ignore-pattern '.next-*/**'` (zusätzliche generierte UI-Caches vorhanden).
+Drei Desktop-Browserfälle mit synthetischem Kamera-/Audioeingang bestanden:
+Deepgram-Finalisierung bis zum letzten Wort und Wiederverwendung im Review,
+Caption-Abbruch mit weiterhin abspielbarer Aufnahme sowie Signalfeedback-Ausfall.
+Der ältere Abbruchtest verwendet nun denselben Aufnahme-Setup-Helfer wie der
+neue Erfolgsfall. Die lokale `.env` stand noch auf Deepgram ohne Schlüssel;
+`ASR_PROVIDER=whisper` wurde als lokaler Ersatzweg eingerichtet, kein Schlüssel
+geändert oder eingecheckt. Aktivierung: `DEEPGRAM_API_KEY` setzen und Frontend,
+Backend sowie Worker neu bauen/starten. Kein echter Anbieteraufruf getestet.

@@ -95,8 +95,9 @@ export function AppShell({
                 feedback local. Off · gestures only uses no microphone. Full
                 backend analysis captures video and microphone audio, sends
                 audio during recording for live feedback and uploads the
-                complete take after stopping. Live captions additionally send
-                audio when enabled in Recording options. Camera and voice
+                complete take after stopping. Live transcription additionally
+                streams audio to Deepgram’s EU endpoint when enabled in Recording
+                options; local Whisper is the fallback. Camera and voice
                 observations are prototype heuristics, not quality scores. The
                 synthetic walkthrough is separately labelled and needs no
                 camera.
