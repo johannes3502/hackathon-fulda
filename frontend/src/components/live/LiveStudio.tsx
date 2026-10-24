@@ -839,12 +839,10 @@ export function LiveStudio() {
               )}
             </fieldset>
           </details>
-          <FeatureOptions
-            flags={featureFlags}
-            change={setFeatureFlags}
-            disabled={!!progress}
-            speechEnabled={microphone}
-          />
+          <p className="field-hint">
+            Pose model, finger tracking and feedback types are set in{" "}
+            <Link href="/admin">Admin</Link>.
+          </p>
           <details className="live-settings gesture-settings">
             <summary>Gesture guide and calibration</summary>
             <GestureGuide evaluation={evaluation ?? null} />

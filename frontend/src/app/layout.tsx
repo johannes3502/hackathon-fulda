@@ -13,7 +13,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    // Browser translation adds classes to <html> before hydration.
+    <html lang="en" suppressHydrationWarning>
       <body>
         <LiveSessionProvider>{children}</LiveSessionProvider>
       </body>
