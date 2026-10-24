@@ -1,6 +1,6 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Grafische Architektur-Übersicht (Mermaid): `docs/03-architecture.md`.
 
 ## 1. Projekt
 
@@ -53,6 +53,8 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 **Offen:** LLM-Anbieter, Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
 
 ## 4. Architektur
+
+**Pflicht bei Architektur-Änderungen:** Die Mermaid-Diagramme in `docs/03-architecture.md` (Systemübersicht, Compose-Deployment, Sprech­analyse-Flow, RAG-Pipeline, Frontend-Routen, Mobile-Screens, Datenmodell, Event-Modell, API-Endpunkte) sind Teil dieser Datei und immer mitzupflegen. Sobald sich Services in `compose.yaml`, Endpunkte/Routen, Pipelines, Datenmodell oder das Event-Schema ändern, die betroffenen Diagramme im selben Change aktualisieren.
 
 ```
 Browser (Next.js, TS)
@@ -134,6 +136,7 @@ docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
   01-product.md                    # Features und offene Punkte
   02-ai-decision-log.md            # tatsächliche Entscheidungen und Prüfergebnisse
+  03-architecture.md               # Architektur als Mermaid-Diagramme; bei Architektur-Änderungen mittesten
 templates/
   ai-decision-log.md               # Vorlage für die AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
