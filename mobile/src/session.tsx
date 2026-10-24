@@ -4,6 +4,8 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
+import type { SessionConfig } from "../../frontend/src/features/coach/contracts";
+import { defaults } from "../../frontend/src/features/coach/mock/fixtures/scenario";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import type {
@@ -23,18 +25,42 @@ export type Take = {
   endpoint: string;
   notice?: string;
 };
+export type CaptureOptions = {
+  title: string;
+  poseEnabled: boolean;
+  backend: boolean;
+  url: string;
+};
 type Store = {
+  practice: SessionConfig;
+  setPractice: (config: SessionConfig) => void;
+  options: CaptureOptions;
+  setOptions: (patch: Partial<CaptureOptions>) => void;
   takes: Take[];
   save: (take: Take) => void;
   remove: (id: string) => void;
 };
 const Context = createContext<Store | null>(null);
 export function Sessions({ children }: PropsWithChildren) {
+  const [practice, setPractice] = useState<SessionConfig>({
+    ...defaults,
+    criteria: [...defaults.criteria],
+  });
   const [takes, set] = useState<Take[]>([]);
+  const [options, setOptions] = useState<CaptureOptions>({
+    title: "My rehearsal",
+    poseEnabled: true,
+    backend: false,
+    url: process.env.EXPO_PUBLIC_API_URL ?? "",
+  });
   return (
     <Context.Provider
       value={{
         takes,
+        practice,
+        setPractice,
+        options,
+        setOptions: (patch) => setOptions((old) => ({ ...old, ...patch })),
         save: (take) =>
           set((old) => [take, ...old.filter((t) => t.id !== take.id)]),
         remove: (id) => {

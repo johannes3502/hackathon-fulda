@@ -1,23 +1,5 @@
-import { HEURISTICS, type PoseSample } from "@/features/pose/sample";
-
-const connections: [keyof PoseSample["pose"], keyof PoseSample["pose"]][] = [
-  ["nose", "left_eye"],
-  ["nose", "right_eye"],
-  ["left_eye", "left_ear"],
-  ["right_eye", "right_ear"],
-  ["left_shoulder", "right_shoulder"],
-  ["left_shoulder", "left_elbow"],
-  ["left_elbow", "left_wrist"],
-  ["right_shoulder", "right_elbow"],
-  ["right_elbow", "right_wrist"],
-  ["left_shoulder", "left_hip"],
-  ["right_shoulder", "right_hip"],
-  ["left_hip", "right_hip"],
-  ["left_hip", "left_knee"],
-  ["left_knee", "left_ankle"],
-  ["right_hip", "right_knee"],
-  ["right_knee", "right_ankle"],
-];
+import type { PoseSample } from "@/features/pose/sample";
+import { connections, visiblePosePoints } from "@/features/pose/overlay";
 
 export function PoseOverlay({
   sample,
@@ -28,18 +10,7 @@ export function PoseOverlay({
   largeView: boolean;
   label?: string;
 }) {
-  const points = Object.fromEntries(
-    Object.entries(sample.pose).filter(
-      ([, point]) =>
-        point &&
-        point[0] >= 0 &&
-        point[0] <= 1 &&
-        point[1] >= 0 &&
-        point[1] <= 1 &&
-        (point[3] ?? 0) >= HEURISTICS.confidence &&
-        (point[4] === null || point[4] >= HEURISTICS.confidence),
-    ),
-  );
+  const points = visiblePosePoints(sample);
   const { width, height } = sample.image;
   return (
     <svg

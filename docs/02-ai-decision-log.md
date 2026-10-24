@@ -227,3 +227,32 @@ machen und das Wie/Warum der Auswertung dokumentieren.
 - Beim Neubau der integrierten Backend-Abhängigkeiten lief ein PyPI-Download in
   den Standard-Timeout. Der Build verwendet nun 120 s Download-Timeout und fünf
   Retries; keine Paketversionen wurden zur Umgehung geändert.
+- Spätere Team-Änderungen integrieren native Quellen-/Practice-Flows, ein
+  gemeinsames Overlay und den Loading-Screen. Der native Pfad importiert noch
+  `CrossArmsCue`; deshalb bleibt dieser Adapter samt Tests für die App erhalten.
+  Die Web-Auswertung nutzt ausschließlich `PoseEvaluator`. Die Migration der
+  Browser-Hinweise darf die parallele native Arbeit nicht brechen.
+### Lokale Prüfung nach Integration
+
+- 63 Frontend-Tests und 18 Mobile-Tests bestanden; ESLint in beiden Workspaces
+  sowie TypeScript in beiden Workspaces bestanden. Die native App wurde hier nicht auf einem
+  physischen Gerät neu qualifiziert.
+- 36 Browser-Tests auf Desktop und 375-px-Viewport bestanden: synthetischer
+  Jury-Rundgang, echte Regel-Engine mit kontrollierten Landmarks, lokale
+  Aufnahme/Replay/Loop/Export, Ausfälle sowie Sources-/Sample-Pfade. Das echte
+  MediaPipe-Modell wurde auf synthetischen Kameraframes geladen. Kein Nachweis
+  für Kamera-Erkennungsqualität oder physisches Safari/iOS.
+- Frontend-Produktionsbuild bestanden. Der Loop-Test beobachtet jetzt den
+  tatsächlichen Zeitsprung beim Wiederholen; langsames Polling hatte den kurzen
+  Abschnitt bei vierfacher Wiedergabe wiederholt verpasst.
+- 43 Backend-Tests im Compose-Image bestanden, einschließlich echtem Silero-
+  Modell und synthetischem pgvector-Datenbanktest. Keine externen ASR-/LLM-
+  Anbieteraufrufe als Nachweis verwendet.
+- Compose-Smoke bestätigt API/FFmpeg/MediaPipe, PostgreSQL, S3-Zugriff und
+  Cleanup sowie getrennte Celery-Verarbeitung bei weiter antwortender API.
+  Quellen-Smoke: synthetisches PPTX hochgeladen, lokal eingebettet, gesucht und
+  wieder gelöscht. Alle sechs Compose-Dienste sind gesund.
+- Hand hoch, Hände zusammen und seitlicher Versatz wurden vom Nutzer mit der
+  echten Kamera bestätigt. Daraus folgt keine gemessene Erkennungsquote.
+  Die auf 0,8 s verkürzte Positionsregel ist automatisiert geprüft; eine neue
+  Rückmeldung zur empfundenen Geschwindigkeit und ein Safari-Vergleich fehlen.

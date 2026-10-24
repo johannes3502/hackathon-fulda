@@ -218,3 +218,16 @@ Alle Formeln und Konfigurationen: [Gesten-Evaluation](../docs/04-gesture-evaluat
 
 Quellen: [MediaPipe Web Guide](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js),
 [Pose Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker).
+
+### Native Integration (iPhone, iPad, Android)
+
+`mobile/` verwendet dieselben Sample-Ableitungen, Sichtbarkeitsfilter,
+Skelett-Verbindungen und die Zustandsmaschine für „Arme verschränkt“.
+Die native Vorschau zeigt Overlay und Diagnosewerte; nach Ausschalten der Kamera
+kann der Preview-Log geteilt werden. Rohkoordinaten bleiben ungespiegelt.
+
+Native Logs kennzeichnen `timebase: preview-start` bzw. `recording-request` und
+`alignment: approximate`: Vision Camera liefert hier keinen bestätigten
+Startzeitpunkt des ersten codierten Videoframes. Das ist ausdrücklich keine
+framegenaue Synchronisierung. Rotation, Spiegelung und Zeitversatz müssen auf
+echten Geräten geprüft werden. Pose-Events in der Timeline fehlen weiterhin.

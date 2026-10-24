@@ -8,6 +8,11 @@ export const CROSS_ARMS = {
   maxWristHeight: 0.2,
   maxElbowDeg: 120,
   holdMs: 2000,
+  // Legacy native cue release behavior; web PoseEvaluator ends on missing data.
+  releaseMs: 500,
+  // Crossed wrists are often hidden under the other arm, so a missing
+  // measurement ends an episode later than a clear "not crossed".
+  unknownReleaseMs: 1500,
   cooldownMs: 20000,
 };
 
@@ -48,4 +53,38 @@ export function crossArmsCheck(sample: PoseSample | null): CrossArmsCheck {
 export const armsCrossed = (sample: PoseSample | null) =>
   crossArmsCheck(sample).crossed;
 
-// Dwell, gaps and cooldown are handled by PoseEvaluator so hints and review share one clock.
+/**
+ * Native-app compatibility adapter. Web uses PoseEvaluator for canonical events.
+ * Turns per-sample results into one hint per episode: active once arms stay
+ * crossed for holdMs, inactive after they are released, then a cooldown.
+ */
+export class CrossArmsCue {
+  private since: number | null = null;
+  private lastCrossed = -Infinity;
+  private cooldownUntil = -Infinity;
+  private active = false;
+  update(crossed: boolean | null, now: number) {
+    if (crossed) {
+      this.since ??= now;
+      this.lastCrossed = now;
+    } else if (
+      this.since !== null &&
+      now - this.lastCrossed >=
+        (crossed === false
+          ? CROSS_ARMS.releaseMs
+          : CROSS_ARMS.unknownReleaseMs)
+    ) {
+      if (this.active) this.cooldownUntil = now + CROSS_ARMS.cooldownMs;
+      this.active = false;
+      this.since = null;
+    }
+    if (
+      !this.active &&
+      this.since !== null &&
+      this.lastCrossed - this.since >= CROSS_ARMS.holdMs &&
+      now >= this.cooldownUntil
+    )
+      this.active = true;
+    return this.active;
+  }
+}

@@ -1,7 +1,5 @@
 import {
   Platform,
-  PlatformColor,
-  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -12,61 +10,69 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from "react-native";
+import { Color } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { PropsWithChildren } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
+export { Action, Symbol } from "./components/controls";
 export function useColors() {
   const dark = useColorScheme() === "dark";
   return {
     bg:
       Platform.OS === "ios"
-        ? PlatformColor("systemGroupedBackground")
+        ? Color.ios.systemGroupedBackground
         : dark
           ? "#101318"
           : "#f2f4f8",
     panel:
       Platform.OS === "ios"
-        ? PlatformColor("secondarySystemGroupedBackground")
+        ? Color.ios.secondarySystemGroupedBackground
         : dark
           ? "#1b2028"
           : "#fff",
     text:
-      Platform.OS === "ios"
-        ? PlatformColor("label")
-        : dark
-          ? "#f3f4f7"
-          : "#182132",
+      Platform.OS === "ios" ? Color.ios.label : dark ? "#f3f4f7" : "#182132",
     muted:
       Platform.OS === "ios"
-        ? PlatformColor("secondaryLabel")
+        ? Color.ios.secondaryLabel
         : dark
           ? "#b8c1cf"
           : "#536176",
     line:
       Platform.OS === "ios"
-        ? PlatformColor("separator")
+        ? Color.ios.separator
         : dark
           ? "#3b4656"
           : "#c6ceda",
-    tint: dark ? "#9bbdff" : "#2555d9",
-    error: dark ? "#ffb4ac" : "#a3261f",
+    tint:
+      Platform.OS === "ios"
+        ? Color.ios.systemBlue
+        : dark
+          ? "#9bbdff"
+          : "#2555d9",
+    error:
+      Platform.OS === "ios"
+        ? Color.ios.systemRed
+        : dark
+          ? "#ffb4ac"
+          : "#a3261f",
   };
 }
 export function Copy({
   children,
   muted,
   title,
+  caption,
   ...props
-}: TextProps & { muted?: boolean; title?: boolean }) {
+}: TextProps & { muted?: boolean; title?: boolean; caption?: boolean }) {
   const c = useColors();
   return (
     <Text
-      selectable
       {...props}
       style={[
         {
           color: muted ? c.muted : c.text,
-          fontSize: title ? 22 : 17,
-          lineHeight: title ? 29 : 25,
+          fontSize: caption ? 13 : title ? 20 : 17,
+          lineHeight: caption ? 18 : title ? 25 : 23,
           fontWeight: title ? "600" : "400",
         },
         props.style,
@@ -76,66 +82,13 @@ export function Copy({
     </Text>
   );
 }
-export function Action({
-  label,
-  onPress,
-  disabled,
-  secondary = false,
-  destructive = false,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  secondary?: boolean;
-  destructive?: boolean;
-}) {
-  const c = useColors();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled: !!disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: 48,
-        padding: 13,
-        borderRadius: 12,
-        borderCurve: "continuous",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: secondary ? c.panel : destructive ? c.error : c.tint,
-        opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
-        borderColor: c.line,
-        borderWidth: secondary ? 1 : 0,
-      })}
-    >
-      <Text
-        style={{
-          fontSize: 17,
-          fontWeight: "600",
-          color: secondary
-            ? c.text
-            : destructive
-              ? "white"
-              : c.tint === "#9bbdff"
-                ? "#10244b"
-                : "white",
-          textAlign: "center",
-        }}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 export function Panel({ children }: PropsWithChildren) {
   const c = useColors();
   return (
     <View
       style={{
         backgroundColor: c.panel,
-        borderRadius: 16,
+        borderRadius: 20,
         borderCurve: "continuous",
         padding: 18,
         gap: 14,
@@ -145,11 +98,36 @@ export function Panel({ children }: PropsWithChildren) {
     </View>
   );
 }
+export function Section({
+  title,
+  footer,
+  children,
+}: PropsWithChildren<{ title: string; footer?: string }>) {
+  return (
+    <View style={{ gap: 8 }}>
+      <Copy caption muted style={{ paddingHorizontal: 16 }}>
+        {title}
+      </Copy>
+      <Panel>{children}</Panel>
+      {footer && (
+        <Copy caption muted style={{ paddingHorizontal: 16 }}>
+          {footer}
+        </Copy>
+      )}
+    </View>
+  );
+}
+export function Divider() {
+  const c = useColors();
+  return <View style={{ height: 0.5, backgroundColor: c.line }} />;
+}
 export function Field({ label, ...props }: TextInputProps & { label: string }) {
   const c = useColors();
   return (
-    <View style={{ gap: 7 }}>
-      <Copy>{label}</Copy>
+    <View style={{ gap: 6 }}>
+      <Copy caption muted>
+        {label}
+      </Copy>
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={c.muted}
@@ -159,10 +137,9 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
             fontSize: 17,
             minHeight: 48,
             color: c.text,
-            borderWidth: 1,
+            borderBottomWidth: 0.5,
             borderColor: c.line,
-            borderRadius: 10,
-            padding: 12,
+            paddingVertical: 10,
           },
           props.style,
         ]}
@@ -178,13 +155,14 @@ export function Page({ children }: PropsWithChildren) {
       style={{ flex: 1, backgroundColor: c.bg }}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
       contentContainerStyle={{
         padding: 20,
-        paddingBottom: Math.max(insets.bottom, 20) + 20,
-        gap: 20,
+        paddingBottom: Math.max(insets.bottom, 20) + 24,
+        gap: 24,
         alignSelf: "center",
         width: "100%",
-        maxWidth: 1200,
+        maxWidth: 1100,
       }}
     >
       {children}
@@ -194,19 +172,26 @@ export function Page({ children }: PropsWithChildren) {
 export function Columns({
   main,
   side,
+  sideFirst = false,
 }: {
-  main: React.ReactNode;
-  side: React.ReactNode;
+  main: ReactNode;
+  side: ReactNode;
+  sideFirst?: boolean;
 }) {
   const { width, fontScale } = useWindowDimensions();
   const wide = width / fontScale >= 800;
-  const style: ViewStyle = { flex: 1, minWidth: 0, gap: 20 };
+  const style: ViewStyle = { flex: 1, minWidth: 0, gap: 24 };
   return (
-    <View style={{ flexDirection: wide ? "row" : "column", gap: 20 }}>
+    <View
+      style={{
+        flexDirection: wide ? "row" : sideFirst ? "column-reverse" : "column",
+        gap: 24,
+      }}
+    >
       <View style={[style, wide && { flex: 1.5 }]}>{main}</View>
       <View style={style}>{side}</View>
     </View>
   );
 }
 export const time = (ms: number) =>
-  `${Math.floor(ms / 60000)}:${Math.floor(ms / 1000) % 60 < 10 ? "0" : ""}${Math.floor(ms / 1000) % 60}`;
+  `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;

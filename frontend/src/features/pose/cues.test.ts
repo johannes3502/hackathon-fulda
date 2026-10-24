@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { armsCrossed } from "./cues";
+import { CROSS_ARMS, CrossArmsCue, armsCrossed } from "./cues";
 import { poseSample, type Landmark } from "./sample";
 function points(crossed: boolean): Landmark[] {
   const p = Array.from({ length: 33 }, () => ({
@@ -58,4 +58,29 @@ it("returns null instead of guessing when points are not usable", () => {
   const hidden = points(true);
   hidden[15].visibility = 0;
   expect(armsCrossed(sample(hidden))).toBeNull();
+});
+it("native adapter hints once per episode after the hold time, then cools down", () => {
+  const cue = new CrossArmsCue();
+  const run = (from: number, to: number, value: boolean | null) => {
+    let active = false;
+    for (let t = from; t <= to; t += 100) active = cue.update(value, t);
+    return active;
+  };
+  expect(run(0, CROSS_ARMS.holdMs - 100, true)).toBe(false);
+  expect(cue.update(true, CROSS_ARMS.holdMs)).toBe(true);
+  // Brief dropouts and hidden wrists keep the episode alive.
+  expect(cue.update(false, 2100)).toBe(true);
+  expect(run(2200, 3000, null)).toBe(true);
+  expect(run(3100, 5000, true)).toBe(true);
+  expect(run(5100, 5600, false)).toBe(false);
+  // Crossing again during the cooldown stays silent until it expires.
+  expect(run(6000, 9000, true)).toBe(false);
+  expect(cue.update(true, 5600 + CROSS_ARMS.cooldownMs)).toBe(true);
+});
+it("native adapter does not hint for a quick crossing", () => {
+  const cue = new CrossArmsCue();
+  for (let t = 0; t < 1000; t += 100) cue.update(true, t);
+  for (let t = 1000; t <= 1600; t += 100) cue.update(false, t);
+  expect(cue.update(true, 1700)).toBe(false);
+  expect(cue.update(true, 3000)).toBe(false);
 });

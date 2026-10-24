@@ -6,13 +6,18 @@ export class NativePoseLog {
   private origin: number | null = null;
   private lines: string[] = [];
   private last = -Infinity;
+  private timebase: "preview-start" | "recording-request" = "preview-start";
   get count() {
     return this.lines.length;
   }
   get full() {
     return this.count >= 3000;
   }
-  start(timestamp: number) {
+  start(
+    timestamp: number,
+    timebase: "preview-start" | "recording-request" = "recording-request",
+  ) {
+    this.timebase = timebase;
     this.origin = timestamp;
     this.lines = [];
     this.last = -Infinity;
@@ -37,7 +42,7 @@ export class NativePoseLog {
       this.lines.push(
         JSON.stringify({
           ...sample,
-          timebase: "recording-request",
+          timebase: this.timebase,
           alignment: "approximate",
           model_mode: "IMAGE",
         }),

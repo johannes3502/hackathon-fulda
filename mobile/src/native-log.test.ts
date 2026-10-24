@@ -35,3 +35,16 @@ describe("native frame log", () => {
     expect(JSON.parse(log.text().split("\n")[0]).pose.left_knee).toBeNull();
   });
 });
+it("labels preview logs separately and resets them at recording start", () => {
+  const log = new NativePoseLog();
+  log.start(100, "preview-start");
+  log.add(points(), 640, 480, 142);
+  expect(JSON.parse(log.text()).timebase).toBe("preview-start");
+  log.start(500);
+  log.add(points(), 640, 480, 542);
+  expect(log.count).toBe(1);
+  expect(JSON.parse(log.text())).toMatchObject({
+    timebase: "recording-request",
+    t_ms: 42,
+  });
+});

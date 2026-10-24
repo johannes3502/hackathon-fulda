@@ -3,6 +3,9 @@
 Stand: 24.10.2026. **Prototyp, keine validierte Beurteilung.**
 Implementierung: `frontend/src/features/pose/evaluation.ts` (`pose-rules-v3`).
 Kamera: `/live`. Synthetischer, reproduzierbarer Rundgang: `/gestures`.
+Diese Regeln beschreiben den Web-Pfad. Die native App verwendet weiterhin
+ihren separaten `CrossArmsCue`-Adapter; dessen bisherige Release-Zeiten wurden
+bei der Team-Integration erhalten, nicht als Web-Verhalten übernommen.
 
 ## Entscheidung nach Recherche
 
