@@ -135,7 +135,7 @@ export function PoseLabOptions() {
       icon={FlaskConical}
       title="Pose lab tests"
       badge={`${labOn} of ${POSE_TESTS.length} on`}
-      description="Developer tool in the studio. These tests show coaching text only and never create review events."
+      description="Shown in the studio's Pose lab panel. Hand in pocket, hands hidden, hand near face, crossed legs, shoulder tilt and head tilt also create live hints and review events; switching a test off stops both."
       actions={
         <div className="admin-bulk">
           <Button

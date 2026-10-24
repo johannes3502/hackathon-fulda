@@ -3,6 +3,28 @@ import type { PoseEvent } from "@/features/pose/evaluation";
 export function PoseEvidence({ event }: { event?: PoseEvent }) {
   if (!event) return null;
   const p = event.payload;
+  if (
+    p.threshold === null ||
+    p.measurement === null ||
+    p.initial_measurement === null
+  )
+    return (
+      <details className="pose-evidence">
+        <summary>How was this observed?</summary>
+        <p>
+          Same per-frame check as the Pose lab panel, held for{" "}
+          {((p.confirmed_at_ms - event.t_ms) / 1000).toFixed(1)} seconds before
+          it counted. It uses fixed image geometry, not a neutral reference.
+        </p>
+        <p>
+          Only visible landmarks count. This image-based heuristic cannot
+          establish intent, eye contact, emotion or presentation quality.
+        </p>
+        <span className="field-hint">
+          {p.rule_version} · local browser processing
+        </span>
+      </details>
+    );
   return (
     <details className="pose-evidence">
       <summary>How was this observed?</summary>

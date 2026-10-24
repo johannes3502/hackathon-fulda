@@ -23,7 +23,6 @@ it("shows the active delegate and renderer in the status view", () => {
       handError={null}
       hands={0}
       backend={gpu}
-      view="status"
     />,
   );
   expect(html).toContain("pose GPU · hands GPU");
@@ -45,7 +44,6 @@ it("shows why the worker fell back to CPU", () => {
       handError={null}
       hands={0}
       backend={cpu}
-      view="status"
     />,
   );
   expect(html).toContain("pose CPU · hands CPU");
