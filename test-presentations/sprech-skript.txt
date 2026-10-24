@@ -1,0 +1,134 @@
+PRÄSENTATIONSTRAINER — TEST-SKRIPT
+=================================
+
+NICHT ALS QUELLE HOCHLADEN. Diese Datei ist nur zum Vorlesen gedacht.
+Wenn sie im Quellen-Ordner landet, prüft der Fact-Check die Aussagen gegen sich selbst.
+
+Die drei Präsentationen sind frei erfunden und enthalten nur synthetische Daten.
+
+ABLAUF PRO PRÄSENTATION
+-----------------------
+1. Backend und Frontend starten (docker compose up), dann http://localhost:3000 öffnen.
+2. Sammlung öffnen: /sources -> "Use this collection on another device"
+   -> Sammlungs-ID aus dem Abschnitt einfügen -> "Open collection".
+   (Die IDs sind nur Beispiel-Sammlungen, kein Login und kein Geheimnis.)
+3. Präsentationsdatei hochladen: /sources -> "Drop files or choose from device"
+   oder /live -> "Presentation & material" -> "Add material".
+   Warten, bis der Status "Ready" ist.
+4. /live öffnen, passenden Präsentationstyp wählen und die Aufnahme starten.
+5. Den Abschnitt laut vorlesen (Markierungen in eckigen Klammern nicht mitlesen),
+   nach ca. 45 bis 60 Sekunden stoppen und die Transkription abwarten.
+6. Im Review den Fact-Check starten und mit der Liste "Erwartete Funde" vergleichen.
+7. Danach "Practice questions" öffnen: Der Agent soll gezielt auf Widersprüche und
+   Lücken eingehen.
+
+Hinweis: Der Fact-Check prüft höchstens sechs Aussagen pro Lauf. Es ist normal,
+dass nicht jede Zeile in den Funden auftaucht. "Nicht gefunden" bedeutet nicht
+"falsch", sondern nur "in den hochgeladenen Quellen nicht belegt".
+
+
+ABSCHNITT A — STARTUP PITCH
+===========================
+Datei:            01-startup-plantsens.pptx
+Sammlung:         11111111-1111-4111-8111-111111111111
+Präsentationstyp: Startup pitch
+Dauer:            ca. 45 Sekunden
+
+Vorlesen:
+
+ 1  [Kontext]     Danke für die Aufmerksamkeit. Ich stelle Ihnen kurz PlantSens vor.
+ 2  [belegt]      Kleine Gewächshäuser verlieren im Schnitt 38 Prozent Wasser.
+ 3  [belegt]      Im Pilot mit neun Betrieben sank der Wasserverbrauch um 27 Prozent.
+ 4  [Widerspruch] Tatsächlich haben wir den Wasserverbrauch um 54 Prozent gesenkt.
+ 5  [Widerspruch] Die Hardware kostet 299 Euro.
+ 6  [Lücke]       Wir arbeiten heute mit 120 Betrieben in ganz Deutschland zusammen.
+ 7  [Lücke]       Der Markt wächst jährlich um 30 Prozent.
+ 8  [Kontext]     Vielen Dank für Ihre Zeit.
+
+Erwartete Funde:
+  belegt          38 % Wasserverlust                      -> Folie 2
+  belegt          27 % weniger Wasserverbrauch            -> Folie 3
+  widerspricht    54 % statt 27 %                        -> Folie 3 nennt 27 %
+  widerspricht    299 € statt 149 €                       -> Folie 5 nennt 149 €
+  nicht gefunden  120 Betriebe in ganz Deutschland        -> Folien nennen 9 Pilotbetriebe
+  nicht gefunden  30 % jährliches Marktwachstum           -> keine Wachstumszahl in den Folien
+
+Gute Rückfragen des Frage-Agenten: Warum weichen die genannten Zahlen von den
+Folien ab? Wie viele Betriebe sind es wirklich? Worauf stützt sich das
+Marktwachstum?
+
+
+ABSCHNITT B — THESIS DEFENSE
+============================
+Datei:            02-thesis-kurzpausen.pdf
+Sammlung:         22222222-2222-4222-8222-222222222222
+Präsentationstyp: Thesis defense
+Dauer:            ca. 50 Sekunden
+
+Vorlesen:
+
+ 1  [Kontext]     Vielen Dank für die Einladung. Ich fasse die wichtigste Studie meiner Arbeit zusammen.
+ 2  [belegt]      An der Studie nahmen 48 Studierende teil, 24 pro Gruppe.
+ 3  [belegt]      Die 5-Minuten-Gruppe erreichte 7,1 Punkte mehr als die 30-Minuten-Gruppe.
+ 4  [belegt]      Der Unterschied war mit p gleich 0,03 statistisch auffällig.
+ 5  [Widerspruch] Tatsächlich lag die 5-Minuten-Gruppe 12,4 Punkte vorne.
+ 6  [Widerspruch] Wir hatten insgesamt 120 Teilnehmende.
+ 7  [Lücke]       Die Studie wurde von der Deutschen Forschungsgemeinschaft gefördert.
+ 8  [Kontext]     Damit bin ich am Ende meines Vortrags angekommen.
+
+Erwartete Funde:
+  belegt          48 Studierende, 24 pro Gruppe             -> Seite 3
+  belegt          7,1 Punkte Differenz                      -> Seite 4
+  belegt          p = 0,03                                  -> Seite 4
+  widerspricht    12,4 Punkte statt 7,1                     -> Seite 4 nennt 7,1 Punkte
+  widerspricht    120 Teilnehmende statt 48                 -> Seite 3 nennt 48
+  nicht gefunden  Förderung durch die DFG                   -> keine Förderangabe in der Studie
+
+Gute Rückfragen des Frage-Agenten: Wie passt die genannte Differenz zu den
+berichteten 7,1 Punkten? Warum weicht die Stichprobengröße ab? Wer hat die
+Studie finanziert? Die Arbeit selbst sagt außerdem, dass die Hypothese knapp
+verfehlt wurde - der Agent sollte das aufgreifen.
+
+
+ABSCHNITT C — NONPROFIT-EINLADUNG
+=================================
+Datei:            03-nonprofit-tafel-musterstadt.docx
+Sammlung:         33333333-3333-4333-8333-333333333333
+Präsentationstyp: Nonprofit invitation
+Dauer:            ca. 45 Sekunden
+
+Vorlesen:
+
+ 1  [Kontext]     Guten Abend. Ich stelle Ihnen die Tafel Musterstadt vor.
+ 2  [belegt]      Wir versorgen jede Woche 1.200 Haushalte.
+ 3  [belegt]      90 Ehrenamtliche arbeiten bei uns.
+ 4  [belegt]      Für 2026 brauchen wir 48.000 Euro, vor allem für Kühlung und Transport.
+ 5  [Widerspruch] Wir haben drei Standorte in der Region.
+ 6  [Widerspruch] Die Wartezeit beträgt aktuell zwei Wochen.
+ 7  [Lücke]       Wir arbeiten mit 25 Supermärkten zusammen.
+ 8  [Kontext]     Vielen Dank. Ich freue mich über jede Unterstützung.
+
+Erwartete Funde:
+  belegt          1.200 Haushalte pro Woche               -> Tabelle "Was wir 2025 erreicht haben"
+  belegt          90 Ehrenamtliche                         -> Tabelle "Was wir 2025 erreicht haben"
+  belegt          48.000 Euro für 2026                     -> Abschnitt "Was wir brauchen"
+  widerspricht    3 Standorte statt 2                      -> Tabelle nennt 2 Standorte
+  widerspricht    2 Wochen Wartezeit statt 6               -> Dokument nennt 6 Wochen
+  nicht gefunden  25 Supermärkte                           -> keine Anzahl in den Unterlagen
+
+Gute Rückfragen des Frage-Agenten: Wie viele Standorte gibt es? Wie lang ist die
+Wartezeit wirklich? Mit wie vielen Märkten arbeitet die Tafel? Der Agent sollte
+außerdem nach der Finanzierung fragen, weil die FAQ staatliche Mittel verneint.
+
+
+WEITERE FEATURES SCHNELL TESTEN
+-------------------------------
+- Sprechmerkmale: Abschnitt A langsam lesen und zwei kurze Pausen machen
+  (Pausen-/Tempo-Events). Ein paar "ähm" einstreuen (Füllwort-Events).
+- Timestamp-Review: im Review auf einen Marker klicken; das lokale Video soll an
+  die Stelle springen.
+- Präsentationsmodus: denselben Abschnitt einmal als "School presentation"
+  aufnehmen und die Fragen vergleichen; die Fragen sollen schülerzentrierter
+  werden, die Quellenprüfung bleibt gleich.
+- Frage-Simulator: nach dem Fact-Check "Practice questions" öffnen. Widersprüche
+  und nicht belegte Aussagen sollten bevorzugt als Fragen auftauchen.
