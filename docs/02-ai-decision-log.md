@@ -1054,3 +1054,24 @@ Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
   pädagogischer Genauigkeitsnachweis. Web-Anbindung, Retention-Cron und Rate
   Limiting bleiben offen. `all`/Export sind unpaginiert, die vollständige
   Theil–Sen-Auswertung bleibt quadratisch und wurde nicht lastvalidiert.
+
+## Auswertung nach der Fragerunde (24.10.2026)
+
+- Nutzerauftrag: Nach den Agenten-Fragen eine Auswertung des Vortrags mit
+  Gestik, Stimmlage und vor allem dem Gesagten (Fakten, Wissen) und einem Score.
+  Damit wird die bisherige „keine Scores“-Leitplanke für genau diesen
+  Fall gelockert: Der Score ist keine erfundene Note, sondern eine
+  transparente Aggregation bereits gemessener Events und Urteile.
+- Umsetzung rein clientseitig (`frontend/src/features/evaluation/performance.ts`,
+  Panel `frontend/src/components/live/PerformanceEvaluation.tsx`), kein
+  Backend-Endpunkt, kein LLM, deterministisch. Erscheint im Web-Review, sobald
+  jede Frage der getippten Runde beantwortet ist.
+- Formel `evidence-count-heuristic.v1`: Inhalt (Gewicht 0,5) = Anteil der
+  Fact-Check-Aussagen und Antwort-Urteile mit Punkten (stützt 1, widerspricht 0,
+  nicht gefunden/ungeprüft 0,5). Stimme (0,25) und Gestik (0,25) starten bei 100
+  und ziehen je 15 Punkte pro gemeldetem Marker pro Minute ab, Floor 40.
+  Fehlende Kategorien werden gewichtsmäßig renormalisiert; ohne Daten kein Score.
+- Grenzen im UI benannt: Heuristik ohne Validierung, kein Vergleich mit anderen
+  Sprechern, „nicht gefunden“ heißt nicht falsch, Inhalts-Score misst
+  Quellenabdeckung statt Allgemeinwissen, keine Personenbewertung.
+- Prüfungen: `typecheck`, `lint`, 8 neue Vitest-Unit-Tests für die Formel.

@@ -14,7 +14,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | 4 | Timestamp-Review | Events auf einer Timeline; `peakMs` springt zur Stelle in der lokalen Aufnahme; keine serverseitigen Clips |
 | 5 | Frage-Simulator | Agent stellt nach der Präsentation Fragen, abgeleitet aus Transkript, Quellen und Fact-Check-Funden |
 
-**Leitplanken:** nur diese fünf Features; keine erfundenen Scores, Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeits-/Notenbewertung; nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
+**Leitplanken:** nur diese fünf Features; Scores nur als transparente, evidenzbasierte Aggregation bereits gemessener Events (Auswertung nach der Fragerunde), keine erfundenen Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeitsbewertung; nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
 
 **Expliziter Nutzerauftrag (24.10.2026):** Im Review vier 0–100-Prototyp-Scores
 für Gestik, Fachwissen, Flow und Struktur statt bloßer Moment-Anzahlen anzeigen.
@@ -205,8 +205,14 @@ Der Frage-Simulator ist umgesetzt (`backend/app/questions/`, `POST /questions`,
 Fact-Check-Funden (Widerspruch, nicht belegt), Lücken gegenüber den Quellen und
 unklaren Stellen; `t_ms` und Evidenz kommen aus Verweisen, nicht vom Modell.
 Getippte Antworten werden mit den Quellen verglichen (Zitat-Prüfung, optionale
-Nachfrage), ohne Punkte oder Noten; Fragen mit gesprochener Stelle sind
-`question`-Events. Voice-Agent: Rolle `student` (neugieriger Erstsemester) oder
+Nachfrage); Fragen mit gesprochener Stelle sind `question`-Events. Nach der
+vollständig beantworteten getippten Runde zeigt der Web-Review eine Auswertung
+(`frontend/src/features/evaluation/performance.ts`, Panel
+`PerformanceEvaluation.tsx`): transparenter Heuristik-Score 0–100 aus bereits
+gemessenen Events — Inhalt (Gewicht 0,5; Fact-Check- und Antwort-Urteile),
+Stimme (0,25) und Gestik (0,25; je 15 Punkte Abzug pro Marker/Minute, Floor 40,
+Gewichte renormalisiert wenn Daten fehlen) — mit Belegen, Stärken,
+Übungsvorschlägen und Methodenhinweis; keine Personenbewertung. Voice-Agent: Rolle `student` (neugieriger Erstsemester) oder
 `tutor` (Professor/Tutor) wählbar; der Browser liest Fragen und Reaktionen per
 `speechSynthesis` vor, gesprochene Antworten gehen über
 `POST /questions/answers/voice` an den konfigurierten Transcriber (standardmäßig lokales Whisper) und werden danach wie getippte
@@ -327,7 +333,7 @@ Vor der Aufnahme stehen Material-Upload und vier Präsentationstypen bereit:
 `presentationMode` werden im Take festgehalten und an beide Fragepfade übergeben.
 ElevenLabs ist auf Nutzerwunsch als optionaler Sprachdialog integriert; Nutzer
 konfiguriert `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` selbst. Kontext als
-Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Keine Bewertungs-Scores; Sprachreaktionen sind nicht zitateverifiziert.
+Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Sprachreaktionen sind nicht zitateverifiziert; die Auswertung nach der getippten Runde ist ein Client-Heuristik-Score aus gemessenen Events (siehe Abschnitt 6, Frage-Simulator).
 Einrichtung und offene Grenzen: `docs/07-review-and-agent.md`.
 
 ## Datenbasierter Kurzreview-Fallback (24.10.2026)

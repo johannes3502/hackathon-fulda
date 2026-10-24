@@ -133,6 +133,37 @@ Der Browser lädt den offiziellen `@elevenlabs/client` erst beim Start. Er bekom
 Signed URL; der API-Key bleibt im Backend. Es werden keine Agenten automatisch
 im ElevenLabs-Konto angelegt oder verändert.
 
+## Auswertung nach der Fragerunde (24.10.2026)
+
+Sobald jede Frage der getippten Runde beantwortet ist, zeigt der Web-Review
+unterhalb der Fragereunde eine Auswertung („Your take at a glance“) mit
+Score 0–100. Sie ist rein clientseitig und deterministisch
+(`frontend/src/features/evaluation/performance.ts`, Panel
+`frontend/src/components/live/PerformanceEvaluation.tsx`); kein Backend-Endpunkt,
+kein LLM, Eingaben sind nur Daten, die der Browser ohnehin hat
+(Fact-Check-Urteile, Antwort-Urteile, Wörter, Feedback-Events, Pose-Events).
+
+Formel `evidence-count-heuristic.v1`:
+
+- **Inhalt** (Gewicht 0,5): Jede Fact-Check-Aussage und jede beantwortete Frage
+  zählt nach Urteil — `supports` = 1, `contradicts` = 0, `not_found`/
+  `unchecked` = 0,5. Score = 100 · Punkte / Items.
+- **Stimme** (0,25): 100 abzüglich 15 Punkte pro Tempo-/Lautstärke-/Tonhöhen-,
+  Füllwort- und Pausen-Marker pro Minute, Floor 40.
+- **Gestik** (0,25): gleiche Formel über Pose-Marker (Haltung, Gesten,
+  Kopfrichtung). Fehlt eine Kategorie (z. B. keine Pose-Daten), entfällt sie
+  mit Renormalisierung der Gewichte; ohne Daten erscheint kein Score.
+- Labels: ab 85 „Strong“, ab 70 „Solid“, ab 55 „Fair“, darunter „Keep
+  practicing“; Stärken und Übungsvorschläge folgen nur aus Zählern
+  (z. B. „3 von 5 Aussagen quellengestützt“).
+
+Grenzen (im Panel aufklappbar benannt): unvalidierte Heuristik aus
+Prototyp-Regeln, kein Vergleich mit anderen Sprechern, „nicht gefunden“ ist
+nicht „falsch“, der Inhalts-Score misst Abdeckung durch die hochgeladenen
+Quellen statt Allgemeinwissen, keine Personen- oder Emotionsbewertung. Der
+Sprachpfad (ElevenLabs-Dialog) erzeugt keine Antwort-Urteile; dort bleibt die
+Inhalts-Kategorie auf den Fact-Check beschränkt.
+
 ## Daten und Grenzen
 
 - Ein Celery-Job bereitet Kontext aus dem Transkript und bis zu acht passenden
