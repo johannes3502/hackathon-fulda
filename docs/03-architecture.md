@@ -480,8 +480,9 @@ flowchart TD
     RP --> RA["ReviewAnalysis + PerformanceGraph / FeedbackGraph<br/>qualitativer Event-Saldo, positive Hinweise oben<br/>neutrale Mittellinie, Anpassungshinweise unten<br/>video.currentTime, Zeitmarken, Abschnitt-Loop"]
     LREV --> SCORES["ReviewScores über dem Video<br/>evidence-share-v1: 4 Kriterien, 0–100<br/>Zeitanteile / Quellenurteile, Abdeckung und fehlende Daten"]
     RA --> SCORES
-    LREV --> FGRAPH["VideoPlayback + FeedbackGraph unter dem Video<br/>Durchgehende kubische Linie, Zwischenwerte interpoliert<br/>Cursor an video.currentTime, gute Momente oben<br/>Klick / Zeitregler / Tastatur-Zeitmarken → lokales Video"]
+    LREV --> FGRAPH["VideoPlayback + FeedbackGraph unter dem Video<br/>Zackiger Liniengraph, Zwischenwerte linear interpoliert<br/>Gute Momente oben; farbige Wiedergabeleiste darunter<br/>Cursor + abgespielter Fortschritt an video.currentTime<br/>Play/Pause / Zeitregler / Zeitmarken ↔ lokales Video"]
     LA --> RA
+    RA --> FGRAPH
 
     SRC -->|"collection_id aus localStorage"| UPLOAD["POST /sources<br/>POST /sources/search"]
 

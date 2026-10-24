@@ -46,6 +46,7 @@ export function ReviewAnalysis({
   const pendingSeek = useRef<number | null>(null);
   const segment = useRef<{ start: number; end: number } | null>(null);
   const [positionMs, setPositionMs] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>(
     data.moments[0]?.id,
   );
@@ -182,6 +183,8 @@ export function ReviewAnalysis({
                   playsInline
                   preload="metadata"
                   aria-label="Präsentationsvideo"
+                  onPlay={() => setPlaying(true)}
+                  onPause={() => setPlaying(false)}
                   onLoadedMetadata={() => {
                     setMediaReady(true);
                     if (pendingSeek.current !== null) {
@@ -206,6 +209,7 @@ export function ReviewAnalysis({
                     }
                   }}
                   onEnded={(event) => {
+                    setPlaying(false);
                     if (loop && segment.current) {
                       event.currentTarget.currentTime = segment.current.start;
                       void event.currentTarget
@@ -233,6 +237,23 @@ export function ReviewAnalysis({
                 selectedId={selectedId}
                 onSeek={seek}
                 onSelect={select}
+                playing={playing}
+                playbackDisabled={!mediaReady}
+                onTogglePlayback={() => {
+                  const player = video.current;
+                  if (!player) return;
+                  if (!player.paused) player.pause();
+                  else {
+                    setError(null);
+                    void player
+                      .play()
+                      .catch(() =>
+                        setError(
+                          "Bitte starte das Video über die Wiedergabesteuerung.",
+                        ),
+                      );
+                  }
+                }}
               />
               <div className="review418-under-chart">
                 <span>Ein Klick auf den Verlauf springt zur Videostelle.</span>

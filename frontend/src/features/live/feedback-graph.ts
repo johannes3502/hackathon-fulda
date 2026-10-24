@@ -16,7 +16,7 @@ export function lineSamples(samples: GraphSample[]) {
   );
 }
 
-/** Cubic easing with a linear time coordinate; cannot overshoot its evidence knots. */
+/** Straight segments retain sharp changes without inventing extra measurements. */
 export function lineValueAt(samples: GraphSample[], tMs: number) {
   if (!samples.length) return 0;
   if (tMs <= samples[0].tMs) return samples[0].balance;
@@ -25,9 +25,7 @@ export function lineValueAt(samples: GraphSample[], tMs: number) {
       after = samples[index];
     if (tMs <= after.tMs) {
       const t = (tMs - before.tMs) / Math.max(1, after.tMs - before.tMs);
-      return (
-        before.balance + (after.balance - before.balance) * t * t * (3 - 2 * t)
-      );
+      return before.balance + (after.balance - before.balance) * t;
     }
   }
   return samples[samples.length - 1].balance;
@@ -42,12 +40,44 @@ export function feedbackLinePath(
   const y = (balance: number) => 120 + (balance / Math.max(1, extent)) * 88;
   return samples
     .map((point, index) => {
-      if (!index) return `M${x(point.tMs)},${y(point.balance)}`;
-      const before = samples[index - 1];
-      const third = (x(point.tMs) - x(before.tMs)) / 3;
-      return `C${x(before.tMs) + third},${y(before.balance)} ${x(point.tMs) - third},${y(point.balance)} ${x(point.tMs)},${y(point.balance)}`;
+      return `${index ? "L" : "M"}${x(point.tMs)},${y(point.balance)}`;
     })
     .join(" ");
+}
+
+/** Match the line's sign exactly, including crossings between event knots. */
+export function playbackGradient(samples: GraphSample[], durationMs: number) {
+  if (durationMs <= 0 || !Number.isFinite(durationMs)) return "var(--muted)";
+  const stops: string[] = [];
+  const color = (balance: number) =>
+    balance < 0
+      ? "var(--success)"
+      : balance > 0
+        ? "var(--error)"
+        : "var(--muted)";
+  const band = (start: number, end: number, balance: number) => {
+    if (end <= start) return;
+    stops.push(
+      `${color(balance)} ${(start / durationMs) * 100}% ${(end / durationMs) * 100}%`,
+    );
+  };
+  for (let index = 1; index < samples.length; index++) {
+    const before = samples[index - 1],
+      after = samples[index];
+    if (before.balance * after.balance < 0) {
+      const crossing =
+        before.tMs +
+        ((after.tMs - before.tMs) * Math.abs(before.balance)) /
+          (Math.abs(before.balance) + Math.abs(after.balance));
+      band(before.tMs, crossing, before.balance);
+      band(crossing, after.tMs, after.balance);
+    } else {
+      band(before.tMs, after.tMs, before.balance + after.balance);
+    }
+  }
+  return stops.length
+    ? `linear-gradient(to right, ${stops.join(", ")})`
+    : "var(--muted)";
 }
 
 /** An event balance, not a score. The renderer places praise above neutral. */

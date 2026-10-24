@@ -12,8 +12,12 @@ mit zeitlicher Vereinigung überlappender Hinweise derselben Art. Für Fachwisse
 hat der Anteil gestützter an entscheidbaren Quellenurteilen Vorrang. Offene
 Aussagen, neutrale Beobachtungen und unbekannte Zeit werden ausgeschlossen.
 Ohne Evidenz steht „–“. Datenabdeckung und Formel sind direkt im UI sichtbar.
-Der Graph ist eine durchgehende, ungefüllte kubische Linie. Zwischenwerte
+Der Graph ist eine durchgehende, ungefüllte Linie mit geraden, zackigen Segmenten. Zwischenwerte
 sind als interpoliert gekennzeichnet, der Wiedergabepunkt folgt dem Video.
+Darunter teilt eine Wiedergabeleiste dieselbe Zeitachse und die Grün-/Rot-/Neutralbereiche
+des Graphen, inklusive interpolierter Nulldurchgänge. Bereits abgespielte Zeit ist
+kräftig eingefärbt, kommende Zeit gedämpft. Play/Pause und Zeitregler sind mit
+den nativen Videosteuerungen synchronisiert; Tastatursprünge bleiben möglich.
 
 1. Im Studio **Presentation & material** öffnen, Präsentationstyp wählen und
    Material hochladen. PDF/PPTX/DOCX/TXT/MD, maximal 25 MB pro Datei. **Ready**

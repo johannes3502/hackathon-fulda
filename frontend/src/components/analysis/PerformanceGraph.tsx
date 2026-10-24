@@ -10,6 +10,9 @@ export function PerformanceGraph({
   selectedId,
   onSeek,
   onSelect,
+  playing,
+  onTogglePlayback,
+  playbackDisabled,
 }: {
   durationMs: number;
   moments: ReviewMoment[];
@@ -17,6 +20,9 @@ export function PerformanceGraph({
   selectedId?: string;
   onSeek: (tMs: number) => void;
   onSelect: (moment: ReviewMoment) => void;
+  playing: boolean;
+  onTogglePlayback: () => void;
+  playbackDisabled: boolean;
 }) {
   return (
     <div className="review418-graph-panel">
@@ -26,6 +32,9 @@ export function PerformanceGraph({
         selectedId={selectedId}
         language="de"
         onSeek={onSeek}
+        playing={playing}
+        onTogglePlayback={onTogglePlayback}
+        playbackDisabled={playbackDisabled}
         onSelect={(item) => {
           const moment = moments.find((moment) => moment.id === item.id);
           if (moment) onSelect(moment);
