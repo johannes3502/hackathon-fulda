@@ -1,5 +1,4 @@
 .stats418-card {
-  --accent: #42ff8c;
   --tilt-x: 0deg;
   --tilt-y: 0deg;
   position: relative;
@@ -14,7 +13,7 @@
   box-shadow:
     0 24px 60px -36px #163c2338,
     0 2px 8px #163c2305;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
   transform: perspective(1000px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
   transition: transform 180ms ease-out;
 }
@@ -49,10 +48,7 @@
   letter-spacing: 0.18em;
 }
 .stats418-total {
-  font:
-    400 76px/1.14 "Noto Serif Display",
-    Georgia,
-    serif;
+  font: 400 76px/1.14 var(--font-sans);
   letter-spacing: -0.06em;
   font-variant-numeric: lining-nums tabular-nums;
 }
@@ -73,18 +69,12 @@
 .stats418-brand {
   display: block;
   margin-bottom: 9px;
-  font:
-    400 20px/1 "Noto Serif Display",
-    Georgia,
-    serif;
+  font: 400 20px/1 var(--font-sans);
   letter-spacing: -0.09em;
 }
 .stats418-heading h2 {
   margin: 0;
-  font:
-    400 31px/1.25 "Noto Serif Display",
-    Georgia,
-    serif;
+  font: 400 31px/1.25 var(--font-sans);
   letter-spacing: -0.035em;
 }
 .stats418-heading p {
@@ -124,10 +114,7 @@
 }
 .stats418-stat dd {
   margin: 7px 0 11px;
-  font:
-    400 39px/1.1 "Noto Serif Display",
-    Georgia,
-    serif;
+  font: 400 39px/1.1 var(--font-sans);
   font-variant-numeric: lining-nums tabular-nums;
   letter-spacing: -0.04em;
 }
@@ -171,7 +158,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #42ff8c;
+  background: var(--accent);
 }
 .stats418-review-link {
   display: block;
@@ -201,24 +188,19 @@
 .stats418-preview-header a {
   position: relative;
   isolation: isolate;
-  font:
-    400 34px/1 "Noto Serif Display",
-    Georgia,
-    serif;
+  font: 400 34px/1 var(--font-sans);
   letter-spacing: -0.09em;
 }
 .stats418-preview-header a span {
   position: absolute;
   z-index: -1;
   inset: -3px 5px -3px 1px;
-  background: #42ff8c;
+  background: var(--soft-accent);
   border-radius: 50%;
 }
 .stats418-preview-header > span {
   color: #687269;
-  font:
-    11px Arial,
-    sans-serif;
+  font: 11px var(--font-sans);
   letter-spacing: 0.06em;
 }
 .stats418-preview-center {
@@ -240,13 +222,11 @@
   border-radius: 999px;
   background: #fff;
   color: #344739;
-  font:
-    12px Arial,
-    sans-serif;
+  font: 12px var(--font-sans);
 }
 .stats418-replay:hover {
   background: #effff5;
-  border-color: #42ff8c;
+  border-color: var(--accent);
 }
 .stats418-replay:focus-visible,
 .stats418-preview-header a:focus-visible {

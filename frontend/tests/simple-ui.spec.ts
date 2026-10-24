@@ -8,9 +8,15 @@ test("home opens monitoring directly and keeps the sample optional", async ({
   );
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
+  expect(
+    await page.evaluate(
+      async () =>
+        (await document.fonts.load('16px "Open Sans Variable"')).length,
+    ),
+  ).toBeGreaterThan(0);
   for (const [selector, color] of [
     ["body", "oklch(0.976 0.004 260)"],
-    [".stage-placeholder .button", "oklch(0.49 0.2 264)"],
+    [".stage-placeholder .button", "#3803bf"],
     [".live-camera-stage", "oklch(0.205 0.029 264)"],
   ]) {
     const matches = await page
@@ -29,7 +35,7 @@ test("home opens monitoring directly and keeps the sample optional", async ({
           (channel, index) => Math.abs(channel - reference[index]) <= 1,
         );
       }, color);
-    expect(matches, `${selector} uses the original palette`).toBe(true);
+    expect(matches, `${selector} uses the configured palette`).toBe(true);
   }
   await expect(
     page.getByRole("button", { name: "Enable camera", exact: true }),
@@ -39,7 +45,10 @@ test("home opens monitoring directly and keeps the sample optional", async ({
       name: "Practice your presentation.",
       exact: true,
     }),
-  ).toHaveCSS("font-family", "Arial, Helvetica, sans-serif");
+  ).toHaveCSS(
+    "font-family",
+    '"Open Sans Variable", Arial, Helvetica, sans-serif',
+  );
   await expect(
     page.getByRole("button", { name: "Standard view", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");

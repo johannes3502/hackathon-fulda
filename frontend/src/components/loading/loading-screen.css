@@ -1,5 +1,5 @@
 .loading418-screen {
-  --loading-accent: #42ff8c;
+  --loading-accent: var(--accent);
   display: grid;
   place-items: center;
   width: 100%;
@@ -49,11 +49,13 @@
 
 .loading418-monogram {
   position: relative;
-  font-family: "Noto Serif Display", "Times New Roman", serif;
-  font-size: clamp(156px, 21vw, 236px);
+  font-family: var(--font-sans);
+  font-size: clamp(76px, 10vw, 112px);
+  color: white;
+  text-shadow: 0 1px 3px var(--accent);
   font-weight: 400;
   line-height: 1;
-  letter-spacing: -0.085em;
+  letter-spacing: -0.04em;
   padding-right: 0.085em;
   transform: translateY(-0.025em);
 }
@@ -62,7 +64,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font: 400 13px/1.5 Arial, Helvetica, sans-serif;
+  font: 400 13px/1.5 var(--font-sans);
   letter-spacing: 0.035em;
   color: #5c5c5c;
 }

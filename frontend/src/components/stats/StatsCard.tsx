@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import "@fontsource/noto-serif-display/latin-400.css";
+import "@fontsource-variable/open-sans";
 import { StatsRing } from "./StatsRing";
 import {
   DEMO_STATS,

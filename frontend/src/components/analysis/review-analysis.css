@@ -1,7 +1,7 @@
 .review418-page {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 .review418-page button,
 .review418-page input,
@@ -56,10 +56,7 @@
 }
 .review418-intro h1 {
   margin: 0;
-  font:
-    600 32px/1.2 Arial,
-    Helvetica,
-    sans-serif;
+  font: 600 32px/1.2 var(--font-sans);
   letter-spacing: -0.035em;
 }
 .review418-intro p {
@@ -76,10 +73,7 @@
   gap: 16px;
 }
 .review418-summary-number {
-  font:
-    400 50px/1 "Noto Serif Display",
-    Georgia,
-    serif;
+  font: 400 50px/1 var(--font-sans);
   letter-spacing: -0.06em;
 }
 .review418-summary-number small {
@@ -128,10 +122,7 @@
   font-size: 10px;
 }
 .review418-criterion > strong {
-  font:
-    400 31px/1.1 "Noto Serif Display",
-    Georgia,
-    serif;
+  font: 400 31px/1.1 var(--font-sans);
   letter-spacing: -0.045em;
 }
 .review418-criterion > strong small {
@@ -264,9 +255,7 @@
   overflow: visible;
 }
 .review418-chart text {
-  font:
-    11px Arial,
-    sans-serif;
+  font: 11px var(--font-sans);
   fill: var(--muted);
 }
 .review418-chart text.review418-axis-title {
@@ -284,9 +273,7 @@
   color: #344e3e;
   transform: translate(-50%, -50%);
   padding: 0;
-  font:
-    600 11px Arial,
-    sans-serif;
+  font: 600 11px var(--font-sans);
   box-shadow: 0 0 0 3px #fff;
 }
 .review418-plot-moment::after {
@@ -314,7 +301,7 @@
   width: 100%;
   height: 20px;
   margin: 4px 0 11px;
-  accent-color: #1e5c36;
+  accent-color: var(--accent);
   cursor: pointer;
 }
 .review418-legend {
@@ -396,10 +383,7 @@
   font-size: 10px;
 }
 .review418-annotation h2 {
-  font:
-    600 19px/1.35 Arial,
-    Helvetica,
-    sans-serif;
+  font: 600 19px/1.35 var(--font-sans);
   letter-spacing: -0.025em;
   margin: 5px 0 12px;
 }
@@ -413,10 +397,7 @@
   border: 0;
   margin: 18px 0 0;
   padding: 0;
-  font:
-    400 16px/1.6 "Noto Serif Display",
-    Georgia,
-    serif;
+  font: 400 16px/1.6 var(--font-sans);
   color: #344e3e;
 }
 .review418-source {
@@ -476,7 +457,7 @@
   font-size: 9px;
 }
 .review418-play-section:hover {
-  background: #2df47a;
+  background: var(--accent-hover);
 }
 .review418-loop {
   display: flex;
@@ -489,7 +470,7 @@
   cursor: pointer;
 }
 .review418-loop input {
-  accent-color: #196d39;
+  accent-color: var(--accent);
 }
 .review418-moments {
   margin-top: 23px;
