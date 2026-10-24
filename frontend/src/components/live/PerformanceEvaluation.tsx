@@ -23,13 +23,26 @@ export function PerformanceEvaluation({ input }: { input: PerformanceInput }) {
       <p className="field-hint">
         Heuristic summary from measured moments, not a validated grade.
       </p>
-      <div className="performance-overall">
-        <span className="performance-score">
-          {evaluation.score === null ? "—" : evaluation.score}
-          <small>/100</small>
-        </span>
-        <span className="performance-label">{evaluation.label}</span>
+      <div className="performance-overall" aria-label="Overall prototype score">
+        {evaluation.score === null ? (
+          <strong>No overall score available</strong>
+        ) : (
+          <>
+            <span className="performance-score">
+              {evaluation.score}
+              <small>/100</small>
+            </span>
+            <span className="performance-label">{evaluation.label}</span>
+          </>
+        )}
       </div>
+      {evaluation.score === null && (
+        <p className="field-hint">
+          No transcript, source verdicts or voice/gesture feedback were
+          available for this take. Create a transcript or run a source check in
+          the review to calculate a score.
+        </p>
+      )}
       <ul className="performance-categories">
         {evaluation.categories.map((category) => (
           <li key={category.category} className="performance-category">
@@ -37,10 +50,7 @@ export function PerformanceEvaluation({ input }: { input: PerformanceInput }) {
               <strong>{category.label}</strong>
               <span className="performance-category-score">
                 {category.score === null ? "—" : category.score}
-                <small>
-                  {" "}
-                  /100 · weight {category.weight}
-                </small>
+                <small> /100 · weight {category.weight}</small>
               </span>
             </div>
             <p>{category.summary}</p>
