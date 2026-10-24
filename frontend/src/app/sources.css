@@ -38,7 +38,7 @@
 .source-drop.dragging,
 .source-drop:focus-within {
   border-color: var(--primary);
-  background: var(--soft-blue);
+  background: var(--soft-accent);
 }
 .source-empty {
   font-size: 13px;
@@ -134,4 +134,8 @@
   .spin {
     animation: none;
   }
+}
+
+.sources-workspace > .context-disclosure {
+  margin-top: 24px;
 }

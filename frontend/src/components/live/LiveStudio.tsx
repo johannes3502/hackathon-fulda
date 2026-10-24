@@ -174,13 +174,13 @@ export function LiveStudio() {
       >
         <div className="workspace-back">
           <Link href="/">
-            <ArrowLeft size={15} /> Sample rehearsal
+            <ArrowLeft size={15} /> Home
           </Link>
           <LiveBadge mode={mode} />
         </div>
         <div className="workspace-heading">
           <div>
-            <h1>Your pitch. In the picture.</h1>
+            <h1>Record your presentation</h1>
             <p>
               Record a take, get feedback, and revisit the moments that matter.
             </p>
@@ -207,14 +207,6 @@ export function LiveStudio() {
           >
             {largeView ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
             {largeView ? "Standard view" : "Large view"}
-          </Button>
-          <Button
-            variant="outline"
-            aria-pressed={poseDebug}
-            onClick={() => setPoseDebug(!poseDebug)}
-          >
-            <Eye size={18} />
-            Pose debug
           </Button>
           {largeView && (
             <strong className="live-view-time">
@@ -384,11 +376,106 @@ export function LiveStudio() {
                     : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis${transcribe ? " and transcription" : ""}.`))
                 : cameraCopy[cameraStatus]}
             </p>
-            <section
-              className="panel live-settings"
+            <section className="panel live-settings">
+              <h2>Recording settings</h2>
+              <fieldset disabled={!!progress}>
+                <details className="connection-settings">
+                  <summary>Title and duration</summary>
+                  <div className="form-row">
+                    <div className="field">
+                      <label htmlFor="live-title">Recording title</label>
+                      <Input
+                        id="live-title"
+                        value={title}
+                        maxLength={100}
+                        onChange={(e) => setTitle(e.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="live-duration">Recording limit</label>
+                      <NativeSelect
+                        id="live-duration"
+                        value={targetMs}
+                        onChange={(e) => setTargetMs(Number(e.target.value))}
+                      >
+                        <option value={60000}>1 minute</option>
+                        <option value={180000}>3 minutes</option>
+                        <option value={300000}>5 minutes</option>
+                      </NativeSelect>
+                    </div>
+                  </div>
+                </details>
+                <div className="field">
+                  <label htmlFor="live-source">Feedback source</label>
+                  <NativeSelect
+                    id="live-source"
+                    value={mode}
+                    onChange={(e) => {
+                      stopCamera();
+                      setMode(e.target.value as LiveConfig["mode"]);
+                    }}
+                  >
+                    <option value="demo">Local demo · scripted markers</option>
+                    <option value="backend">
+                      Backend · audio analysis after recording
+                    </option>
+                  </NativeSelect>
+                </div>
+                {mode === "backend" && (
+                  <div className="field">
+                    <details className="connection-settings">
+                      <summary>Server connection</summary>
+                      <label htmlFor="live-endpoint">Backend API URL</label>
+                      <Input
+                        id="live-endpoint"
+                        value={endpoint}
+                        placeholder="http://localhost:8000"
+                        onChange={(e) => setEndpoint(e.target.value)}
+                      />
+                    </details>
+                    {health && (
+                      <p className="field-hint" role="status">
+                        {health}
+                      </p>
+                    )}
+                    <p className="field-hint">
+                      By starting, you agree to send your complete video and
+                      microphone audio to <strong>{endpoint}</strong> after
+                      stopping. The backend stores the upload for its analysis
+                      job and removes the original after processing; analysis
+                      results remain stored.
+                    </p>
+                    <label className="live-transcribe">
+                      <input
+                        type="checkbox"
+                        checked={transcribe}
+                        onChange={(e) => setTranscribe(e.target.checked)}
+                      />
+                      Transcribe speech for word analysis and fact-check
+                    </label>
+                    <p className="field-hint">
+                      {transcribe
+                        ? "The backend sends the audio to its configured speech recognition provider (default: Deepgram, EU endpoint). The transcript is needed for the fact-check in the review."
+                        : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
+                    </p>
+                  </div>
+                )}
+              </fieldset>
+            </section>
+            <details
+              className="live-settings studio-diagnostics"
               aria-label="Local pose capture"
             >
-              <h2>Local pose capture</h2>
+              <summary>Camera diagnostics</summary>
+              <Button
+                variant="outline"
+                aria-pressed={poseDebug}
+                onClick={() => setPoseDebug(!poseDebug)}
+              >
+                <Eye size={18} />
+                Pose debug
+              </Button>
+
               <p>
                 Landmarks appear automatically while the camera is on. No pose
                 data is uploaded or used to score your presentation.
@@ -424,87 +511,18 @@ export function LiveStudio() {
                 Download preview samples first if you need them. Logs are
                 released when you leave.
               </p>
-            </section>
-            <section className="panel live-settings">
-              <h2>Set up this take</h2>
-              <fieldset disabled={!!progress}>
-                <div className="form-row">
-                  <div className="field">
-                    <label htmlFor="live-title">Recording title</label>
-                    <Input
-                      id="live-title"
-                      value={title}
-                      maxLength={100}
-                      onChange={(e) => setTitle(e.target.value)}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="live-duration">Recording limit</label>
-                    <NativeSelect
-                      id="live-duration"
-                      value={targetMs}
-                      onChange={(e) => setTargetMs(Number(e.target.value))}
-                    >
-                      <option value={60000}>1 minute</option>
-                      <option value={180000}>3 minutes</option>
-                      <option value={300000}>5 minutes</option>
-                    </NativeSelect>
-                  </div>
-                </div>
-                <div className="field">
-                  <label htmlFor="live-source">Feedback source</label>
-                  <NativeSelect
-                    id="live-source"
-                    value={mode}
-                    onChange={(e) => {
-                      stopCamera();
-                      setMode(e.target.value as LiveConfig["mode"]);
-                    }}
-                  >
-                    <option value="demo">Local demo · scripted markers</option>
-                    <option value="backend">
-                      Backend · audio analysis after recording
-                    </option>
-                  </NativeSelect>
-                </div>
-                {mode === "backend" && (
-                  <div className="field">
-                    <label htmlFor="live-endpoint">Backend API URL</label>
-                    <Input
-                      id="live-endpoint"
-                      value={endpoint}
-                      placeholder="http://localhost:8000"
-                      onChange={(e) => setEndpoint(e.target.value)}
-                    />
-                    {health && (
-                      <p className="field-hint" role="status">
-                        {health}
-                      </p>
-                    )}
-                    <p className="field-hint">
-                      By starting, you agree to send your complete video and
-                      microphone audio to this destination after stopping. The
-                      backend stores the upload for its analysis job and removes
-                      the original after processing; analysis results remain
-                      stored.
-                    </p>
-                    <label className="live-transcribe">
-                      <input
-                        type="checkbox"
-                        checked={transcribe}
-                        onChange={(e) => setTranscribe(e.target.checked)}
-                      />
-                      Transcribe speech for word analysis and fact-check
-                    </label>
-                    <p className="field-hint">
-                      {transcribe
-                        ? "The backend sends the audio to its configured speech recognition provider (default: Deepgram, EU endpoint). The transcript is needed for the fact-check in the review."
-                        : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
-                    </p>
-                  </div>
-                )}
-              </fieldset>
-            </section>
+              <div className="stream-summary">
+                <span>
+                  {progress?.chunksSent ?? 0} recording parts{" "}
+                  {mode === "demo"
+                    ? "handled locally"
+                    : "uploaded after stopping"}
+                </span>
+                <span>
+                  {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
+                </span>
+              </div>
+            </details>
             <p className="local-recording-note">
               <ShieldCheck size={16} /> Video is held in browser memory for
               review. Download it before refreshing or leaving this workspace.
@@ -537,35 +555,39 @@ export function LiveStudio() {
                 </span>
               )}
             </section>
-            <section className="panel live-events">
-              <div className="panel-title-row">
-                <h2>Session observations</h2>
-                <span className="badge">{progress?.feedback.length ?? 0}</span>
-              </div>
-              {progress?.feedback.length ? (
-                <div className="event-feed">
-                  {progress.feedback.toReversed().map((item) => (
-                    <div key={item.id}>
-                      <span className={`feedback-kind ${item.kind}`}>
-                        {item.category} · {time(item.startMs)}
-                      </span>
-                      <strong>{item.title}</strong>
-                      <p>{item.detail}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="live-empty">
-                  <CheckCircle2 size={24} />
-                  <p>No observations yet.</p>
-                  <span>
-                    {mode === "demo"
-                      ? "Three scripted markers arrive in the first 10 seconds."
-                      : "No feedback does not imply a perfect performance."}
+            {progress && (
+              <section className="panel live-events">
+                <div className="panel-title-row">
+                  <h2>Session observations</h2>
+                  <span className="badge">
+                    {progress?.feedback.length ?? 0}
                   </span>
                 </div>
-              )}
-            </section>
+                {progress?.feedback.length ? (
+                  <div className="event-feed">
+                    {progress.feedback.toReversed().map((item) => (
+                      <div key={item.id}>
+                        <span className={`feedback-kind ${item.kind}`}>
+                          {item.category} · {time(item.startMs)}
+                        </span>
+                        <strong>{item.title}</strong>
+                        <p>{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="live-empty">
+                    <CheckCircle2 size={24} />
+                    <p>No observations yet.</p>
+                    <span>
+                      {mode === "demo"
+                        ? "Three scripted markers arrive in the first 10 seconds."
+                        : "No feedback does not imply a perfect performance."}
+                    </span>
+                  </div>
+                )}
+              </section>
+            )}
             {!!progress?.metrics.length && (
               <section className="panel live-events">
                 <h2>Backend metrics</h2>
@@ -582,17 +604,6 @@ export function LiveStudio() {
                 </dl>
               </section>
             )}
-            <div className="stream-summary">
-              <span>
-                {progress?.chunksSent ?? 0} recording parts{" "}
-                {mode === "demo"
-                  ? "handled locally"
-                  : "uploaded after stopping"}
-              </span>
-              <span>
-                {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
-              </span>
-            </div>
           </aside>
         </div>
         {Object.values(recordings).length > 0 && (

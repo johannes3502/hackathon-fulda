@@ -1,14 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  CheckCircle2,
-  Clock3,
-  Download,
-  MessageSquare,
-  Video,
-} from "lucide-react";
+import { ArrowRight, Clock3, Download, MessageSquare } from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
@@ -92,28 +85,6 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 ? "Demo markers"
                 : "Feedback moments"}
             </span>
-          </div>
-          <div>
-            <CheckCircle2 size={19} />
-            <strong>
-              {
-                recording.feedback.filter((item) => item.kind === "positive")
-                  .length
-              }
-            </strong>
-            <span>
-              {recording.config.mode === "demo"
-                ? "Positive examples"
-                : "Positive observations"}
-            </span>
-          </div>
-          <div>
-            <Video size={19} />
-            <strong>
-              {(recording.video.size / 1024 / 1024).toFixed(1)}
-              <small> MB</small>
-            </strong>
-            <span>Local video size</span>
           </div>
         </div>
         <div className="live-review-grid">

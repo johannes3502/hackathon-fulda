@@ -154,6 +154,9 @@ test("custom context, simulation mode, interruption, failure and active refresh 
 }) => {
   await page.goto("/");
   await page
+    .getByText("Customize the sample rehearsal", { exact: true })
+    .click();
+  await page
     .getByRole("button", { name: "Start practice", exact: true })
     .click();
   await expect(page.getByLabel("Pitch title")).toBeFocused();
@@ -161,6 +164,7 @@ test("custom context, simulation mode, interruption, failure and active refresh 
   await page
     .getByLabel("What’s the big idea?")
     .fill("A synthetic proposal to help students share learning materials.");
+  await page.getByText("Practice options", { exact: true }).click();
   await page.getByLabel("Who’s listening?").selectOption("investor");
   await page
     .getByRole("button", { name: "Simulation Feedback at the end" })
@@ -266,7 +270,7 @@ test("pending camera can be bypassed and late tracks are stopped after exit", as
   ).toBeEnabled();
   await page.getByRole("link", { name: "Start new practice" }).click();
   await expect(
-    page.getByRole("button", { name: "Start practice", exact: true }),
+    page.getByRole("button", { name: "Try sample demo", exact: true }),
   ).toBeVisible();
   await page.evaluate(() =>
     (window as unknown as { resolveCamera: () => void }).resolveCamera(),

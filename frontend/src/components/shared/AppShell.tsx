@@ -1,11 +1,6 @@
 "use client";
 import Link from "next/link";
-import {
-  AudioLines,
-  CircleHelp,
-  FlaskConical,
-  ShieldCheck,
-} from "lucide-react";
+import { CircleHelp, FlaskConical, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import type { ReactNode } from "react";
@@ -31,19 +26,14 @@ export function AppShell({
         Skip to content
       </a>
       <header className="app-header">
-        <Link href="/" className="brand" aria-label="Pitch Coach home">
-          <span className="brand-symbol">
-            <AudioLines size={23} strokeWidth={2.2} />
-          </span>
-          <span>
-            pitch<span className="brand-light">coach</span>
-            <span className="prototype-label">LAB</span>
-          </span>
+        <Link href="/" className="brand" aria-label="418 home">
+          <span className="brand-mark">418</span>
+          <span className="brand-caption">Presentation practice</span>
         </Link>
         <nav aria-label="Practice progress" className="step-nav">
           {(experience === "live"
             ? ["Record", "Review", "Replay"]
-            : ["Set up", "Practice", "Reflect"]
+            : ["Start", "Practice", "Review"]
           ).map((label, index) => (
             <div
               key={label}
@@ -74,11 +64,11 @@ export function AppShell({
           {experience === "live" ? (
             <>
               <ol className="help-list">
-                <li>Enable your camera for a local preview.</li>
                 <li>
-                  Choose demo feedback or your backend connection, then start
-                  recording.
+                  Choose demo feedback or audio analysis, then enable your
+                  camera.
                 </li>
+                <li>Start recording when you are ready.</li>
                 <li>
                   Review your video and the feedback received during that
                   recording.
@@ -88,9 +78,11 @@ export function AppShell({
                 </li>
               </ol>
               <p>
-                No microphone is captured. Backend mode sends encoded video
-                chunks to the destination shown in the studio. Demo mode keeps
-                video local and supplies scripted markers, not real detections.
+                Demo mode records video locally without microphone audio and
+                uses scripted feedback. Backend mode captures video and
+                microphone audio and uploads the complete recording after you
+                stop. Optional transcription uses the provider named in the
+                studio.
               </p>
               <p>
                 Recordings live in browser memory only. Download before

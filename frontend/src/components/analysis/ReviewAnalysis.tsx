@@ -10,7 +10,7 @@ import {
   Play,
   RotateCcw,
 } from "lucide-react";
-import "@fontsource/noto-serif-display/latin-400.css";
+import { AppShell } from "@/components/shared/AppShell";
 import { STAT_LABELS, summarizeStats } from "@/components/stats/stats";
 import { PerformanceGraph } from "./PerformanceGraph";
 import {
@@ -106,332 +106,326 @@ export function ReviewAnalysis({
   }
 
   return (
-    <main className="review418-page" lang="de">
-      <header className="review418-header">
-        <Link href={backHref} className="review418-back">
-          <ArrowLeft size={15} />
-          {backLabel}
-        </Link>
-        <Link
-          href="/"
-          className="review418-wordmark"
-          aria-label="418 – Startseite"
-        >
-          418
-          <span />
-        </Link>
-        <span className="review418-mode">
-          {data.demo ? "Synthetische Demo" : "Deine Aufnahme"}
-        </span>
-      </header>
-      <div className="review418-workspace">
-        <div className="review418-intro">
-          <div>
-            <span className="review418-eyebrow">Deine Analyse</span>
-            <h1>Jeder Moment zählt.</h1>
-            <p>
-              {data.title} <span>·</span> {timestamp(data.durationMs)} Minuten
-            </p>
-          </div>
-          <div className="review418-summary">
-            <span className="review418-summary-number">
-              {overall ?? "–"}
-              {overall !== null && <small>%</small>}
-            </span>
-            <span>
-              Gesamt
-              {overall !== null ? (
-                <small>Ø der vier Kriterien</small>
-              ) : (
-                <small>Noch keine Bewertung</small>
-              )}
-            </span>
-          </div>
-        </div>
-        <div
-          className="review418-criteria"
-          aria-label="Kriterien und Filter für Momente"
-        >
-          {Object.entries(STAT_LABELS).map(([key, label], index) => {
-            const value = data.stats?.[key as Criterion];
-            return (
-              <button
-                type="button"
-                key={key}
-                className={`review418-criterion ${criterion === key ? "active" : ""}`}
-                aria-pressed={criterion === key}
-                onClick={() =>
-                  setCriterion(criterion === key ? null : (key as Criterion))
-                }
-              >
-                <span>
-                  <small>0{index + 1}</small>
-                  {label}
-                </span>
-                <strong>
-                  {value ?? "–"}
-                  {value !== undefined && <small>%</small>}
-                </strong>
-                <span className="review418-criterion-bar" aria-hidden="true">
-                  <i style={{ width: `${value ?? 0}%` }} />
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="review418-context">
-          <span>
-            {data.notice ??
-              (data.demo
-                ? "Demo: Video, Bewertungen und Anmerkungen sind synthetisch. Der Verlauf ist illustrativ."
-                : "Zeitmarken stammen aus den vorhandenen Events. Kriterien-Scores und Performance-Verlauf sind noch nicht berechnet.")}
+    <AppShell experience={data.demo ? "sample" : "live"} step={3}>
+      <div className="review418-page" lang="de">
+        <header className="review418-header">
+          <Link href={backHref} className="review418-back">
+            <ArrowLeft size={15} />
+            {backLabel}
+          </Link>
+          <span className="review418-mode">
+            {data.demo ? "Synthetische Demo" : "Deine Aufnahme"}
           </span>
-          <button
-            type="button"
-            onClick={() => setCriterion(null)}
-            aria-pressed={criterion === null}
-          >
-            Alle Kriterien
-          </button>
-        </div>
-        <div className="review418-layout">
-          <div className="review418-main">
-            <section
-              className="review418-video-panel"
-              aria-label="Präsentation ansehen"
-            >
-              <div className="review418-video-top">
-                <span>
-                  <i />
-                  {data.demo
-                    ? "Beispiel-Präsentation · ohne Ton"
-                    : "Deine Präsentation"}
-                </span>
-                <span>
-                  {timestamp(positionMs)} / {timestamp(data.durationMs)}
-                </span>
-              </div>
-              <video
-                ref={video}
-                src={data.videoUrl}
-                poster={data.poster}
-                controls
-                playsInline
-                preload="metadata"
-                aria-label="Präsentationsvideo"
-                onLoadedMetadata={() => {
-                  setMediaReady(true);
-                  if (pendingSeek.current !== null) {
-                    const target = pendingSeek.current;
-                    pendingSeek.current = null;
-                    seek(target);
-                  }
-                }}
-                onSeeked={(event) =>
-                  setPositionMs(event.currentTarget.currentTime * 1000)
-                }
-                onTimeUpdate={(event) => {
-                  const player = event.currentTarget;
-                  setPositionMs(player.currentTime * 1000);
-                  const range = segment.current;
-                  if (range && player.currentTime >= range.end) {
-                    if (loop) player.currentTime = range.start;
-                    else {
-                      player.pause();
-                      segment.current = null;
-                    }
-                  }
-                }}
-                onEnded={(event) => {
-                  if (loop && segment.current) {
-                    event.currentTarget.currentTime = segment.current.start;
-                    void event.currentTarget
-                      .play()
-                      .catch(() =>
-                        setError("Bitte starte die Wiedergabe erneut."),
-                      );
-                  }
-                }}
-                onError={() => {
-                  setMediaReady(false);
-                  setError(videoErrorMessage);
-                }}
-              />
-              {error && (
-                <p className="review418-error" role="status">
-                  {error}
-                </p>
-              )}
-            </section>
-            <PerformanceGraph
-              durationMs={data.durationMs}
-              points={data.performance}
-              moments={visible}
-              positionMs={positionMs}
-              selectedId={selectedId}
-              onSeek={seek}
-              onSelect={select}
-            />
-            <div className="review418-under-chart">
-              <span>Ein Klick auf den Verlauf springt zur Videostelle.</span>
+        </header>
+        <div className="review418-workspace">
+          <div className="review418-intro">
+            <div>
+              <span className="review418-eyebrow">Deine Analyse</span>
+              <h1>Jeder Moment zählt.</h1>
+              <p>
+                {data.title} <span>·</span> {timestamp(data.durationMs)} Minuten
+              </p>
+            </div>
+            <div className="review418-summary">
+              <span className="review418-summary-number">
+                {overall ?? "–"}
+                {overall !== null && <small>%</small>}
+              </span>
               <span>
-                {visible.length} {visible.length === 1 ? "Moment" : "Momente"}
-                {criterion
-                  ? ` · ${STAT_LABELS[criterion]}`
-                  : " · alle Kriterien"}
+                Gesamt
+                {overall !== null ? (
+                  <small>Ø der vier Kriterien</small>
+                ) : (
+                  <small>Noch keine Bewertung</small>
+                )}
               </span>
             </div>
           </div>
-          <aside
-            className="review418-sidebar"
-            aria-label="Anmerkungen und besondere Momente"
+          <div
+            className="review418-criteria"
+            aria-label="Kriterien und Filter für Momente"
           >
-            <section
-              className={`review418-annotation ${selected?.kind ?? "note"}`}
-              aria-label="Ausgewählte Anmerkung"
-            >
-              {selected ? (
-                <>
-                  <div className="review418-annotation-top">
-                    <span>{kindLabels[selected.kind]}</span>
-                    <button
-                      type="button"
-                      className="review418-timestamp-button"
-                      onClick={() => seek(selected.tMs)}
-                    >
-                      {timestamp(selected.tMs)}
-                      <ArrowRight size={13} />
-                    </button>
-                  </div>
-                  <span className="review418-annotation-criterion">
-                    {selected.criterion
-                      ? STAT_LABELS[selected.criterion]
-                      : "Beobachtung"}
+            {Object.entries(STAT_LABELS).map(([key, label], index) => {
+              const value = data.stats?.[key as Criterion];
+              return (
+                <button
+                  type="button"
+                  key={key}
+                  className={`review418-criterion ${criterion === key ? "active" : ""}`}
+                  aria-pressed={criterion === key}
+                  onClick={() =>
+                    setCriterion(criterion === key ? null : (key as Criterion))
+                  }
+                >
+                  <span>
+                    <small>0{index + 1}</small>
+                    {label}
                   </span>
-                  <h2>{selected.title}</h2>
-                  <p>{selected.detail}</p>
-                  {selected.quote && (
-                    <blockquote>„{selected.quote}“</blockquote>
-                  )}
-                  {selected.source && (
-                    <div className="review418-source">
-                      <strong>
-                        {selected.source.href ? (
-                          <a
-                            href={selected.source.href}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {selected.source.title} ↗
-                          </a>
-                        ) : (
-                          selected.source.title
-                        )}
-                      </strong>
-                      <p>„{selected.source.quote}“</p>
-                    </div>
-                  )}
-                  <div className="review418-tip">
-                    <span>Nächster Versuch</span>
-                    <p>{selected.action}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="review418-play-section"
-                    disabled={!mediaReady}
-                    onClick={playSection}
-                  >
-                    <Play size={14} fill="currentColor" />
-                    Stelle ansehen<span>± 2 s Kontext</span>
-                  </button>
-                  <label className="review418-loop">
-                    <input
-                      type="checkbox"
-                      checked={loop}
-                      onChange={(event) => setLoop(event.target.checked)}
-                    />
-                    <RotateCcw size={12} />
-                    Ausschnitt wiederholen
-                  </label>
-                </>
-              ) : (
-                <>
-                  <h2>Dein nächster Blick.</h2>
-                  <p>
-                    {moments.length
-                      ? "Wähle einen Moment aus, um die Anmerkung zu lesen und die Stelle anzusehen."
-                      : "Es liegen noch keine Anmerkungen vor. Du kannst deine Aufnahme trotzdem ansehen."}
-                  </p>
-                </>
-              )}
-            </section>
-            <section
-              className="review418-moments"
-              aria-label="Besondere Momente"
+                  <strong>
+                    {value ?? "–"}
+                    {value !== undefined && <small>%</small>}
+                  </strong>
+                  <span className="review418-criterion-bar" aria-hidden="true">
+                    <i style={{ width: `${value ?? 0}%` }} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="review418-context">
+            <span>
+              {data.notice ??
+                (data.demo
+                  ? "Demo: Video, Bewertungen und Anmerkungen sind synthetisch. Der Verlauf ist illustrativ."
+                  : "Zeitmarken stammen aus den vorhandenen Events. Kriterien-Scores und Performance-Verlauf sind noch nicht berechnet.")}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCriterion(null)}
+              aria-pressed={criterion === null}
             >
-              <div className="review418-moments-heading">
-                <h2>
-                  Momente <span>{visible.length}</span>
-                </h2>
-                <div>
-                  <button
-                    type="button"
-                    aria-label="Vorheriger Moment"
-                    disabled={selectedIndex <= 0}
-                    onClick={() => select(visible[selectedIndex - 1])}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Nächster Moment"
-                    disabled={
-                      !visible.length || selectedIndex >= visible.length - 1
-                    }
-                    onClick={() => select(visible[selectedIndex + 1])}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
+              Alle Kriterien
+            </button>
+          </div>
+          <div className="review418-layout">
+            <div className="review418-main">
+              <section
+                className="review418-video-panel"
+                aria-label="Präsentation ansehen"
+              >
+                <div className="review418-video-top">
+                  <span>
+                    <i />
+                    {data.demo
+                      ? "Beispiel-Präsentation · ohne Ton"
+                      : "Deine Präsentation"}
+                  </span>
+                  <span>
+                    {timestamp(positionMs)} / {timestamp(data.durationMs)}
+                  </span>
                 </div>
-              </div>
-              <div className="review418-moment-list">
-                {visible.map((moment) => (
-                  <button
-                    type="button"
-                    key={moment.id}
-                    className={`review418-moment ${moment.kind} ${selectedId === moment.id ? "selected" : ""}`}
-                    aria-pressed={selectedId === moment.id}
-                    onClick={() => select(moment)}
-                  >
-                    <span className="review418-kind-icon" aria-hidden="true">
-                      {moment.kind === "positive"
-                        ? "✓"
-                        : moment.kind === "attention"
-                          ? "!"
-                          : "i"}
-                    </span>
-                    <span>
-                      <strong>{moment.title}</strong>
-                      <small>
-                        {moment.criterion
-                          ? STAT_LABELS[moment.criterion]
-                          : "Beobachtung"}{" "}
-                        · {kindLabels[moment.kind]}
-                      </small>
-                    </span>
-                    <time>{timestamp(moment.tMs)}</time>
-                  </button>
-                ))}
-                {!visible.length && (
-                  <p className="review418-empty">
-                    Keine Momente für dieses Kriterium.
+                <video
+                  ref={video}
+                  src={data.videoUrl}
+                  poster={data.poster}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  aria-label="Präsentationsvideo"
+                  onLoadedMetadata={() => {
+                    setMediaReady(true);
+                    if (pendingSeek.current !== null) {
+                      const target = pendingSeek.current;
+                      pendingSeek.current = null;
+                      seek(target);
+                    }
+                  }}
+                  onSeeked={(event) =>
+                    setPositionMs(event.currentTarget.currentTime * 1000)
+                  }
+                  onTimeUpdate={(event) => {
+                    const player = event.currentTarget;
+                    setPositionMs(player.currentTime * 1000);
+                    const range = segment.current;
+                    if (range && player.currentTime >= range.end) {
+                      if (loop) player.currentTime = range.start;
+                      else {
+                        player.pause();
+                        segment.current = null;
+                      }
+                    }
+                  }}
+                  onEnded={(event) => {
+                    if (loop && segment.current) {
+                      event.currentTarget.currentTime = segment.current.start;
+                      void event.currentTarget
+                        .play()
+                        .catch(() =>
+                          setError("Bitte starte die Wiedergabe erneut."),
+                        );
+                    }
+                  }}
+                  onError={() => {
+                    setMediaReady(false);
+                    setError(videoErrorMessage);
+                  }}
+                />
+                {error && (
+                  <p className="review418-error" role="status">
+                    {error}
                   </p>
                 )}
+              </section>
+              <PerformanceGraph
+                durationMs={data.durationMs}
+                points={data.performance}
+                moments={visible}
+                positionMs={positionMs}
+                selectedId={selectedId}
+                onSeek={seek}
+                onSelect={select}
+              />
+              <div className="review418-under-chart">
+                <span>Ein Klick auf den Verlauf springt zur Videostelle.</span>
+                <span>
+                  {visible.length} {visible.length === 1 ? "Moment" : "Momente"}
+                  {criterion
+                    ? ` · ${STAT_LABELS[criterion]}`
+                    : " · alle Kriterien"}
+                </span>
               </div>
-            </section>
-          </aside>
+            </div>
+            <aside
+              className="review418-sidebar"
+              aria-label="Anmerkungen und besondere Momente"
+            >
+              <section
+                className={`review418-annotation ${selected?.kind ?? "note"}`}
+                aria-label="Ausgewählte Anmerkung"
+              >
+                {selected ? (
+                  <>
+                    <div className="review418-annotation-top">
+                      <span>{kindLabels[selected.kind]}</span>
+                      <button
+                        type="button"
+                        className="review418-timestamp-button"
+                        onClick={() => seek(selected.tMs)}
+                      >
+                        {timestamp(selected.tMs)}
+                        <ArrowRight size={13} />
+                      </button>
+                    </div>
+                    <span className="review418-annotation-criterion">
+                      {selected.criterion
+                        ? STAT_LABELS[selected.criterion]
+                        : "Beobachtung"}
+                    </span>
+                    <h2>{selected.title}</h2>
+                    <p>{selected.detail}</p>
+                    {selected.quote && (
+                      <blockquote>„{selected.quote}“</blockquote>
+                    )}
+                    {selected.source && (
+                      <div className="review418-source">
+                        <strong>
+                          {selected.source.href ? (
+                            <a
+                              href={selected.source.href}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {selected.source.title} ↗
+                            </a>
+                          ) : (
+                            selected.source.title
+                          )}
+                        </strong>
+                        <p>„{selected.source.quote}“</p>
+                      </div>
+                    )}
+                    <div className="review418-tip">
+                      <span>Nächster Versuch</span>
+                      <p>{selected.action}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="review418-play-section"
+                      disabled={!mediaReady}
+                      onClick={playSection}
+                    >
+                      <Play size={14} fill="currentColor" />
+                      Stelle ansehen<span>± 2 s Kontext</span>
+                    </button>
+                    <label className="review418-loop">
+                      <input
+                        type="checkbox"
+                        checked={loop}
+                        onChange={(event) => setLoop(event.target.checked)}
+                      />
+                      <RotateCcw size={12} />
+                      Ausschnitt wiederholen
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <h2>Dein nächster Blick.</h2>
+                    <p>
+                      {moments.length
+                        ? "Wähle einen Moment aus, um die Anmerkung zu lesen und die Stelle anzusehen."
+                        : "Es liegen noch keine Anmerkungen vor. Du kannst deine Aufnahme trotzdem ansehen."}
+                    </p>
+                  </>
+                )}
+              </section>
+              <section
+                className="review418-moments"
+                aria-label="Besondere Momente"
+              >
+                <div className="review418-moments-heading">
+                  <h2>
+                    Momente <span>{visible.length}</span>
+                  </h2>
+                  <div>
+                    <button
+                      type="button"
+                      aria-label="Vorheriger Moment"
+                      disabled={selectedIndex <= 0}
+                      onClick={() => select(visible[selectedIndex - 1])}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Nächster Moment"
+                      disabled={
+                        !visible.length || selectedIndex >= visible.length - 1
+                      }
+                      onClick={() => select(visible[selectedIndex + 1])}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="review418-moment-list">
+                  {visible.map((moment) => (
+                    <button
+                      type="button"
+                      key={moment.id}
+                      className={`review418-moment ${moment.kind} ${selectedId === moment.id ? "selected" : ""}`}
+                      aria-pressed={selectedId === moment.id}
+                      onClick={() => select(moment)}
+                    >
+                      <span className="review418-kind-icon" aria-hidden="true">
+                        {moment.kind === "positive"
+                          ? "✓"
+                          : moment.kind === "attention"
+                            ? "!"
+                            : "i"}
+                      </span>
+                      <span>
+                        <strong>{moment.title}</strong>
+                        <small>
+                          {moment.criterion
+                            ? STAT_LABELS[moment.criterion]
+                            : "Beobachtung"}{" "}
+                          · {kindLabels[moment.kind]}
+                        </small>
+                      </span>
+                      <time>{timestamp(moment.tMs)}</time>
+                    </button>
+                  ))}
+                  {!visible.length && (
+                    <p className="review418-empty">
+                      Keine Momente für dieses Kriterium.
+                    </p>
+                  )}
+                </div>
+              </section>
+            </aside>
+          </div>
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }

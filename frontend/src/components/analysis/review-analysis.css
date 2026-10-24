@@ -1,7 +1,6 @@
 .review418-page {
-  min-height: 100svh;
-  background: #fff;
-  color: #142019;
+  background: var(--background);
+  color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
 .review418-page button,
@@ -16,47 +15,30 @@
   outline-offset: 4px;
 }
 .review418-header {
-  max-width: 1440px;
+  max-width: 1160px;
   margin: auto;
-  padding: 27px 48px;
+  padding: 24px 24px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #eef1ee;
 }
 .review418-back {
   display: inline-flex;
   align-items: center;
   gap: 9px;
   font-size: 12px;
-  color: #66736a;
-}
-.review418-wordmark {
-  position: relative;
-  isolation: isolate;
-  font:
-    400 37px/1 "Noto Serif Display",
-    Georgia,
-    serif;
-  letter-spacing: -0.085em;
-}
-.review418-wordmark span {
-  position: absolute;
-  z-index: -1;
-  inset: -1px 4px -2px 0;
-  border-radius: 50%;
-  background: #42ff8c;
+  color: var(--muted);
 }
 .review418-mode {
   font-size: 11px;
-  color: #65756a;
+  color: var(--muted);
   padding: 6px 10px;
   background: #f4f8f5;
   border-radius: 20px;
 }
 .review418-workspace {
-  max-width: 1344px;
-  padding: 38px 32px 64px;
+  max-width: 1160px;
+  padding: 24px 24px 48px;
   margin: auto;
 }
 .review418-intro {
@@ -68,24 +50,22 @@
 }
 .review418-eyebrow {
   display: block;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: 10px;
+  font-size: 13px;
   margin-bottom: 9px;
-  color: #65756a;
+  color: var(--muted);
 }
 .review418-intro h1 {
   margin: 0;
   font:
-    400 clamp(32px, 3.5vw, 48px)/1.2 "Noto Serif Display",
-    Georgia,
-    serif;
-  letter-spacing: -0.045em;
+    600 32px/1.2 Arial,
+    Helvetica,
+    sans-serif;
+  letter-spacing: -0.035em;
 }
 .review418-intro p {
   margin: 10px 0 0;
   font-size: 13px;
-  color: #66736a;
+  color: var(--muted);
 }
 .review418-intro p > span {
   margin: 0 8px;
@@ -112,7 +92,7 @@
 .review418-summary > span:last-child small {
   display: block;
   font-size: 10px;
-  color: #79857c;
+  color: var(--muted);
   margin-top: 4px;
 }
 .review418-criteria {
@@ -134,7 +114,7 @@
 }
 .review418-criterion:hover,
 .review418-criterion.active {
-  border-color: #42ff8c;
+  border-color: var(--accent);
   background: #f4fff8;
 }
 .review418-criterion > span:first-child {
@@ -144,7 +124,7 @@
   font-size: 13px;
 }
 .review418-criterion > span:first-child small {
-  color: #89958c;
+  color: var(--muted);
   font-size: 10px;
 }
 .review418-criterion > strong {
@@ -168,7 +148,7 @@
 .review418-criterion-bar i {
   display: block;
   height: 100%;
-  background: #42ff8c;
+  background: var(--accent);
 }
 .review418-context {
   display: flex;
@@ -213,7 +193,7 @@
   gap: 12px;
   padding: 13px 18px;
   font-size: 10px;
-  color: #65756a;
+  color: var(--muted);
   background: #fff;
 }
 .review418-video-top > span:first-child {
@@ -225,7 +205,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #42ff8c;
+  background: var(--accent);
 }
 .review418-video-panel video {
   width: 100%;
@@ -257,7 +237,7 @@
   margin: 0;
 }
 .review418-panel-title p {
-  color: #7b877f;
+  color: var(--muted);
   font-size: 10px;
   margin: 4px 0 0;
 }
@@ -287,7 +267,7 @@
   font:
     11px Arial,
     sans-serif;
-  fill: #7b877f;
+  fill: var(--muted);
 }
 .review418-chart text.review418-axis-title {
   font-size: 10px;
@@ -315,8 +295,8 @@
   inset: -8px;
 }
 .review418-plot-moment.positive {
-  background: #42ff8c;
-  border-color: #42ff8c;
+  background: var(--accent);
+  border-color: var(--accent);
   color: #102b1b;
 }
 .review418-plot-moment.attention {
@@ -360,8 +340,8 @@
   font-style: normal;
 }
 .review418-legend i.positive {
-  background: #42ff8c;
-  border-color: #42ff8c;
+  background: var(--accent);
+  border-color: var(--accent);
   color: #142019;
 }
 .review418-legend i.attention {
@@ -375,7 +355,7 @@
   gap: 12px;
   margin-top: 12px;
   font-size: 10px;
-  color: #7b877f;
+  color: var(--muted);
 }
 .review418-annotation {
   border: 1px solid #dee8e1;
@@ -412,14 +392,14 @@
   font-variant-numeric: tabular-nums;
 }
 .review418-annotation-criterion {
-  color: #7b877f;
+  color: var(--muted);
   font-size: 10px;
 }
 .review418-annotation h2 {
   font:
-    400 25px/1.25 "Noto Serif Display",
-    Georgia,
-    serif;
+    600 19px/1.35 Arial,
+    Helvetica,
+    sans-serif;
   letter-spacing: -0.025em;
   margin: 5px 0 12px;
 }
@@ -430,9 +410,9 @@
   margin: 0;
 }
 .review418-annotation blockquote {
-  border-left: 2px solid #42ff8c;
+  border: 0;
   margin: 18px 0 0;
-  padding: 0 0 0 13px;
+  padding: 0;
   font:
     400 16px/1.6 "Noto Serif Display",
     Georgia,
@@ -483,8 +463,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: #42ff8c;
-  border: 1px solid #42ff8c;
+  background: var(--accent);
+  border: 1px solid var(--accent);
   border-radius: 7px;
   padding: 12px 8px;
   color: #10371f;
@@ -561,7 +541,7 @@
 }
 .review418-moment.selected {
   background: #f1fff6;
-  border-color: #42ff8c;
+  border-color: var(--accent);
 }
 .review418-kind-icon {
   flex-shrink: 0;
@@ -575,8 +555,8 @@
   font-size: 10px;
 }
 .review418-moment.positive .review418-kind-icon {
-  background: #42ff8c;
-  border-color: #42ff8c;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .review418-moment.attention .review418-kind-icon {
   background: #22372b;

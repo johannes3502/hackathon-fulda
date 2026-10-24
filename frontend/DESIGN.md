@@ -1,4 +1,26 @@
-# Pitch Coach design
+# 418 presentation practice design
+
+## Shared web interface (2026-10-24)
+
+The home, sample practice, recording, sources and review screens now share the
+418 wordmark and a restrained white/green palette. Shared tokens live in
+`src/app/globals.css`: #42ff8c for primary buttons with dark text, #23613a for
+links and selected states, #526158 for secondary copy. Product headings and
+controls use one sans family; the serif is reserved for the 418 mark and existing
+specialized data previews. The common AppShell also wraps the analysis view.
+
+Start with a one-click sample, or open the recording studio. Optional sample
+context and practice options are disclosures. The home screen no longer shows
+a synthetic score card or a second explanation of the rehearsal flow. Sources
+lead directly into recording. Camera diagnostics, server settings, title and
+duration are available on demand. Consent, upload destination, transcription
+opt-in, errors and recording-retention notices remain visible. Empty observation
+feeds are omitted before recording; review leads with duration and moments.
+
+Desktop and mobile use the same buttons, fields and spacing. No new routes,
+scoring logic, recording defaults or service dependencies were introduced.
+The sections below record earlier component directions; this shared interface
+supersedes the former blue workspace palette and separate analysis header.
 
 ## 418 review analysis (2026-10-24)
 

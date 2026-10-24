@@ -354,6 +354,7 @@ test("local pose worker loads real assets and runs on synthetic camera frames", 
 }) => {
   await syntheticCamera(page);
   await enable(page);
+  await page.getByText("Camera diagnostics", { exact: true }).click();
   await expect(
     page.getByText("No usable pose. Keep your upper body in frame."),
   ).toBeVisible({ timeout: 45000 });
@@ -394,6 +395,7 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
     }),
   );
   await enable(page);
+  await page.getByText("Camera diagnostics", { exact: true }).click();
   await expect(
     page.getByText("Pose samples stay in this browser."),
   ).toBeVisible();
@@ -545,6 +547,7 @@ test("pose model failure preserves camera recording controls", async ({
     }),
   );
   await enable(page);
+  await page.getByText("Camera diagnostics", { exact: true }).click();
   await expect(
     page.getByText("Pose detection failed.", { exact: false }),
   ).toBeVisible();
@@ -669,10 +672,13 @@ test("transcribed take is fact-checked against sources and links back to the vid
   await backend(page, true);
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
-  const inputs = page.locator(".fact-check-inputs");
+  const factCheck = page.locator('[aria-labelledby="fact-check-title"]');
+  const inputs = factCheck.locator(".fact-check-inputs");
   await expect(inputs).toContainText("4 words");
   await expect(inputs).toContainText("1 ready");
-  await expect(page.getByText("llm.example", { exact: false })).toBeVisible();
+  await expect(
+    factCheck.getByText("llm.example", { exact: false }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Check facts" }).click();
   await expect(page.locator(".fact-verdict")).toHaveText(
     "Source says otherwise",
@@ -690,7 +696,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
     "Source says otherwise",
   );
   await noOverflow(page);
-  await page.locator(".fact-check").screenshot({
+  await factCheck.screenshot({
     path: `test-results/fact-check-${info.project.name}.png`,
   });
   await page.getByRole("link", { name: "Feedback moments" }).click();

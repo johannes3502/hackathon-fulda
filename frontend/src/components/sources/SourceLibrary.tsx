@@ -184,11 +184,13 @@ export function SourceLibrary() {
           <div>
             <h1>Your sources</h1>
             <p>
-              Upload your slides, papers or notes and search the indexed
-              passages. Fact-check and generated questions are not connected
-              yet.
+              Add slides, papers or notes to check claims and prepare questions
+              after recording.
             </p>
           </div>
+          <Button asChild>
+            <Link href="/live">Continue to recording</Link>
+          </Button>
         </div>
         {config && "error" in config && (
           <p className="status-error" role="alert">
@@ -199,50 +201,6 @@ export function SourceLibrary() {
           <p className="status-error" role="alert">
             {error}
           </p>
-        )}
-        {collection && (
-          <details className="context-disclosure">
-            <summary>Use this collection on another device</summary>
-            <p>
-              Enter this ID and the same server address in the native app. The
-              ID groups documents; it is not a login or access-control secret.
-            </p>
-            <Input
-              aria-label="Current collection ID"
-              readOnly
-              value={collection}
-            />
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                try {
-                  const id = setCollectionId(collectionDraft);
-                  if (id === collection) return;
-                  if (config && "api" in config)
-                    cachedConfig = { ...config, collection: id };
-                  setSources([]);
-                  setHits(null);
-                  setError(null);
-                  setSelectedCollection(id);
-                } catch (reason) {
-                  setError(String(reason));
-                }
-              }}
-            >
-              <Input
-                aria-label="Collection ID from another device"
-                placeholder="Collection ID"
-                value={collectionDraft}
-                onChange={(event) => setCollectionDraft(event.target.value)}
-              />
-              <Button
-                type="submit"
-                disabled={!!uploading || searching || !collectionDraft.trim()}
-              >
-                Open collection
-              </Button>
-            </form>
-          </details>
         )}
         <div className="sources-grid">
           <section
@@ -311,10 +269,10 @@ export function SourceLibrary() {
             )}
           </section>
           <section className="panel sources-panel" aria-label="Test retrieval">
-            <h2>What will the coach find?</h2>
+            <h2>Search your sources</h2>
             <p className="muted small">
               Ask a question or paste a claim from your talk. These passages are
-              what fact-check and the question round would see.
+              used by fact-checking and the question round.
             </p>
             <form className="source-search" onSubmit={(e) => void search(e)}>
               <Input
@@ -361,6 +319,50 @@ export function SourceLibrary() {
             )}
           </section>
         </div>
+        {collection && (
+          <details className="context-disclosure">
+            <summary>Use this collection on another device</summary>
+            <p>
+              Enter this ID and the same server address in the native app. The
+              ID groups documents; it is not a login or access-control secret.
+            </p>
+            <Input
+              aria-label="Current collection ID"
+              readOnly
+              value={collection}
+            />
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                try {
+                  const id = setCollectionId(collectionDraft);
+                  if (id === collection) return;
+                  if (config && "api" in config)
+                    cachedConfig = { ...config, collection: id };
+                  setSources([]);
+                  setHits(null);
+                  setError(null);
+                  setSelectedCollection(id);
+                } catch (reason) {
+                  setError(String(reason));
+                }
+              }}
+            >
+              <Input
+                aria-label="Collection ID from another device"
+                placeholder="Collection ID"
+                value={collectionDraft}
+                onChange={(event) => setCollectionDraft(event.target.value)}
+              />
+              <Button
+                type="submit"
+                disabled={!!uploading || searching || !collectionDraft.trim()}
+              >
+                Open collection
+              </Button>
+            </form>
+          </details>
+        )}
       </div>
     </AppShell>
   );

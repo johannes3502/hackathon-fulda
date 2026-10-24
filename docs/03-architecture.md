@@ -267,13 +267,13 @@ flowchart TD
     LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>Three.js, statischer Fallback"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
     SP["/stats-preview<br/>Stats-Karte mit Replay"] --> SC["StatsCard<br/>Three.js-Ring, vier Kriterien<br/>synthetische Demo-Werte"]
-    HOME --> SC
     SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
     LOADING -. "Suspense-Fallback beim Laden" .-> HOME
-    HOME["/ - Start<br/>SessionSetupForm"] -->|"Demo starten"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
+    HOME["/ - Start<br/>Demo mit einem Klick,<br/>optionales Setup"] -->|"Demo starten"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
     HOME -->|"Session konfigurieren"| PRAC
     HOME --> LIVE["/live<br/>LiveStudio: Kamera, Pose-Overlay,<br/>MediaRecorder, Transkription (Opt-in)"]
     HOME --> SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]
+    SRC -->|"Weiter zur Aufnahme"| LIVE
 
     PRAC --> STATE{"Phasen"}
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]
