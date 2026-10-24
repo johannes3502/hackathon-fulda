@@ -388,7 +388,9 @@ sequenceDiagram
         FE->>BE: POST /questions/agent/session
         BE->>E: Signed URL anfordern (API-Key bleibt serverseitig)
         BE-->>FE: Signed URL, Cache-Control no-store
-        FE->>E: SDK-WebSocket mit Kontext und Modus im Prompt-Override
+        FE->>E: SDK-WebSocket mit Kontext und Modus im Prompt-Override, first_message leer
+        E-->>FE: Verbindung bestätigt
+        FE->>E: Programmatische user_message fordert erste Frage aus Transkript an
         loop Eine Frage nach der anderen
             E->>FE: Frage / Reaktion, Audio + Text
             U->>FE: Gesprochene Antwort

@@ -106,7 +106,9 @@ export function QuestionPractice({
         signedUrl,
         connectionType: "websocket",
         textOnly: false,
-        overrides: { agent: { prompt: { prompt: context.prompt } } },
+        overrides: {
+          agent: { prompt: { prompt: context.prompt }, firstMessage: "" },
+        },
         onConversationCreated: (created) => {
           if (pending.signal.aborted) void created.endSession();
           else session.current = created;
@@ -152,6 +154,10 @@ export function QuestionPractice({
         return;
       }
       session.current = current;
+      // The saved greeting bypasses the LLM; request a generated opening after context is installed.
+      current.sendUserMessage(
+        "The presentation is complete. Ask your first question about a specific point in the supplied presentation transcript, in its language. Start directly with the question.",
+      );
     } catch (failure) {
       if (!pending.signal.aborted) {
         setError(

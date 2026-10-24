@@ -64,7 +64,10 @@ def prepare_context(request: QuestionRequest) -> AgentContext:
     }
     prompt = "\n".join([
         "You are an AI rehearsal partner, not an actual examiner. " + PRESENTATION_STYLES[request.presentation_mode],
-        "Use the language of the presentation. Start directly with one specific question about what was said. "
+        "Use the language of the presentation, even if the session-start instruction is in another language. "
+        "The presentation has already finished and its transcript is provided below. "
+        "Do not greet, introduce yourself, or ask what the presentation was about. "
+        "Start directly with one specific question that refers to an actual claim, example or explanation in it. "
         "Ask one question at a time and wait for the answer. Listen, probe evasive or unsupported answers, "
         "and adapt follow-ups to the answer. After three main questions, give two concrete practice suggestions "
         "and offer to finish. Do not lecture or list all questions at once.",

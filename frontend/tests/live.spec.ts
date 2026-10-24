@@ -574,7 +574,7 @@ async function backend(
   const studio = page.getByRole("main");
   await studio.getByText("Recording options", { exact: true }).click();
   await expect(
-    page.getByText("analysis results remain stored", { exact: false }),
+    studio.getByText("analysis results remain stored", { exact: false }),
   ).toBeVisible();
   await page.getByLabel("Create a transcript").setChecked(transcribe);
   if (transcribe)
@@ -1704,7 +1704,7 @@ test("Deepgram streaming waits for the last word and reuses the final transcript
   ).toBeVisible();
 });
 
-test("material upload and thesis mode reach ElevenLabs; leaving review ends the voice session", async ({
+test("ElevenLabs receives the presentation and starts a contextual question instead of its saved greeting", async ({
   page,
 }, info) => {
   const jobId = "12345678-1234-1234-1234-123456789abc";
@@ -1759,6 +1759,7 @@ test("material upload and thesis mode reach ElevenLabs; leaving review ends the 
     expect(route.request().postDataJSON()).toMatchObject({
       presentation_mode: "thesis",
       collection_id: savedCollection,
+      words: [{ word: "Synthetic thesis result.", start_ms: 0, end_ms: 500 }],
     });
     await route.fulfill({ status: 202, json: { job_id: jobId } });
   });
@@ -1785,6 +1786,7 @@ test("material upload and thesis mode reach ElevenLabs; leaving review ends the 
   );
   let closed = 0;
   let override = "";
+  let kickoffs = 0;
   await page.routeWebSocket("wss://api.elevenlabs.io/**", (socket) => {
     socket.onClose(() => closed++);
     socket.onMessage((raw) => {
@@ -1792,6 +1794,7 @@ test("material upload and thesis mode reach ElevenLabs; leaving review ends the 
       const message = JSON.parse(raw);
       if (message.type === "conversation_initiation_client_data") {
         override = message.conversation_config_override.agent.prompt.prompt;
+        expect(message.conversation_config_override.agent.first_message).toBe("");
         socket.send(
           JSON.stringify({
             type: "conversation_initiation_metadata",
@@ -1802,17 +1805,19 @@ test("material upload and thesis mode reach ElevenLabs; leaving review ends the 
             },
           }),
         );
-        setTimeout(
-          () =>
-            socket.send(
-              JSON.stringify({
-                type: "agent_response",
-                agent_response_event: {
-                  agent_response: "Why did you choose this research method?",
-                },
-              }),
-            ),
-          600,
+      }
+      if (message.type === "user_message") {
+        expect(override).toBe("Synthetic thesis context with source notes");
+        expect(message.text).toContain("first question");
+        expect(message.text).toContain("presentation");
+        kickoffs++;
+        socket.send(
+          JSON.stringify({
+            type: "agent_response",
+            agent_response_event: {
+              agent_response: "Why did you choose this research method?",
+            },
+          }),
         );
       }
     });
@@ -1855,6 +1860,7 @@ test("material upload and thesis mode reach ElevenLabs; leaving review ends the 
       name: "Why did you choose this research method?",
     }),
   ).toBeVisible();
+  expect(kickoffs).toBe(1);
   await page
     .getByRole("button", { name: "Mute microphone", exact: true })
     .click();

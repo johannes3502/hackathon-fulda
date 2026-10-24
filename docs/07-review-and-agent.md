@@ -60,14 +60,20 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
 ## ElevenLabs konfigurieren
 
 - Einen privaten Conversational Agent anlegen. In **Security** die Authentifizierung
-  und den Override für **System prompt** aktivieren.
+  und die Overrides für **System prompt** und **First message** aktivieren.
 - Der API-Schlüssel braucht unter **ElevenAgents** die Berechtigung **Write**
   (`convai_write`). **Read** kann den Agenten laden, aber keine Signed URL
   ausstellen; dieser Aufruf scheitert dann mit HTTP 401 `missing_permissions`.
-- Die erste Nachricht des Agenten kurz und offen halten, z. B. „Lassen Sie uns
-  Ihre zentrale Aussage besprechen. Welche Belege stützen sie?“ Sprache und
-  Stimme passend zur Vorführung konfigurieren. Der Gesprächsprompt fordert
-  danach Fragen in der Sprache des Transkripts.
+- Sprache und Stimme passend zur Vorführung konfigurieren. Die App überschreibt
+  die gespeicherte erste Nachricht pro Gespräch mit einem leeren Text und sendet
+  nach dem Verbindungsaufbau einen Startauftrag per `sendUserMessage`. Damit
+  generiert der Agent seine erste Frage aus dem bereits übergebenen Transkript,
+  statt die feste Begrüßung vorzulesen. Der Startauftrag erscheint beim Anbieter
+  als programmatische Nutzernachricht; er ist keine gesprochene Antwort.
+  Der Gesprächsprompt verlangt Fragen in der Sprache des Transkripts und
+  untersagt Begrüßung, Vorstellung und die Frage nach dem Vortragsthema.
+  Im Thesis-Modus prüft die Professur auch Zusammenhänge, Transfer auf neue
+  Beispiele und Gegenbeispiele, jeweils am Vortrag oder Material verankert.
 - In der lokalen `.env` setzen:
 
 ```dotenv
@@ -92,8 +98,8 @@ curl http://localhost:3000/api/questions/agent/settings
 
 `available: true` bedeutet nur, dass beide Einstellungen vorhanden sind.
 Erst eine echte Gesprächsverbindung bestätigt Agent-Berechtigungen, Prompt-
-Override, Mikrofon, Audioausgabe und Anbieter-Verfügbarkeit. Der Browser lädt
-den offiziellen `@elevenlabs/client` erst beim Start. Er bekommt eine kurzlebige
+und First-message-Override, Mikrofon, Audioausgabe und Anbieter-Verfügbarkeit.
+Der Browser lädt den offiziellen `@elevenlabs/client` erst beim Start. Er bekommt eine kurzlebige
 Signed URL; der API-Key bleibt im Backend. Es werden keine Agenten automatisch
 im ElevenLabs-Konto angelegt oder verändert.
 

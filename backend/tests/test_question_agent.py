@@ -1,5 +1,6 @@
 """Synthetic ElevenLabs protocol, grounding and mode checks; no paid calls."""
 
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
@@ -50,6 +51,17 @@ def test_missing_or_processing_sources_are_not_presented_as_ready(monkeypatch):
     monkeypatch.setattr(agent.db, "list_sources", lambda value: [SimpleNamespace(status="processing")])
     with pytest.raises(ValueError, match="processing"):
         agent.prepare_context(QuestionRequest(words=TRANSCRIPT, collection_id=uuid4()))
+
+
+def test_professor_receives_the_spoken_content_and_probes_breadth_without_a_greeting():
+    result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode="thesis"))
+    context = json.loads(result.prompt.splitlines()[-1])
+    assert context["transcript"] == " ".join(word.word for word in TRANSCRIPT)
+    assert "Do not greet" in result.prompt
+    assert "actual claim, example or explanation" in result.prompt
+    assert "breadth of understanding" in result.prompt
+    assert "new application or counterexample" in result.prompt
+    assert "do not turn the conversation into unrelated trivia" in result.prompt
 
 
 def test_agent_api_queues_context_without_needing_the_local_llm(monkeypatch):
