@@ -1,8 +1,7 @@
 # AGENTS.md — Hackathon Fulda 2026
 
 > **Einstiegspunkt für Menschen und Agents.**
-> Lies dieses File zuerst. Das Thema ist fix; alte Viva-Unterlagen liegen im
-> Archiv und sind nicht mehr Scope.
+> Lies dieses File zuerst. Das Thema ist fix.
 
 ---
 
@@ -14,8 +13,7 @@
 **Status (24.10.2026):**
 - Thema und Feature-Rahmen sind **fix**.
 - Die fünf Features sind **erste Beschreibungen**, kein ausgearbeitetes Konzept.
-- Viva, alte Research und alte Produktideen sind nach
-  `archive/2026-10-24-viva/` verschoben.
+- Alte Viva-Unterlagen und Research sind gelöscht.
 - Kein Feature hinzufügen, das nicht in `docs/01-product.md` steht.
 
 **Ein Satz:** *Ein Live-Präsentationstrainer, der Auftritt und Sprache
@@ -80,9 +78,6 @@ Lies nur, was du für die Aufgabe brauchst:
 3. **`templates/ai-decision-log.md`** — Pflicht für die AI Reflection.
 4. **`templates/team-roles.md`** — Rollen, Gates, RACI.
 
-Das **Archiv** nur lesen, wenn ein historischer Zusammenhang ausdrücklich
-gebraucht wird. Es ist keine gültige Quelle für den aktuellen Scope.
-
 ---
 
 ## 4. Repo-Map
@@ -96,9 +91,6 @@ docs/
 templates/
   ai-decision-log.md               # AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
-archive/
-  README.md                        # Warum das Archiv existiert
-  2026-10-24-viva/                 # alte Viva-Vorbereitung, nicht mehr Scope
 ```
 
 ---
