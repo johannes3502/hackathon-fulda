@@ -158,7 +158,7 @@ def test_uploads_first_quotes_verified_and_web_second():
     assert moon.verdict == "contradicts" and moon.checked == ["upload", "web"]
     assert moon.evidence.kind == "web" and moon.evidence.url == "https://de.wikipedia.org/wiki/Mond"
     assert moon.evidence.label == "Wikipedia: Mond"
-    assert searcher.queries == ["Gründung Hochschule", "Mond Zusammensetzung"]  # Supported claim never leaves.
+    assert sorted(searcher.queries) == ["Gründung Hochschule", "Mond Zusammensetzung"]  # Parallel queries; supported claim never leaves.
     assert sorted(retrieved) == sorted(["Hochschule Studierende", "Gründung Hochschule", "Mond Zusammensetzung"])
 
     assert [(e.t_ms, e.type, e.source, e.severity) for e in result.events] == [
