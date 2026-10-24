@@ -1,6 +1,7 @@
 import { Host } from "@expo/ui";
 import {
   Form,
+  Picker,
   Section,
   Text,
   TextField,
@@ -9,19 +10,33 @@ import {
 } from "@expo/ui/swift-ui";
 import {
   accessibilityLabel,
+  tag,
   autocorrectionDisabled,
   keyboardType,
   textInputAutocapitalization,
 } from "@expo/ui/swift-ui/modifiers";
 import { useSessions } from "../session";
 export default function CaptureOptions() {
-  const { options, setOptions } = useSessions();
+  const { options, setOptions, practice, setPractice } = useSessions();
   const title = useNativeState(options.title);
   const url = useNativeState(options.url);
   return (
     <Host style={{ flex: 1 }}>
       <Form>
         <Section title="Recording">
+          <Picker
+            label="Duration"
+            selection={practice.targetDurationMs}
+            onSelectionChange={(targetDurationMs: number) =>
+              setPractice({ ...practice, targetDurationMs })
+            }
+          >
+            {[1, 3, 5].map((n) => (
+              <Text key={n} modifiers={[tag(n * 60000)]}>
+                {n} minutes
+              </Text>
+            ))}
+          </Picker>
           <TextField
             text={title}
             placeholder="Recording name"

@@ -20,6 +20,8 @@ export default function Layout() {
             name="index"
             options={{ title: "Rehearsals", headerLargeTitle: true }}
           />
+          <Stack.Screen name="setup" options={{ title: "Practice Setup" }} />
+          <Stack.Screen name="sources" options={{ title: "Sources" }} />
           <Stack.Screen name="studio" options={{ title: "New Recording" }} />
           <Stack.Screen name="review" options={{ title: "Review" }} />
           <Stack.Screen name="demo" options={{ title: "Sample Rehearsal" }} />

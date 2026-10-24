@@ -6,17 +6,29 @@ import {
   useFrameProcessor,
 } from "react-native-vision-camera";
 import { NativePoseLog } from "./native-log";
-import type { Landmark } from "../../frontend/src/features/pose/sample";
+import {
+  CrossArmsCue,
+  armsCrossed,
+} from "../../frontend/src/features/pose/cues";
+import {
+  poseSample,
+  type PoseSample,
+  type Landmark,
+} from "../../frontend/src/features/pose/sample";
 const plugin = VisionCameraProxy.initFrameProcessorPlugin("poseDetection", {});
 export function useNativePose(enabled: boolean) {
   const [log] = useState(() => new NativePoseLog());
   const [handle, setHandle] = useState<number>();
+  const [latest, setLatest] = useState<PoseSample | null>(null);
+  const [crossed, setCrossed] = useState(false);
   const [count, setCount] = useState(0);
   const [status, setStatus] = useState("Loading local pose model…");
   useEffect(() => {
     if (!enabled) return;
     const native = NativeModules.PoseDetection;
     if (!native || !plugin) return;
+    log.start(Date.now(), "preview-start");
+    const cue = new CrossArmsCue();
     let disposed = false;
     let detector: number | undefined;
     const events = new NativeEventEmitter(native);
@@ -36,6 +48,20 @@ export function useNativePose(enabled: boolean) {
           data.inputImageHeight,
           data.timestampMs ?? NaN,
         );
+        const visible =
+          sample ??
+          (log.full
+            ? poseSample(
+                data.results[0]?.landmarks[0] ?? [],
+                data.inputImageWidth,
+                data.inputImageHeight,
+                0,
+              )
+            : null);
+        setLatest(visible);
+        setCrossed(
+          cue.update(armsCrossed(visible), data.timestampMs ?? Date.now()),
+        );
         setCount(log.count);
         setStatus(
           log.full
@@ -49,8 +75,11 @@ export function useNativePose(enabled: boolean) {
     const errors = events.addListener(
       "onError",
       (error: { handle: number; message: string }) => {
-        if (!disposed && error.handle === detector)
+        if (!disposed && error.handle === detector) {
+          setLatest(null);
+          setCrossed(false);
           setStatus(`Pose unavailable: ${error.message}`);
+        }
       },
     );
     native
@@ -101,6 +130,8 @@ export function useNativePose(enabled: boolean) {
   );
   return {
     frameProcessor,
+    latest: enabled ? latest : null,
+    crossed: enabled && crossed,
     count,
     status: !enabled
       ? "Pose capture off"
