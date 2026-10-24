@@ -80,6 +80,7 @@ Diese Werte werden aus den geloggten Punkten berechnet, nicht zusätzlich getrac
 | `left_elbow_deg`, `right_elbow_deg` | Schulter → Ellbogen → Handgelenk |
 | `left_arm_open_deg`, `right_arm_open_deg` | Torso-Achse ↔ Oberarm |
 | `left_wrist_height`, `right_wrist_height` | relativ zur Schulterbreite |
+| `left_wrist_cross`, `right_wrist_cross` | Handgelenk entlang der Schulterlinie, ab Körpermitte, in Schulterbreiten; positiv = über die Mitte auf die Gegenseite |
 | `legs_visible` | Knie und Knöchel ausreichend sichtbar |
 
 ## Log-Schema
@@ -154,7 +155,8 @@ Aufnahme-Logs ausgegeben.
   installierten JS-/WASM-Dateien nach `public/pose/runtime` (generiert, gitignored).
   Im Browser sind keine CDN-/Modell-Downloads von Drittanbietern nötig.
 - `IMAGE`-Modus pro Frame vermeidet das zeitliche Smoothing des VIDEO-Graphen.
-  Keine zusätzliche Glättung, keine Pose-Bewertung und keine Pose-Feedback-Events.
+  Keine zusätzliche Glättung im Log. Einziger Live-Hinweis bisher: „Arme
+  verschränkt“ (siehe unten); noch keine Pose-Events in Review/Timeline.
 - Jeder Log-Eintrag enthält alle 21 Schlüssel aus der Indexliste. Tupel sind
   `[x,y,z,visibility,presence]`; fehlende Konfidenzwerte sind `null`, nicht erfunden.
   Ungültige Koordinaten sind `null`. Für Beine gelten zusätzlich die Sichtbarkeitsregeln.
@@ -187,11 +189,34 @@ sind technische Prototyp-Konfiguration, keine validierte Genauigkeit.
 - Kopf-Pitch: Nase minus Ohrmitte, `atan2(dY,-dZ)`; nur bei nutzbaren Punkten und
   `-dZ > 0`. Das ist eine unkalibrierte Orientierungshilfe, kein anatomisch
   genauer Nickwinkel. Sonst `null`; individuelle Neutralstellung kann abweichen.
+- Wrist-Cross: Projektion (Handgelenk − Schultermitte) auf die Achse rechte →
+  linke Schulter, geteilt durch die Schulterbreite. Vorzeichen so gewählt, dass
+  positiv „auf der Gegenseite“ heißt; unabhängig von Spiegelung und Bildseite.
 - `eyes_forward`: Alle Augenpunkte 1–6 müssen nutzbar sein. Die kleinere/größere
   Augenbreite (innerer–äußerer Punkt in X/Y/Z) muss mindestens 0,65 sein und die
   Tiefendifferenz der Augenmitten höchstens 0,35 ihres 2D-Abstands. Kein Yaw und
   keine Nase als Forward-Kriterium. Nicht nutzbare/degenerierte Augen ergeben
   `false`, was **keine** gesicherte Abwendung bedeutet.
+
+### Live-Hinweis „Arme verschränkt“ (Heuristik, nicht validiert)
+
+Implementierung und Konstanten: `src/features/pose/cues.ts` (`CROSS_ARMS`).
+Läuft in Vorschau und Aufnahme im Browser; Anzeige nur als Chip auf dem Video
+(„Arms crossed. Try an open stance. · Heuristic“). Keine Speicherung als Event,
+keine Aussage über Haltung oder Emotion.
+
+Pro Sample gilt „verschränkt“, wenn alle Bedingungen erfüllt sind:
+
+- beide `*_wrist_cross >= 0.1` (jedes Handgelenk über die Körpermitte),
+- beide `*_wrist_height` in `[-1.3, 0.2]` (etwa zwischen Schulter und Hüfte),
+- beide `*_elbow_deg <= 120` (Ellbogen gebeugt).
+
+Fehlt ein Wert (z. B. Handgelenk unter dem anderen Arm verdeckt), ist das
+Ergebnis `null`, nicht `false`. Zustandsmaschine pro Episode: Hinweis nach
+2 s durchgehend „verschränkt“; Ende nach 0,5 s „nicht verschränkt“ oder 1,5 s
+ohne Messung; danach 20 s Cooldown. Ein Hinweis pro Episode, keine
+Wiederholung. Bekannte Grenzen: 2D-Geometrie, gefaltete Hände vor dem Körper
+oder ein Presenter in beiden Händen können ähnlich aussehen.
 
 Quellen: [MediaPipe Web Guide](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js),
 [Pose Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker).

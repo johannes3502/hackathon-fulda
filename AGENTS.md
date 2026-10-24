@@ -155,7 +155,8 @@ nutzen `app.sources.retrieval` (`search`, `format_context`, `quote_in_text`);
 beide sind noch nicht implementiert. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
-Bewertungs-/Feedback-Regeln darauf sind noch offen (`frontend/DATA_POINTS.md`).
+erste Live-Regel „Arme verschränkt“ als Overlay-Hinweis, weitere Regeln und
+Pose-Events für die Timeline sind noch offen (`frontend/DATA_POINTS.md`).
 Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
 jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
