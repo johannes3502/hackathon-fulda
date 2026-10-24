@@ -33,7 +33,13 @@ export const HEURISTICS = {
   confidence: 0.5,
   eyeWidthRatio: 0.65,
   eyeDepthRatio: 0.35,
+  // A detected hand belongs to the nearest pose wrist within this many
+  // shoulder widths (hand landmark 0 is the wrist).
+  handWristDist: 0.5,
 };
+/** One Hand Landmarker result: 21 points and its detection score. */
+export type HandInput = { points: Landmark[]; score: number | null };
+type HandPoint = [number, number, number];
 type PointName = keyof typeof POINTS;
 type Vector = [number, number, number];
 type RawPoint = [number, number, number, number | null, number | null];
@@ -41,12 +47,10 @@ const valid = (p?: Landmark): p is Landmark =>
   !!p && [p.x, p.y, p.z].every(Number.isFinite);
 const confidence = (n?: number) =>
   n !== undefined && Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
+const inImage = (p?: Landmark): p is Landmark =>
+  valid(p) && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
 const visible = (p?: Landmark) =>
-  valid(p) &&
-  p.x >= 0 &&
-  p.x <= 1 &&
-  p.y >= 0 &&
-  p.y <= 1 &&
+  inImage(p) &&
   (confidence(p.visibility) ?? 0) >= HEURISTICS.confidence &&
   (p.presence === undefined ||
     (confidence(p.presence) ?? 0) >= HEURISTICS.confidence);
@@ -85,6 +89,8 @@ export function poseSample(
   width: number,
   height: number,
   tMs: number,
+  // null when the hand model is unavailable; [] when it found no hands.
+  hands: HandInput[] | null = null,
 ) {
   if (
     points.length !== 33 ||
@@ -172,6 +178,59 @@ export function poseSample(
         : null;
     return a === null ? null : Math.min(a, 180 - a);
   };
+  // Wrist to same-side hip in shoulder widths. The wrist only needs to be an
+  // in-image estimate: a hand in a pocket is hidden by design.
+  const hipDist = (w: number, h: number) => {
+    const hip = get(h)?.map(planar);
+    const p = points[w];
+    const span = shoulders ? Math.hypot(...sub(shoulders[0], shoulders[1])) : 0;
+    return hip && inImage(p) && span > 1e-8
+      ? Math.hypot(p.x * width - hip[0][0], p.y * height - hip[0][1]) / span
+      : null;
+  };
+  // Highest visibility of the pinky, index and thumb points. Null when they
+  // fall outside the image, where a low value only means "out of frame".
+  const hand = (...indices: number[]) => {
+    const values = indices.map((i) =>
+      inImage(points[i]) ? confidence(points[i].visibility) : null,
+    );
+    return values.includes(null) ? null : Math.max(...(values as number[]));
+  };
+  // Each detected hand goes to the nearest pose wrist; the closer one wins.
+  const span = shoulders ? Math.hypot(...sub(shoulders[0], shoulders[1])) : 0;
+  const owner: [HandInput | null, HandInput | null] = [null, null];
+  const ownerDist = [Infinity, Infinity];
+  if (hands && span > 1e-8)
+    for (const h of hands) {
+      const root = h.points[0];
+      if (h.points.length !== 21 || !valid(root)) continue;
+      const dist = [15, 16].map((w) =>
+        valid(points[w])
+          ? Math.hypot(
+              (root.x - points[w].x) * width,
+              (root.y - points[w].y) * height,
+            ) / span
+          : Infinity,
+      );
+      const side = dist[0] <= dist[1] ? 0 : 1;
+      if (dist[side] <= HEURISTICS.handWristDist && dist[side] < ownerDist[side]) {
+        owner[side] = h;
+        ownerDist[side] = dist[side];
+      }
+    }
+  const handOut = (h: HandInput | null) =>
+    h && {
+      score: confidence(h.score ?? undefined),
+      points: h.points.map((p): HandPoint => [p.x, p.y, p.z]),
+    };
+  // true = a hand was detected at this wrist. null when the hand model did
+  // not run or the hand is estimated outside the image (cropped, not hidden).
+  const found = (side: 0 | 1, ...fingers: number[]) =>
+    owner[side]
+      ? true
+      : hands === null || span <= 1e-8 || hand(...fingers) === null
+        ? null
+        : false;
   return {
     t_ms: Math.round(tMs),
     image: { width, height },
@@ -198,9 +257,20 @@ export function poseSample(
       right_wrist_cross: cross(16, 1),
       left_forearm_deg: forearm(13, 15),
       right_forearm_deg: forearm(14, 16),
+      left_wrist_hip_dist: hipDist(15, 23),
+      right_wrist_hip_dist: hipDist(16, 24),
+      left_hand_visibility: hand(17, 19, 21),
+      right_hand_visibility: hand(18, 20, 22),
+      left_hand_found: found(0, 17, 19, 21),
+      right_hand_found: found(1, 18, 20, 22),
     },
+    hands:
+      hands === null
+        ? null
+        : { left: handOut(owner[0]), right: handOut(owner[1]) },
     quality: {
       pose_present: true,
+      hips_visible: [23, 24].every((i) => visible(points[i])),
       legs_visible: [25, 26, 27, 28].every((i) => visible(points[i])),
     },
   };
@@ -221,7 +291,13 @@ export class PoseLog {
   get full() {
     return this.count >= 3000;
   }
-  add(points: Landmark[], width: number, height: number, timestamp: number) {
+  add(
+    points: Landmark[],
+    width: number,
+    height: number,
+    timestamp: number,
+    hands: HandInput[] | null = null,
+  ) {
     if (
       this.full ||
       !Number.isFinite(timestamp) ||
@@ -233,6 +309,7 @@ export class PoseLog {
       width,
       height,
       timestamp - (this.origin ?? timestamp),
+      hands,
     );
     if (sample) {
       this.origin ??= timestamp;

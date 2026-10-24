@@ -12,18 +12,21 @@ export const CROSS_ARMS = {
   // Forearms roughly level with the shoulders; rejects hands pressed
   // together with fingertips up in front of the chest.
   maxForearmDeg: 40,
-  // No hold or cooldown for now: hint shows as soon as arms cross.
+};
+export const POCKET = {
+  // Wrist estimate close to the same-side hip, in shoulder widths. The other
+  // condition is that Hand Landmarker finds no hand at that wrist.
+  maxHipDist: 0.45,
+};
+export const CUE_TIMING = {
+  // No hold or cooldown for now: hints show as soon as the pose is seen.
   holdMs: 0,
   releaseMs: 500,
-  // Crossed wrists are often hidden under the other arm, so a missing
-  // measurement ends an episode later than a clear "not crossed".
+  // Hidden points are common in both poses, so a missing measurement ends
+  // an episode later than a clear "not in the pose".
   unknownReleaseMs: 1500,
   cooldownMs: 0,
 };
-type Timing = Pick<
-  typeof CROSS_ARMS,
-  "holdMs" | "releaseMs" | "unknownReleaseMs" | "cooldownMs"
->;
 
 type Pair = [left: number | null, right: number | null];
 export type CrossArmsCheck = {
@@ -39,6 +42,7 @@ export const passes = {
     v >= CROSS_ARMS.minWristHeight && v <= CROSS_ARMS.maxWristHeight,
   elbow: (v: number) => v <= CROSS_ARMS.maxElbowDeg,
   forearm: (v: number) => v <= CROSS_ARMS.maxForearmDeg,
+  hipDist: (v: number) => v <= POCKET.maxHipDist,
 };
 
 /** Per-sample inputs and result; crossed is null when points are not usable. */
@@ -56,7 +60,7 @@ export function crossArmsCheck(sample: PoseSample | null): CrossArmsCheck {
       d?.right_forearm_deg ?? null,
     ] as Pair,
   };
-  const entries = Object.entries(check) as [keyof typeof passes, Pair][];
+  const entries = Object.entries(check) as [keyof typeof check, Pair][];
   const crossed = entries.some(([, pair]) => pair.includes(null))
     ? null
     : entries.every(([key, pair]) =>
@@ -68,25 +72,58 @@ export function crossArmsCheck(sample: PoseSample | null): CrossArmsCheck {
 export const armsCrossed = (sample: PoseSample | null) =>
   crossArmsCheck(sample).crossed;
 
+export type PocketCheck = {
+  /** true if either hand is in a pocket; null if undecided. */
+  inPocket: boolean | null;
+  side: Flags;
+  hipDist: Pair;
+  /** Hand Landmarker found a hand at this wrist. */
+  found: Flags;
+};
+type Flags = [left: boolean | null, right: boolean | null];
+export function pocketCheck(sample: PoseSample | null): PocketCheck {
+  const d = sample?.derived;
+  const hipDist: Pair = [
+    d?.left_wrist_hip_dist ?? null,
+    d?.right_wrist_hip_dist ?? null,
+  ];
+  const found: Flags = [d?.left_hand_found ?? null, d?.right_hand_found ?? null];
+  const side = ([0, 1] as const).map((i) => {
+    const dist = hipDist[i];
+    // A detected hand is never in a pocket, even if the hip is out of view.
+    if (found[i]) return false;
+    return dist === null || found[i] === null ? null : passes.hipDist(dist);
+  }) as Flags;
+  // One hand is enough; "no" needs both sides measured.
+  const inPocket = side.includes(true)
+    ? true
+    : side.includes(null)
+      ? null
+      : false;
+  return { inPocket, side, hipDist, found };
+}
+
+export const handsInPockets = (sample: PoseSample | null) =>
+  pocketCheck(sample).inPocket;
+
 /**
- * Turns per-sample results into one hint per episode: active once arms stay
- * crossed for holdMs, inactive after they are released, then a cooldown.
+ * Turns per-sample results into one hint per episode: active once the pose
+ * holds for holdMs, inactive after it is released, then a cooldown.
  */
-export class CrossArmsCue {
+export class PoseCue {
   private since: number | null = null;
-  private lastCrossed = -Infinity;
+  private lastSeen = -Infinity;
   private cooldownUntil = -Infinity;
   private active = false;
-  constructor(private timing: Timing = CROSS_ARMS) {}
-  update(crossed: boolean | null, now: number) {
+  constructor(private timing = CUE_TIMING) {}
+  update(seen: boolean | null, now: number) {
     const { holdMs, releaseMs, unknownReleaseMs, cooldownMs } = this.timing;
-    if (crossed) {
+    if (seen) {
       this.since ??= now;
-      this.lastCrossed = now;
+      this.lastSeen = now;
     } else if (
       this.since !== null &&
-      now - this.lastCrossed >=
-        (crossed === false ? releaseMs : unknownReleaseMs)
+      now - this.lastSeen >= (seen === false ? releaseMs : unknownReleaseMs)
     ) {
       if (this.active) this.cooldownUntil = now + cooldownMs;
       this.active = false;
@@ -95,10 +132,33 @@ export class CrossArmsCue {
     if (
       !this.active &&
       this.since !== null &&
-      this.lastCrossed - this.since >= holdMs &&
+      this.lastSeen - this.since >= holdMs &&
       now >= this.cooldownUntil
     )
       this.active = true;
     return this.active;
+  }
+}
+
+const detectors = {
+  arms_crossed: armsCrossed,
+  hands_in_pockets: handsInPockets,
+};
+export type PoseHint = keyof typeof detectors;
+
+/** At most one hint at a time: the current one stays until it ends. */
+export class PoseHints {
+  private cues = {
+    arms_crossed: new PoseCue(),
+    hands_in_pockets: new PoseCue(),
+  } satisfies Record<PoseHint, PoseCue>;
+  private current: PoseHint | null = null;
+  update(sample: PoseSample | null, now: number) {
+    const active = (Object.keys(detectors) as PoseHint[]).filter((hint) =>
+      this.cues[hint].update(detectors[hint](sample), now),
+    );
+    if (!this.current || !active.includes(this.current))
+      this.current = active[0] ?? null;
+    return this.current;
   }
 }

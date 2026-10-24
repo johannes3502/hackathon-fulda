@@ -1,6 +1,15 @@
 import { expect, it } from "vitest";
-import { CROSS_ARMS, CrossArmsCue, armsCrossed } from "./cues";
-import { poseSample, type Landmark } from "./sample";
+import {
+  CROSS_ARMS,
+  CUE_TIMING,
+  POCKET,
+  PoseCue,
+  PoseHints,
+  armsCrossed,
+  handsInPockets,
+  pocketCheck,
+} from "./cues";
+import { poseSample, type HandInput, type Landmark } from "./sample";
 function points(crossed: boolean): Landmark[] {
   const p = Array.from({ length: 33 }, () => ({
     x: 0.5,
@@ -90,9 +99,9 @@ it("returns null instead of guessing when points are not usable", () => {
   hidden[15].visibility = 0;
   expect(armsCrossed(sample(hidden))).toBeNull();
 });
-const timed = { ...CROSS_ARMS, holdMs: 2000, cooldownMs: 20000 };
+const timed = { ...CUE_TIMING, holdMs: 2000, cooldownMs: 20000 };
 it("hints once per episode after the hold time, then cools down", () => {
-  const cue = new CrossArmsCue(timed);
+  const cue = new PoseCue(timed);
   const run = (from: number, to: number, value: boolean | null) => {
     let active = false;
     for (let t = from; t <= to; t += 100) active = cue.update(value, t);
@@ -110,16 +119,120 @@ it("hints once per episode after the hold time, then cools down", () => {
   expect(cue.update(true, 5600 + timed.cooldownMs)).toBe(true);
 });
 it("hints immediately and again right after release with default timing", () => {
-  const cue = new CrossArmsCue();
+  const cue = new PoseCue();
   expect(cue.update(true, 0)).toBe(true);
   expect(cue.update(false, 100)).toBe(true);
   expect(cue.update(false, 600)).toBe(false);
   expect(cue.update(true, 700)).toBe(true);
 });
 it("does not hint for a quick crossing", () => {
-  const cue = new CrossArmsCue(timed);
+  const cue = new PoseCue(timed);
   for (let t = 0; t < 1000; t += 100) cue.update(true, t);
   for (let t = 1000; t <= 1600; t += 100) cue.update(false, t);
   expect(cue.update(true, 1700)).toBe(false);
   expect(cue.update(true, 3000)).toBe(false);
+});
+type Side = "pocket" | "hang" | "hip";
+/** Standing pose; hands are detected unless they are in a pocket. */
+function pocketPose(left: Side, right: Side) {
+  const p = Array.from({ length: 33 }, () => ({
+    x: 0.5,
+    y: 0.5,
+    z: 0,
+    visibility: 0.99,
+    presence: 0.99,
+  }));
+  const hands: HandInput[] = [];
+  const set = (i: number, x: number, y: number, visibility = 0.99) =>
+    Object.assign(p[i], { x, y, visibility });
+  set(11, 0.4, 0.3);
+  set(12, 0.6, 0.3);
+  set(23, 0.42, 0.7);
+  set(24, 0.58, 0.7);
+  set(13, 0.36, 0.5);
+  set(14, 0.64, 0.5);
+  const side = (pose: Side, wrist: number, fingers: number[], x: number[]) => {
+    const [wx, wy] = pose === "hang" ? [x[1], 0.85] : [x[0], 0.72];
+    set(wrist, wx, wy, pose === "pocket" ? 0.3 : 0.99);
+    fingers.forEach((i) =>
+      set(i, wx, wy + 0.03, pose === "pocket" ? 0.1 : 0.99),
+    );
+    if (pose !== "pocket")
+      hands.push({
+        score: 0.95,
+        points: Array.from({ length: 21 }, (_, i) => ({
+          x: wx,
+          y: wy + i * 0.002,
+          z: 0,
+        })),
+      });
+  };
+  side(left, 15, [17, 19, 21], [0.44, 0.36]);
+  side(right, 16, [18, 20, 22], [0.56, 0.64]);
+  return { p, hands };
+}
+const standing = (
+  { p, hands }: ReturnType<typeof pocketPose>,
+  found: HandInput[] | null = hands,
+) => poseSample(p, 1000, 500, 0, found);
+it("detects one hand in a front pocket when no hand is found near the hip", () => {
+  const s = standing(pocketPose("pocket", "hang"))!;
+  expect(s.quality.hips_visible).toBe(true);
+  expect(s.derived.left_wrist_hip_dist).toBeCloseTo(0.11, 1);
+  expect(s.derived.left_hand_found).toBe(false);
+  expect(s.derived.right_hand_found).toBe(true);
+  expect(s.hands?.right?.points).toHaveLength(21);
+  expect(pocketCheck(s).side).toEqual([true, false]);
+  expect(handsInPockets(s)).toBe(true);
+});
+it("ignores hanging arms and detected hands resting on the hips", () => {
+  const hang = standing(pocketPose("hang", "hang"))!;
+  expect(hang.derived.left_wrist_hip_dist).toBeGreaterThan(POCKET.maxHipDist);
+  expect(handsInPockets(hang)).toBe(false);
+  expect(handsInPockets(standing(pocketPose("hip", "hang")))).toBe(false);
+});
+it("assigns each detected hand to its nearest wrist only", () => {
+  const pose = pocketPose("hang", "hang");
+  // Both hands next to the right wrist: the left wrist has no hand.
+  const right = pose.hands[1];
+  const s = standing(pose, [right, { ...right }])!;
+  expect(s.derived.left_hand_found).toBe(false);
+  expect(s.derived.right_hand_found).toBe(true);
+  // A hand far from both wrists belongs to neither.
+  const far = {
+    score: 0.9,
+    points: right.points.map((q) => ({ ...q, x: 0.05, y: 0.05 })),
+  };
+  expect(standing(pose, [far])!.derived.right_hand_found).toBe(false);
+});
+it("stays undecided without the hand model, hips or an in-frame hand", () => {
+  expect(
+    handsInPockets(standing(pocketPose("pocket", "hang"), null)),
+  ).toBeNull();
+  const hips = pocketPose("pocket", "pocket");
+  hips.p[23].visibility = 0;
+  hips.p[24].visibility = 0;
+  const hidden = standing(hips)!;
+  expect(hidden.quality.hips_visible).toBe(false);
+  expect(handsInPockets(hidden)).toBeNull();
+  const cropped = pocketPose("hang", "hang");
+  [17, 19, 21].forEach((i) => (cropped.p[i].y = 1.05));
+  const out = standing(cropped, [cropped.hands[1]])!;
+  expect(out.derived.left_hand_found).toBeNull();
+  expect(handsInPockets(out)).toBeNull();
+});
+it("shows one hint at a time and keeps the current one until it ends", () => {
+  const hints = new PoseHints();
+  const crossed = poseSample(points(true), 800, 400, 0);
+  const pocket = standing(pocketPose("pocket", "hang"));
+  expect(hints.update(crossed, 0)).toBe("arms_crossed");
+  expect(hints.update(pocket, 100)).toBe("arms_crossed");
+  // A pocketed wrist is hidden, so arms-crossed is unknown, not "open".
+  expect(hints.update(pocket, CUE_TIMING.unknownReleaseMs - 100)).toBe(
+    "arms_crossed",
+  );
+  expect(hints.update(pocket, CUE_TIMING.unknownReleaseMs)).toBe(
+    "hands_in_pockets",
+  );
+  expect(hints.update(null, 5000)).toBeNull();
 });

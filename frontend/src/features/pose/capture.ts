@@ -1,16 +1,16 @@
-import { CrossArmsCue, armsCrossed } from "./cues";
+import { PoseHints, type PoseHint } from "./cues";
 import { PoseLog, poseSample, type PoseSample } from "./sample";
 export type PoseState = {
   phase: "loading" | "running" | "stopped" | "error";
   count: number;
   message: string;
   latest: PoseSample | null;
-  armsCrossed: boolean;
+  hint: PoseHint | null;
 };
 export class PoseCapture {
   readonly log = new PoseLog();
-  private crossArms = new CrossArmsCue();
-  private armsCrossed = false;
+  private hints = new PoseHints();
+  private hint: PoseHint | null = null;
   private worker: Worker | null = null;
   private frame = 0;
   private pending = false;
@@ -28,7 +28,7 @@ export class PoseCapture {
       message,
       count: this.log.count,
       latest: this.latest,
-      armsCrossed: this.armsCrossed,
+      hint: this.hint,
     });
   }
   start() {
@@ -59,20 +59,19 @@ export class PoseCapture {
         } else if (data.type === "sample") {
           this.pending = false;
           // A frame captured before the recording anchor must not enter its log.
+          const hands = data.hands ?? null;
           const sample = this.log.full
-            ? poseSample(data.points, data.width, data.height, 0)
+            ? poseSample(data.points, data.width, data.height, 0, hands)
             : this.log.add(
                 data.points,
                 data.width,
                 data.height,
                 data.timestamp,
+                hands,
               );
           this.latest = sample;
           // Uses the frame clock, so preview and recording share one episode.
-          this.armsCrossed = this.crossArms.update(
-            armsCrossed(sample),
-            data.timestamp,
-          );
+          this.hint = this.hints.update(sample, data.timestamp);
           this.publish(
             "running",
             this.log.full

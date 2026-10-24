@@ -143,6 +143,15 @@ body:has(.live-workspace-large) .app-footer,
   stroke: #111827;
   stroke-width: 2px;
 }
+.live-pose-overlay .hand line {
+  stroke: #f4924d;
+  stroke-width: 2px;
+}
+.live-pose-overlay .hand circle {
+  fill: white;
+  stroke: #f4924d;
+  stroke-width: 1px;
+}
 .live-pose-status {
   position: absolute;
   top: 62px;
@@ -251,6 +260,25 @@ body:has(.live-workspace-large) .app-footer,
 }
 .live-pose-debug tbody th {
   text-align: left;
+}
+.live-pose-debug tbody th.section {
+  padding-top: 6px;
+  color: oklch(0.8 0.02 264);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.live-pose-framing {
+  position: absolute;
+  top: 100px;
+  left: 16px;
+  z-index: 1;
+  max-width: calc(100% - 32px);
+  padding: 6px 10px;
+  border-left: 3px solid #f4924d;
+  border-radius: 6px;
+  background: #111827;
+  color: white;
+  font-size: 12px;
 }
 .live-pose-debug .pass {
   color: #86efac;

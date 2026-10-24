@@ -19,3 +19,4 @@ assert(
 assert(
   (await stat(resolve(root, "public/pose/pose_landmarker_lite.task"))).size > 0,
 );
+assert((await stat(resolve(root, "public/pose/hand_landmarker.task"))).size > 0);

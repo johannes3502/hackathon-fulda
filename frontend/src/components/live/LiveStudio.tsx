@@ -28,6 +28,7 @@ import { createVideoTransport } from "@/features/live/transport";
 import { apiEndpoint, request } from "@/features/live/analysis";
 import type { LiveConfig, LiveProgress } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
+import type { PoseHint } from "@/features/pose/cues";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { PoseDownload } from "./PoseDownload";
 import { CoachCue } from "./CoachCue";
@@ -35,6 +36,10 @@ import { PoseDebug } from "./PoseDebug";
 import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
 
+const hintCopy: Record<PoseHint, string> = {
+  arms_crossed: "Try uncrossing your arms!",
+  hands_in_pockets: "Take your hands out of your pockets!",
+};
 const cameraCopy = {
   idle: "Camera off. Enable a preview to check your framing.",
   pending: "Waiting for camera permission. Nothing is being recorded or sent.",
@@ -285,15 +290,22 @@ export function LiveStudio() {
               )}
               {cameraStatus === "active" &&
                 pose.state?.phase === "running" &&
-                pose.state.armsCrossed && (
-                  <CoachCue message="Try uncrossing your arms!" />
-                )}
+                (pose.state.hint ? (
+                  <CoachCue message={hintCopy[pose.state.hint]} />
+                ) : (
+                  pose.state.latest &&
+                  !pose.state.latest.quality.hips_visible && (
+                    <span className="live-pose-framing">
+                      Step back so your hips are visible
+                    </span>
+                  )
+                ))}
               {cameraStatus === "active" &&
                 poseDebug &&
                 pose.state?.phase === "running" && (
                   <PoseDebug
                     sample={pose.state.latest}
-                    active={pose.state.armsCrossed}
+                    hint={pose.state.hint}
                   />
                 )}
               {cameraStatus !== "active" && (

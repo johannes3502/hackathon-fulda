@@ -19,6 +19,31 @@ const connections: [keyof PoseSample["pose"], keyof PoseSample["pose"]][] = [
   ["right_knee", "right_ankle"],
 ];
 
+// MediaPipe Hand Landmarker topology: wrist (0), then four joints per finger.
+const handConnections: [number, number][] = [
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 4],
+  [0, 5],
+  [5, 6],
+  [6, 7],
+  [7, 8],
+  [5, 9],
+  [9, 10],
+  [10, 11],
+  [11, 12],
+  [9, 13],
+  [13, 14],
+  [14, 15],
+  [15, 16],
+  [13, 17],
+  [0, 17],
+  [17, 18],
+  [18, 19],
+  [19, 20],
+];
+
 export function PoseOverlay({
   sample,
   largeView,
@@ -72,6 +97,32 @@ export function PoseOverlay({
               r={5}
               vectorEffect="non-scaling-stroke"
             />
+          ),
+      )}
+      {[sample.hands?.left, sample.hands?.right].map(
+        (hand, side) =>
+          hand && (
+            <g key={side} className="hand">
+              {handConnections.map(([from, to]) => (
+                <line
+                  key={`${from}-${to}`}
+                  x1={hand.points[from][0] * width}
+                  y1={hand.points[from][1] * height}
+                  x2={hand.points[to][0] * width}
+                  y2={hand.points[to][1] * height}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+              {hand.points.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p[0] * width}
+                  cy={p[1] * height}
+                  r={3}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
           ),
       )}
     </svg>

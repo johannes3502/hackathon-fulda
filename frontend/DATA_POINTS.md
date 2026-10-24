@@ -1,17 +1,29 @@
 # Pose-Datenpunkte — MVP
 
-Ziel: Kamera starten, Pose-Landmarks pro Sample erfassen und als JSONL loggen.  
-Keine Bewertung, kein Backend, kein Face-Mesh, keine Iris/Pupille, keine Finger.
+Ziel: Kamera starten, Pose- und Hand-Landmarks pro Sample erfassen und als JSONL loggen.  
+Keine Bewertung, kein Backend, kein Face-Mesh, keine Iris/Pupille.
 
 ## Modell
 
-**MediaPipe Pose Landmarker** (33 Punkte).  
-Holistic, Face- und Hand-Tasks sind für diesen MVP nicht nötig:
+**MediaPipe Pose Landmarker** (33 Punkte) und **MediaPipe Hand Landmarker**
+(21 Punkte pro Hand, bis zu zwei Hände), beide im selben Worker auf demselben
+Frame. Holistic und Face-Tasks sind nicht nötig:
 
 - Augen kommen aus den Pose-Punkten.
 - Kopfwinkel kommen aus Nase, Augen und Ohren.
-- Hände werden nur als Handgelenk aus Pose erfasst.
-- Keine Finger, keine Iris, keine Pupille.
+- Hände (Handfläche, Fingergelenke, Spitzen) kommen aus dem Hand Landmarker.
+  Lädt er nicht, läuft Pose weiter; Hand-Werte sind dann `null`.
+- Keine Iris, keine Pupille.
+
+### Hand-Landmarks im Log
+
+`hands: { left, right }` mit je `{ score, points: [[x,y,z] × 21] }` oder `null`
+(keine Hand an diesem Handgelenk). `hands: null` heißt: Hand-Modell nicht
+verfügbar. Zuordnung über Abstand von Hand-Punkt 0 (Handgelenk) zum nächsten
+Pose-Handgelenk (15/16), höchstens 0,5 Schulterbreiten (`HEURISTICS.handWristDist`);
+bei zwei Händen am selben Handgelenk gewinnt die nähere. Das Handedness-Label
+des Modells wird nicht verwendet, weil es ein gespiegeltes Selfie-Bild annimmt
+und unsere Frames nicht gespiegelt sind.
 
 ## Koordinaten
 
@@ -53,7 +65,8 @@ Nur diese Indizes werden gebraucht:
 | 28 | rechter Knöchel | Beine, später überkreuzte Beine |
 
 Beine (25–28) nur loggen, wenn sie tatsächlich sichtbar sind.  
-Nicht nötig: 9–10 (Mund), 17–22 (grobe Handpunkte), 29–32 (Füße).
+Nicht nötig: 9–10 (Mund), 29–32 (Füße). Die groben Handpunkte 17–22 werden
+nicht roh geloggt, nur ihre Sichtbarkeit fließt in `*_hand_visibility` ein.
 
 ## Augen und Kopf
 
@@ -82,7 +95,11 @@ Diese Werte werden aus den geloggten Punkten berechnet, nicht zusätzlich getrac
 | `left_wrist_height`, `right_wrist_height` | relativ zur Schulterbreite |
 | `left_wrist_cross`, `right_wrist_cross` | Handgelenk entlang der Schulterlinie, ab Körpermitte, in Schulterbreiten; positiv = über die Mitte auf die Gegenseite |
 | `left_forearm_deg`, `right_forearm_deg` | Unterarm ↔ Schulterlinie, 0–90°, 0 = parallel |
+| `left_wrist_hip_dist`, `right_wrist_hip_dist` | Handgelenk ↔ eigene Hüfte, 2D, in Schulterbreiten; Handgelenk muss nur im Bild liegen |
+| `left_hand_visibility`, `right_hand_visibility` | höchste Sichtbarkeit von Pinky/Zeigefinger/Daumen (17–22); `null`, wenn ein Punkt außerhalb des Bildes liegt; nur zum Vergleich geloggt |
+| `left_hand_found`, `right_hand_found` | Hand Landmarker hat eine Hand an diesem Handgelenk gefunden; `null` ohne Hand-Modell oder wenn die Hand außerhalb des Bildes liegt |
 | `legs_visible` | Knie und Knöchel ausreichend sichtbar |
+| `hips_visible` (unter `quality`) | beide Hüftpunkte nutzbar |
 
 ## Log-Schema
 
@@ -128,7 +145,6 @@ Regeln:
 - vollständiges 478-Punkte-Face-Mesh
 - Iris, Pupille, Gaze-Richtung
 - Yaw-Winkel
-- Hand- und Finger-Landmarks
 - Emotionen, Persönlichkeit, Scores
 - Segmentierungsmaske
 - Fußanalyse
@@ -156,8 +172,9 @@ Aufnahme-Logs ausgegeben.
   installierten JS-/WASM-Dateien nach `public/pose/runtime` (generiert, gitignored).
   Im Browser sind keine CDN-/Modell-Downloads von Drittanbietern nötig.
 - `IMAGE`-Modus pro Frame vermeidet das zeitliche Smoothing des VIDEO-Graphen.
-  Keine zusätzliche Glättung im Log. Einziger Live-Hinweis bisher: „Arme
-  verschränkt“ (siehe unten); noch keine Pose-Events in Review/Timeline.
+  Keine zusätzliche Glättung im Log. Live-Hinweise bisher: „Arme
+  verschränkt“ und „Hand in der Hosentasche“ (siehe unten); noch keine
+  Pose-Events in Review/Timeline.
 - Jeder Log-Eintrag enthält alle 21 Schlüssel aus der Indexliste. Tupel sind
   `[x,y,z,visibility,presence]`; fehlende Konfidenzwerte sind `null`, nicht erfunden.
   Ungültige Koordinaten sind `null`. Für Beine gelten zusätzlich die Sichtbarkeitsregeln.
@@ -226,6 +243,35 @@ bei „verschränkt“ (`holdMs` derzeit 0); Ende nach 0,5 s „nicht verschrän
 oder 1,5 s ohne Messung; derzeit kein Cooldown (`cooldownMs` 0). Ein Hinweis
 pro Episode, keine Wiederholung. Bekannte Grenzen: 2D-Geometrie, gefaltete Hände vor dem Körper
 oder ein Presenter in beiden Händen können ähnlich aussehen.
+
+### Live-Hinweis „Hand in der Hosentasche“ (Heuristik, nicht validiert)
+
+Konstanten: `POCKET` in `src/features/pose/cues.ts`. Nur vordere Taschen; eine
+Hand reicht. Sprechblase: „Take your hands out of your pockets! · Heuristic“.
+Pro Seite gilt „in der Tasche“, wenn
+
+- `*_wrist_hip_dist <= 0.45` (Handgelenk-Schätzung nahe der eigenen Hüfte;
+  das Handgelenk muss nur im Bild liegen, nicht sichtbar sein), und
+- `*_hand_found == false` (Hand Landmarker findet an diesem Handgelenk keine
+  Hand).
+
+Eine gefundene Hand ist nie „in der Tasche“. `null` (unentschieden), wenn das
+Hand-Modell nicht läuft, die Hüfte nicht nutzbar ist oder die groben
+Pose-Handpunkte außerhalb des Bildes liegen (abgeschnitten, nicht verdeckt).
+Gesamt: `true`, sobald eine Seite `true` ist; `false` nur, wenn beide Seiten
+entschieden und `false` sind. Bekannte Grenzen: Hände hinter dem Rücken;
+sehr kleine Hände (weit von der Kamera) oder Bewegungsunschärfe, bei denen der
+Hand Landmarker eine sichtbare Hand übersieht.
+
+Sind die Hüften nicht sichtbar und läuft kein Hinweis, zeigt das Video
+„Step back so your hips are visible“.
+
+### Gemeinsame Regeln für Live-Hinweise
+
+Zeitsteuerung `CUE_TIMING` gilt für alle Hinweise. Höchstens ein Hinweis
+gleichzeitig (`PoseHints`): Der aktive bleibt, bis er endet; danach übernimmt
+ein anderer aktiver Hinweis. Mit „Pose debug“ schreibt die Konsole
+`[pose]`-Zeilen bei jeder Status-/Hinweisänderung, sonst einmal pro Sekunde.
 
 Quellen: [MediaPipe Web Guide](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js),
 [Pose Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker).
