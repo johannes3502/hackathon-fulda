@@ -46,16 +46,17 @@ VS Code configuration is in `.vscode/`. Personal `.idea/` state stays ignored.
 
 - **IntelliJ IDEA:** enable the **Docker** plugin, select **Docker Compose**
   in the run selector and click **Run**. It builds images and starts every
-  service in `compose.yaml`: backend, Celery worker, Redis, PostgreSQL and S3 storage. The
+  service in `compose.yaml`: frontend, backend, Celery worker, Redis, PostgreSQL and S3 storage. The
   configuration uses the local Docker connection named `Docker`; select your
   local connection in its **Server** field if it has a different name.
   View logs and stop containers in the **Services** tool window.
 - **VS Code:** run **Tasks: Run Build Task** (`Cmd+Shift+B` on macOS,
   `Ctrl+Shift+B` on Windows/Linux). The default **Compose: up** task builds
-  and starts the full stack, then waits for the health checks. **Tasks: Run
-  Task** also offers **Compose: stop** and **Compose: backend logs**.
+  and starts all six containers, then waits for their health checks. **Tasks:
+  Run Task** also offers **Compose: stop**, **Compose: frontend logs** and
+  **Compose: backend logs**.
 
-No local Python SDK or virtual environment is required to start the stack.
+No local Node.js, Python SDK or virtual environment is required to start the stack.
 FastAPI runs inside Docker and reloads when `backend/app/` changes. Run the
 smoke command above to check the running containers.
 

@@ -4,7 +4,27 @@ Pitch rehearsal built from `../Pitch_Coach_Frontend_Plan.md`, with two connected
 
 ## Run
 
-Requires Node 22.12+ and npm. Run from the monorepo root; dependencies and the lockfile are shared.
+From the repository root, start Docker and create `.env` from `.env.example`
+once, then:
+
+```sh
+docker compose up --build -d --wait
+```
+
+This starts the frontend and backend services together. Open
+<http://localhost:3000>. Source changes in `frontend/src/` reload automatically;
+rebuild after changing dependencies or configuration. The container keeps
+dependencies in its image and Next.js output in a Docker volume.
+
+Browser requests to `/api/...` are forwarded by Next.js to
+`http://backend:8000/...` inside Compose. For example,
+<http://localhost:3000/api/health/ready> checks the backend connection.
+`API_INTERNAL_URL` is server-side configuration; local npm development defaults
+to `http://localhost:8000`. This connects the existing HTTP API; the live video
+WebSocket protocol below still needs a backend implementation.
+
+Optional local frontend development requires Node 22.12+ and npm. Run from the
+monorepo root; dependencies and the lockfile are shared:
 
 ```sh
 npm ci

@@ -1,20 +1,19 @@
 # Hackathon Fulda – Presentation Trainer
 
-## Start the backend
+## Start the app
 
-Make sure `.env` is ready. Copy `.env.example` if it doesn't exist.
-Run from the repository root:
+Start Docker. Copy `.env.example` to `.env` if it doesn't exist, then run from
+the repository root:
 
 ```sh
 docker compose up --build -d --wait
 ```
 
-This starts FastAPI, the Celery worker, Redis, PostgreSQL and S3 storage.
-API docs: <http://localhost:8000/docs>. Run the synthetic smoke check with:
+Frontend: <http://localhost:3000> · API docs: <http://localhost:8000/docs>.
+All six containers start together; no local Node.js or Python installation needed.
 
-```sh
-docker compose exec backend python -m scripts.smoke
-```
+**IntelliJ:** **Docker Compose → Run**. **VS Code:** **Run Build Task**
+(`Cmd+Shift+B` / `Ctrl+Shift+B`). Stop: `docker compose stop`.
 
 ## Generate TypeScript API types
 
@@ -55,15 +54,7 @@ Usage examples and current type limitations: [API contract](api/README.md).
 Backend setup, analysis endpoints and background jobs:
 [backend/README.md](backend/README.md).
 
-## Start the frontend
-
 The Next.js app lives in [`frontend/`](frontend/README.md). npm workspaces share one root lockfile and dependency installation.
-
-```sh
-npm ci
-npm run dev
-```
-
 Root commands (`dev`, `build`, `start`, `lint`, `typecheck`, `test`, `test:e2e`) run the frontend workspace. For arguments, target it explicitly: `npm run dev -w frontend -- --port 3001`.
 
 Event requirements, research, and the original plans remain at the repository root. Live video transport and feedback formats are documented in [`docs/live-camera-protocol.md`](docs/live-camera-protocol.md).

@@ -29,6 +29,29 @@ x-backend: &backend
       condition: service_healthy
 
 services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    init: true
+    environment:
+      API_INTERNAL_URL: http://backend:8000
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./frontend/src:/app/frontend/src:ro
+      - ./api:/app/api:ro
+      - frontend_next:/app/frontend/.next
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "Promise.all(['/', '/api/health/ready'].map(path => fetch('http://127.0.0.1:3000' + path, {signal: AbortSignal.timeout(5000)}))).then(responses => process.exit(responses.every(response => response.ok) ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
   backend:
     <<: *backend
     ports:
@@ -105,3 +128,4 @@ volumes:
   postgres_data:
   media_data:
   redis_data:
+  frontend_next:

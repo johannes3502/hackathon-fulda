@@ -123,9 +123,10 @@ Event {
 
 ```
 AGENTS.md                          # Einstiegspunkt und Zielarchitektur
-compose.yaml                       # Backend + Celery + Redis + PostgreSQL + S3
+compose.yaml                       # Frontend + Backend + Celery + Redis + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
 backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
+frontend/                          # Next.js-App, eigener Entwicklungscontainer
 .run/                              # geteilte IntelliJ-Run-Konfigurationen
 .vscode/                           # geteilte VS-Code-Tasks für Docker Compose
 Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
@@ -142,8 +143,11 @@ Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
 einen separaten Celery-Worker, Redis, PostgreSQL **ohne pgvector** und
 **SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job
 geprüft; Produkt-Tasks und Job-API-Endpunkte sind noch nicht implementiert. MinIO,
-pgvector, das Next.js-Frontend und die Analyse-/Aufnahme-Pipeline aus der
-Zielarchitektur sind noch nicht umgesetzt. Umgesetzt sind zwei getrennte
+pgvector und die vollständige Analyse-/Aufnahme-Pipeline aus der
+Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend läuft in einem
+eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
+Der Live-Video-WebSocket benötigt weiterhin eine Backend-Implementierung.
+Umgesetzt sind zwei getrennte
 Analyse-Pipelines ohne Persistenz, beide mit `t_ms` ab Aufnahmestart im
 gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als
 Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription
