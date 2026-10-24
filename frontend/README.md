@@ -6,6 +6,12 @@ rebuild after changing dependencies or configuration.
 
 ## Use
 
+- **418 loading preview** (`/loading-preview`): white background, #42ff8c rotating
+  Three.js disc and locally hosted Noto Serif Display. The reusable
+  `LoadingScreen` also supplies the App Router loading fallback (`app/loading.tsx`).
+  Mount it during pending work with an optional `label`; no simulated percentage
+  or artificial delay. Reduced motion and unavailable WebGL use a static logo.
+
 - **Try sample demo:** deterministic rehearsal, sample transcript, judge questions
   and review. Works without camera, microphone or backend credentials.
 - **Open camera studio** (`/live`): enable the camera, then **Record with demo
