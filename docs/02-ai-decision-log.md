@@ -869,3 +869,88 @@ Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
 - Offen: physische Mikrofone, Safari/iOS und schwierige akustische Umgebungen.
   Browser-Pitch/Aktivitätsheuristik ist kein validierter Sprachdetektor; periodische
   Störgeräusche können weiterhin Sprachmessungen ähneln.
+
+## Gemini statt Ollama (24.10.2026)
+
+- Nutzerentscheidung: den lokalen Ollama-Pfad entfernen und Gemini über den
+  OpenAI-kompatiblen Endpoint als Default nutzen; Key aus dem Image-Skill in
+  die lokale, nicht versionierte `.env` übernehmen. Kein Schlüssel wurde
+  ausgegeben oder committet.
+- Code: `LocalOllamaChat` und `backend/app/factcheck/local.py` entfernt;
+  `llm_settings()` hat keinen impliziten lokalen Fallback mehr;
+  `configured_llm()` liest `LLM_API_KEY`, sonst `GEMINI_API_KEY`, sonst
+  `GOOGLE_API_KEY`; `llm_available()` verlangt für Gemini einen Key.
+  `factcheck/settings` und `review/require_llm` prüfen keine lokale
+  Modellliste mehr; Review verlangt Cloud-Einwilligung. Compose übergibt
+  `LLM_*`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`; `OLLAMA_URL`, `COACH_MODEL` und
+  `host.docker.internal` sind entfernt. `QuestionConfig.max_questions` ist
+  auf 5 begrenzt.
+- Modellwahl: `gemini-3.1-flash-lite` (minimales Reasoning) für Test/Live,
+  `gemini-3.8-flash` (kein `minimal`) für final. `gemini-2.5-flash-lite` ist
+  im Projekt nicht erreichbar (404). Der OpenAI-kompatible Endpoint akzeptiert
+  `response_format={"type":"json_object"}` im Test; für Garantien ist natives
+  `responseJsonSchema` nötig. Thinking-Tokens zählen als Output.
+- Datenschutz: Gemini Developer API ohne EU-Region-Pinning; Paid-Inhalte
+  werden nicht zum Training genutzt, Unpaid kann geprüft werden. Die frühere
+  Local-only-Zusage ist hinfällig. Nur synthetische Demo-Daten senden oder
+  Vertex AI mit EU-Region prüfen.
+- Build: Ollama war kein Bestandteil des Docker-Images, sondern ein
+  Host-Dienst. Die Build-Zeit ändert sich durch das Entfernen daher nicht;
+  entfernt wurde die Laufzeit- und Konfigurationsabhängigkeit.
+- Geprüft: **187 Backend-Tests bestanden** (Container, inkl. neuer
+  LLM-Konfigurationstests). `scripts/smoke_gemini.py`:
+  `gemini-3.1-flash-lite`, 0,71 s, valides JSON. `scripts/smoke_coaching.py`:
+  Fact-Check 3,4 s, Fragen 2,1 s, Antwortprüfung 1,7 s; drei korrekte Urteile
+  auf synthetischen Daten. Keine Genauigkeits- oder Latenzzusage.
+- `scripts/smoke_review.py --llm` mit `gemini-3.1-flash-lite` scheiterte
+  erwartungsgemäß an der Verifikationsgrenze (`E_REVIEW_VERIFICATION`, >20 %
+  Fallback); die geprüfte Template-Review blieb abrufbar. Das ist der
+  vorgesehene sichere Fallback, kein stiller Fehler. `gemini-3.8-flash`
+  lieferte im direkten JSON-Test 2,15 s und ist für den finalen Writer
+  vorgesehen.
+- Offen: echte deutsche Prompts/Quellen, Rate-Limits unter Last, EU-Region,
+  Frontend-Einwilligungstext für Google, finaler Lauf mit
+  `gemini-3.8-flash`. Evidenz: `docs/11-deep-research-validation.md`.
+
+## Branch-Review und Integration von Gemini (24.10.2026)
+
+- Nutzerauftrag: `voice-agent-plan` prüfen, Fehler beheben, vereinfachen und in
+  `main` integrieren. Ausgangspunkt `26c4394`; Teamänderungen bis `c0ae192`
+  einschließlich des durchgängigen Backend-Aufnahmepfads sind integriert.
+- Konfiguration: Gemini verlangt den Schlüssel bereits vor Speicherung und
+  Queue-Auftrag. Google-Key-Aliase gelten nur für den exakten HTTPS-Host
+  `generativelanguage.googleapis.com`; andere Endpoints erhalten ausschließlich
+  einen expliziten `LLM_API_KEY`. Ungültige URLs und nicht endliche Zahlenoptionen
+  sind nicht verfügbar. `available` bleibt eine Konfigurationsprüfung ohne
+  Anbieteraufruf. Explizit leeres Modell oder leere Basis-URL deaktivieren den
+  Pfad auch in Compose; der Timeout-Default ist einheitlich 45 s.
+- Modellantworten: Schema und Anweisung zur Behandlung von Transkript, Quellen
+  und Antworten als nicht vertrauenswürdige Daten bleiben im Systemprompt.
+  JSON-Modus allein garantiert keine Schema- oder Evidenzkorrektheit. Abgeschnittene,
+  blockierte und nicht objektförmige Antworten werden verworfen; bestehende
+  Quellenprüfung und geprüfter Template-Fallback bleiben erhalten.
+- API-Vertrag vollständig regeneriert. Das Maximum von fünf Anfangsfragen ist
+  kein globales Follow-up-Limit oder Sitzungstimer; weitergehende TTS-/Question-
+  Lanes bleiben als Plan gekennzeichnet. Der getippte Fragepfad benennt Google
+  Gemini vor dem Start. Anleitung und Mermaid-Diagramme folgen dem aktuellen
+  Studio; Browserprüfungen verwenden sichtbare Regionen statt vorübergehendem
+  verstecktem Next.js-Streaming-Markup.
+- Geprüft: **249 Backend-Tests ohne Skips** mit PostgreSQL/pgvector und lokalem
+  Silero ONNX; **219 Web- und 18 Mobile-Unit-Tests**; Lint und Typecheck beider
+  Workspaces, Web-Produktionsbuild, API-Aktualitätscheck und drei Compose-Checks.
+  **20 gezielte Chromium-Prüfungen** in Desktop-/Mobile-Viewports: Aufnahme,
+  Upload, Fehlererhalt des Videos, Fact-Check, getippte Antwort, gemockter
+  ElevenLabs-Dialog und Verbindungsabbau, Einstieg, Appearance und Navigation.
+  Alle zwölf Architekturdiagramme mit Mermaid geparst.
+- Lokaler Compose-Smoke: API bleibt während eines Celery-Jobs erreichbar,
+  PostgreSQL/S3-Roundtrip und anonymer Zugriff geprüft. Review-Smoke bestätigt
+  Idempotenz, zwei synthetische Events, Template-Review, Löschung des temporären
+  Audios und Session-Kaskade; ein Take mit 60 Events ebenfalls verarbeitet.
+  Die synthetische Pause hat Abstand zur 2-s-Heuristik, damit überlappende
+  Analyseframes sie nicht unter die Grenze kürzen.
+- Grenzen: In dieser Umgebung fehlt der Gemini-Key; kein erneuter echter
+  Cloud-Aufruf. ElevenLabs ist im Browser gemockt, keine physische Geräte- oder
+  Genauigkeitsabnahme. `npm audit` meldet acht bereits auf `main` vorhandene
+  Expo-Abhängigkeitswarnungen; Mobile-SDK und Lockfile wurden in diesem
+  Provider-Change nicht geändert. Retention/TTL und die geplanten
+  Sitzungsgrenzen bleiben offen.

@@ -118,10 +118,9 @@ export function FeatureOptions({
           ))}
         </fieldset>
         <p className="field-hint" id="speech-types-hint">
-          Pauses, volume, pitch variation and rhythm appear live while speech
-          analysis runs in the studio. Filler words and word-based pace need the
-          transcript after stopping. Saved with each take; changes apply to the
-          next recording.
+          Pauses, volume, pitch variation and rhythm appear live during
+          recording. Filler words and word-based pace need the transcript after
+          stopping. Saved with each take; changes apply to the next recording.
         </p>
       </AdminSection>
     </>

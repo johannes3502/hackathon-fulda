@@ -37,7 +37,7 @@ def main():
         try:
             settings = client.get("/factcheck/settings").raise_for_status().json()
             assert settings["available"] and settings["web_provider"] is None, settings
-            assert "qwen3.5" in settings["model"], settings
+            assert "gemini" in settings["model"].lower(), settings
             accepted = client.post("/sources", data={"collection_id": collection}, files={"file": ("synthetisches-lernlabor.txt", source.encode(), "text/plain")}).raise_for_status().json()
             source_id = accepted["source"]["id"]
             assert wait(client, accepted["status_url"], {"ready", "failed"})["status"] == "ready"

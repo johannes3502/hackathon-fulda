@@ -34,13 +34,13 @@ Gesten-/Sample-Demo reicht alternativ Node.js 22.12+: `npm ci`, `npm run dev`.
 
 ## Echte lokale Sprache und Fragen (optional, etwa 2 weitere Minuten)
 
-Ollama vorab starten, Modell laden und Smoke ausführen:
-[lokale KI einrichten](06-local-coaching.md). Unter `/sources` eine TXT-Datei
+Gemini-Key in `.env` setzen, Backend/Worker neu starten und den Smoke ausführen:
+[Einrichtung und Grenzen](06-local-coaching.md). Unter `/sources` eine TXT-Datei
 mit erfundenem Inhalt hochladen: „Synthetische Beispieldaten: Das Lernlabor hat
 zwanzig Plätze. Es öffnet um neun Uhr.“ Auf **Ready** warten.
 
-Unter `/live` oberhalb der Kamera **Speech analysis → On · local speech analysis** wählen. Mikro
-und Kamera einschalten, normal sprechen und neutral stehen. Als synthetischen
+Unter `/live` ist Live-Feedback mit vollständiger Backend-Analyse immer aktiv.
+Mikro und Kamera einschalten, normal sprechen und neutral stehen. Als synthetischen
 Vortrag z. B. sagen: „Das Lernlabor hat zwanzig Plätze. Es öffnet um acht Uhr.
 Das Lernlabor hat einen Swimmingpool.“ Nach Stop das echte Whisper-Transkript
 prüfen, dann **Check facts**, danach **Start question round**. Zitate ansehen, Zeitknopf ausprobieren
@@ -62,7 +62,7 @@ beibehalten oder ändern möchte.“**
 | Seitwärts-Hinweis erscheint verzögert | Positionsregel wartet bewusst 0,8 s. „Pose debug“ zeigt zusätzlich Frame-/Modellzeit und Abtastrate. Bei hoher Frame-Zeit andere Browser vergleichen; Safari ist bisher nicht als Ursache belegt. |
 | API/Netz fehlt | Lokale Gestenerkennung braucht nach Laden der App/Assets keine Anbieter-API. Synthetischer Rundgang braucht keine Kamera. Kein Service-Worker: erstmaliger Seitenaufruf braucht den App-Server. |
 | Backend-Audio schlägt fehl | Aufnahme und bereits vorhandene lokale Gesten bleiben im Review; Fehlermeldung sichtbar. |
-| Quellenmodell fehlt / Quellen nicht bereit | Ollama und Modellstatus prüfen, Quelle fertig laden lassen, **Refresh status**. Kein Cloud-Fallback. |
+| Quellenmodell fehlt / Quellen nicht bereit | Gemini-Key und Modellstatus prüfen, Quelle fertig laden lassen, **Refresh status**. Kein stiller Fallback. |
 | Zitat kann nicht geprüft werden | Kein Urteil anzeigen; Passage selbst prüfen. Eine Zahl von Modellurteilen ist keine Genauigkeit. |
 | Kamera bewegt / Person wechselt | Aufnahme beenden. Neue Aufnahme mit neuer Kalibrierung. |
 | Seite wird neu geladen | Lokales Video ist weg. Vorher downloaden; neuen Versuch starten. |
@@ -82,7 +82,7 @@ Vor-Ort-Abnahme nicht. Keine echten Juryaufnahmen als Testfixtures einchecken.
 | Lokale Dienste / Assets | App, Modell-Assets und optional Compose-Audio-Backend vor Start laden | Lokal prüfen; keine öffentliche URL benötigt |
 | Lokale KI | Whisper, Quellenvergleich, Frage und Antwort auf synthetischen Daten | Reale lokale Modelle und Desktop-/Mobile-Viewport-Flows geprüft; Nutzer bestätigt Mikrofon/Transkript funktioniert, langsam, für diesen Stand akzeptiert |
 | Lokaler Fallback | `/gestures` und vorbereitete Sprach-/Frage-Session vorher öffnen | Automatisiert prüfen; am Stand wiederholen |
-| Einwilligung | Vor Aufnahme erklären: lokal oder optional Backend-Audio-Upload, Speicherung, Download/Verlassen | UI-Hinweise vorhanden; Team erklärt vor Ort |
+| Einwilligung | Vor Aufnahme erklären: Live-Audio und Aufnahme-Upload ans Backend, Speicherung, Download/Verlassen | UI-Hinweise vorhanden; Team erklärt vor Ort |
 
 ## Ergebnisprotokoll für echte Kamera (auszufüllen)
 
@@ -104,7 +104,7 @@ gezählte Versuche und dokumentierte Bedingungen, die noch nicht vorliegen.
 Der Kamerapfad erzeugt lokale Gesten-/Haltungsereignisse und spielt das komplette
 Video im Browser ab. Er erstellt noch keine dauerhaft gespeicherten Server-Clips.
 Audioanalyse, lokale Whisper-Transkription, Quellen-Ingest/Hybrid-Retrieval,
-Ollama-Quellenvergleich und Text-Frage-/Antwortanalyse sind im Web angebunden.
+Gemini-Quellenvergleich und Text-Frage-/Antwortanalyse sind im Web angebunden.
 Optionale Live-Captions liefern während der Aufnahme eine Textvorschau;
 die vollständige Transkription nach dem Stoppen bleibt die Review-Zeitbasis.
 Web-Fetch, Blickkontakt-Auswertung und dauerhafte Server-Clips sind nicht Teil
@@ -124,11 +124,12 @@ Konfiguration und Fallback-Gründe.
 
 **Speech feedback** schaltet alle Sprachmarker; **Pauses**, **Speaking pace**,
 **Filler words**, **Volume**, **Pitch variation** wählen einzelne Typen.
-**Speech analysis → Live · in browser** ist Standard: Kamera/Mikro bleiben lokal;
-3 s normal sprechen, dann Lautstärke, längere Pause oder Tonhöhenvariation testen.
-Bei **Live + full backend analysis** nutzt die App den Server-Signalstream.
+Jede Aufnahme verwendet **Live + full backend analysis**, ohne Modus-Auswahl:
+Mikrofon-Audio geht live an den Server, die vollständige Aufnahme nach dem Stoppen.
+Backend vor der Aufnahme starten; 3 s normal sprechen, dann Lautstärke,
+längere Pause oder Tonhöhenvariation testen.
 Füllwörter/Wort-Tempo benötigen weiterhin die Analyse nach dem Stoppen.
-**Off · gestures only** benötigt kein Mikro. Abschalten eines Feedbacktyps
+Abschalten eines Feedbacktyps
 entfernt dessen Marker, nicht die Messwerte der vollständigen Analyse. Importierte Wort-Timestamps
 beachten dieselben Schalter der jeweiligen Aufnahme. Pose-/Fact-Check- und
 Frage-Ergebnisse bleiben unabhängig davon.
@@ -138,7 +139,7 @@ während Aufnahme/Analyse gesperrt. Im Workspace bleiben sie bis zum Reload.
 Ein Wechsel von Modell, Modus oder **Pose lab** startet Pose und Kalibrierung neu.
 **Pose lab** ist standardmäßig aus. **Track fingers** ist unabhängig davon
 standardmäßig an: bis 5 Hz, auch ohne Torso. Finger werden pink eingezeichnet;
-„Hands detected“ und Mikrofonpegel helfen bei der Diagnose. Die Haltungsreferenz
+„Hands detected“ und der Live-Sprachstatus helfen bei der Diagnose. Die Haltungsreferenz
 kalibriert ohne Hand-Stillhaltepflicht. Im Nutzertest funktionierte die Korrektur;
 dies ist eine informelle Rückmeldung ohne gezählte Versuche oder Genauigkeitsmessung.
 T12, Pocket und Kopforientierung erzeugen keine Produktions-Events.
@@ -146,3 +147,18 @@ T12, Pocket und Kopforientierung erzeugen keine Produktions-Events.
 Vor Ort weiter offen: echtes GPU-Verhalten, Heavy-Durchsatz unter Kamera-/Audio-
 Last, Verzögerung durch VIDEO-Glättung und Erkennungsqualität. Automatisierte
 Tests mit synthetischen Bildern belegen Start und Datenfluss, keine Genauigkeit.
+
+## Deep Research (24.10.2026)
+
+- **Gemini statt Ollama:** Der Quellenvergleich braucht jetzt einen
+  `GEMINI_API_KEY` in `.env`; es gibt keinen stillen lokalen Fallback. Der
+  schwache Testpfad (`gemini-3.1-flash-lite`) lief mit 3,4 / 2,1 / 1,7 s; der
+  finale Writer braucht `gemini-3.8-flash`, sonst greift sichtbar die
+  Template-Review.
+- **Datenschutz:** Gemini ist Cloud ohne EU-Region-Pinning. Für die Jury nur
+  synthetische Inhalte verwenden; keine echten Personenaufnahmen an das LLM
+  senden.
+- **Fragegrenzen:** 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop; die
+  Begründung und Zitate stehen in `docs/11-deep-research-validation.md`.
+- **Was die Demo nicht verspricht:** keine Genauigkeits-, Latenz- oder
+  Lernwirksamkeitsgarantie; keine Noten oder Personenbewertung.

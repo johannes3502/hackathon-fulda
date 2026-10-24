@@ -40,7 +40,7 @@ export class AnalysisTransport implements VideoTransport {
     } catch (error) {
       this.controller.signal.throwIfAborted();
       throw new Error(
-        "Speech analysis is unavailable. Nothing has been recorded. Start the backend or set Speech analysis to Off, then enable the camera and try again." +
+        "Speech analysis is unavailable. Nothing has been recorded. Start the backend, then enable the camera and try again." +
           (error instanceof Error ? ` (${error.message})` : ""),
       );
     }

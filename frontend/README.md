@@ -29,14 +29,13 @@ rebuild after changing dependencies or configuration.
   and review. Works without camera, microphone or backend credentials.
 - **Monitoring studio** (`/` and `/live`): navigation and settings are visible by default; **Large view** is optional. Choose **Enable camera**, then **Start recording**. Local gesture observations replace scripted markers; hold a neutral position for 3 seconds first.
 - **See gestures in 22 seconds** (`/gestures`): synthetic walkthrough using the real observation rules.
-- **Speech analysis:** **Live · in browser** is the default, with local microphone
-  hints for pauses, volume, pitch variation and speaking rhythm. **Off · gestures
-  only** uses no microphone. **Live + full backend analysis** adds the server's
-  Silero/RMS/YIN signal stream and uploads the take after stopping. Calibration
+- **Speech analysis:** every recording uses live backend feedback and full
+  analysis after stopping. The microphone is always enabled and the complete
+  take is uploaded; there is no recording-mode selector. The backend must be
+  ready before recording starts. Calibration
   waits for about three seconds of voiced speech; startup silence and unpitched
   room noise do not count. The voice reference then adjusts slowly while you speak
-  and stays fixed during pauses. A new recording calibrates afresh. Transcription is on by default within backend
-  mode, with Deepgram EU streaming enabled (requires a server-side API key).
+  and stays fixed during pauses. A new recording calibrates afresh. Transcription is on by default, with Deepgram EU streaming enabled (requires a server-side API key).
   Completed stream words are reused in review; otherwise local Whisper runs
   after stopping. Turn transcription off for signal analysis only. The batch
   fallback uses `local_only=true` to prevent an unintended hosted ASR provider.
@@ -45,7 +44,7 @@ rebuild after changing dependencies or configuration.
   applied to the next recording. **Track fingers** is independent of the diagnostic **Pose lab**.
   Filler words and word-based pace require the transcript after stopping.
 - **Source review and questions:** upload sources under `/sources`, then in a
-  recorded take choose **Check facts**. Local Ollama selects claims,
+  recorded take choose **Check facts**. Gemini selects claims and
   compares retrieved passages. **Start question round** asks follow-up questions;
   enter a text answer to compare it with the sources. Quotes are verified against retrieved text.
   [Setup, evaluation and limits](../docs/06-local-coaching.md).

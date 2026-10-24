@@ -2485,7 +2485,8 @@
         "properties": {
           "max_questions": {
             "default": 3,
-            "maximum": 10.0,
+            "description": "Maximum initial questions; follow-ups are separate",
+            "maximum": 5.0,
             "minimum": 1.0,
             "title": "Max Questions",
             "type": "integer"

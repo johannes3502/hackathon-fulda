@@ -15,7 +15,6 @@ from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from app.factcheck.llm import configured_llm
-from app.factcheck.local import LocalOllamaChat
 from app.jobs import QueueUnavailable, enqueue_task
 from app.review import db, media, service
 from app.review.errors import ReviewError
@@ -77,14 +76,10 @@ def require_cloud_consent(take_id):
 def require_llm(take_id):
     try:
         model = configured_llm()
-        if isinstance(model, LocalOllamaChat):
-            if not model.available():
-                raise ValueError("Local model unavailable")
-        else:
-            require_cloud_consent(take_id)
-        return model
     except ValueError as error:
         raise ReviewError(503, "E_LLM_UNAVAILABLE", "Sprachmodell ist nicht verfügbar.") from error
+    require_cloud_consent(take_id)
+    return model
 
 
 async def dispatch(value):

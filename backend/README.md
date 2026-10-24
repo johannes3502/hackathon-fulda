@@ -42,12 +42,11 @@ colima start --activate=false
 docker --context colima compose up --build -d --wait backend worker
 ```
 
-For host Ollama with Colima, set `OLLAMA_URL=http://host.lima.internal:11434`
-in `.env` before starting the stack; keep Ollama bound to host loopback.
 Use that context for subsequent Compose commands. Existing Docker Desktop
-volumes and Colima volumes are separate. In the studio, unavailable analysis
-blocks capture with a retry message; **Speech analysis → Off** allows a local
-camera-only take. No recording exists if startup fails before capture.
+volumes and Colima volumes are separate. Gemini is reached over outbound HTTPS;
+no host-gateway or local model server is needed. In the studio, unavailable
+analysis blocks capture with a retry message; **Speech analysis → Off** allows a
+local camera-only take. No recording exists if startup fails before capture.
 
 ## IntelliJ IDEA and VS Code
 
@@ -151,8 +150,8 @@ successful completion. A hard worker kill delays cleanup until redelivery.
 
 The review writer receives a bounded evidence-card pack, chooses at most three
 findings and builds counts/summary in code. `mode: "llm"` uses the configured
-model as a selector of approved placeholder-based wording; local Ollama uses
-native JSON-schema output. All providers pass the same schema/catalog checks.
+model as a selector of approved placeholder-based wording; Gemini uses the
+OpenAI-compatible JSON mode. All providers pass the same schema/catalog checks.
 Unknown values, sources, advice or numerical literals cannot enter the report.
 After one retry, invalid claims use templates. Over 20% fallback marks the job
 failed (`E_REVIEW_VERIFICATION`), while the grounded fallback report remains
@@ -165,7 +164,7 @@ Synthetic verification, without touching the frontend:
 # After changing app code, restart the worker (API reloads automatically).
 docker compose restart worker
 docker compose exec -T backend python < backend/scripts/smoke_review.py
-# Explicit optional local-LLM smoke (Ollama must be running):
+# Explicit LLM smoke (Gemini key required; cloud consent for review):
 docker compose exec -T backend python - --llm < backend/scripts/smoke_review.py
 PYTHONPATH=backend backend/.venv/bin/python -m pytest backend/tests -q
 ```
@@ -434,22 +433,23 @@ model works without credentials; `ASR_PROVIDER=json` checks the explicit
 deterministic demo, and `ASR_PROVIDER=deepgram` sends synthetic audio to the
 paid ASR API.
 
-## Local source comparison and questions
+## Source comparison and questions
 
-The fact-check and question modules below default to native Ollama with
-`qwen3.5:4b-q4_K_M` when `LLM_BASE_URL` and `LLM_MODEL` are empty.
-Compose reaches the host at `OLLAMA_URL=http://host.docker.internal:11434`.
-No API key or cloud fallback. Web search is off by default.
+The fact-check and question modules default to Gemini through its
+OpenAI-compatible endpoint. Configure `GEMINI_API_KEY` (or `GOOGLE_API_KEY`)
+and, optionally, `LLM_BASE_URL`/`LLM_MODEL` in `.env`. The test default is
+`gemini-3.1-flash-lite`; use `gemini-3.8-flash` for the final pass. There is no
+implicit local fallback. Web search is off by default.
 [Setup, evaluation and limits](../docs/06-local-coaching.md).
 
-The explicit GGUF tag works with structured output in tested Ollama 0.40.10;
-the default macOS MLX variant returned HTTP 501. Native local requests use
-JSON schemas plus code validation of references and quotes. Invalid evidence
+The Gemini Developer API is cloud processing without EU region pinning. Send
+only synthetic demo data, or use Vertex AI for EU residency. Invalid evidence
 is `unchecked`, rather than a finding that evidence is absent.
 
-Synthetic real-model integration check (Ollama must be running):
+Synthetic real-model integration check:
 
 ```sh
+docker compose exec -T backend python - < backend/scripts/smoke_gemini.py
 docker compose exec -T backend python - < backend/scripts/smoke_coaching.py
 ```
 
@@ -584,14 +584,12 @@ GET /factcheck/settings    configured model, LLM host and web provider (for cons
   (whitespace, case and quote style ignored) and has at least
   `min_quote_chars` characters. Upload evidence names file and page/slide;
   web evidence names title and URL.
-- Default model: native local Ollama. Optional adapter: `POST {LLM_BASE_URL}/chat/completions`
-  (OpenAI, hosted open models, Ollama, vLLM, LM Studio). Configure
-  `LLM_BASE_URL`, `LLM_MODEL` and, if needed, `LLM_API_KEY` in `.env` only to
-  explicitly use this optional adapter. Empty URL/model selects local Ollama. `LLM_JSON_MODE=false` for servers without
-  `response_format=json_object`; `LLM_TEMPERATURE` stays unset unless the model
-  accepts it. A local server on the host is reachable from the containers as
-  `http://host.docker.internal:<port>/v1`. Calls are not retried (they may be
-  billed); `LLM_CONCURRENCY` claims are judged in parallel.
+- Default model: Gemini via `POST {LLM_BASE_URL}/chat/completions`
+  (OpenAI-compatible). Configure `LLM_BASE_URL`, `LLM_MODEL` and
+  `GEMINI_API_KEY`/`GOOGLE_API_KEY` in `.env`; `LLM_API_KEY` wins if set.
+  `LLM_JSON_MODE=false` for servers without `response_format=json_object`;
+  `LLM_TEMPERATURE` stays unset unless the model accepts it. Calls are not
+  retried (they may be billed); `LLM_CONCURRENCY` claims are judged in parallel.
 - Web search (`WEB_SEARCH_PROVIDER`): `wikipedia` (optional, MediaWiki API, no
   key, `WEB_SEARCH_LANGUAGE=de`), `tavily` (`TAVILY_API_KEY`) or `none` (default). Only
   search APIs, no HTML scraping. The client can switch it off per request
@@ -611,7 +609,7 @@ the end-to-end check with a deterministic stand-in model.
 
 Asks follow-up questions after the talk and compares typed answers with the
 sources. Input is the transcript plus the fact-check findings of the same
-recording; it uses the same local model (or explicit compatible adapter) as the fact-check.
+recording; it uses the same Gemini model as the fact-check.
 
 ```
 POST /questions {words, collection_id?, claims[]} → S3 question-jobs/{id}/request.json
@@ -747,7 +745,8 @@ questions with four presentation contexts. Configure `ELEVENLABS_API_KEY` and
 `GET /questions/agent/settings` reports configuration presence. Context preparation
 is queued through `POST /questions/agent`, polled at `/questions/agent/jobs/{id}`.
 `POST /questions/agent/session` issues an uncached signed WebSocket URL. It does
-not require Ollama. Typed questions still use the configured local model.
+not require Gemini. Typed questions use the configured LLM (Gemini by default);
+transcript, retrieved passages and typed answers are sent to that provider.
 Setup, privacy, retention and verification limits: [Review and agent](../docs/07-review-and-agent.md).
 
 ## Synthetischer Datenbank-Seed

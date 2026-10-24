@@ -98,7 +98,7 @@ export function QuestionSimulator({
       );
       if (!settings.available)
         throw new Error(
-          "Typed questions are unavailable. Start the language model on your backend and retry.",
+          "Typed questions are unavailable. Check the backend model settings and API key, then retry.",
         );
       let claims = recording.factCheck?.claims ?? [];
       const sources = await listSources(recording.config.endpoint, collection);
@@ -204,7 +204,8 @@ export function QuestionSimulator({
           </Button>
           <p className="field-hint">
             This sends your transcript, matching material and typed answers to
-            the language model configured on your backend.
+            the language model configured on your backend (Google Gemini by
+            default).
           </p>
         </>
       )}

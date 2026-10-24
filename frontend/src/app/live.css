@@ -104,29 +104,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.live-analysis-choice {
-  min-width: 0;
-  padding: 0;
-  flex: 1;
-}
-.live-analysis-choice .field {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-}
-.live-analysis-choice label {
-  margin: 0;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.live-analysis-choice .input {
-  width: auto;
-  max-width: 100%;
-}
-.live-analysis-choice .field-hint {
-  margin: 0;
-}
 .live-view-toolbar {
   margin-left: auto;
   display: flex;
@@ -1051,12 +1028,6 @@ body:has(.live-workspace-large) .app-footer {
   }
   .live-settings {
     padding: 8px 0;
-  }
-  .live-analysis-choice {
-    flex-basis: 100%;
-  }
-  .live-analysis-choice .input {
-    width: 100%;
   }
   .live-review-grid,
   .feedback-replay-grid {

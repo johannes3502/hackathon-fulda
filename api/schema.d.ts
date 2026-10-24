@@ -1533,6 +1533,7 @@ export interface components {
         QuestionConfig: {
             /**
              * Max Questions
+             * @description Maximum initial questions; follow-ups are separate
              * @default 3
              */
             max_questions: number;

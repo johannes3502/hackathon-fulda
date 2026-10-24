@@ -196,9 +196,9 @@ export function AppShell({
                 <ol className="help-list">
                   <li>
                     Enable your camera and check that your upper body is
-                    visible. Use Speech analysis above the camera to include
-                    audio. Hold a neutral position for 3 seconds to calibrate
-                    gesture feedback.
+                    visible. Camera and microphone are used for every recording.
+                    Hold a neutral position for 3 seconds to calibrate gesture
+                    feedback.
                   </li>
                   <li>Start recording when you are ready.</li>
                   <li>
@@ -211,16 +211,14 @@ export function AppShell({
                   </li>
                 </ol>
                 <p>
-                  Live · in browser keeps video, microphone measurements and
-                  feedback local. Off · gestures only uses no microphone. Full
-                  backend analysis captures video and microphone audio, sends
-                  audio during recording for live feedback and uploads the
-                  complete take after stopping. Live transcription additionally
-                  streams audio to Deepgram’s EU endpoint when enabled in
-                  Recording options; local Whisper is the fallback. Camera and
-                  voice observations are prototype heuristics, not quality
-                  scores. The synthetic walkthrough is separately labelled and
-                  needs no camera.
+                  Every recording uses live feedback and full backend analysis.
+                  It captures video and microphone audio, sends audio during
+                  recording for live feedback and uploads the complete take
+                  after stopping. Live transcription additionally streams audio
+                  to Deepgram’s EU endpoint when enabled in Recording options;
+                  local Whisper is the fallback. Camera and voice observations
+                  are prototype heuristics, not quality scores. The synthetic
+                  walkthrough is separately labelled and needs no camera.
                 </p>
                 <p>
                   Recordings live in browser memory only. Download before

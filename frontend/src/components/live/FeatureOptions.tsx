@@ -98,7 +98,7 @@ export function FeatureOptions({
         <p className="field-hint">
           {speechEnabled
             ? "Pauses, volume, pitch variation and speaking rhythm are shown live. Your voice reference starts when you speak and adjusts gradually; silence does not train it. Filler words and word-based pace need the transcript after stopping."
-            : "Choose Live · in browser above the camera for local voice feedback."}{" "}
+            : "Enable Speech feedback to show live voice hints during recording."}{" "}
           These switches control feedback markers; analysis, measurements and
           transcription keep their own settings.
         </p>
