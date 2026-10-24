@@ -467,7 +467,7 @@ flowchart TD
     LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>PNG-Logo, CSS-Animation, Reduced-Motion"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
     SP["/ und /stats-preview<br/>Einleitung + Neue Präsentation / Quellen vorbereiten<br/>darunter Aufnahmeübersicht im Browser-Arbeitsbereich"] --> SC["StatsDashboard<br/>Anzahl, Dauer, Hinweise und Transkripte<br/>aus aufgenommenen Takes, sonst Leerzustand"]
-    SP -->|"Neue Präsentation"| LIVE
+    SP -->|"Neue Präsentation"| SRC
     SP -->|"Quellen vorbereiten"| SRC
     SP -->|"Letzte Aufnahme, falls vorhanden"| LREV
     DRAWER --> SP

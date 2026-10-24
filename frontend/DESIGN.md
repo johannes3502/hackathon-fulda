@@ -30,9 +30,10 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   visible. Reduced motion disables animation; increased contrast strengthens
   separators and secondary text.
 - `/` and `/stats-preview` begin with a presentation introduction: primary action
-  “Neue Präsentation” opens the existing `/live` studio, secondary action prepares
-  sources. Three steps explain preparation, recording and review. A recent take
-  links back into its review; completed takes persist locally in IndexedDB.
+  “Neue Präsentation” opens `/sources` to add presentation material; the secondary
+  action also prepares sources. Three steps explain preparation, recording and
+  review. A recent take links back into its review; completed takes persist locally
+  in IndexedDB.
   Below, `StatsDashboard` shows counts, durations and observations from actual
   recordings in the current workspace, with an empty state before the first take.
   No synthetic percentages, monthly histories or performance scores appear.
