@@ -153,6 +153,65 @@ body:has(.live-workspace-large) .app-footer,
   color: white;
   font-size: 12px;
 }
+.live-pose-cue {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  border-left: 3px solid oklch(0.8 0.15 75);
+  border-radius: 6px;
+  background: #111827e6;
+  color: white;
+  font-size: 13px;
+  transform: translateX(-50%);
+}
+.live-pose-cue small {
+  color: oklch(0.8 0.02 264);
+  font-size: 10px;
+}
+.live-pose-debug {
+  position: absolute;
+  top: 62px;
+  right: 16px;
+  z-index: 1;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #111827e6;
+  color: white;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.live-pose-debug table {
+  margin: 6px 0 4px;
+  border-collapse: collapse;
+}
+.live-pose-debug th,
+.live-pose-debug td {
+  padding: 1px 6px;
+  text-align: right;
+  font-weight: 400;
+}
+.live-pose-debug tbody th {
+  text-align: left;
+}
+.live-pose-debug .pass {
+  color: #86efac;
+}
+.live-pose-debug .fail {
+  color: #fca5a5;
+}
+.live-pose-debug .missing {
+  color: oklch(0.7 0.02 264);
+}
+.live-pose-debug small {
+  color: oklch(0.8 0.02 264);
+  font-size: 10px;
+}
 .live-camera-stage .stage-top,
 .live-camera-stage .stage-bottom {
   background: #111827d9;
