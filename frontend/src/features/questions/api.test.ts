@@ -34,6 +34,7 @@ const gap: Question = {
   query: "Fachbereiche",
 };
 const result: QuestionResult = {
+  presentation_mode: "thesis",
   questions: [moon, gap],
   events: [],
   persona: "student",
@@ -68,7 +69,13 @@ it("posts transcript and findings, then polls the question job", async () => {
   vi.stubGlobal("fetch", fetcher);
   const generated = await generateQuestions(
     "/api",
-    { words, collectionId: null, claims: [], persona: "student" },
+    {
+      words,
+      collectionId: null,
+      claims: [],
+      persona: "student",
+      presentationMode: "school",
+    },
     new AbortController().signal,
     0,
   );
@@ -79,6 +86,7 @@ it("posts transcript and findings, then polls the question job", async () => {
     collection_id: null,
     claims: [],
     persona: "student",
+    presentation_mode: "school",
   });
   expect(fetcher.mock.calls[2][0]).toBe(`/api/questions/jobs/${jobId}`);
 });
@@ -157,6 +165,7 @@ it("uploads a spoken answer as multipart and returns its transcript", async () =
     question: moon,
     collection_id: null,
     persona: "student",
+    presentation_mode: "thesis",
   });
   expect(fetcher.mock.calls[2][0]).toBe(`/api/questions/answers/${jobId}`);
 });

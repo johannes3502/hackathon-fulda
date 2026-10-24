@@ -170,3 +170,20 @@ für Pause, Tempo, Füllwörter, Lautstärke und Tonhöhe einzeln schaltbar.
 „Live · in browser“ ist Standard und liefert lokale Mikrofonhinweise ohne Backend;
 der Backend-Modus nutzt den Signal-Stream. Füllwörter und Wort-Tempo kommen nach
 dem Stoppen. Die Haltungsreferenz benötigt keine stillgehaltenen Hände mehr.
+
+## Vereinfachter Review und kontextbezogene Fragen (24.10.2026)
+
+Nutzerauftrag: Review im Stil des Live-Monitorings; zwei Hauptschritte statt
+mehrerer gleichzeitiger Analyse-Panels. **Review moments** spielt markierte
+Abschnitte mit Kontext und zeitgenauen Anmerkungen; **Practice questions**
+führt einen Dialog mit einer Frage pro Schritt. Die Wiedergabe-Fenster nutzen
+das lokale Vollvideo; separate serverseitig geschnittene Clip-Dateien sind
+weiterhin nicht implementiert. Transkript und technische Details bleiben
+aufklappbar.
+
+Vor dem Take: Material zum Backend hochladen und Präsentationstyp wählen:
+Startup-Pitch, Bachelor-Verteidigung, Schulvortrag oder Nonprofit-Einladung.
+Der Typ verändert die Fragen und Kriterien, ohne Noten oder Scores. Der
+Nutzer hat ElevenLabs für den Sprachdialog beauftragt und konfiguriert den
+Agenten selbst nach der Implementierung. Getippte Fragen bleiben über das
+konfigurierte lokale Modell möglich. Einrichtung: `docs/07-review-and-agent.md`.

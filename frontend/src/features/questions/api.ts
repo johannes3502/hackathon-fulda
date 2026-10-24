@@ -2,6 +2,7 @@ import type { components } from "../../../../api/schema";
 import { isObject, runBackendJob } from "../../lib/backend-job";
 import type { ClaimResult } from "../factcheck/api";
 import type { LiveFeedback, Word } from "../live/contracts";
+import type { PresentationMode } from "./presentation";
 
 export type Question = components["schemas"]["Question"];
 export type QuestionKind = Question["kind"];
@@ -71,6 +72,7 @@ export function generateQuestions(
     collectionId: string | null;
     claims: ClaimResult[];
     persona: Persona;
+    presentationMode?: PresentationMode;
   },
   signal: AbortSignal,
   pollMs = 1500,
@@ -85,6 +87,7 @@ export function generateQuestions(
         collection_id: input.collectionId,
         claims: input.claims,
         persona: input.persona,
+        presentation_mode: input.presentationMode ?? "thesis",
       },
       label: "question simulator",
       valid: validResult,
@@ -102,6 +105,7 @@ export function reviewAnswer(
     answer: string;
     collectionId: string | null;
     persona: Persona;
+    presentationMode?: PresentationMode;
   },
   signal: AbortSignal,
   pollMs = 1000,
@@ -116,6 +120,7 @@ export function reviewAnswer(
         answer: input.answer,
         collection_id: input.collectionId,
         persona: input.persona,
+        presentation_mode: input.presentationMode ?? "thesis",
       },
       label: "answer review",
       valid: validReview,
@@ -133,6 +138,7 @@ export function reviewVoiceAnswer(
     recording: Blob;
     collectionId: string | null;
     persona: Persona;
+    presentationMode?: PresentationMode;
   },
   signal: AbortSignal,
   pollMs = 1000,
@@ -149,6 +155,7 @@ export function reviewVoiceAnswer(
       question: input.question,
       collection_id: input.collectionId,
       persona: input.persona,
+      presentation_mode: input.presentationMode ?? "thesis",
     }),
   );
   return runBackendJob(

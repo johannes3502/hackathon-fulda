@@ -647,3 +647,14 @@ recreation. Those fixtures were removed too.
 - [Celery with Redis](https://docs.celeryq.dev/en/stable/getting-started/backends-and-brokers/redis.html)
 - [Celery task and worker configuration](https://docs.celeryq.dev/en/stable/userguide/configuration.html)
 - [Redis Docker image](https://hub.docker.com/_/redis)
+
+### ElevenLabs question practice
+
+The web review supports a source-grounded ElevenLabs conversation and typed
+questions with four presentation contexts. Configure `ELEVENLABS_API_KEY` and
+`ELEVENLABS_AGENT_ID` server-side; enable the agent's System prompt override.
+`GET /questions/agent/settings` reports configuration presence. Context preparation
+is queued through `POST /questions/agent`, polled at `/questions/agent/jobs/{id}`.
+`POST /questions/agent/session` issues an uncached signed WebSocket URL. It does
+not require Ollama. Typed questions still use the configured local model.
+Setup, privacy, retention and verification limits: [Review and agent](../docs/07-review-and-agent.md).

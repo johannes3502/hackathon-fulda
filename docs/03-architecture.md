@@ -30,7 +30,7 @@ flowchart TB
         FC["Factcheck-Router<br/>POST /factcheck<br/>GET /factcheck/jobs/id, /settings"]
         QR["Questions-Router<br/>POST /questions, /questions/answers,<br/>/questions/answers/voice<br/>GET /questions/jobs/id, /questions/answers/id"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -50,6 +50,7 @@ flowchart TB
 
     EXT["ASR lokal: faster-whisper small<br/>CPU/int8, Deutsch<br/>Deepgram nur explizit optional"]
     LLM["LLM lokal: Ollama auf dem Host<br/>Qwen3.5 4B Q4_K_M<br/>JSON-Schema, kein Cloud-Fallback"]
+    ELEVEN["ElevenLabs Agent, optional<br/>Live-Audio + Gespräch; serverseitiger Schlüssel"]
     WEBS["Websuche (Zweitquelle)<br/>Wikipedia-API oder Tavily"]
 
     WEB -- "Kamera/Mikro" --> MP_W
@@ -102,6 +103,11 @@ flowchart TB
     QUEST -- "Auszüge für Lücken<br/>und Antwort-Abgleich" --> PG
     QUEST -. "Sätze, Funde, Auszüge,<br/>getippte Antwort" .-> LLM
     QUEST -- "Ergebnis, Request löschen" --> S3
+    TASKS --> AC["prepare_agent: Modus + Transkript<br/>Hybrid-Retrieval aus gespeicherter Collection"]
+    AC --> PG
+    AC --> S3
+    QR -- "Signed URL anfordern" --> ELEVEN
+    WEB -- "Signed WebSocket: Mikrofon + Kontext" --> ELEVEN
     FACT -- "Hybrid-Suche je Aussage" --> PG
     FACT -. "Transkript-Sätze, Auszüge" .-> LLM
     FACT -. "Suchanfragen, nur wenn<br/>Quellen nichts belegen" .-> WEBS
@@ -141,6 +147,8 @@ flowchart LR
     WK --> ST
     WK --> RD
     WK -. "OLLAMA_URL<br/>(Host: host.docker.internal)" .-> LLM(["Ollama lokal; kompatibler Adapter optional"])
+    BE -. "ELEVENLABS_API_KEY + ELEVENLABS_AGENT_ID" .-> EL(["ElevenLabs; Voice optional"])
+    User -. "Signed WebSocket" .-> EL
     WK -. "WEB_SEARCH_PROVIDER" .-> WS(["Wikipedia / Tavily"])
 ```
 
@@ -284,55 +292,69 @@ sequenceDiagram
 
 ## 5b. Datenfluss: Frage-Simulator und Voice-Agent
 
-Die Rolle (`persona`: `student` = neugieriger Erstsemester, `tutor` =
-Professor/Tutor) ändert nur Ton und Fragestil; Quellen, Fact-Check-Funde und
-Zitat-Prüfung sind in beiden Rollen gleich. Der Browser liest Fragen und
-Reaktionen per `speechSynthesis` vor; nur die gesprochene Antwort geht an
-das Backend.
+Der Web-Review hat zwei Ansichten: **Review moments** (begrenzte Wiedergabe-
+Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
+Vor der Aufnahme werden `presentationMode` (startup/thesis/school/nonprofit)
+und `sourceCollectionId` im Take eingefroren. Der Modus steuert fachliche
+Schwerpunkte in beiden Fragepfaden, keine Scores oder Noten.
 
 ```mermaid
 sequenceDiagram
     actor U as Nutzer
-    participant FE as Review (QuestionSimulator)
+    participant FE as Review (QuestionPractice)
     participant BE as FastAPI (questions/router)
-    participant S3 as SeaweedFS (S3)
+    participant S3 as SeaweedFS
     participant W as Celery Worker
     participant PG as Postgres + pgvector
-    participant L as Ollama lokal (JSON-Schema)
-    participant A as ASR (lokales Whisper, Deepgram optional)
+    participant E as ElevenLabs Agent
+    participant L as Lokales LLM
 
-    U->>FE: Rolle wählen, Start question round
-    FE->>BE: POST /questions (Wörter, Fact-Check-Funde, collection_id, persona)
-    BE->>S3: question-jobs/id/request.json
-    BE-->>FE: 202 {job_id, status_url}
-    W->>PG: Hybrid-Suche mit dem Transkript (Auszüge für Lücken)
-    W->>L: Fragen mit Verweisen auf Befund-, Satz- und Auszugsnummern
-    W->>W: t_ms und Evidenz aus den Verweisen, nicht vom Modell,<br/>Widerspruch nur mit passendem Befund,<br/>Lücke nur mit wörtlichem Zitat
-    W->>S3: status.json (Fragen + question-Events), request.json löschen
-    FE->>BE: GET /questions/jobs/{job_id} (Polling)
-    U->>FE: Antwort tippen, "Compare with sources"
-    FE->>BE: POST /questions/answers (Frage, Antwort, collection_id)
-    W->>PG: Hybrid-Suche (Suchanfrage der Frage + Antwort)
-    W->>L: Urteil + wörtliches Zitat + optionale Nachfrage
-    W->>W: quote_in_text prüft Zitat, sonst „nicht gefunden“
-    W->>S3: status.json, request.json (Antworttext) löschen
-    FE->>BE: GET /questions/answers/{job_id} (Polling)
-    FE->>FE: Nachfrage unter der Frage einfügen, keine Punkte oder Noten
-    U->>FE: Talk with the student / professor
-    loop je offene Frage (Nachfragen direkt danach)
-        FE->>U: speechSynthesis liest die Frage vor
-        U->>FE: spricht Antwort (MediaRecorder, Audio), "Done"
-        FE->>BE: POST /questions/answers/voice (Audio + Frage, persona)
-        BE->>S3: answer-jobs/id/recording + request.json
-        W->>A: 16-kHz-WAV, Wort-Timestamps zurück
-        W->>PG: Hybrid-Suche (Frage + Transkript der Antwort)
-        W->>L: Urteil + Zitat + Reaktion in der Rolle + Nachfrage
-        W->>W: Reaktion nur bei verifiziertem Zitat, sonst neutraler Satz
-        W->>S3: status.json, Audio und request.json löschen
-        FE->>BE: GET /questions/answers/{job_id} (Polling)
-        FE->>U: speechSynthesis liest die Reaktion vor
+    U->>FE: Practice questions
+    opt Kein Transkript vorhanden
+        U->>FE: Transcribe this take (Upload-Hinweis)
+        FE->>BE: POST /speech/analyze, transcribe=true, local_only=true
+        FE->>BE: GET /speech/jobs/id (Polling)
+    end
+    FE->>BE: GET /questions/agent/settings
+    alt Speak with the agent, explizit starten
+        FE->>BE: POST /questions/agent (Wörter, Collection, Modus, Funde)
+        BE->>S3: agent-context-jobs/id/request.json
+        BE-->>FE: 202 Job-ID
+        W->>PG: Hybrid-Suche in der Collection des Takes
+        W->>S3: status.json mit begrenztem Kontext, request.json löschen
+        FE->>BE: GET /questions/agent/jobs/id (Polling)
+        FE->>BE: POST /questions/agent/session
+        BE->>E: Signed URL anfordern (API-Key bleibt serverseitig)
+        BE-->>FE: Signed URL, Cache-Control no-store
+        FE->>E: SDK-WebSocket mit Kontext und Modus im Prompt-Override
+        loop Eine Frage nach der anderen
+            E->>FE: Frage / Reaktion, Audio + Text
+            U->>FE: Gesprochene Antwort
+            FE->>E: Mikrofon-Audio
+        end
+        U->>FE: End conversation oder Ansicht verlassen
+        FE->>E: Verbindung schließen, Mikrofon freigeben
+    else Practice by typing
+        FE->>BE: Optional automatisch POST /factcheck + Status-Polling
+        FE->>BE: POST /questions (Wörter, Funde, Collection, Modus)
+        W->>PG: Hybrid-Suche
+        W->>L: Fragen mit Beleg-Verweisen
+        W->>S3: status.json, Request löschen
+        FE->>BE: GET /questions/jobs/id
+        U->>FE: Eine Frage beantworten
+        FE->>BE: POST /questions/answers + GET /questions/answers/id
+        W->>L: Quellenvergleich + Nachfrage
+        W->>W: Zitat im Quelltext prüfen
+        FE->>FE: Nächste Frage / Nachfrage anzeigen
     end
 ```
+
+ElevenLabs-Antworten sind Modellvorschläge; sie durchlaufen nicht den
+serverseitigen Zitat-Check der getippten Antworten. Der Kontext enthält nur
+bis zu acht passende Auszüge, nicht die gesamte Bibliothek. Ohne konfigurierte
+Zugangsdaten bleibt die Sprachfunktion sichtbar als nicht verfügbar. Der
+bestehende `/questions/answers/voice`-Endpunkt mit ASR bleibt für API-Clients
+kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
 
 ## 6. Frontend-Navigation (Web)
 
@@ -343,7 +365,7 @@ flowchart TD
     SP["/stats-preview<br/>Stats-Karte mit Replay"] --> SC["StatsCard<br/>Three.js-Ring, vier Kriterien<br/>synthetische Demo-Werte"]
     SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
-    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Normalansicht, Large View optional,<br/>Vortragstyp + Material vor der Aufnahme, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
     LIVE --> DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
@@ -356,10 +378,10 @@ flowchart TD
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]
     P1 --> PREV["/practice/sessionId/review<br/>ReviewWorkspace: Findings, Retry,<br/>Evidenz-Sprung"]
 
-    LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Statistiken,<br/>Transcript-Import, Fact-Check-Panel,<br/>Frage-Simulator, Pose-Download"]
-    LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>gleiche collection_id wie /sources"]
-    LREV -->|"POST /questions,<br/>POST /questions/answers,<br/>POST /questions/answers/voice"| QAPI["Frage-Jobs + Voice-Agent<br/>Eingabe: Wörter + Fact-Check-Funde,<br/>Rolle Student / Professor"]
-    LREV --> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
+    LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video und Feedback nebeneinander,<br/>Transkript, Quellencheck und Exporte als Details"]
+    LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>sourceCollectionId des aufgenommenen Takes"]
+    LREV -->|"POST /questions/agent + /agent/session<br/>oder /questions + /answers"| QAPI["ElevenLabs-Dialog oder getippte Fragen<br/>Startup, Thesis, Schule, Nonprofit<br/>eine Frage pro Schritt"]
+    LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
     RP --> RA["ReviewAnalysis + PerformanceGraph<br/>gemeinsame video.currentTime-Zeitachse<br/>Anmerkungen, Quellen, Abschnitt-Loop"]
     LA --> RA
@@ -434,10 +456,11 @@ Zusätzlich (außerhalb Postgres):
 | SeaweedFS `speech-jobs/{job_id}/` | Job-Konfig, Status, Analyse-Ergebnis (Original wird nach Abschluss gelöscht) |
 | SeaweedFS `factcheck-jobs/{job_id}/` | Status und Fact-Check-Ergebnis; `request.json` (Transkript) wird nach Abschluss gelöscht |
 | SeaweedFS `question-jobs/{job_id}/`, `answer-jobs/{job_id}/` | Status mit Fragen bzw. Antwort-Abgleich (bei Sprache mit Transkript der Antwort); `request.json` (Transkript, Antworttext) und `recording` (gesprochene Antwort) werden nach Abschluss gelöscht |
+| SeaweedFS `agent-context-jobs/{job_id}/` | Vorbereiteter Prompt mit gekürztem Transkript und Quellenauszügen; Request wird gelöscht, Ergebnis bleibt wie andere Jobs gespeichert, noch kein TTL-Cleanup |
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), auch vom Fact-Check genutzt |
-| Browser-Speicher (Live-Workspace) | FeatureFlags pro Take, Wörter, Pose-Events mit runtime, Fact-Check-Ergebnis, Fragen und Antworten; nur bis zum Neuladen |
+| Browser-Speicher (Live-Workspace) | FeatureFlags, presentationMode und sourceCollectionId pro Take, ElevenLabs-Gespräch, Wörter, Pose-Events mit runtime, Fact-Check-Ergebnis, Fragen und Antworten; nur bis zum Neuladen |
 
 ## 9. Event-Modell: gemeinsame Timeline
 
@@ -499,9 +522,13 @@ flowchart LR
         Q3["POST /questions/answers"]
         Q4["GET /questions/answers/{job_id}"]
         Q5["POST /questions/answers/voice"]
+        Q6["GET /questions/agent/settings"]
+        Q7["POST /questions/agent (202)"]
+        Q8["GET /questions/agent/jobs/{job_id}"]
+        Q9["POST /questions/agent/session"]
     end
 
-    WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5
+    WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5 & Q6 & Q7 & Q8 & Q9
     MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
 ```
 

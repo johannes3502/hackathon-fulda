@@ -763,3 +763,23 @@ neue Erfolgsfall. Die lokale `.env` stand noch auf Deepgram ohne Schlüssel;
 `ASR_PROVIDER=whisper` wurde als lokaler Ersatzweg eingerichtet, kein Schlüssel
 geändert oder eingecheckt. Aktivierung: `DEEPGRAM_API_KEY` setzen und Frontend,
 Backend sowie Worker neu bauen/starten. Kein echter Anbieteraufruf getestet.
+
+## Review und ElevenLabs (24.10.2026)
+
+Nutzerauftrag: Review im Stil des Live-Monitorings vereinfachen, Material vorab
+hochladen und anschließend durch einen ElevenLabs-Agenten befragen lassen.
+Vier Modi (Startup, Thesis, Schule, Nonprofit) verändern die Schwerpunkte der
+Fragen. Nutzer bestätigt: Integration bauen, Agent-Konfiguration trägt er später ein.
+
+Codex: vorhandene Wiedergabe-, Quellen-, Celery- und Frage-APIs wiederverwendet;
+Review auf zwei Ansichten reduziert, kurze Replay-Abschnitte mit Video-Anmerkungen,
+Einzelfragen mit getipptem Quellenvergleich und optionalem ElevenLabs-Dialog.
+Collection-ID und Präsentationstyp werden bei Aufnahmestart festgehalten.
+Das offizielle ElevenLabs-SDK übernimmt Audio und Verbindung; Schlüssel nur im
+Backend, Signed URL ohne Cache. Kontext-Aufbereitung als wiederholbarer Job.
+
+Grenzen: keine echten ElevenLabs-Zugangsdaten in diesem Lauf, keine Aussage
+zur Audio- oder pädagogischen Qualität. Sprachreaktionen haben keinen
+serverseitigen Zitat-Check. Replay nutzt weiterhin das lokale Vollvideo;
+serverseitiges Clip-Schneiden und persistente Aufnahmehistorie bleiben offen.
+Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.

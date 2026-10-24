@@ -41,10 +41,16 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   consider; green means explicit positive feedback or labelled tracking readiness.
   Ordinary gestures, pauses, calibration and hidden hints remain neutral. Color
   always has a text label; tracking readiness is not a performance assessment.
-- **Review:** use the same type scale, controls, and surfaces as the studio.
-  Video, timeline, selected observation, and moment list remain connected to the
-  existing video clock. On phones, playback and timeline precede the observation.
-  The chart may scroll within its container; the page must not scroll sideways.
+- **Review:** two primary views, Review moments and Practice questions. Large
+  playback sits beside one selected observation and a compact list of replay
+  sections. Annotations follow video.currentTime; ordinary gestures are not
+  labelled bad performance. On phones, playback precedes the feedback.
+  Transcript, source checks, metrics and exports live in disclosures.
+  Questions show one exchange at a time, with voice or typed answers. The
+  presentation mode and material collection are fixed when a take starts.
+  ElevenLabs only starts on an explicit click after its data-sharing notice;
+  leaving the question view disconnects the agent. Missing configuration,
+  unavailable services and missing transcripts have visible recovery paths.
 - **Sources:** place the document library and source search beside one another on
   desktop and stack them on phones. Show supported formats, upload state, errors,
   and when search becomes available. Continue to recording is the main action.

@@ -258,3 +258,17 @@ serverseitig in `.env`; ohne Schlüssel oder bei unvollständigem Stream bleibt
 Whisper der lokale Ersatzweg. Signal-Analyse und Upload bleiben nach Stop nötig.
 Details: `backend/app/transcription/README.md`. Keine Genauigkeits- oder
 Latenzzusage aus den synthetischen Protokolltests ableiten.
+
+## Review und ElevenLabs (24.10.2026)
+
+Web-Review: zwei Hauptansichten, **Review moments** mit zeitgenauen Anmerkungen
+und begrenzter Wiedergabe im lokalen Vollvideo, **Practice questions** mit einer
+Frage pro Schritt. Transkript, Quellencheck und Exporte sind aufklappbare Details.
+Vor der Aufnahme stehen Material-Upload und vier Präsentationstypen bereit:
+`startup`, `thesis`, `school`, `nonprofit`. `sourceCollectionId` und
+`presentationMode` werden im Take festgehalten und an beide Fragepfade übergeben.
+ElevenLabs ist auf Nutzerwunsch als optionaler Sprachdialog integriert; Nutzer
+konfiguriert `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` selbst. Kontext als
+Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen bleiben lokal
+möglich. Keine Bewertungs-Scores; Sprachreaktionen sind nicht zitateverifiziert.
+Einrichtung und offene Grenzen: `docs/07-review-and-agent.md`.

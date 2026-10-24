@@ -52,6 +52,9 @@ import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
 import { FeatureOptions } from "./FeatureOptions";
 import { backendLabel, fallbackLabel } from "@/features/pose/backend";
+import { PresentationSetup } from "./PresentationSetup";
+import type { PresentationMode } from "@/features/questions/presentation";
+import { collectionId } from "@/features/sources/api";
 
 const cameraCopy = {
   idle: "Enable your camera to check your framing. Then start recording when you’re ready.",
@@ -80,6 +83,8 @@ export function LiveStudio() {
     featureFlags,
   );
   const [title, setTitle] = useState("My pitch rehearsal");
+  const [presentationMode, setPresentationMode] =
+    useState<PresentationMode>("startup");
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("local");
   const microphone = mode === "backend" || featureFlags.liveSpeechFeedback;
@@ -207,6 +212,8 @@ export function LiveStudio() {
     busy.current = true;
     const generation = ++startGeneration.current;
     const config = {
+      presentationMode,
+      sourceCollectionId: collectionId(),
       title: title.trim(),
       targetMs,
       mode,
@@ -427,6 +434,21 @@ export function LiveStudio() {
           <p className="status-error" role="alert">
             {error}
           </p>
+        )}
+        {!largeView && (
+          <PresentationSetup
+            mode={presentationMode}
+            onMode={setPresentationMode}
+            endpoint={endpoint}
+            disabled={!!progress}
+            prepared={mode === "backend" && transcribe}
+            onPrepare={() => {
+              stopCamera();
+              setMode("backend");
+              setTranscribe(true);
+              setLiveCaptions(true);
+            }}
+          />
         )}
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
