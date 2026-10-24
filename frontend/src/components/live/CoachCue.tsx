@@ -17,15 +17,29 @@ function Cockatoo() {
   );
 }
 
-export function CoachCue({ message }: { message: string }) {
+export function CoachCue({
+  message,
+  detail,
+  state = "idle",
+  className = "",
+}: {
+  message: string;
+  detail?: string;
+  state?: "alert" | "ok" | "idle";
+  className?: string;
+}) {
   return (
-    <div className="live-pose-cue" role="status">
+    <div
+      className={`live-pose-cue ${className}`.trim()}
+      data-state={state}
+      role="status"
+    >
       <span className="coach-avatar">
         <Cockatoo />
       </span>
       <p className="coach-bubble">
         {message}
-        <small>Heuristic</small>
+        <small>{detail ? `${detail} · heuristic` : "Heuristic"}</small>
       </p>
     </div>
   );

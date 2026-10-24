@@ -1,5 +1,9 @@
 import { armsCrossed } from "./cues";
-import type { HandSample, PoseSample } from "./sample";
+import type {
+  HandLandmark,
+  HandSample,
+  PoseSample,
+} from "./sample";
 
 type RawPoint = [number, number, number, number | null, number | null];
 
@@ -11,7 +15,10 @@ const px = (p: RawPoint, image: { width: number; height: number }) => ({
   y: p[1] * image.height,
 });
 
-export function faceDistance(sample: PoseSample | null) {
+export function faceDistance(
+  sample: PoseSample | null,
+  hands: HandSample[] = [],
+) {
   if (!sample) return null;
   const { image, pose } = sample;
   if (!usable(pose.left_shoulder) || !usable(pose.right_shoulder)) return null;
@@ -21,13 +28,26 @@ export function faceDistance(sample: PoseSample | null) {
   if (span < 1e-6) return null;
   const face = [pose.nose, pose.left_eye, pose.right_eye].filter(usable);
   const wrists = [pose.left_wrist, pose.right_wrist].filter(usable);
-  if (!face.length || !wrists.length) return null;
+  if (!face.length) return null;
+  const handPoints = wrists.map((wrist) => px(wrist, image));
+  // Fingertips are closer to the face than the pose wrist on a chin touch.
+  for (const hand of hands) {
+    if (hand.score < 0.5) continue;
+    for (const index of [8, 12]) {
+      const tip = hand.landmarks[index];
+      if (tip)
+        handPoints.push({
+          x: tip[0] * image.width,
+          y: tip[1] * image.height,
+        });
+    }
+  }
+  if (!handPoints.length) return null;
   let best = Infinity;
-  for (const wrist of wrists) {
-    const w = px(wrist, image);
+  for (const hand of handPoints) {
     for (const point of face) {
       const f = px(point, image);
-      best = Math.min(best, Math.hypot(w.x - f.x, w.y - f.y));
+      best = Math.min(best, Math.hypot(hand.x - f.x, hand.y - f.y));
     }
   }
   return best / span;
@@ -90,6 +110,26 @@ const HAND = {
   pinkyTip: 20,
 } as const;
 
+const FINGER_TIPS = [
+  HAND.indexTip,
+  HAND.middleTip,
+  HAND.ringTip,
+  HAND.pinkyTip,
+] as const;
+
+export const POCKET = {
+  // Visible fingertips of a pocketed hand stay compressed near the wrist.
+  maxReach: 0.24,
+  // A hanging arm is almost straight; a hand in a pocket usually bends it.
+  // Only the weak "hand hidden" branch needs this; visible fingertips are
+  // stronger evidence and also catch a straight arm at a side pocket.
+  maxElbowDeg: 120,
+  minDownTips: 2,
+  minTipsInZone: 2,
+  // A detected hand within this distance is not "hidden".
+  hiddenRadius: 0.35,
+} as const;
+
 export type PocketCheck = {
   evaluable: boolean;
   kind: "fingers" | "hidden" | null;
@@ -110,7 +150,8 @@ const inPocket = (
 /**
  * Fingertracking heuristic. A hand tucked into a pocket is either partly
  * visible and compressed, or not found near a wrist that sits at the hip.
- * A relaxed open hand hangs long below the wrist and must not match.
+ * A relaxed open hand hangs long below the wrist and must not match. The
+ * elbow angle separates a hanging arm (nearly straight) from a pocket.
  */
 export function handAtPocket(
   sample: PoseSample | null,
@@ -136,37 +177,77 @@ export function handAtPocket(
   const hips = [pose.left_hip, pose.right_hip]
     .filter(usable)
     .map((hip) => px(hip, image));
-  const wrists = [pose.left_wrist, pose.right_wrist]
-    .filter(usable)
-    .map((wrist) => px(wrist, image));
+  const wrists = [
+    { point: pose.left_wrist, elbow: sample.derived.left_elbow_deg },
+    { point: pose.right_wrist, elbow: sample.derived.right_elbow_deg },
+  ]
+    .filter(
+      (wrist): wrist is { point: RawPoint; elbow: number | null } =>
+        usable(wrist.point),
+    )
+    .map(({ point, elbow }) => ({ ...px(point, image), elbow }));
   if (!hips.length || !wrists.length)
     return { evaluable: false, kind: null, display: "no hips" };
   const inZone = (p: { x: number; y: number }) =>
     hips.some((hip) => inPocket(p.x, p.y, hip, span));
+  const elbowFor = (p: { x: number; y: number }) =>
+    wrists.reduce(
+      (best, wrist) => {
+        const distance = Math.hypot(wrist.x - p.x, wrist.y - p.y);
+        return distance < best.distance
+          ? { distance, elbow: wrist.elbow }
+          : best;
+      },
+      { distance: Infinity, elbow: null as number | null },
+    ).elbow;
 
   for (const hand of hands) {
+    if (hand.score < 0.5) continue;
     const wrist = hand.landmarks[HAND.wrist];
-    const middle = hand.landmarks[HAND.middleTip];
-    if (!wrist || !middle) continue;
+    if (!wrist) continue;
     const w = { x: wrist[0] * image.width, y: wrist[1] * image.height };
     if (!inZone(w)) continue;
-    const m = {
-      x: middle[0] * image.width,
-      y: middle[1] * image.height,
-    };
-    const length = Math.hypot(m.x - w.x, m.y - w.y) / span;
-    // In a pocket the visible hand is compressed; a hanging hand is long.
-    if (length <= 0.22)
-      return { evaluable: true, kind: "fingers", display: `${length.toFixed(2)}×SW` };
+    const elbow = elbowFor(w);
+    // A straight arm at the hip is a relaxed hand, not a pocket.
+    if (elbow === null || elbow > POCKET.maxElbowDeg) continue;
+    const tips = FINGER_TIPS.map((index) => hand.landmarks[index])
+      .filter((tip): tip is HandLandmark => !!tip)
+      .map((tip) => ({
+        x: tip[0] * image.width,
+        y: tip[1] * image.height,
+      }));
+    if (!tips.length) continue;
+    const reach =
+      Math.max(
+        ...tips.map((tip) => Math.hypot(tip.x - w.x, tip.y - w.y)),
+      ) / span;
+    const down = tips.filter((tip) => tip.y > w.y).length;
+    const tipsInZone = tips.filter((tip) => inZone(tip)).length;
+    // Compressed fingertips prove that the hand is tucked in, not hanging.
+    if (
+      reach <= POCKET.maxReach &&
+      (down >= POCKET.minDownTips || tipsInZone >= POCKET.minTipsInZone)
+    )
+      return {
+        evaluable: true,
+        kind: "fingers",
+        display: `${reach.toFixed(2)}×SW`,
+      };
   }
 
   for (const wrist of wrists) {
     if (!inZone(wrist)) continue;
+    // Straight arms hang at the hip in the neutral pose; do not call that a pocket.
+    if (wrist.elbow === null || wrist.elbow > POCKET.maxElbowDeg) continue;
     const covered = hands.every((hand) => {
+      if (hand.score < 0.5) return true;
       const p = hand.landmarks[HAND.wrist];
       if (!p) return true;
       const h = { x: p[0] * image.width, y: p[1] * image.height };
-      return Math.hypot(h.x - wrist.x, h.y - wrist.y) > 0.35 * span;
+      return (
+        Math.hypot(h.x - wrist.x, h.y - wrist.y) >
+        POCKET.hiddenRadius * span
+      );
     });
     if (covered)
       return { evaluable: true, kind: "hidden", display: "hand hidden at hip" };
@@ -194,7 +275,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Stand centered, arms relaxed, head straight.",
     kind: "baseline",
     priority: 0,
-    holdMs: 800,
+    holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
     evaluate(sample) {
@@ -218,7 +299,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Lean sideways; keep both hips in frame.",
     kind: "alert",
     priority: 40,
-    holdMs: 1500,
+    holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
     evaluate(sample) {
@@ -234,7 +315,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Drop one shoulder clearly below the other.",
     kind: "alert",
     priority: 30,
-    holdMs: 1500,
+    holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
     evaluate(sample) {
@@ -250,7 +331,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Tilt your head clearly toward one shoulder.",
     kind: "alert",
     priority: 20,
-    holdMs: 1500,
+    holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
     evaluate(sample) {
@@ -266,7 +347,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Cross both arms in front of your chest.",
     kind: "alert",
     priority: 70,
-    holdMs: 2000,
+    holdMs: 0,
     releaseMs: 500,
     unknownReleaseMs: 1500,
     evaluate(sample) {
@@ -282,7 +363,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Touch your chin or cheek with one hand.",
     kind: "alert",
     priority: 50,
-    holdMs: 1500,
+    holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
     evaluate(sample) {
@@ -298,7 +379,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Turn your head clearly to one side.",
     kind: "alert",
     priority: 10,
-    holdMs: 1500,
+    holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
     evaluate(sample) {
@@ -323,7 +404,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Raise both hands above shoulder height.",
     kind: "alert",
     priority: 15,
-    holdMs: 800,
+    holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
     evaluate(sample) {
@@ -340,7 +421,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Keep shoulders visible but move your hips out of frame.",
     kind: "framing",
     priority: 0,
-    holdMs: 1500,
+    holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
     evaluate(sample) {
@@ -360,16 +441,21 @@ export const POSE_TESTS: PoseTestDefinition[] = [
     instruction: "Hide both hands behind your back or in pockets.",
     kind: "alert",
     priority: 60,
-    holdMs: 1500,
+    holdMs: 0,
     releaseMs: 300,
     unknownReleaseMs: 800,
-    evaluate(sample) {
+    evaluate(sample, hands) {
       const shoulders = sample?.derived.shoulder_tilt_deg ?? null;
       const left = sample?.derived.left_wrist_height ?? null;
       const right = sample?.derived.right_wrist_height ?? null;
       if (shoulders === null) return missing("no shoulders");
-      const pass = left === null && right === null;
-      return measured(null, pass, pass ? "both hidden" : "visible");
+      const visibleHand = hands.some((hand) => hand.score >= 0.5);
+      const pass = left === null && right === null && !visibleHand;
+      return measured(
+        null,
+        pass,
+        pass ? "both hidden" : visibleHand ? "hand detected" : "visible",
+      );
     },
   },
   {
@@ -379,7 +465,7 @@ export const POSE_TESTS: PoseTestDefinition[] = [
       "Tuck one hand into a trouser pocket; leave the thumb out.",
     kind: "alert",
     priority: 100,
-    holdMs: 1500,
+    holdMs: 0,
     releaseMs: 500,
     unknownReleaseMs: 1200,
     evaluate(sample, hands) {
@@ -482,6 +568,7 @@ export class PoseTestTracker {
 
 export type PoseFeedback = {
   state: "alert" | "ok" | "idle";
+  id: PoseTestId | null;
   label: string;
   detail: string;
 };
@@ -491,14 +578,48 @@ export function poseFeedback(results: PoseTestResult[]): PoseFeedback {
     (result) => result.kind === "alert" && result.state === "recognized",
   );
   const top = alerts.sort((a, b) => b.priority - a.priority)[0];
-  if (top) return { state: "alert", label: top.label, detail: top.display };
+  if (top)
+    return {
+      state: "alert",
+      id: top.id,
+      label: top.label,
+      detail: top.display,
+    };
   const neutral = results.find((result) => result.id === "neutral");
   if (neutral?.state === "recognized")
-    return { state: "ok", label: "OK", detail: "posture neutral" };
+    return {
+      state: "ok",
+      id: "neutral",
+      label: "OK",
+      detail: "posture neutral",
+    };
   const framing = results.find(
     (result) => result.kind === "framing" && result.state === "recognized",
   );
   if (framing)
-    return { state: "idle", label: "—", detail: framing.label };
-  return { state: "idle", label: "—", detail: "hold a test pose" };
+    return {
+      state: "idle",
+      id: framing.id,
+      label: "—",
+      detail: framing.label,
+    };
+  return { state: "idle", id: null, label: "—", detail: "hold a test pose" };
+}
+
+const COACH_MESSAGES: Record<PoseTestId, string> = {
+  neutral: "Nice, open posture.",
+  "torso-lean": "Straighten up a little.",
+  "shoulder-tilt": "Level your shoulders.",
+  "head-tilt": "Keep your head upright.",
+  "arms-crossed": "Try uncrossing your arms!",
+  "self-touch": "Hands away from your face.",
+  "look-away": "Look back toward the camera.",
+  "hands-up": "Lower your hands.",
+  "hips-out": "Step back so your hips are in frame.",
+  "hands-hidden": "Bring your hands into view.",
+  pocket: "Take your hand out of your pocket.",
+};
+
+export function coachMessage(id: PoseTestId | null) {
+  return id ? COACH_MESSAGES[id] : "Hold a test pose.";
 }

@@ -160,9 +160,10 @@ sichtbar (Hüfthöhe). Das kann eine Tasche, eine Jacke oder eine verdeckte Hand
 sein – keine Bewertung.“
 
 **MUSS:** Der Hand Landmarker läuft nur lokal und nur für den Dev-Check
-„Hand in pocket“ (FR-POSE-20). Er erzeugt keine Events, Clips oder
-Backend-Payloads. Eine vollständig verdeckte Hand sieht er nicht; der
-`hidden`-Zweig bleibt eine Sichtbarkeits-Heuristik.
+„Hand in pocket“ (FR-POSE-20). Er nutzt Handgelenk und Fingerspitzen
+(8/12/16/20) und erzeugt keine Events, Clips oder Backend-Payloads. Eine
+vollständig verdeckte Hand sieht er nicht; der `hidden`-Zweig bleibt eine
+Sichtbarkeits-Heuristik.
 
 ### FR-POSE-09 — Füße und Stand
 
@@ -293,33 +294,41 @@ IndexedDB-Quota und WebM-Seekbarkeit prüfen.
 ### FR-POSE-19 — Dev mode „Pose Lab“
 
 **MUSS:** Im `/live`-Workspace gibt es einen „Pose lab“-Toggle. Bei aktiver
-Kamera zeigt er **genau ein** großes Statusfeld, kein Testprotokoll und keine
-Liste. Grün bei neutraler Haltung (`OK`), rot bei einer erkannten Abweichung,
-grau ohne Auswertung (`—`).
+Kamera zeigt er **eine von zwei umschaltbaren Darstellungen** derselben
+dominanten Pose, nie eine Liste:
+
+- **Coach:** Cockatoo-Avatar mit Sprechblase, die die Pose anspricht
+  (z. B. „Try uncrossing your arms!“). Das ist die Standardansicht.
+- **Status:** genau ein großes Statusfeld mit Pose und Messwert, grün bei
+  neutraler Haltung (`OK`), rot bei einer erkannten Abweichung, grau ohne
+  Auswertung (`—`).
+
+Der Umschalter („Coach view“ / „Status view“) ist nur bei aktivem Pose Lab
+sichtbar. Beide Darstellungen zeigen dieselbe Priorität; bei Rot pulsiert
+die Anzeige und die Videobühne erhält einen roten Rahmen, damit es aus der
+Ferne lesbar ist.
 
 **MUSS:** Bei mehreren erkannten Abweichungen gewinnt die höchste Priorität:
 Pocket > Arme verschränkt > Hände verdeckt > Hand im Gesicht > Rumpf-Neigung >
-Schultertilt > Kopflateral > Hände hoch > Kopf weg. Das Feld nennt Pose und
-Messwert; bei Rot pulsiert es und die Videobühne erhält einen roten Rahmen,
-damit es aus der Ferne lesbar ist.
+Schultertilt > Kopflateral > Hände hoch > Kopf weg.
 
-**MUSS:** `recognized` erscheint erst nach der jeweiligen Haltezeit. Die
-Anzeige ist rein lokal, erzeugt keine Events, keine Scores und keine
-Backend-Aufrufe.
+**MUSS:** `recognized` erscheint im Dev-Modus sofort (`holdMs` 0); nur der
+Release-/Unknown-Grace bleibt. Die Anzeige ist rein lokal, erzeugt keine
+Events, keine Scores und keine Backend-Aufrufe.
 
-| ID | Testpose | Erkennung | Haltezeit |
+| ID | Testpose | Erkennung | Anzeige |
 |---|---|---|---|
-| T01 | Neutral / Baseline | Rumpf ±8°, Schulter ±6°, Kopf ±8°, Arme offen | 0,8 s |
-| T02 | Rumpf-Seitneigung | `|trunkLean| ≥ 20°` | 1,5 s |
-| T03 | Schultertilt | `|shoulderTilt| ≥ 10°` | 1,5 s |
-| T04 | Kopflateral | `|headRoll| ≥ 12°` | 1,5 s |
-| T05 | Arme verschränkt | bestehende `armsCrossed`-Heuristik | 2,0 s |
-| T06 | Hand im Gesicht | Hand–Gesicht-Abstand ≤ 0,60 × Schulterbreite | 1,5 s |
-| T07 | Kopf weg | `|headTurn| ≥ 0.35` (Proxy) | 1,5 s |
-| T08 | Hände über Schulter | beide `wristHeight > 0.20 × Schulterbreite` | 0,8 s |
-| T09 | Hüften außerhalb | Schultern sichtbar, `trunkLean` nicht auswertbar | 1,5 s |
-| T10 | Hände verdeckt | beide Handgelenkhöhen nicht messbar | 1,5 s |
-| T11 | Hand in der Hosentasche | Fingertracking-Heuristik (FR-POSE-20) | 1,5 s |
+| T01 | Neutral / Baseline | Rumpf ±8°, Schulter ±6°, Kopf ±8°, Arme offen | sofort |
+| T02 | Rumpf-Seitneigung | `|trunkLean| ≥ 20°` | sofort |
+| T03 | Schultertilt | `|shoulderTilt| ≥ 10°` | sofort |
+| T04 | Kopflateral | `|headRoll| ≥ 12°` | sofort |
+| T05 | Arme verschränkt | Handgelenke an/nahe der Körpermitte, Unterarm ≤ 40° zur Schulterlinie | sofort |
+| T06 | Hand im Gesicht | Hand–Gesicht-Abstand ≤ 0,60 × Schulterbreite | sofort |
+| T07 | Kopf weg | `|headTurn| ≥ 0.35` (Proxy) | sofort |
+| T08 | Hände über Schulter | beide `wristHeight > 0.20 × Schulterbreite` | sofort |
+| T09 | Hüften außerhalb | Schultern sichtbar, `trunkLean` nicht auswertbar | sofort |
+| T10 | Hände verdeckt | beide Handgelenkhöhen nicht messbar | sofort |
+| T11 | Hand in der Hosentasche | Fingerspitzen komprimiert + Ellbogen ≤ 120° (FR-POSE-20) | sofort |
 
 **MUSS:** T10 ist ein **Sichtbarkeitstest**, kein Taschenbeweis. T07 ist ein
 **Kopforientierungs-Proxy**, kein Gaze. T11 ist eine Heuristik, kein Beweis
@@ -336,15 +345,17 @@ ein Pose-Handgelenk in Hüftnähe ist, sonst ca. 1,6 Hz. Hand-Landmarks werden
 nicht in das JSONL-Log geschrieben.
 
 **MUSS:** `handAtPocket` prüft zwei Fälle:
-1. **Fingers:** Eine erkannte Hand hat das Handgelenk in der Hüftzone und die
-   sichtbare Wrist→Middle-Tip-Länge ist ≤ 0,22 Schulterbreiten (komprimierte
-   Hand).
-2. **Hidden:** Ein Pose-Handgelenk liegt in der Hüftzone und keine erkannte
-   Hand liegt innerhalb von 0,35 Schulterbreiten (Proxy für verdeckte Hand).
+1. **Fingers:** Eine erkannte Hand hat das Handgelenk in der Hüftzone, der
+   Ellbogen ist ≤ 120° gebeugt und die Fingerspitzen 8/12/16/20 bleiben
+   komprimiert: maximale Wrist→Tip-Distanz ≤ 0,24 Schulterbreiten.
+2. **Hidden:** Ein Pose-Handgelenk liegt in der Hüftzone, der Ellbogen ist
+   ≤ 120° gebeugt und keine erkannte Hand liegt innerhalb von 0,35
+   Schulterbreiten (Proxy für eine verdeckte Hand).
 
-Eine locker hängende, offene Hand (Länge > 0,22) zählt nicht als Tasche. Die
-Hüftzone ist |x − hip.x| ≤ 0,24 und −0,02 ≤ (y − hip.y) ≤ 0,45 in
-Schulterbreiten.
+Eine locker hängende, offene Hand (max. Reach > 0,24) zählt nicht als Tasche.
+Ein gerader Arm an der Hüfte (Ellbogen > 120°) zählt nicht, weil er auch in
+der neutralen Pose auftritt. Die Hüftzone ist |x − hip.x| ≤ 0,24 und
+−0,02 ≤ (y − hip.y) ≤ 0,45 in Schulterbreiten.
 
 **MUSS:** UI-Text „Hand in pocket“ nur zusammen mit dem Detail
 (`fingers` oder `hidden at hip`). Keine Sicherheit, keine Event-Erzeugung.
@@ -813,8 +824,9 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
    `evaluable=false`.
 3. **Hände:** In Produktions-Events kein String „Tasche“; optional
    `hand-hidden-near-torso` mit `confidence: low`. Im Dev-Modus erkennt T11
-   eine komprimierte Hand an der Hüfte oder eine verdeckte Hand als
-   Heuristik und erzeugt kein Event.
+   komprimierte Fingerspitzen an der Hüfte mit gebeugtem Ellbogen oder eine
+   verdeckte Hand als Heuristik; ein gerader Arm an der Hüfte zählt nicht.
+   T11 erzeugt kein Event.
 4. **Füße:** Im `upper-body`-Modus keine Fußmetrik; im `full-body`-Modus ohne
    sichtbare Füße `evaluable=false`.
 5. **Kopf:** `camera`-Modus liefert CFR/OffRatio/ReturnRate; `room`-Modus
@@ -843,7 +855,7 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 | OD-5 | Kalibrierungs-Set | 10–20 Personen, 0,5/1/2 m, Brille, Licht, Hauttöne; Precision/Recall berichten | offen |
 | OD-6 | Default `audienceMode` | Kein stiller Default; Demo `camera` | entschieden |
 | OD-7 | R7 live freigeben? | Erst nach Precision ≥ 90 % auf Demo-Set | offen |
-| OD-8 | Bestehende Live-Regel „Arme verschränkt“ (2 s, 20 s Cooldown, Chip) | Auf post-hoc downgraden (R4, 3 s, keine Live-Anzeige) oder als explizite Ausnahme mit Precision-Gate behalten | offen |
+| OD-8 | Live-Regel „Arme verschränkt“ | Aktuell Coach-Sprechblase mit `minCross −0,25`, Unterarm ≤ 40°, sofort, ohne Cooldown (Hassan-Commit). Auf post-hoc downgraden (R4, 3 s, keine Live-Anzeige) oder als explizite Ausnahme mit Precision-Gate behalten | offen |
 
 ## 11. Research-Entscheidungen
 
@@ -863,10 +875,13 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 - **Gesten:** Pose-only reicht für GPM, Amplitude, Zwei-Hand-Anteil und
   Gestenraum. Semantische Typen brauchen ein eigenes Modell. Kein „mehr ist
   besser“.
-- **Bestehende Implementierung:** Die bereits gebaute Live-Regel „Arme
-  verschränkt“ (2 s Dwell, 20 s Cooldown) ist eine Heuristik mit hohem
-  False-Positive-Risiko (gefaltete Hände, Presenter, Okklusion). Die
-  Anforderungen empfehlen R4 nur post-hoc; die Entscheidung steht in OD-8.
+- **Bestehende Implementierung:** Die Live-Regel „Arme verschränkt“ nutzt
+  jetzt Handgelenke an/nahe der Körpermitte (`minCross −0,25`), einen
+  Unterarmwinkel ≤ 40° zur Schulterlinie und zeigt sofort ohne Cooldown.
+  Das reduziert die wichtigsten False Positives (gekreuzte Handgelenke an
+  der Mittellinie, gefaltete Hände mit Fingerspitzen nach oben), bleibt
+  aber eine Heuristik. Die Anforderungen empfehlen R4 nur post-hoc; die
+  Entscheidung steht in OD-8.
 
 ## 12. Quellen (Auswahl)
 
@@ -892,3 +907,4 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 | 24.10.2026 | Anforderungen angelegt | Deep Research zu Haltung, Kopforientierung, Händen, Füßen und Gesten; finale Datenmodelle und Regeln festgehalten. |
 | 24.10.2026 | Pose-Lab ergänzt | Zehn feste Testposen für den lokalen Debug-Modus; keine Events, kein Backend-Streaming, keine Scores. |
 | 24.10.2026 | Pose-Lab auf ein Output-Feld umgestellt; Pocket-Check per Hand-Landmarker | Nutzerentscheidung: falsche Pose live rot aus der Ferne erkennbar; Hosentaschen-Erkennung über Fingertracking. |
+| 24.10.2026 | Hassan-Crossed-Logik übernommen; Coach-/Status-Umschalter; Fingerspitzen-Pocket | Handgelenke an der Mittellinie und Unterarmwinkel ≤ 40°; Coach-Sprechblase als Standard, großes Statusfeld umschaltbar; Pocket prüft Fingerspitzen 8/12/16/20 und Ellbogen ≤ 120°. |

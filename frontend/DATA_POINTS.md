@@ -146,15 +146,18 @@ Regeln:
 ## Pocket-Check (Dev, live-only)
 
 Der Pose Lab im `/live`-Workspace nutzt den Hand Landmarker für eine
-Heuristik „Hand in pocket“. Verwendet werden nur Handgelenk (0) und
-Fingerspitzen (4, 8, 12, 16, 20); die Landmarks bleiben im Browser und
+Heuristik „Hand in pocket“. Verwendet werden Handgelenk (0) und die
+Fingerspitzen (8, 12, 16, 20); die Landmarks bleiben im Browser und
 erscheinen nicht im JSONL.
 
-- Handgelenk in der Hüftzone und sichtbare Wrist→Middle-Tip-Länge
-  ≤ 0,22 Schulterbreiten → `fingers`.
-- Pose-Handgelenk in der Hüftzone und keine erkannte Hand innerhalb
-  0,35 Schulterbreiten → `hidden` (Proxy).
-- Eine locker hängende, offene Hand (Länge > 0,22) zählt nicht.
+- Handgelenk in der Hüftzone, Ellbogen ≤ 120° (Arm nicht locker gerade)
+  und die Fingerspitzen bleiben komprimiert: maximale Wrist→Tip-Distanz
+  ≤ 0,24 Schulterbreiten → `fingers`.
+- Pose-Handgelenk in der Hüftzone, Ellbogen ≤ 120° und keine erkannte
+  Hand innerhalb von 0,35 Schulterbreiten → `hidden` (Proxy für eine
+  vollständig verdeckte Hand).
+- Eine locker hängende, offene Hand (max. Reach > 0,24) zählt nicht.
+- Ein gerader Arm an der Hüfte (Ellbogen > 120°) zählt nicht als Tasche.
 - Keine Sicherheit, kein Event, kein Backend-Payload.
 
 ## Implementierter Frontend-Vertrag (24.10.2026)

@@ -10,6 +10,7 @@ import {
   Clock3,
   Eye,
   Maximize2,
+  MessageCircle,
   Mic,
   MicOff,
   Minimize2,
@@ -30,7 +31,7 @@ import type { LiveConfig, LiveProgress } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { PoseDownload } from "./PoseDownload";
-import { PoseDevMode } from "./PoseDevMode";
+import { PoseDevMode, type PoseView } from "./PoseDevMode";
 import { poseFeedback } from "@/features/pose/testPoses";
 import { CoachCue } from "./CoachCue";
 import { PoseOverlay } from "./PoseOverlay";
@@ -68,6 +69,7 @@ export function LiveStudio() {
   const [error, setError] = useState<string | null>(null);
   const [largeView, setLargeView] = useState(false);
   const [poseLab, setPoseLab] = useState(false);
+  const [poseView, setPoseView] = useState<PoseView>("coach");
   const poseAlert =
     poseLab &&
     pose.state?.phase === "running" &&
@@ -220,6 +222,21 @@ export function LiveStudio() {
             <Eye size={18} />
             Pose lab
           </Button>
+          {poseLab && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                setPoseView(poseView === "coach" ? "status" : "coach")
+              }
+            >
+              {poseView === "coach" ? (
+                <Eye size={18} />
+              ) : (
+                <MessageCircle size={18} />
+              )}
+              {poseView === "coach" ? "Status view" : "Coach view"}
+            </Button>
+          )}
           {largeView && (
             <strong className="live-view-time">
               {time(progress?.elapsedMs ?? 0)}
@@ -294,13 +311,13 @@ export function LiveStudio() {
                 !poseLab && (
                   <CoachCue message="Try uncrossing your arms!" />
                 )}
-                )}
               {cameraStatus === "active" &&
                 poseLab &&
                 pose.state?.phase === "running" && (
                   <PoseDevMode
                     results={pose.state.tests}
                     handModel={pose.state.handModel}
+                    view={poseView}
                   />
                 )}
               {cameraStatus !== "active" && (

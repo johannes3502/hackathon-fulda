@@ -112,19 +112,29 @@ function handsHidden(): Landmark[] {
   return p;
 }
 
+function pocketPose(): Landmark[] {
+  const p = base();
+  Object.assign(p[13], { x: 0.38, y: 0.55 });
+  Object.assign(p[15], { x: 0.25, y: 0.72 });
+  return p;
+}
+
 function hand(x: number, y: number, length: number): HandSample {
   const landmarks = Array.from(
     { length: 21 },
     () => [x, y, 0] as [number, number, number],
   );
   landmarks[0] = [x, y, 0];
-  landmarks[12] = [x, y + length, 0];
+  for (const tip of [8, 12, 16, 20])
+    landmarks[tip] = [x, y + length, 0];
   return { label: "Left", score: 0.9, landmarks };
 }
 
 it("measures hand-to-face distance in shoulder widths", () => {
   expect(faceDistance(sample())!).toBeGreaterThan(0.6);
   expect(faceDistance(sample(selfTouch()))!).toBeLessThan(0.1);
+  // The hand model finds a fingertip at the chin the pose wrist misses.
+  expect(faceDistance(sample(), [hand(0.5, 0.18, 0.05)])!).toBeLessThan(0.1);
   const hidden = base();
   hidden[15].visibility = 0;
   hidden[16].visibility = 0;
@@ -158,36 +168,45 @@ it("does not recognize the neutral pose while off baseline", () => {
   expect(evaluate("neutral", hipsOut()).pass).toBeNull();
 });
 
-it("recognizes only after the hold time and resets on release", () => {
+it("recognizes immediately and resets on release", () => {
   const tracker = new PoseTestTracker();
   const at = (points: Landmark[], t: number) =>
     tracker.update(sample(points), t).find((r) => r.id === "torso-lean")!;
-  expect(at(lean(), 0).state).toBe("watching");
-  expect(at(lean(), 1400).state).toBe("watching");
-  expect(at(lean(), 1500).state).toBe("recognized");
-  expect(at(base(), 1600).state).toBe("recognized");
-  expect(at(base(), 1900).state).toBe("off");
+  expect(at(lean(), 0).state).toBe("recognized");
+  expect(at(base(), 100).state).toBe("recognized");
+  expect(at(base(), 400).state).toBe("off");
 });
 
 it("marks missing data as not evaluable after the unknown grace period", () => {
   const tracker = new PoseTestTracker();
   const at = (points: Landmark[], t: number) =>
     tracker.update(sample(points), t).find((r) => r.id === "torso-lean")!;
-  expect(at(lean(), 0).state).toBe("watching");
-  expect(at(lean(), 1500).state).toBe("recognized");
-  expect(at(hipsOut(), 1600).state).toBe("recognized");
-  expect(at(hipsOut(), 2400).state).toBe("not-evaluable");
+  expect(at(lean(), 0).state).toBe("recognized");
+  expect(at(hipsOut(), 100).state).toBe("recognized");
+  expect(at(hipsOut(), 900).state).toBe("not-evaluable");
 });
 
 it("distinguishes a tucked hand from a relaxed open hand", () => {
-  expect(evaluate("pocket", base(), [hand(0.25, 0.75, 0.1)]).pass).toBe(true);
   expect(
-    evaluate("pocket", base(), [
-      hand(0.25, 0.75, 0.35),
-      hand(0.75, 0.75, 0.35),
+    evaluate("pocket", pocketPose(), [hand(0.25, 0.72, 0.1)]).pass,
+  ).toBe(true);
+  // A compressed hand at the hip with a straight arm is a relaxed hand.
+  expect(evaluate("pocket", base(), [hand(0.25, 0.75, 0.1)]).pass).toBe(false);
+  expect(
+    evaluate("pocket", pocketPose(), [
+      hand(0.25, 0.72, 0.35),
+      hand(0.75, 0.72, 0.35),
     ]).pass,
   ).toBe(false);
-  expect(evaluate("pocket", base(), []).pass).toBe(true);
+  // A bent arm at the hip with no detected hand is the hidden-pocket proxy.
+  expect(evaluate("pocket", pocketPose(), []).pass).toBe(true);
+});
+
+it("does not call hands hidden while the hand model sees a hand", () => {
+  expect(evaluate("hands-hidden", handsHidden()).pass).toBe(true);
+  expect(
+    evaluate("hands-hidden", handsHidden(), [hand(0.5, 0.5, 0.1)]).pass,
+  ).toBe(false);
 });
 
 it("shows exactly one prioritized output for the pose lab", () => {
@@ -197,7 +216,9 @@ it("shows exactly one prioritized output for the pose lab", () => {
     state: "ok",
     label: "OK",
   });
-  expect(poseFeedback(tracker.update(sample(), 1500, []))).toMatchObject({
+  expect(
+    poseFeedback(tracker.update(sample(pocketPose()), 1500, [])),
+  ).toMatchObject({
     state: "alert",
     label: "Hand in pocket",
   });

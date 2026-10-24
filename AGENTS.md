@@ -156,13 +156,16 @@ nutzen `app.sources.retrieval` (`search`, `format_context`, `quote_in_text`);
 beide sind noch nicht implementiert. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
-erste Live-Regel „Arme verschränkt“ als Overlay-Hinweis. Im `/live`-Workspace
-zeigt der Dev-Toggle „Pose lab“ genau ein Statusfeld (grün/rot) für elf
-Testposen; der Hand Landmarker erkennt eine Hand an der Hosentasche als
-Heuristik, ohne Event. Die finalen
-Pose-/Feedback-Regeln stehen in `docs/04-pose-tracking-requirements.md`;
-die Umsetzung ist noch offen (`frontend/DATA_POINTS.md` beschreibt das
-Roh-Logging).
+die Live-Regel „Arme verschränkt“ zeigt eine Coach-Sprechblase mit
+Cockatoo-Avatar (Handgelenke an/nahe der Körpermitte, Unterarm ≤ 40° zur
+Schulterlinie, sofort). Im `/live`-Workspace zeigt der Dev-Toggle „Pose lab“
+elf Testposen in zwei umschaltbaren Darstellungen: Coach-Sprechblase
+(Standard) oder großes Statusfeld (grün/rot/grau) mit Pose und Messwert. Der
+Hand Landmarker prüft für die Pocket-Heuristik die Fingerspitzen
+(8/12/16/20) und den Ellbogen; Treffer bleiben Dev-only, ohne Event. Die
+finalen Pose-/Feedback-Regeln stehen in
+`docs/04-pose-tracking-requirements.md`; die Umsetzung ist noch offen
+(`frontend/DATA_POINTS.md` beschreibt das Roh-Logging).
 Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
 jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte

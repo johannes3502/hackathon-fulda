@@ -218,6 +218,37 @@ body:has(.live-workspace-large) .app-footer,
   font-size: 10px;
   font-weight: 500;
 }
+.live-pose-cue[data-state="alert"] .coach-bubble {
+  border-color: #ef4444;
+  background: #7f1d1d;
+  color: #fff;
+}
+.live-pose-cue[data-state="alert"] .coach-bubble small {
+  color: #fecaca;
+}
+.live-pose-cue[data-state="alert"] .coach-bubble::before {
+  border-right-color: #ef4444;
+}
+.live-pose-cue[data-state="alert"] .coach-bubble::after {
+  border-right-color: #7f1d1d;
+}
+.live-pose-cue[data-state="ok"] .coach-bubble {
+  border-color: #22c55e;
+  background: #14532d;
+  color: #fff;
+}
+.live-pose-cue[data-state="ok"] .coach-bubble small {
+  color: #bbf7d0;
+}
+.live-pose-cue[data-state="ok"] .coach-bubble::before {
+  border-right-color: #22c55e;
+}
+.live-pose-cue[data-state="ok"] .coach-bubble::after {
+  border-right-color: #14532d;
+}
+.live-pose-cue-lab {
+  top: 100px;
+}
 @media (max-width: 640px) {
   .coach-avatar {
     width: 48px;
