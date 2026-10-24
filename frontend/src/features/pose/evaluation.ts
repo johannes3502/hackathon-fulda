@@ -1,6 +1,7 @@
 import { HEURISTICS, type PoseSample } from "./sample";
 import { CROSS_ARMS, crossArmsCheck } from "./cues";
 import type { PoseRuntime } from "./options";
+import type { LabRule } from "./lab-events";
 
 // Engineering settings for a visible, reproducible prototype, NOT validated
 // presentation-quality cutoffs. Rationale and acceptance protocol: docs/04-gesture-evaluation.md.
@@ -101,19 +102,21 @@ export type PoseEvent = {
   source: "browser";
   payload: {
     runtime?: PoseRuntime;
-    rule: PoseRule;
+    rule: PoseRule | LabRule;
     rule_version: string;
     heuristic: true;
     title: string;
     detail: string;
     action: string;
-    measurement: number;
-    initial_measurement: number;
+    // Pose lab rules have no calibrated baseline or single threshold.
+    measurement: number | null;
+    initial_measurement: number | null;
     baseline: number | null;
-    threshold: number;
-    unit: "shoulder widths" | "degrees" | "ear-distance ratio";
+    threshold: number | null;
+    unit: "shoulder widths" | "degrees" | "ear-distance ratio" | null;
     confirmed_at_ms: number;
-    calibration: Baseline;
+    calibration: Baseline | null;
+    values?: Record<string, number | boolean | string | null>;
   };
 };
 type Features = {
@@ -485,7 +488,9 @@ export class PoseEvaluator {
     );
     // One cue at a time; retain it while that observation is active, then allow the next.
     const active = [...this.holds.values()].flatMap((h) =>
-      h.event && this.modes[h.event.payload.rule] !== "review" ? [h.event] : [],
+      h.event && this.modes[h.event.payload.rule as PoseRule] !== "review"
+        ? [h.event]
+        : [],
     );
     let cue = active.find((e) => e.id === this.lastCueId) ?? null;
     if (!cue || t >= this.cueUntil) {
