@@ -164,12 +164,25 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
 - Silero v6.2 is installed and checksum-verified at image build time. CPU ONNX
   inference runs locally, without PyTorch or runtime downloads. `activity_detector:
   "energy"` explicitly selects the old energy gate for DSP tests/debugging.
-- Set `DEEPGRAM_API_KEY` in `.env`, then recreate backend/worker. Default ASR:
-  Nova-3, German, batch upload to `https://api.eu.deepgram.com/v1/listen`.
-  The audio is sent to this third party; only synthetic demo recordings are
-  intended at this stage. German filler preservation is **unverified** and the
-  English-only `filler_words` feature is not enabled.
-- Without a key, submit `transcribe=false` for local signal analysis, or set
+- Default ASR is local `faster-whisper` (`ASR_PROVIDER=whisper`, German).
+  The worker loads the model once per process; audio stays on the VM. Word
+  timestamps come from `word_timestamps=True`. Filler preservation and German
+  quality are model-dependent and not measured here.
+- `WHISPER_MODEL` is a **build argument** (default `small`). The Dockerfile
+  downloads the CTranslate2 model into `/app/models/whisper`; the runtime path
+  is `WHISPER_MODEL_PATH`. Change the model in `.env`, then
+  `docker compose up --build -d --wait`. CPU defaults to `int8`; available
+  sizes include `tiny`, `base`, `small`, `medium`, `large-v3`. Each worker
+  process holds its own model, so raise `CELERY_WORKER_CONCURRENCY` only with
+  enough RAM.
+- Optional tuning: `WHISPER_DEVICE` (`cpu`/`cuda`), `WHISPER_COMPUTE_TYPE`,
+  `WHISPER_LANGUAGE` (empty = auto-detect), `WHISPER_BEAM_SIZE`,
+  `WHISPER_VAD_FILTER`, `WHISPER_INITIAL_PROMPT`.
+- `ASR_PROVIDER=deepgram` remains available: set `DEEPGRAM_API_KEY` and
+  recreate backend/worker. Audio is then sent to the EU endpoint; only
+  synthetic demo recordings are intended. German filler preservation is
+  **unverified** and the English-only `filler_words` feature is not enabled.
+- Without ASR, submit `transcribe=false` for local signal analysis, or set
   `ASR_PROVIDER=json` to explicitly replay `app/demo/words.json`. Demo output is
   flagged `synthetic_demo=true`; those words are invented and not aligned to an
   arbitrary upload. Failed ASR never silently turns into fabricated feedback.
@@ -195,9 +208,10 @@ docker compose cp backend/tests/fixtures/speech-de.wav backend:/tmp/speech-de.wa
 docker compose exec -T backend python -m scripts.smoke_audio /tmp/speech-de.wav
 ```
 
-Use `--transcribe` only when the desired provider is configured. With
-`ASR_PROVIDER=json` this checks the explicit deterministic demo; with
-`ASR_PROVIDER=deepgram` it sends the synthetic audio to the paid ASR API.
+Use `--transcribe` to run the configured provider. The default local Whisper
+model works without credentials; `ASR_PROVIDER=json` checks the explicit
+deterministic demo, and `ASR_PROVIDER=deepgram` sends synthetic audio to the
+paid ASR API.
 
 For local inference outside Docker, from `backend/`:
 
@@ -213,12 +227,15 @@ contract tests use mocked HTTP responses and do not prove German ASR quality.
 ### Transcription (`app/transcription/`, `POST /transcription/analyze-words`)
 
 ```
-recording → FFmpeg WAV → Transcriber → words {word, start_ms, end_ms}
-  → events: filler (incl. repetition) | pause | pace   (source "asr")
+recording → FFmpeg 16 kHz WAV → Transcriber → words {word, start_ms, end_ms}
+  → text + events: filler (incl. repetition) | pause | pace   (source "asr")
 ```
 
-- `Transcriber` keeps the provider exchangeable. `DeepgramTranscriber` maps
-  seconds to millisecond word timestamps; `JsonTranscriber` replays demo words.
+- `Transcriber` keeps the provider exchangeable. `WhisperTranscriber` runs
+  `faster-whisper` locally and maps CTranslate2 word timestamps to
+  milliseconds; `DeepgramTranscriber` is the optional hosted adapter and
+  `JsonTranscriber` replays demo words. `RecordingAnalysis.text` joins the
+  words into a readable transcript; timestamps remain authoritative.
 - Fillers use a configurable list (still open, see `docs/01-product.md`);
   repetitions ("ich ich") are `filler` events with `payload.kind = "repetition"`.
 - Word-based pause and words-per-minute complement the signal-based values.

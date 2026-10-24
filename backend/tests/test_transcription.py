@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.transcription import JsonTranscriber, WordConfig, Word, analyze_words, run_transcription_pipeline
+from app.transcription import JsonTranscriber, WordConfig, Word, analyze_words, run_transcription_pipeline, transcript_text
 
 
 def words_from(spec: list[tuple[str, int, int]]) -> list[Word]:
@@ -28,6 +28,12 @@ def test_empty_transcript():
     assert result.events == []
     assert result.summary.word_count == 0
     assert result.summary.words_per_minute is None
+    assert transcript_text([]) == ""
+
+
+def test_transcript_text_joins_words_without_blank_tokens():
+    words = words_from([("Hallo,", 0, 200), (" ", 200, 250), ("Welt.", 250, 500)])
+    assert transcript_text(words) == "Hallo, Welt."
 
 
 def test_pause_detected_with_context():

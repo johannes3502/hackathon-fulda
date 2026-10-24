@@ -64,7 +64,8 @@ Produktentscheidung.
 - Lokales Grundgerüst: PostgreSQL und S3-Dateispeicher mit persistenten
   Docker-Volumes, ausschließlich für synthetische Entwicklungsdaten.
   Expliziter Audio-Upload unter `/speech/analyze`, keine automatische Aufzeichnung.
-  Celery verarbeitet Silero-VAD/RMS/YIN sowie optional Deepgram-ASR (EU, deutsch).
+  Celery verarbeitet Silero-VAD/RMS/YIN sowie standardmäßig lokales
+  faster-whisper (deutsch); Deepgram-ASR (EU) bleibt optional.
   Originale werden nach terminaler Verarbeitung gelöscht; Ergebnisse verbleiben
   in S3. Stalled Jobs und Speicherfehler benötigen noch eine Cleanup-Regel.
   Der Smoke-Test entfernt seine synthetischen Audiodaten wieder.
@@ -80,9 +81,10 @@ Produktentscheidung.
   MediaRecorder im Browser und SeaweedFS als S3-Dateispeicher;
   FFmpeg im Backend. Celery führt lange Arbeiten in einem separaten Worker
   aus, Redis dient als Queue und temporärer Ergebnisspeicher. Die
-  Post-Transkription nutzt Deepgram Nova-3 hinter einem austauschbaren Interface.
-  Deutsche Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und Speicherverhalten:
-  `backend/README.md`.
+  Post-Transkription nutzt standardmäßig lokales faster-whisper hinter einem
+  austauschbaren Interface; Deepgram Nova-3 (EU) ist optional. Deutsche
+  Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und
+  Speicherverhalten: `backend/README.md`.
 - Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
 - Hosting und Anbieter für Fact-Check/Frage-Agent bleiben offen.
 - Latenz, Ausfall-Fallback, Kosten.
@@ -116,3 +118,4 @@ einbauen**:
 | 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
 | 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |
+| 24.10.2026 | Lokale Whisper-Transkription als Standard | Nutzerauftrag: Speech-to-Text mit einem lokalen Modell statt Cloud-Zwang; Deepgram bleibt optional. |

@@ -269,7 +269,7 @@
           },
           "transcribe": {
             "default": true,
-            "description": "Send audio to configured ASR (default: Deepgram EU). false = local signal analysis only",
+            "description": "Run configured ASR (default: local Whisper). false = local signal analysis only",
             "title": "Transcribe",
             "type": "boolean"
           }
@@ -391,6 +391,10 @@
             "title": "Synthetic Demo",
             "type": "boolean"
           },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
           "transcription": {
             "anyOf": [
               {
@@ -412,6 +416,7 @@
         "required": [
           "audio",
           "words",
+          "text",
           "transcription",
           "events",
           "asr_provider"
@@ -678,7 +683,7 @@
     },
     "/speech/analyze": {
       "post": {
-        "description": "Store in S3 and enqueue analysis. Poll status_url for the result.\n\nGerman filler preservation is unverified. Originals are deleted after\nterminal processing. Demo recordings must be synthetic.",
+        "description": "Store in S3 and enqueue analysis. Poll status_url for the result.\n\nWhisper runs locally; German filler preservation is model-dependent.\nOriginals are deleted after terminal processing. Demo recordings must be synthetic.",
         "operationId": "analyze_speech_analyze_post",
         "requestBody": {
           "content": {

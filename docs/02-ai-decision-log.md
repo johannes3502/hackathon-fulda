@@ -19,6 +19,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 11 | Sprachanalyse auf das Audiosignal umstellen, Transkription trennen | Claude Code: `app/speech/` analysiert nur das Signal (Pegel, F0 per YIN, Sprachaktivität, Silbenspitzen als Zeitreihe; Events pause/volume/pitch/pace); wortbasierter Code nach `app/transcription/` (Events mit `source="asr"`); gemeinsames `Event`-Schema in `app/events.py` | Signalbasierte Silbenrate und Monotonie sind Näherungen; nur mit synthetischen Tönen geprüft, nicht mit echter Sprache. Testerwartung für Lautstärke korrigiert: Referenz ist der Median der ganzen Aufnahme inkl. leisem Abschnitt (≈ −10 dB statt theoretisch −15,6 dB) | Nutzerauftrag (Signal-Zeitreihe, Transkription als eigene Pipeline, alles mit Timestamp) | `backend/tests/`: 22 Tests bestanden (Python 3.12, lokal); 60 s synthetisches Audio in ≈ 0,7 s analysiert |
 | 12 | API-Vertrag für TypeScript generieren | Codex: OpenAPI-Export aus FastAPI, TypeScript-Typen und Aktualitätscheck ergänzt; Merge mit Celery/Redis zusammengeführt | Generierte Typen prüfen nur zur Compile-Zeit; freie Event-Payloads und JSON im Multipart-String bleiben untypisiert. Kein laufender Server für den Export nötig | Ausdrücklicher Nutzerauftrag für TypeScript-Generierung und Integration nach main | `api/`, `package.json`, zentrale `README.md`; Generierung, Aktualitätscheck und TypeScript-Kompilierung bestanden; 22 Backend-Tests nach der Konfliktlösung bestanden (Python 3.14, temporäre Testumgebung) |
 | 13 | ML-Audioanalyse mit Hintergrundjobs | Codex: Silero VAD v6.2 als gepinntes ONNX-Modell (SHA-256 geprüft), RMS/YIN beibehalten, 3-s-Kalibrierung; Deepgram Nova-3 (de, EU) hinter `Transcriber`; asynchroner Upload/Status und kombinierte Timeline, S3-Ergebnisse und Löschung der Originale | VAD nur an synthetischer Sprache/Rauschen geprüft; keine Genauigkeitsbehauptung. Deepgram-HTTP-Vertrag mit Mock geprüft, kein echter Anbieteraufruf ohne Schlüssel. Deutsche Füllworterhaltung laut Detaildokumentation nicht zugesichert; kein `filler_words=true`. Englische Feature-Unterstützung nicht auf Deutsch übertragen. JSON-Demo explizit markiert; kein stilles Ersetzen fehlgeschlagener ASR durch erfundene Wörter. S3-Ausfälle/abgebrochene Jobs können Cleanup verzögern; kein allgemeiner Retention-Job. Prozessabbruch zwischen bezahltem ASR-Aufruf und Speicherung kann diesen Aufruf wiederholen | Nutzer bestätigt vorgeschlagenes Vorgehen und eigenen Arbeitsbranch; Entscheidung für ersten austauschbaren ASR-Adapter innerhalb dieses Auftrags | `backend/tests/test_ml_audio.py`, `backend/tests/fixtures/`, `backend/scripts/smoke_audio.py`; Quellen und Prüfumfang unten |
+| 14 | Lokale Whisper-Transkription als Standard | Codex: faster-whisper hinter dem bestehenden `Transcriber`-Protokoll, lokales Modell im Image, Deepgram nur noch optional; `RecordingAnalysis.text` und regeneriertes API-Schema | Modellqualität, deutsche Füllwörter und Wortgrenzen nicht bewertet. Docker-Build mit Modelldownload nicht geprüft. PyAV 15.1.0 nötig, da 19.0.2 den faster-whisper-Dekoder bricht. Kein Cloud-Zwang, aber auch kein Nachweis besserer Erkennung | Nutzerauftrag: Speech-to-Text mit lokalem Modell, Review vor Push | 37 Backend-Tests bestanden, ein Silero-Test übersprungen; echter `tiny`-Lauf über `run_analysis` mit synthetischer deutscher Sprache; API-Aktualitätscheck bestanden; Details unten |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -133,3 +134,31 @@ oben dokumentierte fehlende Audio-UI-Anbindung für die lokale Signalanalyse beh
 Prüfung vor PR/Merge: 33 Backend-Tests (echtes Silero-Modell), 26 Frontend-Tests,
 sechs Browser-Tests mit synthetischer Kamera auf Desktop/schmalem Viewport,
 TypeScript, ESLint, Produktionsbuild und API-Aktualitätscheck bestanden.
+
+## Lokale Whisper-Transkription als Standard (24.10.2026)
+
+- Nutzerauftrag: Speech-to-Text mit einem lokalen Modell statt Cloud-Zwang.
+  `faster-whisper` 1.2.1 läuft im bestehenden Celery-Worker auf CPU und liefert
+  Wort-Timestamps; `WhisperTranscriber` implementiert weiterhin das vorhandene
+  `Transcriber`-Protokoll. Deepgram bleibt als optionaler Adapter erhalten,
+  JSON nur als explizit gewählte synthetische Demo.
+- Modell: [faster-whisper](https://github.com/SYSTRAN/faster-whisper),
+  [CTranslate2](https://github.com/OpenNMT/CTranslate2),
+  [Systran/faster-whisper-small](https://huggingface.co/Systran/faster-whisper-small)
+  (MIT). Das Image lädt das Modell beim Build nach `/app/models/whisper`; zur
+  Laufzeit wird nicht nachgeladen. `WHISPER_MODEL` ist ein Build-Argument,
+  `WHISPER_MODEL_PATH` zeigt auf die eingebetteten Dateien.
+- Ergebnis enthält zusätzlich `RecordingAnalysis.text`; die Wortliste bleibt
+  für Timestamps und Events maßgeblich. Das OpenAPI-/TypeScript-Schema wurde
+  regeneriert.
+- PyAV ist auf 15.1.0 begrenzt: Mit 19.0.2 bricht der Dekoder mit
+  `TypeError: open() got an unexpected keyword argument 'metadata_errors'` ab.
+- Verifiziert nativ mit Python 3.13 und ffmpeg 7.1.5: 37 Backend-Tests bestanden,
+  ein Silero-Test übersprungen (kein lokales Modell); dazu ein echter
+  `tiny`-Lauf über `run_analysis` mit `tests/fixtures/speech-de.wav`, inklusive
+  Text und Wort-Timestamps. Standardmodell `small` wurde nicht qualitativ
+  bewertet.
+- Nicht verifiziert: Docker-Build mit Modell-Download (Docker in dieser VM nicht
+  verfügbar), deutsche Füllwortqualität, menschliche Stimmen, GPU/`cuda`,
+  Latenz und Speicherbedarf des `small`-Modells pro Worker. Keine Aussage zur
+  Erkennungsgenauigkeit.

@@ -39,11 +39,11 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker, FaceLandmarker (Iris, Kopfausrichtung), HandLandmarker |
 | Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
 | Medien-Verarbeitung | `ffmpeg` im Backend: Clips schneiden, WebM/MP4 remuxen (seekbar machen) |
-| Transkription | Gehostete ASR-API hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}`), damit der Anbieter austauschbar bleibt |
+| Transkription | Lokales Whisper (`faster-whisper`) hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}` + Text), Deepgram optional; Anbieter bleibt austauschbar |
 
 **Vorschläge, noch zu bestätigen** (Bestätigung im `docs/02-ai-decision-log.md` festhalten; Vorlage: `templates/ai-decision-log.md`)
 
-- **Transkription:** Stufe A (zuerst): Audio nach dem Stoppen hochladen, Wort-Timestamps zurück. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg → Anbieter mit Füllwort-Option prüfen (z. B. Deepgram, AssemblyAI) oder `faster-whisper`/CrisperWhisper als lokale Alternative. Wort-Timestamps und Füllwort-Unterstützung des gewählten Modells vor der Entscheidung gegen die aktuelle Doku prüfen.
+- **Transkription:** Stufe A (umgesetzt): Audio nach dem Stoppen hochladen, Wort-Timestamps und Text zurück. Standard ist lokales `faster-whisper` (deutsch), damit keine Audiodaten an einen Cloudanbieter gehen; Deepgram bleibt als optionaler Adapter verfügbar. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg; deutsche Füllwortqualität ist ungeprüft. Wort-Timestamps sind vorhanden.
 - **Embeddings:** mehrsprachiges Modell (Inhalte sind deutsch), z. B. Voyage, OpenAI oder lokal bge-m3 / multilingual-e5. Bei wenigen kleinen Dokumenten reicht auch Long-Context ohne Vektoren.
 - **Fact-Check und Frage-Agent:** ein LLM-Anbieter für beides. Für den Web-Fetch-Agent Anbieter-Tool für Suche/Abruf nutzen, kein eigenes Scraping.
 - **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
@@ -151,8 +151,9 @@ jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
 Analyse-Pipelines mit S3-Persistenz für kombinierte Jobs, beide mit `t_ms` ab Aufnahmestart im
 gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als
 Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription
-(`backend/app/transcription/`, Deepgram Nova-3 über EU-Endpunkt; deutsche
-Füllworterhaltung ungeprüft). Silero VAD v6.2 (ONNX, lokal) erkennt
+(`backend/app/transcription/`, standardmäßig lokales faster-whisper; Deepgram
+Nova-3 über EU-Endpunkt optional; deutsche Füllworterhaltung ungeprüft).
+Das Ergebnis enthält zusätzlich den zusammengesetzten Transkripttext. Silero VAD v6.2 (ONNX, lokal) erkennt
 Sprachaktivität; RMS und YIN bleiben erhalten, Standard-Kalibrierung 3 s. Die Umstellung des Speichers
 ist eine separate Implementierungsaufgabe.
 

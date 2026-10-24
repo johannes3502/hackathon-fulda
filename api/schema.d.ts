@@ -51,8 +51,8 @@ export interface paths {
          * Analyze
          * @description Store in S3 and enqueue analysis. Poll status_url for the result.
          *
-         *     German filler preservation is unverified. Originals are deleted after
-         *     terminal processing. Demo recordings must be synthetic.
+         *     Whisper runs locally; German filler preservation is model-dependent.
+         *     Originals are deleted after terminal processing. Demo recordings must be synthetic.
          */
         post: operations["analyze_speech_analyze_post"];
         delete?: never;
@@ -192,7 +192,7 @@ export interface components {
             recording: string;
             /**
              * Transcribe
-             * @description Send audio to configured ASR (default: Deepgram EU). false = local signal analysis only
+             * @description Run configured ASR (default: local Whisper). false = local signal analysis only
              * @default true
              */
             transcribe: boolean;
@@ -242,6 +242,8 @@ export interface components {
              * @default false
              */
             synthetic_demo: boolean;
+            /** Text */
+            text: string;
             transcription: components["schemas"]["WordAnalysis"] | null;
             /** Words */
             words: components["schemas"]["Word"][];

@@ -15,10 +15,17 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+ARG WHISPER_MODEL=small
+ENV WHISPER_MODEL=${WHISPER_MODEL}
+
 COPY --chown=app:app app ./app
 COPY --chown=app:app scripts ./scripts
-RUN python -m scripts.install_silero /app/models
+RUN python -m scripts.install_silero /app/models \
+    && python -m scripts.install_whisper /app/models/whisper ${WHISPER_MODEL} \
+    && chown -R app:app /app/models
 
 USER app
+
+ENV WHISPER_MODEL_PATH=/app/models/whisper
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,7 +1,10 @@
 name: hackathon-fulda
 
 x-backend: &backend
-  build: ./backend
+  build:
+    context: ./backend
+    args:
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
   image: hackathon-fulda-backend
   init: true
   environment:
@@ -18,7 +21,15 @@ x-backend: &backend
     CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
     CELERY_BROKER_URL: redis://redis:6379/0
     CELERY_RESULT_BACKEND: redis://redis:6379/1
-    ASR_PROVIDER: ${ASR_PROVIDER:-deepgram}
+    ASR_PROVIDER: ${ASR_PROVIDER:-whisper}
+    WHISPER_MODEL: ${WHISPER_MODEL:-small}
+    WHISPER_MODEL_PATH: /app/models/whisper
+    WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+    WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+    WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-de}
+    WHISPER_BEAM_SIZE: ${WHISPER_BEAM_SIZE:-5}
+    WHISPER_VAD_FILTER: ${WHISPER_VAD_FILTER:-false}
+    WHISPER_INITIAL_PROMPT: ${WHISPER_INITIAL_PROMPT:-}
     DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
     DEEPGRAM_MODEL: ${DEEPGRAM_MODEL:-nova-3}
     SILERO_MODEL_PATH: /app/models/silero_vad.onnx
