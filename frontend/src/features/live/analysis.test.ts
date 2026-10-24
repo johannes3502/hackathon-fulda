@@ -30,6 +30,97 @@ const result = {
 };
 const jobId = "12345678-1234-1234-1234-123456789abc";
 const accepted = { job_id: jobId, status_url: `/speech/jobs/${jobId}` };
+it.each([10, 250])(
+  "keeps completed analysis with %i ms of backend timestamp drift",
+  async (drift) => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ status: "ok" }))
+      .mockResolvedValueOnce(Response.json(accepted))
+      .mockResolvedValueOnce(
+        Response.json({
+          job_id: jobId,
+          status: "completed",
+          result: {
+            audio: { summary: { duration_ms: 1000 + drift, pause_count: 1 } },
+            words: [{ word: "Hallo", start_ms: 900, end_ms: 1000 + drift }],
+            events: result.events,
+            transcription: { summary: { word_count: 1 }, events: [] },
+            asr_provider: "whisper",
+            synthetic_demo: false,
+            notices: [],
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    const receive = vi.fn();
+    const transport = new AnalysisTransport("/api", true);
+    await transport.connect({ sessionId: "test" }, receive);
+    await transport.finish(1000.5, new Blob(["synthetic recording"]));
+    const messages = receive.mock.calls.map(([message]) => message);
+    expect(
+      messages.find((m) => m.type === "transcript").transcript,
+    ).toMatchObject({
+      words: [{ word: "Hallo", start_ms: 900, end_ms: 1000 }],
+      notices: [expect.stringContaining("aligned")],
+    });
+    expect(messages.find((m) => m.type === "feedback").feedback.startMs).toBe(
+      100,
+    );
+    expect(messages.find((m) => m.type === "metrics").metrics).toContainEqual({
+      id: "words-word_count",
+      label: "Transcript: word count",
+      value: 1,
+    });
+    // Imported timestamps must still be rejected rather than silently changed.
+    expect(() =>
+      parseWords(
+        [{ word: "Hallo", start_ms: 900, end_ms: 1000 + drift }],
+        1000,
+      ),
+    ).toThrow();
+    transport.close();
+  },
+);
+
+it("retains audio findings and measurements when the transcript is invalid", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ status: "ok" }))
+      .mockResolvedValueOnce(Response.json(accepted))
+      .mockResolvedValueOnce(
+        Response.json({
+          job_id: jobId,
+          status: "completed",
+          result: {
+            audio: result,
+            events: result.events,
+            words: [{ word: "Hallo", start_ms: 900, end_ms: 2000 }],
+            asr_provider: "whisper",
+            synthetic_demo: false,
+            notices: [],
+          },
+        }),
+      ),
+  );
+  const receive = vi.fn();
+  const transport = new AnalysisTransport("/api", true);
+  await transport.connect({ sessionId: "test" }, receive);
+  await expect(
+    transport.finish(1000, new Blob(["synthetic recording"])),
+  ).rejects.toThrow();
+  const messages = receive.mock.calls.map(([message]) => message);
+  expect(messages.map((m) => m.type)).toEqual(["feedback", "metrics"]);
+  expect(messages[1].metrics).toContainEqual({
+    id: "speech-pause_count",
+    label: "Audio: pause count",
+    value: 1,
+  });
+  transport.close();
+});
+
 it("requests local-only ASR, retains words and avoids duplicate timestamp events", async () => {
   const words = [{ word: "Ähm", start_ms: 0, end_ms: 250 }];
   const event = {

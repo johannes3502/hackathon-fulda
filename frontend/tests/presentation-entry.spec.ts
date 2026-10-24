@@ -21,7 +21,7 @@ test("presentation introduction leads into preparation and recording", async ({
   await expect(page.locator("h1")).toHaveCount(1);
   await expect(
     page.getByRole("heading", {
-      name: "Deine Präsentations-Stats im Überblick.",
+      name: "Deine Aufnahmen im Überblick.",
     }),
   ).toBeVisible();
   await page.screenshot({

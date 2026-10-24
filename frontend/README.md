@@ -6,25 +6,18 @@ rebuild after changing dependencies or configuration.
 
 ## Use
 
-- **418 review analysis** (`/review-preview`): synthetic 90-second video, four
-  criteria and an interactive performance graph with timestamped positive,
-  practice and factual notes. Click a marker or the graph to seek; the slider
-  supports keyboard seeking. Play a selected section with ±2 seconds of context,
-  optionally looping. Criterion buttons filter moments, not the overall curve.
-  The stats-card demo links here. A matching view at `/live/[sessionId]/analysis`
-  is linked from live review and uses the actual recording and feedback events.
-  Completed fact-check results also supply transcript quotes and source excerpts
-  to its annotation panel (including links for web evidence).
-  Live recordings expose captured observations; synthetic scores/curves belong
-  only to the design preview. Video remains in memory.
+- **Recording dashboard** (`/`, also `/stats-preview`): counts, durations and
+  observations from takes actually captured in the current browser workspace.
+  Before the first recording it shows an empty state. There are no fixed demo
+  statistics, quality scores or simulated monthly progress. Video remains in memory.
 
-- **418 stats card**: synthetic design preview at `/stats-preview` (with replay).
-  SVG ring, 2×2 criteria and a brief count-up, using the shared design system.
-  `StatsCard` accepts `gesture`, `knowledge`, `flow`, `structure` values from
-  1–100; the overall value is their rounded arithmetic mean. Invalid or missing
-  values produce an unavailable overall value. These are explicitly labeled
-  synthetic demo values; no backend scoring is implemented.
-  Reduced motion shows final values immediately.
+- **418 review analysis** (`/review-preview`): a clearly labelled synthetic
+  90-second video with timestamped example notes and sources, without synthetic
+  scores or a performance curve. The matching `/live/[sessionId]/analysis` view
+  uses the actual recording and feedback events. Click a marker or the timeline
+  to seek; the slider supports keyboard seeking. Selected sections play with
+  ±2 seconds of context and optional looping. Criterion buttons filter moments.
+  Fact-check results supply transcript quotes and source excerpts.
 
 - **418 loading preview** (`/loading-preview`): system typography, a small wordmark
   and an announced status with a subtle activity dot. The reusable
@@ -129,3 +122,11 @@ The [React Native companion](../mobile/README.md) supports iPhone, iPad and Andr
 including native on-device pose capture. Run `npm run mobile:ios` or
 `npm run mobile:android` from the repository root to build a development client.
 Expo Go cannot load its native pose modules.
+
+## Backend timestamp alignment
+
+Backend transcript timestamps may differ from the browser clock by up to 250 ms
+at the end (the same allowance used by live captions). The adapter bounds those
+words to the recorded duration and adds a notice. Imported word timestamps remain
+strict. If a transcript is malformed or exceeds that allowance, the review still
+receives the completed audio findings and measurements, alongside the error.

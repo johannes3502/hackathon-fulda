@@ -39,7 +39,8 @@ Produktentscheidung.
 
 UI-Einstieg (24.10.2026, Nutzerauftrag): Die Startseite leitet mit „Neue
 Präsentation“ ins vorhandene Live-Studio und bietet Quellen-Vorbereitung als
-zweiten Weg. Die Stats-Vorschau bleibt darunter als synthetische Demo. Der
+zweiten Weg. Darunter stehen Anzahl, Dauer und Hinweise der tatsächlich in diesem
+Browser-Arbeitsbereich aufgenommenen Takes; vor der ersten Aufnahme ein Leerzustand. Der
 gemeinsame Ablauf Vorbereiten → Aufnehmen → Review verbindet die Ansichten;
 ohne eigene Aufnahme ist das Review-Ziel ausdrücklich ein Beispiel. Die
 Darstellung Hell/Dunkel/System wird lokal gespeichert. Daraus entstehen keine

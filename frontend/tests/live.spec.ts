@@ -186,6 +186,22 @@ test("local microphone feedback emits live volume/pause markers and preserves th
     "Voice louder than your baseline",
   );
   expect(uploads).toBe(0);
+  const reviewUrl = page.url();
+  await page.getByRole("link", { name: "418 home" }).click();
+  await expect(
+    page
+      .locator(".stats418-kpi")
+      .filter({ hasText: "Aufnahmen" })
+      .locator("dd"),
+  ).toHaveText("1");
+  await expect(
+    page.getByRole("article", { name: "Aufnahmeübersicht" }),
+  ).toContainText("My pitch rehearsal");
+  await expect(page.locator("main")).not.toContainText("%");
+  await page
+    .getByRole("link", { name: "Aufnahme ansehen", exact: true })
+    .click();
+  await expect(page).toHaveURL(reviewUrl);
 });
 
 test("normal preview displays all finger points without enabling the lab, including a hand-only frame", async ({

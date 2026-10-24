@@ -1,6 +1,6 @@
-import { StatsPreview } from "@/components/stats/StatsCard";
+import { StatsDashboard } from "@/components/stats/StatsCard";
 
 export default function Page() {
-  return <StatsPreview />;
+  return <StatsDashboard />;
 }
 

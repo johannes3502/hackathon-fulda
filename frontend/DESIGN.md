@@ -33,10 +33,10 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   “Neue Präsentation” opens the existing `/live` studio, secondary action prepares
   sources. Three steps explain preparation, recording and review. A recent take
   links back into its review while it is available in browser memory.
-  Below, the stats dashboard with `StatsCard` and interactive monthly progress,
-  criteria comparison and training activity charts (clearly labelled as synthetic
-  demo data) and direct actions into `/live`, `/review-preview`, `/sources` and
-  `/demo`. `AppShell` provides both the header navigation (`Main navigation`) and a
+  Below, `StatsDashboard` shows counts, durations and observations from actual
+  recordings in the current workspace, with an empty state before the first take.
+  No synthetic percentages, monthly histories or performance scores appear.
+  `AppShell` provides both the header navigation (`Main navigation`) and a
   slide-over navigation drawer (`Menü`) across all views. The active destination
   is identified visually and with `aria-current`. The drawer is a modal Radix
   dialog with focus containment, Escape dismissal and focus restoration. A shared
@@ -63,9 +63,9 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
 - **Sources:** place the document library and source search beside one another on
   desktop and stack them on phones. Show supported formats, upload state, errors,
   and when search becomes available. Continue to recording is the main action.
-- **Sample:** retain explicit synthetic-data labels. Existing sample scores are
-  illustrations, not validated assessments; the redesign does not invent scores
-  for actual recordings. The stats preview uses an SVG ring, without a 3D renderer.
+- **Sample:** retain explicit synthetic-data labels for the walkthrough and
+  example annotations. Review criteria count timestamped moments; synthetic
+  quality scores and performance curves have been removed.
 - **Loading:** small wordmark and announced status, with a reduced-motion-safe
   indicator. Loading must not download a font or initialize WebGL.
 

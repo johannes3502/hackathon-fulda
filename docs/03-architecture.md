@@ -401,7 +401,7 @@ flowchart TD
     JOURNEY --> LREV
     LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>Three.js, statischer Fallback"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
-    SP["/ und /stats-preview<br/>Einleitung + Neue Präsentation / Quellen vorbereiten<br/>darunter Stats und Monatsfortschritt"] --> SC["StatsCard + Monatsdiagramme<br/>SVG-Ring, vier Kriterien,<br/>6-Monats-Verlauf (synthetisch)"]
+    SP["/ und /stats-preview<br/>Einleitung + Neue Präsentation / Quellen vorbereiten<br/>darunter Aufnahmeübersicht im Browser-Arbeitsbereich"] --> SC["StatsDashboard<br/>Anzahl, Dauer, Hinweise und Transkripte<br/>aus aufgenommenen Takes, sonst Leerzustand"]
     SP -->|"Neue Präsentation"| LIVE
     SP -->|"Quellen vorbereiten"| SRC
     SP -->|"Letzte Aufnahme, falls vorhanden"| LREV
@@ -411,7 +411,8 @@ flowchart TD
     DRAWER --> RP
     DRAWER --> WALK
     DRAWER --> DEMOPAGE
-    SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
+    RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ohne Scores und Performance-Kurve"]
+    SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
     LIVE["/live - LiveStudio<br/>Standardansicht, optionale Large View, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]

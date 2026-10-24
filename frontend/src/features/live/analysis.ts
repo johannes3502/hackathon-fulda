@@ -3,6 +3,9 @@ import type { LiveFeedback, LiveMetric, LiveTranscript } from "./contracts";
 import { feedbackEnabled, type FeatureFlags } from "./feature-flags";
 
 type Word = components["schemas"]["Word"];
+// Match the live-caption adapter's allowance for encoder/frame rounding.
+// Imported timestamps remain strict; this only applies to backend results.
+export const BACKEND_TIMESTAMP_TOLERANCE_MS = 250;
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
 const time = (v: unknown): v is number =>
@@ -147,11 +150,25 @@ export function parseTranscript(
     !value.notices.every((n) => typeof n === "string")
   )
     throw new Error("The backend returned an invalid transcript.");
+  const endMs = Math.floor(durationMs);
+  const words = value.words.length
+    ? parseWords(value.words, durationMs + BACKEND_TIMESTAMP_TOLERANCE_MS)
+    : [];
+  const aligned = words.some((word) => word.end_ms > endMs);
   return {
-    words: value.words.length ? parseWords(value.words, durationMs) : [],
+    words: words.map((word) => ({
+      ...word,
+      start_ms: Math.min(word.start_ms, endMs),
+      end_ms: Math.min(word.end_ms, endMs),
+    })),
     provider: value.asr_provider as string | null,
     synthetic: value.synthetic_demo,
-    notices: value.notices as string[],
+    notices: [
+      ...(value.notices as string[]),
+      ...(aligned
+        ? ["Word timestamps at the end were aligned to the recording duration."]
+        : []),
+    ],
   };
 }
 
@@ -160,6 +177,7 @@ export function analysisResult(
   source: "speech" | "words",
   durationMs: number,
   flags?: FeatureFlags,
+  timestampToleranceMs = 0,
 ) {
   if (!object(value) || !object(value.summary) || !Array.isArray(value.events))
     throw new Error("The backend returned an invalid analysis.");
@@ -168,7 +186,7 @@ export function analysisResult(
       !object(e) ||
       !time(e.t_ms) ||
       !time(e.duration_ms) ||
-      e.t_ms > durationMs ||
+      e.t_ms > durationMs + timestampToleranceMs ||
       ![
         "posture",
         "gesture",
@@ -195,7 +213,7 @@ export function analysisResult(
       id: `${e.source === "asr" ? "words" : source}-${i}`,
       category: String(e.type),
       kind: e.severity === "warning" ? "attention" : "suggestion",
-      startMs: e.t_ms,
+      startMs: Math.min(durationMs, e.t_ms),
       endMs: Math.min(durationMs, e.t_ms + e.duration_ms),
       title: `${e.type}${direction}${word}`,
       detail: `${source === "words" || e.source === "asr" ? "Word timestamp" : "Audio signal"} heuristic. Review this observation in context; it is not a performance score.`,

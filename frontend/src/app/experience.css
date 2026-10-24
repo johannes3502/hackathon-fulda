@@ -96,6 +96,11 @@
   line-height: 1.16;
   letter-spacing: -0.045em;
 }
+.presentation-intro .stats418-section-eyebrow {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 .presentation-intro h1 > span {
   color: var(--primary);
 }
