@@ -12,6 +12,23 @@ Keep an existing `.env` instead of overwriting it. API docs:
 <http://localhost:8000/docs>. Edit `backend/app/` for automatic reload.
 Changes to dependencies, scripts or the Dockerfile require a rebuild.
 
+## OpenAPI and TypeScript
+
+FastAPI exposes the API contract at <http://localhost:8000/openapi.json>.
+To export it without running the server and generate TypeScript definitions,
+install the backend Python dependencies, then run from the repository root:
+
+```sh
+npm ci
+npm run api:generate
+npm run api:check
+```
+
+The commands use `backend/.venv` automatically, or the interpreter selected
+by `PYTHON`. Generated artifacts and frontend usage examples are documented
+in [`api/README.md`](../api/README.md). Regenerate and commit both artifacts
+whenever API routes or models change.
+
 ## IntelliJ IDEA and VS Code
 
 Open the **repository root** in either IDE. Docker must be running and `.env`

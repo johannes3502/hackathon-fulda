@@ -1,0 +1,632 @@
+{
+  "components": {
+    "schemas": {
+      "AnalyzeRequest": {
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/WordConfig"
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "maxItems": 50000,
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "words"
+        ],
+        "title": "AnalyzeRequest",
+        "type": "object"
+      },
+      "AudioAnalysis": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "heuristics": {
+            "additionalProperties": true,
+            "title": "Heuristics",
+            "type": "object"
+          },
+          "series": {
+            "$ref": "#/components/schemas/AudioSeries"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/AudioSummary"
+          }
+        },
+        "required": [
+          "summary",
+          "series",
+          "events",
+          "heuristics"
+        ],
+        "title": "AudioAnalysis",
+        "type": "object"
+      },
+      "AudioSeries": {
+        "description": "Frame-wise time series, column-oriented. `t_ms[i]` is the centre of frame i\nrelative to the recording start; `f0_hz` is null where no pitch was found.",
+        "properties": {
+          "active": {
+            "items": {
+              "type": "boolean"
+            },
+            "title": "Active",
+            "type": "array"
+          },
+          "f0_hz": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "F0 Hz",
+            "type": "array"
+          },
+          "hop_ms": {
+            "title": "Hop Ms",
+            "type": "integer"
+          },
+          "level_db": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Level Db",
+            "type": "array"
+          },
+          "syllable_peaks_ms": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Syllable Peaks Ms",
+            "type": "array"
+          },
+          "t_ms": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "T Ms",
+            "type": "array"
+          }
+        },
+        "required": [
+          "hop_ms",
+          "t_ms",
+          "level_db",
+          "f0_hz",
+          "active",
+          "syllable_peaks_ms"
+        ],
+        "title": "AudioSeries",
+        "type": "object"
+      },
+      "AudioSummary": {
+        "description": "Measured values only; no score or grade.",
+        "properties": {
+          "active_ms": {
+            "title": "Active Ms",
+            "type": "integer"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "f0_range_st": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F0 Range St"
+          },
+          "median_f0_hz": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median F0 Hz"
+          },
+          "median_level_db": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Level Db"
+          },
+          "pause_count": {
+            "title": "Pause Count",
+            "type": "integer"
+          },
+          "syllables_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Syllables Per Second"
+          }
+        },
+        "required": [
+          "duration_ms",
+          "active_ms",
+          "median_level_db",
+          "median_f0_hz",
+          "f0_range_st",
+          "syllables_per_second",
+          "pause_count"
+        ],
+        "title": "AudioSummary",
+        "type": "object"
+      },
+      "Body_analyze_speech_analyze_post": {
+        "properties": {
+          "config": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional AudioConfig as JSON",
+            "title": "Config"
+          },
+          "recording": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Audio or video recording (WebM, MP4, WAV, ...)",
+            "title": "Recording",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recording"
+        ],
+        "title": "Body_analyze_speech_analyze_post",
+        "type": "object"
+      },
+      "Event": {
+        "properties": {
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "hint",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "browser",
+              "asr",
+              "speech",
+              "factcheck",
+              "agent"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "t_ms": {
+            "title": "T Ms",
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "posture",
+              "gesture",
+              "gaze",
+              "filler",
+              "pause",
+              "pace",
+              "volume",
+              "pitch",
+              "fact",
+              "question"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "t_ms",
+          "duration_ms",
+          "type",
+          "severity",
+          "source",
+          "payload"
+        ],
+        "title": "Event",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "Word": {
+        "properties": {
+          "end_ms": {
+            "minimum": 0.0,
+            "title": "End Ms",
+            "type": "integer"
+          },
+          "start_ms": {
+            "minimum": 0.0,
+            "title": "Start Ms",
+            "type": "integer"
+          },
+          "word": {
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "word",
+          "start_ms",
+          "end_ms"
+        ],
+        "title": "Word",
+        "type": "object"
+      },
+      "WordAnalysis": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "heuristics": {
+            "additionalProperties": true,
+            "title": "Heuristics",
+            "type": "object"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/WordSummary"
+          }
+        },
+        "required": [
+          "summary",
+          "events",
+          "heuristics"
+        ],
+        "title": "WordAnalysis",
+        "type": "object"
+      },
+      "WordConfig": {
+        "properties": {
+          "fillers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fillers",
+            "type": "array"
+          },
+          "pace_fast_ratio": {
+            "default": 1.3,
+            "exclusiveMinimum": 1.0,
+            "title": "Pace Fast Ratio",
+            "type": "number"
+          },
+          "pace_min_words": {
+            "default": 5,
+            "minimum": 1.0,
+            "title": "Pace Min Words",
+            "type": "integer"
+          },
+          "pace_slow_ratio": {
+            "default": 0.7,
+            "exclusiveMaximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Pace Slow Ratio",
+            "type": "number"
+          },
+          "pace_window_ms": {
+            "default": 10000,
+            "exclusiveMinimum": 0.0,
+            "title": "Pace Window Ms",
+            "type": "integer"
+          },
+          "pause_min_ms": {
+            "default": 2000,
+            "minimum": 0.0,
+            "title": "Pause Min Ms",
+            "type": "integer"
+          },
+          "repetition_max_gap_ms": {
+            "default": 1000,
+            "minimum": 0.0,
+            "title": "Repetition Max Gap Ms",
+            "type": "integer"
+          }
+        },
+        "title": "WordConfig",
+        "type": "object"
+      },
+      "WordSummary": {
+        "description": "Measured values only; no score or grade.",
+        "properties": {
+          "filler_count": {
+            "title": "Filler Count",
+            "type": "integer"
+          },
+          "median_window_wpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Window Wpm"
+          },
+          "pause_count": {
+            "title": "Pause Count",
+            "type": "integer"
+          },
+          "repetition_count": {
+            "title": "Repetition Count",
+            "type": "integer"
+          },
+          "speaking_duration_ms": {
+            "title": "Speaking Duration Ms",
+            "type": "integer"
+          },
+          "word_count": {
+            "title": "Word Count",
+            "type": "integer"
+          },
+          "words_per_minute": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Words Per Minute"
+          }
+        },
+        "required": [
+          "word_count",
+          "speaking_duration_ms",
+          "words_per_minute",
+          "pause_count",
+          "filler_count",
+          "repetition_count",
+          "median_window_wpm"
+        ],
+        "title": "WordSummary",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Presentation Trainer API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Live Health Live Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Ready Health Ready Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/speech/analyze": {
+      "post": {
+        "description": "Time series and events from the audio signal only. Stores nothing.",
+        "operationId": "analyze_speech_analyze_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_analyze_speech_analyze_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioAnalysis"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyze",
+        "tags": [
+          "speech"
+        ]
+      }
+    },
+    "/transcription/analyze-words": {
+      "post": {
+        "description": "Word-based events from word timestamps (e.g. ASR output). Stores nothing.",
+        "operationId": "analyze_transcription_analyze_words_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WordAnalysis"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyze",
+        "tags": [
+          "transcription"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "hackathon-fulda-api",
+  "private": true,
+  "scripts": {
+    "api:export": "node scripts/export-openapi.mjs",
+    "api:types": "openapi-typescript api/openapi.json -o api/schema.d.ts",
+    "api:generate": "npm run api:export && npm run api:types",
+    "api:check": "npm run api:export -- --check && npm run api:types -- --check"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.10.1"
+  }
+}
