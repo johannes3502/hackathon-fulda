@@ -38,6 +38,7 @@ from app.questions.models import (
 )
 from app.sources import retrieval
 from app.sources.models import SourceHit
+from app.questions.styles import PRESENTATION_STYLES, PresentationMode
 from app.transcription.pipeline import extract_audio
 from app.transcription.transcriber import Transcriber
 
@@ -60,6 +61,12 @@ UNHEARD_REPLY: dict[Persona, str] = {
     "student": "Sorry, ich habe dich akustisch nicht verstanden. Kannst du das nochmal sagen?",
     "tutor": "Ich habe Ihre Antwort akustisch nicht verstanden. Bitte wiederholen Sie sie.",
 }
+
+def role_prompt(persona: Persona, mode: PresentationMode) -> str:
+    # A pitch investor must not also be instructed to act as a university professor.
+    voice = PERSONAS[persona] + "\n" if mode == "thesis" else ""
+    return voice + PRESENTATION_STYLES[mode]
+
 
 QUESTION_PROMPT = """{persona}
 Du stellst nach dem Vortrag gezielte Rückfragen an die vortragende Person. Vorrang in dieser Reihenfolge:
@@ -207,8 +214,9 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
     config = request.config
     items = sentences(request.words)
     transcript, truncated = _numbered_transcript(items)
-    notices = [f"Fragen stammen vom Sprachmodell {llm.model} in der Rolle "
-               f"{'Studierender' if request.persona == 'student' else 'Lehrperson'}; "
+    role = {"startup": "Investor", "thesis": "Studierender" if request.persona == "student" else "Lehrperson",
+            "school": "Lehrperson", "nonprofit": "Unterstützer"}[request.presentation_mode]
+    notices = [f"Fragen stammen vom Sprachmodell {llm.model} in der Rolle {role}; "
                "sie sind Übungsfragen, keine Bewertung.",
                "Antworten werden nur mit den Quellen verglichen, es gibt keine Punkte oder Noten."]
     if truncated:
@@ -228,7 +236,8 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
         notices.append("Keine fertig verarbeiteten Quellen: keine Fragen zu fehlenden Inhalten.")
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1)) or "(keine Auszüge)"
     answer = structured_json(llm,
-        QUESTION_PROMPT.replace("{persona}", PERSONAS[request.persona]).replace("{limit}", str(config.max_questions)),
+        QUESTION_PROMPT.replace("{persona}", role_prompt(request.persona, request.presentation_mode))
+                       .replace("{limit}", str(config.max_questions)),
         f"Transkript (Satznummer, Zeit, Satz):\n{transcript}\n\n"
         f"Faktencheck-Befunde (Nummer, Zeit, Urteil, Behauptung):\n{_numbered_findings(request.claims)}\n\n"
         f"Quellenauszüge:\n{context}", QuestionDrafts,
@@ -241,6 +250,7 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
     if not questions:
         notices.append("Das Modell hat keine belastbaren Rückfragen vorgeschlagen.")
     return QuestionResult(questions=questions, events=merge_timeline(events), persona=request.persona,
+                          presentation_mode=request.presentation_mode,
                           model=llm.model, sources_used=bool(passages), config=config, notices=notices)
 
 
@@ -275,7 +285,7 @@ def review_answer(request: AnswerRequest, llm: ChatModel,
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1))
     said = f"\nGesagt im Vortrag: {question.transcript}" if question.transcript else ""
     try:
-        answer = structured_json(llm, ANSWER_PROMPT.replace("{persona}", PERSONAS[request.persona]), f"Frage: {question.question}\nAnlass: {question.reason}{said}\n\n"
+        answer = structured_json(llm, ANSWER_PROMPT.replace("{persona}", role_prompt(request.persona, request.presentation_mode)), f"Frage: {question.question}\nAnlass: {question.reason}{said}\n\n"
                                                   f"Antwort: {request.answer}\n\nAuszüge:\n{context}", AnswerJudgment)
     except (LLMError, httpx.HTTPError) as error:
         log.warning("Answer review failed (%s)", type(error).__name__)

@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from app.events import Event
 from app.factcheck.models import ClaimResult, Evidence, EvidenceKind, Verdict
 from app.transcription.models import Word
+from app.questions.styles import PresentationMode
 
 QuestionKind = Literal["contradiction", "unsupported", "gap", "clarification", "follow_up"]
 Persona = Literal["student", "tutor"]
@@ -34,6 +35,7 @@ class QuestionConfig(BaseModel):
 
 
 class QuestionRequest(BaseModel):
+    presentation_mode: PresentationMode = "thesis"
     words: list[Word] = Field(min_length=1, max_length=50000, description="Word timestamps relative to recording start")
     collection_id: UUID | None = Field(default=None, description="Uploaded sources for gaps and answer reviews")
     claims: list[ClaimResult] = Field(default_factory=list, max_length=30,
@@ -56,6 +58,7 @@ class Question(BaseModel):
 
 
 class QuestionResult(BaseModel):
+    presentation_mode: PresentationMode = "thesis"
     questions: list[Question]
     events: list[Event]
     persona: Persona = "tutor"
@@ -73,6 +76,7 @@ class QuestionJob(BaseModel):
 
 
 class AnswerRequest(BaseModel):
+    presentation_mode: PresentationMode = "thesis"
     question: Question
     answer: str = Field(min_length=1, max_length=4000)
     collection_id: UUID | None = None
@@ -83,6 +87,7 @@ class AnswerRequest(BaseModel):
 class VoiceAnswerRequest(BaseModel):
     """Multipart `request` field of a spoken answer; the audio is a separate file."""
 
+    presentation_mode: PresentationMode = "thesis"
     question: Question
     collection_id: UUID | None = None
     persona: Persona = "tutor"

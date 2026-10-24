@@ -135,7 +135,7 @@ neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.m
   ebenfalls lokales faster-whisper); der Browser-Sender ist als optionale Vorschau im Web integriert. Deutsche
   Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und
   Speicherverhalten: `backend/README.md`.
-- Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
+- Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung aus 3 s stimmhafter Sprache, danach langsam adaptive Referenz. Anfangsstille und unvoiced Rauschen zählen nicht.
 - Nutzerentscheidung: lokale Vorführung reicht; öffentliches Hosting ist
   derzeit nicht nötig. Nutzer bevorzugt freie/lokale Modelle statt OpenAI API:
   Qwen3.5 4B Q4_K_M läuft nativ über Ollama, Whisper `small` im Worker.
@@ -191,3 +191,27 @@ für Pause, Tempo, Füllwörter, Lautstärke und Tonhöhe einzeln schaltbar.
 „Live · in browser“ ist Standard und liefert lokale Mikrofonhinweise ohne Backend;
 der Backend-Modus nutzt den Signal-Stream. Füllwörter und Wort-Tempo kommen nach
 dem Stoppen. Die Haltungsreferenz benötigt keine stillgehaltenen Hände mehr.
+
+Stimmreferenz: Browser und Backend warten auf genügend stimmhafte Sprache, statt
+die ersten drei vergangenen Sekunden zu verwenden. Danach wird die Referenz nur
+mit ausreichender Sprache langsam nachgeführt (30 s Halbwertszeit in stimmhafter
+Zeit; Prototyp-Heuristik). Stille, unvoiced Rauschen und kurze Pegelspitzen dürfen
+die Referenz nicht absenken. Eine länger anhaltende Änderung wird zunächst
+angezeigt und danach schrittweise zur Referenz; das ist keine absolute Aussage
+über die geeignete Sprechlautstärke. Wortbasiertes Tempo bleibt separat.
+
+## Vereinfachter Review und kontextbezogene Fragen (24.10.2026)
+
+Nutzerauftrag: Review im Stil des Live-Monitorings; zwei Hauptschritte statt
+mehrerer gleichzeitiger Analyse-Panels. **Review moments** spielt markierte
+Abschnitte mit Kontext und zeitgenauen Anmerkungen; **Practice questions**
+führt einen Dialog mit einer Frage pro Schritt. Die Wiedergabe-Fenster nutzen
+das lokale Vollvideo; serverseitige Clip-Dateien sind gemäß aktuellem Backend-Vertrag nicht vorgesehen. Transkript und technische Details bleiben
+aufklappbar.
+
+Vor dem Take: Material zum Backend hochladen und Präsentationstyp wählen:
+Startup-Pitch, Bachelor-Verteidigung, Schulvortrag oder Nonprofit-Einladung.
+Der Typ verändert die Fragen und Kriterien, ohne Noten oder Scores. Der
+Nutzer hat ElevenLabs für den Sprachdialog beauftragt und konfiguriert den
+Agenten selbst nach der Implementierung. Getippte Fragen bleiben über das
+konfigurierte lokale Modell möglich. Einrichtung: `docs/07-review-and-agent.md`.

@@ -100,6 +100,7 @@ def analyze_speech(self, job_id: str) -> dict[str, str]:
 PREFIX = "factcheck-jobs"
 QUESTION_PREFIX = "question-jobs"
 ANSWER_PREFIX = "answer-jobs"
+AGENT_PREFIX = "agent-context-jobs"
 
 
 def _model_job(task, job_id: str, prefix: str, job_model, run, error: str,
@@ -150,6 +151,16 @@ def fact_check(self, job_id: str) -> dict[str, str]:
 
     return _model_job(self, job_id, PREFIX, FactCheckJob, run,
                       "Faktencheck fehlgeschlagen. LLM-Konfiguration und Erreichbarkeit prüfen.")
+
+
+@celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
+def prepare_agent(self, job_id: str) -> dict[str, str]:
+    from app.questions.agent import AgentJob, prepare_context
+    from app.questions.models import QuestionRequest
+
+    return _model_job(self, job_id, AGENT_PREFIX, AgentJob,
+                      lambda request: prepare_context(QuestionRequest.model_validate(request)),
+                      "Could not prepare the conversation. Check that your materials are ready and retry.")
 
 
 @celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)

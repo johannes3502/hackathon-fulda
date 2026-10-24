@@ -1,5 +1,24 @@
 import { PoseLog, poseSample, type PoseSample } from "./sample";
 import { PoseEvaluator, POSE_RULES, type PoseEvaluation } from "./evaluation";
+import { loadLiveHintSettings } from "../admin/settings";
+import { disabledLabTests, loadPoseFeedback } from "../admin/pose-feedback";
+
+// Pose lab follows the admin hold; praise lasts one minimum display time.
+const labTiming = () => {
+  const s = loadLiveHintSettings();
+  return {
+    alertHoldMs: s.stabilizeHoldMs,
+    praiseAfterMs: s.praiseAfterMs,
+    praiseShowMs: s.minDisplayMs,
+    disabled: disabledLabTests(loadPoseFeedback()),
+  };
+};
+const newEvaluator = (sessionId?: string) =>
+  new PoseEvaluator(
+    sessionId,
+    loadLiveHintSettings(),
+    loadPoseFeedback().rules,
+  );
 export type PoseTiming = {
   frameMs: number | null;
   inferenceMs: number | null;
@@ -33,7 +52,7 @@ export class PoseCapture {
   private handError: string | null = null;
   private hands: HandSample[] | null = [];
   private backend: PoseBackend | null = null;
-  private tests = new PoseTestTracker();
+  private tests = new PoseTestTracker(labTiming());
   private testResults: PoseTestResult[] = [];
   private worker: Worker | null = null;
   private frame = 0;
@@ -43,7 +62,7 @@ export class PoseCapture {
   private timeout?: ReturnType<typeof setTimeout>;
   private latest: PoseSample | null = null;
   private image: PoseState["image"] = null;
-  private evaluator = new PoseEvaluator();
+  private evaluator = newEvaluator();
   private origin: number | null = null;
   private evaluation: PoseEvaluation | null = null;
   private frameTimeout?: ReturnType<typeof setTimeout>;
@@ -209,7 +228,7 @@ export class PoseCapture {
     ) {
       this.latest = null;
       this.hands = null;
-      this.tests.reset();
+      this.tests.reset(labTiming());
       this.testResults = [];
       this.evaluation = this.evaluator.update(null, timestamp - this.origin);
       this.publish(
@@ -281,16 +300,16 @@ export class PoseCapture {
   beginRecording(timestamp: number, sessionId = "recording") {
     this.log.reset(timestamp);
     this.origin = timestamp;
-    this.evaluator = new PoseEvaluator(sessionId);
+    this.evaluator = newEvaluator(sessionId);
     this.evaluation = null;
     this.latest = null;
     this.timestamps = [];
     this.hands = this.handModel ? [] : null;
-    this.tests.reset();
+    this.tests.reset(labTiming());
     this.testResults = [];
   }
   recalibrate() {
-    this.evaluator = new PoseEvaluator();
+    this.evaluator = newEvaluator();
     this.evaluation = null;
     this.publish("running", "Calibration reset. Hold your neutral position.");
   }

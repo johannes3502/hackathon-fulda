@@ -1,0 +1,10 @@
+{
+  "frameMs": 10,
+  "segments": [
+    {"durationMs": 4000, "levelDb": -45, "f0Hz": null, "active": true, "peakEveryFrames": 0, "expected": null},
+    {"durationMs": 3000, "levelDb": -25, "f0Hz": 200, "active": true, "peakEveryFrames": 20, "expected": {"level": -25, "pitch": 200, "rate": 5}},
+    {"durationMs": 1000, "levelDb": -45, "f0Hz": null, "active": true, "peakEveryFrames": 0, "expected": {"level": -25, "pitch": 200, "rate": 5}},
+    {"durationMs": 30000, "levelDb": -13, "f0Hz": 300, "active": true, "peakEveryFrames": 10, "expected": {"level": -19, "pitch": 244.9489742783178, "rate": 7.0710678118654755}},
+    {"durationMs": 60000, "levelDb": -100, "f0Hz": null, "active": false, "peakEveryFrames": 0, "expected": {"level": -19, "pitch": 244.9489742783178, "rate": 7.0710678118654755}}
+  ]
+}

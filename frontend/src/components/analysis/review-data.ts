@@ -66,6 +66,7 @@ export function feedbackToMoment(
     gesture: "gesture",
     posture: "gesture",
     gaze: "gesture",
+    head: "gesture",
     fact: "knowledge",
     content: "knowledge",
     knowledge: "knowledge",

@@ -38,10 +38,7 @@ test("presentation introduction leads into preparation and recording", async ({
   );
   await journey.getByRole("link", { name: /Record/ }).click();
   await expect(page).toHaveURL(/\/live$/);
-  await expect(journey.getByRole("link", { name: /Record/ })).toHaveAttribute(
-    "aria-current",
-    "step",
-  );
+  await expect(journey).toBeHidden();
   await expect(
     page.getByRole("button", { name: "Enable camera", exact: true }),
   ).toBeVisible();
@@ -49,6 +46,8 @@ test("presentation introduction leads into preparation and recording", async ({
     path: info.outputPath("studio-light.png"),
     fullPage: true,
   });
+  await page.goBack();
+  await expect(page).toHaveURL(/\/sources$/);
   await journey.getByRole("link", { name: /Review example/ }).click();
   await expect(page).toHaveURL(/\/review-preview$/);
   await expect(journey.getByRole("link", { name: /Review/ })).toHaveAttribute(
@@ -74,7 +73,7 @@ test("saved appearance overrides the system across routes and reloads", async ({
   await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
   for (const path of ["/sources", "/live", "/demo", "/review-preview"]) {
     await page.goto(path);
-    await expect(appearance).toHaveValue("light");
+    if (path !== "/live") await expect(appearance).toHaveValue("light");
     await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
     expect(
       await page.evaluate(

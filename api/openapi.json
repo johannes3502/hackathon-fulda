@@ -36,6 +36,114 @@
         "title": "AcceptedSource",
         "type": "object"
       },
+      "AgentContext": {
+        "properties": {
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "source_count": {
+            "title": "Source Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "prompt",
+          "source_count",
+          "notices"
+        ],
+        "title": "AgentContext",
+        "type": "object"
+      },
+      "AgentJob": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "AgentJob",
+        "type": "object"
+      },
+      "AgentSession": {
+        "properties": {
+          "signed_url": {
+            "title": "Signed Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signed_url"
+        ],
+        "title": "AgentSession",
+        "type": "object"
+      },
+      "AgentSettings": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "AgentSettings",
+        "type": "object"
+      },
       "Aggregate": {
         "additionalProperties": false,
         "properties": {
@@ -219,6 +327,17 @@
               "tutor"
             ],
             "title": "Persona",
+            "type": "string"
+          },
+          "presentation_mode": {
+            "default": "thesis",
+            "enum": [
+              "startup",
+              "thesis",
+              "school",
+              "nonprofit"
+            ],
+            "title": "Presentation Mode",
             "type": "string"
           },
           "question": {
@@ -494,7 +613,7 @@
                 "type": "null"
               }
             ],
-            "description": "AudioConfig JSON; first 3000 ms are calibration",
+            "description": "AudioConfig JSON; calibrates on voiced speech, then adapts gradually; silence does not train the reference",
             "title": "Config"
           },
           "live_transcript": {
@@ -2480,6 +2599,17 @@
             "title": "Persona",
             "type": "string"
           },
+          "presentation_mode": {
+            "default": "thesis",
+            "enum": [
+              "startup",
+              "thesis",
+              "school",
+              "nonprofit"
+            ],
+            "title": "Presentation Mode",
+            "type": "string"
+          },
           "words": {
             "description": "Word timestamps relative to recording start",
             "items": {
@@ -2527,6 +2657,17 @@
               "tutor"
             ],
             "title": "Persona",
+            "type": "string"
+          },
+          "presentation_mode": {
+            "default": "thesis",
+            "enum": [
+              "startup",
+              "thesis",
+              "school",
+              "nonprofit"
+            ],
+            "title": "Presentation Mode",
             "type": "string"
           },
           "questions": {
@@ -4285,6 +4426,132 @@
           }
         },
         "summary": "Start Questions",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/agent": {
+      "post": {
+        "operationId": "start_agent_context_questions_agent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Agent Context",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/agent/jobs/{job_id}": {
+      "get": {
+        "operationId": "agent_context_status_questions_agent_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agent Context Status",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/agent/session": {
+      "post": {
+        "operationId": "start_agent_session_questions_agent_session_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSession"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start Agent Session",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/agent/settings": {
+      "get": {
+        "operationId": "agent_settings_questions_agent_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Agent Settings",
         "tags": [
           "questions"
         ]

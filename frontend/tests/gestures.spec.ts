@@ -14,14 +14,15 @@ test("jury walkthrough runs the real rules with explicit synthetic labels, evide
   await page.clock.install({ time: new Date("2026-10-24T12:00:00Z") });
   await page.clock.pauseAt(new Date("2026-10-24T12:00:01Z"));
   await page.getByRole("button", { name: "Play 22-second example" }).click();
-  await page.clock.runFor(6000);
+  // The raised hand confirms after the 2 s hold, at 6 s example time.
+  await page.clock.runFor(6500);
   await expect(page.locator(".gesture-example-event")).toHaveCount(1);
   await expect(page.locator(".cue-message")).toHaveText("Hand above shoulder");
   await page.getByRole("button", { name: "Pause example" }).click();
   await page.clock.runFor(10000);
   await expect(page.locator(".gesture-example-event")).toHaveCount(1);
   await page.getByRole("button", { name: "Resume example" }).click();
-  await page.clock.runFor(14000);
+  await page.clock.runFor(13500);
   await expect(page.locator(".gesture-example-event")).toHaveCount(3);
   await expect(page.locator(".cue-message")).toHaveText("Evaluation paused");
   await page.getByText("How was this observed?").first().click();

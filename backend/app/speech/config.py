@@ -2,8 +2,8 @@
 
 None of the thresholds are validated. They are prototype starting points and
 are returned with every analysis so the UI can label them as "Heuristik".
-Comparisons are relative to a baseline: the first `baseline_ms` of the
-recording (calibration) or, if unset, the whole recording.
+The baseline starts after `baseline_ms` of voiced speech, then adapts slowly.
+Explicit `baseline_ms=None` keeps the legacy whole-recording comparison.
 """
 
 from typing import Literal
@@ -16,6 +16,12 @@ class AudioConfig(BaseModel):
     frame_ms: int = Field(default=40, gt=0)
     hop_ms: int = Field(default=10, gt=0)
     baseline_ms: int | None = Field(default=3000, gt=0)
+    baseline_update_ms: int = Field(default=1000, gt=0)
+    baseline_half_life_ms: int = Field(default=30000, gt=0)
+    baseline_min_voiced_ratio: float = Field(default=0.3, gt=0, le=1)
+    baseline_max_level_delta_db: float = Field(default=12.0, gt=0)
+    baseline_max_pitch_delta_st: float = Field(default=12.0, gt=0)
+    baseline_max_rate_ratio: float = Field(default=2.0, gt=1)
 
     activity_detector: Literal["silero", "energy"] = "silero"
     vad_threshold: float = Field(default=0.5, gt=0, lt=1)

@@ -169,6 +169,12 @@ export function AppShell({
           >
             Sample demo
           </Link>
+          <Link
+            href="/admin"
+            aria-current={pathname === "/admin" ? "page" : undefined}
+          >
+            Admin
+          </Link>
         </nav>
         <div className="header-actions">
           <AppearanceSelect />

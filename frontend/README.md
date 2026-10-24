@@ -32,14 +32,17 @@ rebuild after changing dependencies or configuration.
 - **Speech analysis:** **Live · in browser** is the default, with local microphone
   hints for pauses, volume, pitch variation and speaking rhythm. **Off · gestures
   only** uses no microphone. **Live + full backend analysis** adds the server's
-  Silero/RMS/YIN signal stream and uploads the take after stopping. Speak normally
-  for three seconds to calibrate. Transcription is on by default within backend
+  Silero/RMS/YIN signal stream and uploads the take after stopping. Calibration
+  waits for about three seconds of voiced speech; startup silence and unpitched
+  room noise do not count. The voice reference then adjusts slowly while you speak
+  and stays fixed during pauses. A new recording calibrates afresh. Transcription is on by default within backend
   mode, with Deepgram EU streaming enabled (requires a server-side API key).
   Completed stream words are reused in review; otherwise local Whisper runs
   after stopping. Turn transcription off for signal analysis only. The batch
   fallback uses `local_only=true` to prevent an unintended hosted ASR provider.
-- **Analysis features:** choose Lite/Heavy, VIDEO/IMAGE and individual speech
-  feedback types. **Track fingers** is independent of the diagnostic **Pose lab**.
+- **Analysis features** (under **Admin** in the navbar): choose Lite/Heavy,
+  VIDEO/IMAGE and individual speech feedback types; saved in this browser and
+  applied to the next recording. **Track fingers** is independent of the diagnostic **Pose lab**.
   Filler words and word-based pace require the transcript after stopping.
 - **Source review and questions:** upload sources under `/sources`, then in a
   recorded take choose **Check facts**. Local Ollama selects claims,
