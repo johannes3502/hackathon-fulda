@@ -1,10 +1,11 @@
 import { expect, it } from "vitest";
-import { poseSample, type Landmark } from "./sample";
+import { poseSample, type HandSample, type Landmark } from "./sample";
 import {
   POSE_TESTS,
   PoseTestTracker,
   faceDistance,
   headTurn,
+  poseFeedback,
   type PoseTestId,
 } from "./testPoses";
 
@@ -43,8 +44,11 @@ function base(): Landmark[] {
 }
 
 const sample = (points = base()) => poseSample(points, 800, 400, 0)!;
-const evaluate = (id: PoseTestId, points = base()) =>
-  POSE_TESTS.find((test) => test.id === id)!.evaluate(sample(points));
+const evaluate = (
+  id: PoseTestId,
+  points = base(),
+  hands: HandSample[] = [],
+) => POSE_TESTS.find((test) => test.id === id)!.evaluate(sample(points), hands);
 
 function lean(): Landmark[] {
   const p = base();
@@ -108,6 +112,16 @@ function handsHidden(): Landmark[] {
   return p;
 }
 
+function hand(x: number, y: number, length: number): HandSample {
+  const landmarks = Array.from(
+    { length: 21 },
+    () => [x, y, 0] as [number, number, number],
+  );
+  landmarks[0] = [x, y, 0];
+  landmarks[12] = [x, y + length, 0];
+  return { label: "Left", score: 0.9, landmarks };
+}
+
 it("measures hand-to-face distance in shoulder widths", () => {
   expect(faceDistance(sample())!).toBeGreaterThan(0.6);
   expect(faceDistance(sample(selfTouch()))!).toBeLessThan(0.1);
@@ -163,4 +177,28 @@ it("marks missing data as not evaluable after the unknown grace period", () => {
   expect(at(lean(), 1500).state).toBe("recognized");
   expect(at(hipsOut(), 1600).state).toBe("recognized");
   expect(at(hipsOut(), 2400).state).toBe("not-evaluable");
+});
+
+it("distinguishes a tucked hand from a relaxed open hand", () => {
+  expect(evaluate("pocket", base(), [hand(0.25, 0.75, 0.1)]).pass).toBe(true);
+  expect(
+    evaluate("pocket", base(), [
+      hand(0.25, 0.75, 0.35),
+      hand(0.75, 0.75, 0.35),
+    ]).pass,
+  ).toBe(false);
+  expect(evaluate("pocket", base(), []).pass).toBe(true);
+});
+
+it("shows exactly one prioritized output for the pose lab", () => {
+  const tracker = new PoseTestTracker();
+  tracker.update(sample(), 0);
+  expect(poseFeedback(tracker.update(sample(), 800))).toMatchObject({
+    state: "ok",
+    label: "OK",
+  });
+  expect(poseFeedback(tracker.update(sample(), 1500, []))).toMatchObject({
+    state: "alert",
+    label: "Hand in pocket",
+  });
 });

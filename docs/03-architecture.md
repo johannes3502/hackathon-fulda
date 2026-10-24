@@ -13,7 +13,7 @@ flowchart TB
     end
 
     subgraph ClientAI["KI im Client (lokal, kein Upload)"]
-        MP_W["MediaPipe Pose<br/>@mediapipe/tasks-vision<br/>Web Worker"]
+        MP_W["MediaPipe Pose + Hand<br/>@mediapipe/tasks-vision<br/>Web Worker"]
         MP_M["react-native-mediapipe<br/>Pose Landmarker Lite"]
         MR["MediaRecorder / Vision Camera<br/>Video + Audio"]
     end
@@ -117,7 +117,7 @@ sequenceDiagram
     participant DG as Deepgram (optional)
 
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
-    FE->>FE: MediaPipe Pose lokal (Web Worker)
+    FE->>FE: MediaPipe Pose + Hand lokal (Web Worker)
     U->>FE: Stop
     FE->>BE: POST /speech/analyze (recording, transcribe=false)
     BE->>S3: Original speichern
@@ -248,7 +248,7 @@ Zusätzlich (außerhalb Postgres):
 ```mermaid
 flowchart LR
     subgraph Quellen
-        B["browser<br/>posture, gesture, gaze<br/>(MediaPipe, lokal)"]
+        B["browser<br/>posture, gesture, head proxy, pocket check<br/>(MediaPipe, lokal)"]
         A["asr<br/>Füller, Wort-Timestamps"]
         S["speech<br/>pause, pace, volume, pitch"]
     end

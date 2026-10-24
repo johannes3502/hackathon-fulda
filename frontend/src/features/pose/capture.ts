@@ -1,18 +1,26 @@
 import { CrossArmsCue, armsCrossed } from "./cues";
 import { PoseTestTracker, type PoseTestResult } from "./testPoses";
-import { PoseLog, poseSample, type PoseSample } from "./sample";
+import {
+  PoseLog,
+  poseSample,
+  type HandSample,
+  type PoseSample,
+} from "./sample";
 export type PoseState = {
   phase: "loading" | "running" | "stopped" | "error";
   count: number;
   message: string;
   latest: PoseSample | null;
   armsCrossed: boolean;
+  handModel: boolean | null;
   tests: PoseTestResult[];
 };
 export class PoseCapture {
   readonly log = new PoseLog();
   private crossArms = new CrossArmsCue();
   private armsCrossed = false;
+  private handModel: boolean | null = null;
+  private hands: HandSample[] = [];
   private tests = new PoseTestTracker();
   private testResults: PoseTestResult[] = [];
   private worker: Worker | null = null;
@@ -33,13 +41,14 @@ export class PoseCapture {
       count: this.log.count,
       latest: this.latest,
       armsCrossed: this.armsCrossed,
+      handModel: this.handModel,
       tests: this.testResults,
     });
   }
   start() {
     this.publish("loading", "Loading the local pose model…");
     try {
-      const worker = (this.worker = new Worker("/pose/worker.js"));
+      const worker = (this.worker = new Worker("/pose/worker.js?v=2"));
       this.timeout = setTimeout(
         () => this.fail("Pose model loading timed out. Try again."),
         30000,
@@ -52,6 +61,7 @@ export class PoseCapture {
         if (this.worker !== worker) return;
         if (data.type === "ready") {
           clearTimeout(this.timeout);
+          this.handModel = data.hands === true;
           this.publish(
             "running",
             "Waiting for a visible pose. Keep your upper body in frame.",
@@ -73,12 +83,18 @@ export class PoseCapture {
                 data.timestamp,
               );
           this.latest = sample;
+          // Hands arrive less often than pose frames; keep the last usable set.
+          if (Array.isArray(data.hands)) this.hands = data.hands;
           // Uses the frame clock, so preview and recording share one episode.
           this.armsCrossed = this.crossArms.update(
             armsCrossed(sample),
             data.timestamp,
           );
-          this.testResults = this.tests.update(sample, data.timestamp);
+          this.testResults = this.tests.update(
+            sample,
+            data.timestamp,
+            this.hands,
+          );
           this.publish(
             "running",
             this.log.full
@@ -157,6 +173,7 @@ export class PoseCapture {
   beginRecording(timestamp: number) {
     this.log.reset(timestamp);
     this.latest = null;
+    this.hands = [];
     this.tests.reset();
     this.testResults = [];
   }

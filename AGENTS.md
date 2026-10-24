@@ -36,7 +36,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | Hintergrundjobs | Celery-Worker; Redis als Broker und temporäres Result-Backend (Docker Compose) |
 | Datenbank | Postgres mit `pgvector` (Docker Compose): Sessions, Events, Transkript, Quellen-Chunks + Embeddings |
 | Objektspeicher | MinIO, S3-kompatibel (Docker Compose): Uploads, Event-Clips, Snapshots; Browser lädt per Presigned URL direkt hoch |
-| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker (MVP, Heavy); FaceLandmarker (Iris) und HandLandmarker nur optional, nicht MVP |
+| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker (MVP); HandLandmarker lokal für den Dev-Pocket-Check; FaceLandmarker (Iris) nicht MVP |
 | Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
 | Medien-Verarbeitung | `ffmpeg` im Backend: Clips schneiden, WebM/MP4 remuxen (seekbar machen) |
 | Transkription | Gehostete ASR-API hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}`), damit der Anbieter austauschbar bleibt |
@@ -58,7 +58,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 ```
 Browser (Next.js, TS)
- ├─ Kamera → MediaPipe Pose (MVP) → Regeln → Events + Landmarks      [live, lokal]
+ ├─ Kamera → MediaPipe Pose + Hand (Dev-Pocket) → Regeln → Events + Landmarks [live, lokal]
  ├─ Mikro  → AudioWorklet → Pegel, F0, Silbenrate → Regeln → Events + Live-Hinweis [live, lokal]
  └─ MediaRecorder → komplette Aufnahme ──(Presigned URL)──► MinIO
                                                      │
@@ -156,7 +156,10 @@ nutzen `app.sources.retrieval` (`search`, `format_context`, `quote_in_text`);
 beide sind noch nicht implementiert. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
-erste Live-Regel „Arme verschränkt“ als Overlay-Hinweis. Die finalen
+erste Live-Regel „Arme verschränkt“ als Overlay-Hinweis. Im `/live`-Workspace
+zeigt der Dev-Toggle „Pose lab“ genau ein Statusfeld (grün/rot) für elf
+Testposen; der Hand Landmarker erkennt eine Hand an der Hosentasche als
+Heuristik, ohne Event. Die finalen
 Pose-/Feedback-Regeln stehen in `docs/04-pose-tracking-requirements.md`;
 die Umsetzung ist noch offen (`frontend/DATA_POINTS.md` beschreibt das
 Roh-Logging).

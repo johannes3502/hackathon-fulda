@@ -5,6 +5,12 @@ export type Landmark = {
   visibility?: number;
   presence?: number;
 };
+export type HandLandmark = [number, number, number];
+export type HandSample = {
+  label: string;
+  score: number;
+  landmarks: HandLandmark[];
+};
 export const POINTS = {
   nose: 0,
   left_eye_inner: 1,

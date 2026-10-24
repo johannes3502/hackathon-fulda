@@ -31,6 +31,7 @@ import { time } from "@/lib/utils";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { PoseDownload } from "./PoseDownload";
 import { PoseDevMode } from "./PoseDevMode";
+import { poseFeedback } from "@/features/pose/testPoses";
 import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
 
@@ -66,6 +67,10 @@ export function LiveStudio() {
   const [error, setError] = useState<string | null>(null);
   const [largeView, setLargeView] = useState(false);
   const [poseLab, setPoseLab] = useState(false);
+  const poseAlert =
+    poseLab &&
+    pose.state?.phase === "running" &&
+    poseFeedback(pose.state.tests).state === "alert";
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   useEffect(() => () => owner.current?.dispose(), []);
@@ -223,7 +228,7 @@ export function LiveStudio() {
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <section
-              className="media-stage live-camera-stage"
+              className={`media-stage live-camera-stage${poseAlert ? " pose-alert" : ""}`}
               aria-label="Live camera preview"
             >
               <div className="stage-top">
@@ -284,7 +289,8 @@ export function LiveStudio() {
               )}
               {cameraStatus === "active" &&
                 pose.state?.phase === "running" &&
-                pose.state.armsCrossed && (
+                pose.state.armsCrossed &&
+                !poseLab && (
                   <span className="live-pose-cue" role="status">
                     Arms crossed. Try an open stance.
                     <small>Heuristic</small>
@@ -293,7 +299,10 @@ export function LiveStudio() {
               {cameraStatus === "active" &&
                 poseLab &&
                 pose.state?.phase === "running" && (
-                  <PoseDevMode results={pose.state.tests} />
+                  <PoseDevMode
+                    results={pose.state.tests}
+                    handModel={pose.state.handModel}
+                  />
                 )}
               {cameraStatus !== "active" && (
                 <div className="stage-placeholder">

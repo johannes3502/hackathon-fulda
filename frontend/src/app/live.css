@@ -217,81 +217,74 @@ body:has(.live-workspace-large) .app-footer,
   top: 62px;
   right: 16px;
   z-index: 2;
-  width: min(330px, calc(100% - 32px));
-  max-height: calc(100% - 130px);
-  overflow: auto;
-  padding: 10px;
-  border: 1px solid #374151;
-  border-radius: 8px;
+  display: grid;
+  width: min(380px, calc(100% - 32px));
+  gap: 4px;
+  padding: 16px 18px;
+  border: 2px solid #374151;
+  border-radius: 12px;
   background: #111827f2;
   color: white;
-  font-size: 11px;
-}
-.pose-lab-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.pose-lab-head span {
-  color: #fbbf24;
-  text-align: right;
-}
-.pose-lab-list {
-  display: grid;
-  gap: 4px;
-}
-.pose-test {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 5px 6px;
-  border-left: 2px solid #374151;
-  border-radius: 4px;
-  background: #1f2937;
-}
-.pose-test.recognized {
-  border-left-color: #22c55e;
-  background: #14532d;
-}
-.pose-test.watching {
-  border-left-color: #fbbf24;
-}
-.pose-test.not-evaluable {
-  opacity: 0.55;
-}
-.pose-test strong {
-  display: block;
-  font-size: 11px;
-}
-.pose-test small {
-  display: block;
-  color: #9ca3af;
-  font-size: 9px;
-  line-height: 1.3;
-}
-.pose-test-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  text-align: center;
 }
-.pose-test-meta span:last-child {
+.pose-status-kicker {
   color: #9ca3af;
-  font-size: 9px;
-  letter-spacing: 0.04em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.pose-test.recognized .pose-test-meta span:last-child {
-  color: #86efac;
+.live-pose-lab strong {
+  font-size: clamp(1.7rem, 4.2vw, 3rem);
+  letter-spacing: -0.02em;
+  line-height: 1.03;
 }
-.pose-lab-note {
-  display: block;
-  margin-top: 6px;
+.pose-status-detail {
+  color: #e5e7eb;
+  font-size: 14px;
+}
+.live-pose-lab small {
   color: #9ca3af;
   font-size: 9px;
+}
+.pose-status-warning {
+  color: #fca5a5;
+  font-size: 10px;
+}
+.live-pose-lab[data-state="alert"] {
+  border-color: #ef4444;
+  background: #7f1d1de6;
+  animation: pose-alert-pulse 1.1s ease-in-out infinite;
+}
+.live-pose-lab[data-state="ok"] {
+  border-color: #22c55e;
+  background: #14532de6;
+}
+.live-pose-lab[data-state="idle"] {
+  opacity: 0.85;
+}
+@keyframes pose-alert-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 #ef4444b3;
+  }
+  50% {
+    box-shadow: 0 0 0 18px #ef444400;
+  }
+}
+.live-camera-stage.pose-alert {
+  box-shadow: inset 0 0 0 5px #ef4444;
+  animation: pose-frame-pulse 1.1s ease-in-out infinite;
+}
+@keyframes pose-frame-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 5px #ef4444;
+  }
+  50% {
+    box-shadow: inset 0 0 0 5px #ef4444aa;
+  }
 }
 .live-camera-stage .stage-top,
 .live-camera-stage .stage-bottom {

@@ -8,17 +8,20 @@
 Ziel: Kamera starten, Pose-Landmarks pro Sample erfassen und als JSONL loggen.
 Dieses Dokument beschreibt das Roh-Logging; die Analyse-Regeln stehen in
 `docs/04-pose-tracking-requirements.md`. Kein Backend, kein Face-Mesh, keine
-Iris/Pupille, keine Finger.
+Iris/Pupille, keine Finger im JSONL-Log.
 
 ## Modell
 
-**MediaPipe Pose Landmarker** (33 Punkte).  
-Holistic, Face- und Hand-Tasks sind für diesen MVP nicht nötig:
+**MediaPipe Pose Landmarker** (33 Punkte) für das Logging.
+
+**MediaPipe Hand Landmarker** (21 Punkte pro Hand) läuft zusätzlich live im
+selben Worker, nur für den Dev-Pocket-Check. Seine Landmarks werden nicht
+geloggt und nicht an das Backend geschickt.
 
 - Augen kommen aus den Pose-Punkten.
 - Kopfwinkel kommen aus Nase, Augen und Ohren.
-- Hände werden nur als Handgelenk aus Pose erfasst.
-- Keine Finger, keine Iris, keine Pupille.
+- Hände werden im Log nur als Handgelenk aus Pose erfasst.
+- Keine Finger im Log, keine Iris, keine Pupille.
 
 ## Koordinaten
 
@@ -134,10 +137,24 @@ Regeln:
 - vollständiges 478-Punkte-Face-Mesh
 - Iris, Pupille, Gaze-Richtung
 - Yaw-Winkel
-- Hand- und Finger-Landmarks
+- Hand- und Finger-Landmarks im JSONL-Log (live-only für den Dev-Pocket-Check)
 - Emotionen, Persönlichkeit, Scores
 - Segmentierungsmaske
 - Fußanalyse
+
+## Pocket-Check (Dev, live-only)
+
+Der Pose Lab im `/live`-Workspace nutzt den Hand Landmarker für eine
+Heuristik „Hand in pocket“. Verwendet werden nur Handgelenk (0) und
+Fingerspitzen (4, 8, 12, 16, 20); die Landmarks bleiben im Browser und
+erscheinen nicht im JSONL.
+
+- Handgelenk in der Hüftzone und sichtbare Wrist→Middle-Tip-Länge
+  ≤ 0,22 Schulterbreiten → `fingers`.
+- Pose-Handgelenk in der Hüftzone und keine erkannte Hand innerhalb
+  0,35 Schulterbreiten → `hidden` (Proxy).
+- Eine locker hängende, offene Hand (Länge > 0,22) zählt nicht.
+- Keine Sicherheit, kein Event, kein Backend-Payload.
 
 ## Implementierter Frontend-Vertrag (24.10.2026)
 
