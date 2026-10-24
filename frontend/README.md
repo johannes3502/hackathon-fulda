@@ -6,6 +6,18 @@ rebuild after changing dependencies or configuration.
 
 ## Use
 
+- **418 review analysis** (`/review-preview`): synthetic 90-second video, four
+  criteria and an interactive performance graph with timestamped positive,
+  practice and factual notes. Click a marker or the graph to seek; the slider
+  supports keyboard seeking. Play a selected section with ±2 seconds of context,
+  optionally looping. Criterion buttons filter moments, not the overall curve.
+  The stats-card demo links here. A matching view at `/live/[sessionId]/analysis`
+  is linked from live review and uses the actual recording and feedback events.
+  Completed fact-check results also supply transcript quotes and source excerpts
+  to its annotation panel (including links for web evidence).
+  Live scores/curves stay unavailable until a scoring pipeline exists; scripted
+  feedback on real recordings is explicitly disclosed. Video remains in memory.
+
 - **418 stats card**: on the start page and at `/stats-preview` (with replay).
   Animated Three.js ring, 2×2 criteria, count-up and subtle pointer tilt.
   `StatsCard` accepts `gesture`, `knowledge`, `flow`, `structure` values from

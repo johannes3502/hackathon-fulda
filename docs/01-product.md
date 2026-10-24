@@ -40,6 +40,14 @@ Produktentscheidung.
 
 ### UI-Entwurf Stats-Karte (Nutzerwunsch 24.10.2026)
 
+Ergänzender Nutzerwunsch: Review mit Video, denselben Kriterien und einer
+Performance-Zeitkurve nach dem Vorbild einer Schachanalyse. Anklickbare gute und
+schwächere Momente sowie fachliche Anmerkungen springen zum Video-Timestamp.
+Die Vorschau `/review-preview` zeigt synthetische Scores und Quellen mit einem
+generierten Beispielvideo. `/live/[sessionId]/analysis` nutzt vorhandene Events
+und echte Aufnahmen, lässt nicht berechnete Performance-Werte aber ausdrücklich
+offen. Die vier Kriterien filtern die Momente; die Kurve bleibt der Gesamtverlauf.
+
 Auf der Startseite: vereinfachte Spielerkarte mit Gesamt-Kreisdiagramm und
 Gestik/Fachwissen/Flow/Struktur, jeweils 1–100 %. Für diesen ausdrücklich
 angefragten Designentwurf werden synthetische, als Demo markierte Werte gezeigt.
