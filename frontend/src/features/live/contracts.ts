@@ -1,4 +1,5 @@
 import type { PoseEvent } from "../pose/evaluation";
+import type { FeatureFlags } from "./feature-flags";
 import type { QuestionAnswer, QuestionResult } from "../questions/api";
 import type { components } from "../../../../api/schema";
 export type Word = components["schemas"]["Word"];
@@ -35,6 +36,7 @@ export type LiveConfig = {
   mode: "local" | "backend";
   endpoint: string;
   transcribe?: boolean;
+  featureFlags?: FeatureFlags;
 };
 export type VideoChunkMeta = {
   type: "video.chunk";

@@ -26,6 +26,19 @@ function ready() {
   return engine;
 }
 describe("observable gesture rules", () => {
+  it("retains tolerant midline crossed arms with hold time while distinguishing hands together", () => {
+    const engine = ready();
+    const points = syntheticPoints("crossed");
+    points[15].x = 0.5144;
+    points[16].x = 0.5216;
+    let state!: PoseEvaluation;
+    for (let t = 3100; t <= 5000; t += 100)
+      state = engine.update(poseSample(points, 640, 360, t), t);
+    expect(state.events).toHaveLength(0);
+    state = engine.update(poseSample(points, 640, 360, 5100), 5100);
+    expect(state.events.map((e) => e.payload.rule)).toEqual(["arms_crossed"]);
+    expect(state.events[0].payload.confirmed_at_ms).toBe(5100);
+  });
   it("requires a stable visible baseline; motion, sparse samples and missing hips never pass calibration", () => {
     const engine = new PoseEvaluator();
     expect(feed(engine, "neutral", 0, 2900).phase).toBe("calibrating");

@@ -7,6 +7,7 @@ import type {
   VideoTransport,
 } from "./contracts";
 import { upsertFeedback } from "./protocol";
+import { feedbackEnabled } from "./feature-flags";
 
 export function recordingMimeType() {
   if (typeof MediaRecorder === "undefined")
@@ -57,7 +58,10 @@ export class LiveRecorder {
   }
   private receive = (message: LiveMessage) => {
     if (this.disposed || message.sessionId !== this.id) return;
-    if (message.type === "feedback")
+    if (
+      message.type === "feedback" &&
+      feedbackEnabled(message.feedback.category, this.config.featureFlags)
+    )
       this.progress.feedback = upsertFeedback(
         this.progress.feedback,
         message.feedback,

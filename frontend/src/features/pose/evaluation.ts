@@ -1,10 +1,11 @@
 import { HEURISTICS, type PoseSample } from "./sample";
 import { CROSS_ARMS, crossArmsCheck } from "./cues";
+import type { PoseRuntime } from "./options";
 
 // Engineering settings for a visible, reproducible prototype, NOT validated
 // presentation-quality cutoffs. Rationale and acceptance protocol: docs/04-gesture-evaluation.md.
 export const POSE_RULES = Object.freeze({
-  version: "pose-rules-v3",
+  version: "pose-rules-v4",
   calibrationMs: 3000,
   calibrationSamples: 15,
   maxGapMs: 350,
@@ -47,6 +48,7 @@ export type PoseEvent = {
   severity: "info" | "hint";
   source: "browser";
   payload: {
+    runtime?: PoseRuntime;
     rule: PoseRule;
     rule_version: string;
     heuristic: true;
@@ -284,7 +286,18 @@ export class PoseEvaluator {
       POSE_RULES.togetherEnter,
       baseline.distance / 2,
     );
-    const crossed = crossArmsCheck(sample).crossed;
+    const crossCheck = crossArmsCheck(sample);
+    // Tolerant wrist geometry also matches hands held together on their own
+    // sides. Keep the existing together rule for this ambiguous configuration.
+    // A wrist reaching the opposite side still permits the tolerant arm rule.
+    const togetherLimit = this.holds.has("hands_together")
+      ? togetherThreshold + (POSE_RULES.togetherExit - POSE_RULES.togetherEnter)
+      : togetherThreshold;
+    const togetherOnOwnSides =
+      f.distance !== null &&
+      f.distance <= togetherLimit &&
+      crossCheck.cross.every((value) => value !== null && value < 0);
+    const crossed = togetherOnOwnSides ? false : crossCheck.crossed;
     this.rule(
       "hand_raised",
       f.raised,
@@ -303,13 +316,7 @@ export class PoseEvaluator {
       f.distance,
       baseline.distance,
       togetherThreshold,
-      crossed !== true &&
-        f.distance !== null &&
-        f.distance <=
-          (this.holds.has("hands_together")
-            ? togetherThreshold +
-              (POSE_RULES.togetherExit - POSE_RULES.togetherEnter)
-            : togetherThreshold),
+      crossed !== true && f.distance !== null && f.distance <= togetherLimit,
       POSE_RULES.togetherHoldMs,
       t,
     );

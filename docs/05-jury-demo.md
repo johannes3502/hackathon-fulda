@@ -110,3 +110,30 @@ sind nicht Teil des aktuellen vorführbaren Pfads. Die native App behält ihren
 bisherigen Funktionsumfang; die neue lokale Fragerunde ist im Web verfügbar.
 Die bestehende Sample-Session zeigt den angestrebten Gesamtfluss mit vorbereiteten
 Daten. Das Team darf sie nicht als Analyse der Live-Aufnahme vorstellen.
+
+## Analyse-Schalter im Integrationsbranch
+
+Im Studio **Standard view → Analysis features** öffnen. VIDEO und Lite sind
+Standard. IMAGE verarbeitet Frames unabhängig; VIDEO nutzt Tracking und
+zeitliche Modell-Glättung. Heavy ist auswählbar, sein Qualitätsvorteil ist
+nicht gemessen. Alle Assets sind lokal. GPU wird bevorzugt, CPU-Fallback
+ändert weder Modell noch Modus. **Camera diagnostics** zeigt die tatsächliche
+Konfiguration und Fallback-Gründe.
+
+**Speech feedback** schaltet alle Sprachmarker; **Pauses**, **Speaking pace**,
+**Filler words**, **Volume**, **Pitch variation** wählen einzelne Typen.
+Dafür **Speech analysis** oberhalb der Kamera aktivieren. Marker kommen nach
+dem Stoppen. Abschalten der Marker stoppt keine Transkription oder
+Signalanalyse und entfernt keine Messwerte. Importierte Wort-Timestamps
+beachten dieselben Schalter der jeweiligen Aufnahme. Pose-/Fact-Check- und
+Frage-Ergebnisse bleiben unabhängig davon.
+
+Schalter gelten für neue Aufnahmen, werden mit dem Take festgehalten und sind
+während Aufnahme/Analyse gesperrt. Im Workspace bleiben sie bis zum Reload.
+Ein Wechsel von Modell, Modus oder **Pose lab** startet Pose und Kalibrierung neu.
+**Pose lab** ist standardmäßig aus; nur dort wird das Handmodell geladen.
+T12, Pocket und Kopforientierung erzeugen keine Produktions-Events.
+
+Vor Ort weiter offen: echtes GPU-Verhalten, Heavy-Durchsatz unter Kamera-/Audio-
+Last, Verzögerung durch VIDEO-Glättung und Erkennungsqualität. Automatisierte
+Tests mit synthetischen Bildern belegen Start und Datenfluss, keine Genauigkeit.

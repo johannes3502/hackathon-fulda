@@ -13,7 +13,7 @@ flowchart TB
     end
 
     subgraph ClientAI["KI im Client (lokal, kein Upload)"]
-        MP_W["MediaPipe Pose<br/>@mediapipe/tasks-vision<br/>Web Worker"]
+        MP_W["MediaPipe Pose: Lite / Heavy<br/>VIDEO (Standard) / IMAGE<br/>GPU-first, CPU-Fallback; max. 10 Hz"]
         MP_M["react-native-mediapipe<br/>Pose Landmarker Lite"]
         MR["MediaRecorder / Vision Camera<br/>Video + Audio"]
     end
@@ -57,6 +57,8 @@ flowchart TB
     WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>optional während der Aufnahme"]
     PCM -- "WS /api/speech/live: PCM" --> SP
     SP -- "kumulativer Vorschautext" --> WEB
+    FLAGS["FeatureFlags pro Take<br/>Modell, Modus, Pose Lab,<br/>Sprachfeedback pro Typ"] --> MP_W
+    MP_W -. "nur Pose Lab" .-> HAND["Hand Landmarker + T1–T12<br/>lokale Diagnose, keine Events"]
     MP_W --> RULES["PoseEvaluator: Neutralstellung, Geometrie, Mindestdauer<br/>posture/gesture-Events; lokale Evidenz"]
     MOB -- "Kamera" --> MP_M
 
@@ -144,7 +146,8 @@ sequenceDiagram
     participant ASR as Whisper lokal (optional)
 
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
-    FE->>FE: MediaPipe Pose lokal (Web Worker)
+    FE->>FE: FeatureFlags im Take festhalten; Lite/Heavy, VIDEO/IMAGE
+    FE->>FE: Pose-Worker GPU-first/CPU-Fallback; Handmodell nur im Pose Lab
     opt Live captions aktiviert
         FE->>BE: WS /speech/live: start, PCM nach ready
         BE-->>FE: Kumulativer Text als Vorschau (kein Review-Transkript)
@@ -174,6 +177,7 @@ sequenceDiagram
         BE->>S3: Status/Ergebnis lesen
         BE-->>FE: queued / running / completed
     end
+    FE->>FE: Sprachmarker nach FeatureFlags des Takes filtern (auch bei Wort-Import)
     FE->>FE: Timeline mit Video-Clips (±2s) verknüpfen,<br/>Wörter an der Aufnahme speichern (Eingabe für Fact-Check)
 ```
 
@@ -300,7 +304,7 @@ flowchart TD
     SP["/stats-preview<br/>Stats-Karte mit Replay"] --> SC["StatsCard<br/>Three.js-Ring, vier Kriterien<br/>synthetische Demo-Werte"]
     SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
-    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
     LIVE --> DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
@@ -394,14 +398,14 @@ Zusätzlich (außerhalb Postgres):
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), auch vom Fact-Check genutzt |
-| Browser-Speicher (Live-Workspace) | Wörter, Fact-Check-Ergebnis, Fragen und Antworten einer Aufnahme, nur bis zum Neuladen |
+| Browser-Speicher (Live-Workspace) | FeatureFlags pro Take, Wörter, Pose-Events mit runtime, Fact-Check-Ergebnis, Fragen und Antworten; nur bis zum Neuladen |
 
 ## 9. Event-Modell: gemeinsame Timeline
 
 ```mermaid
 flowchart LR
     subgraph Quellen
-        B["browser<br/>posture, gesture, gaze<br/>(MediaPipe, lokal)"]
+        B["browser<br/>posture, gesture<br/>(kalibrierter Evaluator; kein Pocket/Gaze/T12)"]
         A["asr<br/>Füller, Wort-Timestamps"]
         S["speech<br/>pause, pace, volume, pitch"]
         F["factcheck<br/>fact: stützt (info), nicht gefunden (hint),<br/>widerspricht (warning)"]
@@ -417,8 +421,13 @@ flowchart LR
     G --> EV
 
     EV --> MT["merge_timeline()<br/>Deduplizierung<br/>(Tempo aus ASR,<br/>Pausen akustisch)"]
-    MT --> UI["Timestamp-Timeline im Frontend<br/>Klick springt zum Videoclip ±2s"]
+    MT --> FILTER["Sprachmarker-Filter pro Take<br/>Speech / pause / pace / filler / volume / pitch"]
+    FILTER --> UI["Timestamp-Timeline im Frontend<br/>Klick springt zum Videoclip ±2s"]
 ```
+
+Pose-Event-Payload und JSONL tragen optional `runtime` mit Modell, Modus und
+tatsächlichem Delegate; synthetische Fixtures haben keine erfundene Laufzeit.
+Hand-/Lab-Ergebnisse fließen nicht in das gemeinsame Event-Modell.
 
 Alle Kennwerte sind Messwerte ohne Notenbewertung ("Measured values only; no score or grade").
 

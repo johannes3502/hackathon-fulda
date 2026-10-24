@@ -34,9 +34,13 @@ import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { poseFeedback } from "@/features/pose/feedback";
 import { GestureGuide } from "./GestureGuide";
 import { PoseDownload } from "./PoseDownload";
+import { PoseDevMode, type PoseView } from "./PoseDevMode";
+import { poseFeedback as labFeedback } from "@/features/pose/testPoses";
 import { PoseDebug } from "./PoseDebug";
 import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
+import { FeatureOptions } from "./FeatureOptions";
+import { backendLabel, fallbackLabel } from "@/features/pose/backend";
 
 const cameraCopy = {
   idle: "Enable your camera to check your framing. Then start recording when you’re ready.",
@@ -51,7 +55,7 @@ const cameraCopy = {
 };
 export function LiveStudio() {
   const router = useRouter();
-  const { save, recordings } = useLiveSessions();
+  const { save, recordings, featureFlags, setFeatureFlags } = useLiveSessions();
   const {
     status: cameraStatus,
     videoRef,
@@ -59,7 +63,11 @@ export function LiveStudio() {
     stop: stopCamera,
     getStream,
   } = useCameraPreview();
-  const pose = usePoseCapture(videoRef, cameraStatus === "active");
+  const pose = usePoseCapture(
+    videoRef,
+    cameraStatus === "active",
+    featureFlags,
+  );
   const [title, setTitle] = useState("My pitch rehearsal");
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("local");
@@ -76,6 +84,14 @@ export function LiveStudio() {
   const [largeView, setLargeView] = useState(true);
   const [showCues, setShowCues] = useState(true);
   const [poseDebug, setPoseDebug] = useState(false);
+  const poseLab = featureFlags.devMode;
+  const setPoseLab = (devMode: boolean) =>
+    setFeatureFlags({ ...featureFlags, devMode });
+  const [poseView, setPoseView] = useState<PoseView>("coach");
+  const poseAlert =
+    poseLab &&
+    pose.state?.phase === "running" &&
+    labFeedback(pose.state.tests).state === "alert";
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   useEffect(
@@ -146,6 +162,7 @@ export function LiveStudio() {
       mode,
       endpoint: destination,
       transcribe: mode === "backend" && transcribe,
+      featureFlags: { ...featureFlags },
     };
     const recorder = new LiveRecorder(
       stream,
@@ -326,7 +343,7 @@ export function LiveStudio() {
               </div>
             </div>
             <section
-              className="media-stage live-camera-stage"
+              className={`media-stage live-camera-stage${poseAlert ? " pose-alert" : ""}`}
               aria-label="Live camera preview"
             >
               <div className="stage-top">
@@ -370,6 +387,8 @@ export function LiveStudio() {
                   <PoseOverlay
                     sample={pose.state.latest}
                     largeView={largeView}
+                    hands={pose.state.hands}
+                    showHands={poseLab}
                   />
                 )}
               {cameraStatus === "active" && (
@@ -393,6 +412,18 @@ export function LiveStudio() {
                     active={evaluation?.cue?.payload.rule === "arms_crossed"}
                     evaluation={evaluation}
                     timing={pose.state.timing}
+                  />
+                )}
+              {cameraStatus === "active" &&
+                poseLab &&
+                pose.state?.phase === "running" && (
+                  <PoseDevMode
+                    results={pose.state.tests}
+                    handModel={pose.state.handModel}
+                    handError={pose.state.handError}
+                    hands={pose.state.hands.length}
+                    backend={pose.state.backend}
+                    view={poseView}
                   />
                 )}
               {cameraStatus !== "active" && (
@@ -541,6 +572,12 @@ export function LiveStudio() {
                 )}
               </fieldset>
             </details>
+            <FeatureOptions
+              flags={featureFlags}
+              change={setFeatureFlags}
+              disabled={!!progress}
+              speechEnabled={mode === "backend"}
+            />
             <details className="live-settings gesture-settings">
               <summary>Gesture guide and calibration</summary>
               <GestureGuide evaluation={evaluation ?? null} />
@@ -562,10 +599,45 @@ export function LiveStudio() {
               aria-label="Local pose capture"
             >
               <summary>Camera diagnostics</summary>
+              <p role="status">
+                {backendLabel(
+                  pose.state?.backend ?? null,
+                  pose.state?.handModel ?? null,
+                )}
+              </p>
+              {fallbackLabel(pose.state?.backend ?? null) && (
+                <p className="field-hint">
+                  CPU fallback: {fallbackLabel(pose.state?.backend ?? null)}
+                </p>
+              )}
+              <Button
+                variant="outline"
+                aria-pressed={poseLab}
+                disabled={!!progress}
+                onClick={() => {
+                  setPoseLab(!poseLab);
+                  setPoseDebug(false);
+                }}
+              >
+                Pose lab
+              </Button>
+              {poseLab && (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setPoseView(poseView === "coach" ? "status" : "coach")
+                  }
+                >
+                  {poseView === "coach" ? "Status view" : "Coach view"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 aria-pressed={poseDebug}
-                onClick={() => setPoseDebug(!poseDebug)}
+                disabled={poseLab}
+                onClick={() => {
+                  setPoseDebug(!poseDebug);
+                }}
               >
                 <Eye size={18} />
                 Pose debug
@@ -598,7 +670,11 @@ export function LiveStudio() {
                 {pose.state?.count ?? 0} pose samples ·{" "}
                 {pose.state?.latest?.quality.legs_visible
                   ? "Legs visible"
-                  : "Legs not confirmed visible"}
+                  : pose.state?.latest?.quality.thighs_visible
+                    ? "Thighs visible"
+                    : pose.state?.latest?.quality.thighs_available
+                      ? "Thighs visible · lower legs estimated"
+                      : "Legs not confirmed visible"}
               </p>
               <p className="field-hint">
                 Turn the camera off to download preview JSONL. Starting a take

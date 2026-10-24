@@ -41,6 +41,7 @@ export function TranscriptAnalysis({
         ),
         "words",
         recording.durationMs,
+        recording.config.featureFlags,
       );
       if (active.signal.aborted) return;
       update(recording.id, (take) => ({
