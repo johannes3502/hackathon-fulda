@@ -57,14 +57,11 @@ flowchart TB
 
     WEB -- "Kamera/Mikro" --> MP_W
     WEB -- "Aufnahme" --> MR
-    WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>Live-Sprechfeedback im Backend-Modus"]
+    WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>Live-Sprechfeedback für jede Web-Aufnahme"]
     PCM -- "WS /api/speech/live: PCM" --> SP
     FLAGS["FeatureFlags pro Take<br/>Modell, Modus, Pose Lab,<br/>Sprachfeedback pro Typ"] --> MP_W
     MP_W -. "Track fingers, bis 5 Hz" .-> HAND["Hand Landmarker: 21 Punkte pro Hand<br/>auch ohne Torso, kein Upload"]
     HAND -. "Pose Lab" .-> LAB["T1–T12, Pocket<br/>lokale Diagnose, keine Events"]
-    WEB --> DSP["AudioWorklet lokal: RMS/YIN<br/>Energiehüllkurven-Tempo-Proxy"]
-    DSP --> LOCAL_SPEECH["SpeechEvaluator: 3 s stimmhafte Sprache<br/>Referenz langsam nachführen, Stille zählt nicht<br/>Pausen, Pegel, Pitch, Rhythmus + Review-Marker"]
-    LOCAL_SPEECH --> WEB
 
     SP -- "finale Wörter + Text; vorher vorläufiger Text" --> WEB
     SP -- "nur bei provider=deepgram; PCM, serverseitiger Schlüssel" --> DG["Deepgram EU Nova-3<br/>Deutsch, live + Wort-Timestamps"]
@@ -180,7 +177,7 @@ sequenceDiagram
     BE-->>FE: Bereit, oder Abbruch vor Aufnahme mit Retry-Hinweis
     FE->>FE: FeatureFlags im Take festhalten (Lite/Heavy, VIDEO/IMAGE)
     FE->>FE: Pose-Worker GPU-first/CPU-Fallback, Fingertracking separat bis 5 Hz
-    Note over FE: Im lokalen Live-Modus AudioWorklet und SpeechEvaluator ohne Upload
+    Note over FE,BE: Jede Web-Aufnahme mit Mikrofon, Live-Feedback und vollständigem Upload; kein Modus-Schalter
 
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>BE: WS /speech/feedback: start, PCM nach ready
@@ -419,10 +416,17 @@ kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
 
 ```mermaid
 flowchart TD
-    DRAWER["AppShell Navigations-Drawer (außer Live-Studio)<br/>Open Sans + #3803bf, verbindet /, /live,<br/>/sources, /review-preview, /gestures, /demo"]
+    DRAWER["AppShell: modaler Drawer + Header außerhalb des Live-Studio<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>verbindet /, /live, /sources, /review-preview, /gestures, /demo, /admin"]
+    THEME["Root-Layout: gespeicherte Darstellung vor First Paint<br/>localStorage, CSS-Tokens, OS-Fallback"] -.-> DRAWER
+    JOURNEY["Gemeinsamer Ablauf: Prepare / Record / Review<br/>aktuelle oder letzte Aufnahme, sonst markiertes Beispiel"] --> SRC
+    JOURNEY --> LIVE
+    JOURNEY --> LREV
     LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>PNG-Logo, CSS-Animation, Reduced-Motion"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
-    SP["/ und /stats-preview<br/>Aufnahmeübersicht im Browser-Arbeitsbereich"] --> SC["StatsDashboard<br/>Anzahl, Dauer, Hinweise und Transkripte<br/>aus aufgenommenen Takes, sonst Leerzustand"]
+    SP["/ und /stats-preview<br/>Einleitung + Neue Präsentation / Quellen vorbereiten<br/>darunter Aufnahmeübersicht im Browser-Arbeitsbereich"] --> SC["StatsDashboard<br/>Anzahl, Dauer, Hinweise und Transkripte<br/>aus aufgenommenen Takes, sonst Leerzustand"]
+    SP -->|"Neue Präsentation"| LIVE
+    SP -->|"Quellen vorbereiten"| SRC
+    SP -->|"Letzte Aufnahme, falls vorhanden"| LREV
     DRAWER --> SP
     DRAWER --> LIVE
     DRAWER --> SRC
@@ -433,7 +437,7 @@ flowchart TD
     SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
-    LIVE["/live - LiveStudio<br/>Vollbild-Layout ohne Menü, Pose-Overlay,<br/>Options: Vortragstyp, Material und Analyse,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE["/live - LiveStudio<br/>Vollbild-Layout ohne Menü, Pose-Overlay,<br/>Immer Live + Backend-Analyse,<br/>Options: Vortragstyp, Material und Transkript,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
     DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]

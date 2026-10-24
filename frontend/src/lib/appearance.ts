@@ -1,0 +1,2 @@
+// Runs before the first paint so a saved appearance does not flash the system theme.
+export const appearanceScript = `(function(){try{var v=localStorage.getItem("418-appearance");if(v==="light"||v==="dark")document.documentElement.dataset.appearance=v}catch(e){}window.addEventListener("storage",function(e){if(e.key==="418-appearance"||e.key===null){var v=e.newValue;document.documentElement.dataset.appearance=v==="light"||v==="dark"?v:"system"}})})();`;

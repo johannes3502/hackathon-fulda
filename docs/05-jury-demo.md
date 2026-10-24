@@ -39,8 +39,8 @@ Gemini-Key in `.env` setzen, Backend/Worker neu starten und den Smoke ausführen
 mit erfundenem Inhalt hochladen: „Synthetische Beispieldaten: Das Lernlabor hat
 zwanzig Plätze. Es öffnet um neun Uhr.“ Auf **Ready** warten.
 
-Unter `/live` oberhalb der Kamera **Speech analysis → On · local speech analysis** wählen. Mikro
-und Kamera einschalten, normal sprechen und neutral stehen. Als synthetischen
+Unter `/live` ist Live-Feedback mit vollständiger Backend-Analyse immer aktiv.
+Mikro und Kamera einschalten, normal sprechen und neutral stehen. Als synthetischen
 Vortrag z. B. sagen: „Das Lernlabor hat zwanzig Plätze. Es öffnet um acht Uhr.
 Das Lernlabor hat einen Swimmingpool.“ Nach Stop das echte Whisper-Transkript
 prüfen, dann **Check facts**, danach **Start question round**. Zitate ansehen, Zeitknopf ausprobieren
@@ -82,7 +82,7 @@ Vor-Ort-Abnahme nicht. Keine echten Juryaufnahmen als Testfixtures einchecken.
 | Lokale Dienste / Assets | App, Modell-Assets und optional Compose-Audio-Backend vor Start laden | Lokal prüfen; keine öffentliche URL benötigt |
 | Lokale KI | Whisper, Quellenvergleich, Frage und Antwort auf synthetischen Daten | Reale lokale Modelle und Desktop-/Mobile-Viewport-Flows geprüft; Nutzer bestätigt Mikrofon/Transkript funktioniert, langsam, für diesen Stand akzeptiert |
 | Lokaler Fallback | `/gestures` und vorbereitete Sprach-/Frage-Session vorher öffnen | Automatisiert prüfen; am Stand wiederholen |
-| Einwilligung | Vor Aufnahme erklären: lokal oder optional Backend-Audio-Upload, Speicherung, Download/Verlassen | UI-Hinweise vorhanden; Team erklärt vor Ort |
+| Einwilligung | Vor Aufnahme erklären: Live-Audio und Aufnahme-Upload ans Backend, Speicherung, Download/Verlassen | UI-Hinweise vorhanden; Team erklärt vor Ort |
 
 ## Ergebnisprotokoll für echte Kamera (auszufüllen)
 
@@ -124,11 +124,12 @@ Konfiguration und Fallback-Gründe.
 
 **Speech feedback** schaltet alle Sprachmarker; **Pauses**, **Speaking pace**,
 **Filler words**, **Volume**, **Pitch variation** wählen einzelne Typen.
-**Speech analysis → Live · in browser** ist Standard: Kamera/Mikro bleiben lokal;
-3 s normal sprechen, dann Lautstärke, längere Pause oder Tonhöhenvariation testen.
-Bei **Live + full backend analysis** nutzt die App den Server-Signalstream.
+Jede Aufnahme verwendet **Live + full backend analysis**, ohne Modus-Auswahl:
+Mikrofon-Audio geht live an den Server, die vollständige Aufnahme nach dem Stoppen.
+Backend vor der Aufnahme starten; 3 s normal sprechen, dann Lautstärke,
+längere Pause oder Tonhöhenvariation testen.
 Füllwörter/Wort-Tempo benötigen weiterhin die Analyse nach dem Stoppen.
-**Off · gestures only** benötigt kein Mikro. Abschalten eines Feedbacktyps
+Abschalten eines Feedbacktyps
 entfernt dessen Marker, nicht die Messwerte der vollständigen Analyse. Importierte Wort-Timestamps
 beachten dieselben Schalter der jeweiligen Aufnahme. Pose-/Fact-Check- und
 Frage-Ergebnisse bleiben unabhängig davon.
@@ -138,7 +139,7 @@ während Aufnahme/Analyse gesperrt. Im Workspace bleiben sie bis zum Reload.
 Ein Wechsel von Modell, Modus oder **Pose lab** startet Pose und Kalibrierung neu.
 **Pose lab** ist standardmäßig aus. **Track fingers** ist unabhängig davon
 standardmäßig an: bis 5 Hz, auch ohne Torso. Finger werden pink eingezeichnet;
-„Hands detected“ und Mikrofonpegel helfen bei der Diagnose. Die Haltungsreferenz
+„Hands detected“ und der Live-Sprachstatus helfen bei der Diagnose. Die Haltungsreferenz
 kalibriert ohne Hand-Stillhaltepflicht. Im Nutzertest funktionierte die Korrektur;
 dies ist eine informelle Rückmeldung ohne gezählte Versuche oder Genauigkeitsmessung.
 T12, Pocket und Kopforientierung erzeugen keine Produktions-Events.

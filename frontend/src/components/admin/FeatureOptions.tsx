@@ -92,11 +92,10 @@ export function FeatureOptions({
         ))}
       </fieldset>
       <p className="field-hint">
-        Pauses, volume, pitch variation and speaking rhythm are shown live when
-        Speech analysis in the studio is live. Filler words and word-based pace
-        need the transcript after stopping. These switches control feedback
-        markers; analysis, measurements and transcription keep their own
-        settings.
+        Pauses, volume, pitch variation and speaking rhythm are shown live
+        during recording. Filler words and word-based pace need the transcript
+        after stopping. These switches control feedback markers; analysis,
+        measurements and transcription keep their own settings.
       </p>
       <p className="field-hint">
         Saved in this browser and with each take. Changes apply to the next

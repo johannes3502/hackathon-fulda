@@ -6,6 +6,7 @@ import { AppShell } from "@/components/shared/AppShell";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { time } from "@/lib/utils";
 import { summarizeRecordings } from "./stats";
+import { PresentationIntro } from "./PresentationIntro";
 import "./stats-card.css";
 
 export function StatsDashboard() {
@@ -19,12 +20,13 @@ export function StatsDashboard() {
   return (
     <AppShell experience="live">
       <div className="stats418-dashboard" lang="de">
+        <PresentationIntro />
         <section className="stats418-hero" aria-label="Deine Aufnahmen">
           <div className="stats418-hero-info">
             <span className="stats418-section-eyebrow">
               <BarChart3 size={16} /> Dein Arbeitsbereich
             </span>
-            <h1>Deine Aufnahmen im Überblick.</h1>
+            <h2>Deine Aufnahmen im Überblick.</h2>
             <p>
               Nimm deine Präsentation auf und schau dir konkrete Hinweise mit
               Zeitmarken an. Lade Quellen hoch, um Aussagen zu vergleichen und
@@ -35,7 +37,7 @@ export function StatsDashboard() {
                 <Video size={17} /> Live-Aufnahme starten
               </Link>
               <Link href="/sources" className="button button-outline">
-                <FileText size={16} /> Quellen (RAG)
+                <FileText size={16} /> Quellen
               </Link>
             </div>
             <p className="stats418-retention">

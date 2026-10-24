@@ -3,7 +3,9 @@
   margin: 0 auto;
   padding: 40px 32px 64px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
+  overflow-wrap: anywhere;
 }
 .stats418-hero {
   display: grid;
@@ -18,7 +20,14 @@
   color: var(--muted);
   font-size: 0.875rem;
 }
-.stats418-hero-info h1 {
+.stats418-hero-info {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  min-width: 0;
+}
+.stats418-hero-info h2 {
   margin: 16px 0;
   font-size: 2rem;
   line-height: 1.2;
@@ -38,6 +47,9 @@
 }
 .stats418-retention {
   font-size: 0.875rem;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
 }
 .stats418-card,
 .stats418-recordings {
@@ -125,6 +137,7 @@
     padding: 28px 16px 40px;
   }
   .stats418-card,
+  .stats418-hero-info,
   .stats418-recordings {
     padding: 20px;
   }

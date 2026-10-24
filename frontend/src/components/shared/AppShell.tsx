@@ -1,14 +1,9 @@
 "use client";
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { BrandLogo } from "./BrandLogo";
 import { usePathname } from "next/navigation";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   BarChart3,
   CircleHelp,
@@ -24,6 +19,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { AppearanceSelect } from "./AppearanceSelect";
+import { PracticeJourney } from "./PracticeJourney";
 
 const DrawerContext = createContext<{
   open: boolean;
@@ -55,7 +52,6 @@ export function DrawerTriggerButton() {
   );
 }
 
-
 export const NAV_ITEMS = [
   {
     href: "/",
@@ -71,7 +67,7 @@ export const NAV_ITEMS = [
   },
   {
     href: "/sources",
-    label: "Quellen (RAG)",
+    label: "Quellen",
     description: "PDF, PPTX & Notizen für den Fact-Check verwalten",
     icon: FileText,
   },
@@ -114,20 +110,10 @@ export function AppShell({
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        setDrawerOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [drawerOpen]);
-
   return (
-    <DrawerContext.Provider value={{ open: drawerOpen, setOpen: setDrawerOpen }}>
+    <DrawerContext.Provider
+      value={{ open: drawerOpen, setOpen: setDrawerOpen }}
+    >
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -151,6 +137,16 @@ export function AppShell({
           </Link>
         </div>
         <nav aria-label="Main navigation" className="app-nav">
+          <Link
+            href="/"
+            aria-current={
+              pathname === "/" || pathname === "/stats-preview"
+                ? "page"
+                : undefined
+            }
+          >
+            Overview
+          </Link>
           <Link
             href="/live"
             aria-current={pathname.startsWith("/live") ? "page" : undefined}
@@ -180,97 +176,109 @@ export function AppShell({
             Admin
           </Link>
         </nav>
-        <Dialog
-          title="How this practice works"
-          description={
-            experience === "live"
-              ? "Record a camera session, inspect feedback, and revisit the exact moments."
-              : undefined
-          }
-          trigger={
-            <Button variant="ghost" size="icon" aria-label="How it works">
-              <CircleHelp size={20} />
-            </Button>
-          }
-        >
-          {experience === "live" ? (
-            <>
-              <ol className="help-list">
-                <li>
-                  Enable your camera and check that your upper body is visible.
-                  Use Speech analysis above the camera to include audio. Hold a
-                  neutral position for 3 seconds to calibrate gesture feedback.
-                </li>
-                <li>Start recording when you are ready.</li>
-                <li>
-                  Review your video and the feedback received during that
-                  recording.
-                </li>
-                <li>
-                  Open a feedback moment to replay it with surrounding context.
-                </li>
-              </ol>
-              <p>
-                Live · in browser keeps video, microphone measurements and
-                feedback local. Off · gestures only uses no microphone. Full
-                backend analysis captures video and microphone audio, sends
-                audio during recording for live feedback and uploads the
-                complete take after stopping. Live transcription additionally
-                streams audio to Deepgram’s EU endpoint when enabled in
-                Recording options; local Whisper is the fallback. Camera and
-                voice observations are prototype heuristics, not quality scores.
-                The synthetic walkthrough is separately labelled and needs no
-                camera.
-              </p>
-              <p>
-                Recordings live in browser memory only. Download before
-                refreshing or leaving the live workspace. Backend retention is
-                controlled by your backend.
-              </p>
-            </>
-          ) : (
-            <>
-              <ol className="help-list">
-                <li>Set your pitch context and audience.</li>
-                <li>
-                  Watch a sample pitch unfold, with optional local camera
-                  preview.
-                </li>
-                <li>
-                  Choose sample answers to explore the judge’s follow-ups.
-                </li>
-                <li>Inspect the evidence and retry one answer.</li>
-              </ol>
-              <p>
-                No audio is captured. Camera video stays in your browser and is
-                not recorded, uploaded, or analyzed. Sample feedback does not
-                describe you.
-              </p>
-              <p>
-                Setup and demo reports are stored in this tab’s session storage.
-                Use synthetic pitch content.
-              </p>
-            </>
-          )}
-        </Dialog>
+        <div className="header-actions">
+          <AppearanceSelect />
+          <Dialog
+            title="How this practice works"
+            description={
+              experience === "live"
+                ? "Record a camera session, inspect feedback, and revisit the exact moments."
+                : undefined
+            }
+            trigger={
+              <Button variant="ghost" size="icon" aria-label="How it works">
+                <CircleHelp size={20} />
+              </Button>
+            }
+          >
+            {experience === "live" ? (
+              <>
+                <ol className="help-list">
+                  <li>
+                    Enable your camera and check that your upper body is
+                    visible. Camera and microphone are used for every recording.
+                    Hold a neutral position for 3 seconds to calibrate gesture
+                    feedback.
+                  </li>
+                  <li>Start recording when you are ready.</li>
+                  <li>
+                    Review your video and the feedback received during that
+                    recording.
+                  </li>
+                  <li>
+                    Open a feedback moment to replay it with surrounding
+                    context.
+                  </li>
+                </ol>
+                <p>
+                  Every recording uses live feedback and full backend analysis.
+                  It captures video and microphone audio, sends audio during
+                  recording for live feedback and uploads the complete take
+                  after stopping. Live transcription additionally streams audio
+                  to Deepgram’s EU endpoint when enabled in Recording options;
+                  local Whisper is the fallback. Camera and voice observations
+                  are prototype heuristics, not quality scores. The synthetic
+                  walkthrough is separately labelled and needs no camera.
+                </p>
+                <p>
+                  Recordings live in browser memory only. Download before
+                  refreshing or leaving the live workspace. Backend retention is
+                  controlled by your backend.
+                </p>
+              </>
+            ) : (
+              <>
+                <ol className="help-list">
+                  <li>Set your pitch context and audience.</li>
+                  <li>
+                    Watch a sample pitch unfold, with optional local camera
+                    preview.
+                  </li>
+                  <li>
+                    Choose sample answers to explore the judge’s follow-ups.
+                  </li>
+                  <li>Inspect the evidence and retry one answer.</li>
+                </ol>
+                <p>
+                  No audio is captured. Camera video stays in your browser and
+                  is not recorded, uploaded, or analyzed. Sample feedback does
+                  not describe you.
+                </p>
+                <p>
+                  Setup and demo reports are stored in this tab’s session
+                  storage. Use synthetic pitch content.
+                </p>
+              </>
+            )}
+          </Dialog>
+        </div>
       </header>
-      {drawerOpen && (
-        <div className="nav-drawer-layer">
-          <div
-            className="nav-drawer-backdrop"
-            aria-hidden="true"
-            onClick={() => setDrawerOpen(false)}
-          />
-          <aside
+      <DialogPrimitive.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="nav-drawer-backdrop" />
+          <DialogPrimitive.Content
             id="app-navigation-drawer"
             className="nav-drawer"
-            aria-label="Hauptnavigation"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              const trigger = Array.from(
+                document.querySelectorAll<HTMLButtonElement>(
+                  '[aria-controls="app-navigation-drawer"]',
+                ),
+              ).find((button) => button.getClientRects().length > 0);
+              trigger?.focus();
+            }}
           >
+            <DialogPrimitive.Description className="visually-hidden">
+              Choose a workspace or start a new presentation.
+            </DialogPrimitive.Description>
             <div className="nav-drawer-header">
               <div className="brand">
                 <BrandLogo />
                 <div>
-                  <strong className="nav-drawer-title">Navigation</strong>
+                  <DialogPrimitive.Title className="nav-drawer-title">
+                    Navigation
+                  </DialogPrimitive.Title>
                   <span className="nav-drawer-subtitle">
                     Live-Präsentationstrainer
                   </span>
@@ -325,9 +333,10 @@ export function AppShell({
                 <ShieldCheck size={14} /> A rehearsal, not a verdict.
               </span>
             </div>
-          </aside>
-        </div>
-      )}
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+      <PracticeJourney pathname={pathname} />
       <main id="main" tabIndex={-1}>
         {children}
       </main>
@@ -340,4 +349,3 @@ export function AppShell({
     </DrawerContext.Provider>
   );
 }
-

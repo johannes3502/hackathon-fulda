@@ -358,7 +358,7 @@ it.each([500, 503, "network"] as const)(
     const transport = new AnalysisTransport("http://localhost:8000");
     const connection = transport.connect({ sessionId: "test" }, vi.fn());
     await expect(connection).rejects.toThrow("Nothing has been recorded");
-    await expect(connection).rejects.toThrow("set Speech analysis to Off");
+    await expect(connection).rejects.toThrow("Start the backend");
     await expect(connection).rejects.not.toThrow("recording is preserved");
     expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8000/health/ready");
     transport.close();

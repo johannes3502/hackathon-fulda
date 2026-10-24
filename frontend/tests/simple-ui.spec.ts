@@ -84,7 +84,9 @@ test("home shows an empty recording overview without demo statistics and keeps n
   await expect(
     page.getByRole("button", { name: "Start recording", exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByLabel("Speech analysis")).toBeVisible();
+  await expect(page.getByLabel("Speech analysis", { exact: true })).toHaveCount(
+    0,
+  );
   await expect(
     page
       .locator(".stage-placeholder")
@@ -154,7 +156,6 @@ test("recording consent stays visible while diagnostics and server details are o
     page.getByRole("button", { name: "Pose debug", exact: true }),
   ).toBeHidden();
   await studio.getByText("Recording options", { exact: true }).click();
-  await studio.getByLabel("Speech analysis").selectOption("backend");
   await expect(page.locator(".live-audio-hint")).toContainText(
     "Microphone audio is sent to your server",
   );
@@ -257,12 +258,13 @@ test("shared navigation and help work with keyboard focus", async ({
       exact: true,
     }),
   ).toBeVisible();
-  await page.keyboard.press("Tab");
+  // Next's development toolbar can precede app content in the tab order.
+  await page.getByRole("link", { name: "Skip to content" }).focus();
   await expect(
     page.getByRole("link", { name: "Skip to content" }),
   ).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.locator("main")).toBeFocused();
+  await expect(page.getByRole("main")).toBeFocused();
   const menuButton = page.getByRole("button", { name: "Menü", exact: true });
   await menuButton.focus();
   await page.keyboard.press("Enter");
@@ -273,6 +275,7 @@ test("shared navigation and help work with keyboard focus", async ({
   await expect(
     page.getByRole("navigation", { name: "App-Navigation" }),
   ).toHaveCount(0);
+  await expect(menuButton).toBeFocused();
   const navigation = page.getByRole("navigation", { name: "Main navigation" });
   for (const [label, path] of [
     ["Sources", "/sources"],
