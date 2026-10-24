@@ -112,6 +112,27 @@ def web_passages(found: list[WebPassage], provider: str) -> list[Passage]:
     return [Passage("web", f"{name}: {page.title}", page.text, web=page) for page in found]
 
 
+def verified_evidence(quote: object, preferred: object, passages: list[Passage], min_chars: int) -> Evidence | None:
+    """Evidence only if the model's quote is verbatim in a passage; the named passage is tried first."""
+    quote = quote if isinstance(quote, str) else ""
+    if len(retrieval.normalize(quote).strip(" \"'.…")) < min_chars:
+        return None
+    order = list(range(len(passages)))
+    if isinstance(preferred, int) and 1 <= preferred <= len(passages):
+        order.remove(preferred - 1)
+        order.insert(0, preferred - 1)
+    for index in order:
+        if retrieval.quote_in_text(quote, passages[index].text):
+            passage = passages[index]
+            hit, web = passage.hit, passage.web
+            return Evidence(
+                kind=passage.kind, label=passage.label, quote=quote.strip(), passage=passage.text,
+                filename=hit.filename if hit else None, source_id=hit.source_id if hit else None,
+                location=hit.location if hit else None, url=web.url if web else None,
+            )
+    return None
+
+
 def judge(llm: ChatModel, claim: Claim, passages: list[Passage], config: FactCheckConfig) -> tuple[str, str, Evidence | None, list[str]]:
     """Return verdict, explanation, verified evidence and notes."""
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1))
@@ -122,23 +143,9 @@ def judge(llm: ChatModel, claim: Claim, passages: list[Passage], config: FactChe
         return "not_found", "", None, ["Modellantwort ohne gültiges Urteil verworfen."]
     if verdict == "not_found":
         return "not_found", explanation.strip(), None, []
-    quote = answer.get("quote") if isinstance(answer.get("quote"), str) else ""
-    preferred = answer.get("passage")
-    order = list(range(len(passages)))
-    if isinstance(preferred, int) and 1 <= preferred <= len(passages):
-        order.remove(preferred - 1)
-        order.insert(0, preferred - 1)
-    if len(retrieval.normalize(quote).strip(" \"'.…")) >= config.min_quote_chars:
-        for index in order:
-            if retrieval.quote_in_text(quote, passages[index].text):
-                passage = passages[index]
-                hit, web = passage.hit, passage.web
-                evidence = Evidence(
-                    kind=passage.kind, label=passage.label, quote=quote.strip(), passage=passage.text,
-                    filename=hit.filename if hit else None, source_id=hit.source_id if hit else None,
-                    location=hit.location if hit else None, url=web.url if web else None,
-                )
-                return verdict, explanation.strip(), evidence, []
+    evidence = verified_evidence(answer.get("quote"), answer.get("passage"), passages, config.min_quote_chars)
+    if evidence is not None:
+        return verdict, explanation.strip(), evidence, []
     return "not_found", "", None, ["Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen."]
 
 

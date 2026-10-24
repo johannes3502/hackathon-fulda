@@ -99,6 +99,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Questions
+         * @description Generate follow-up questions from transcript, fact-check findings and uploads.
+         *
+         *     Sends transcript sentences, findings and upload passages to the configured
+         *     OpenAI-compatible model (same as the fact-check). Questions with a spoken
+         *     passage carry `t_ms` of the recording and appear as `question` events.
+         */
+        post: operations["start_questions_questions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Answer Review
+         * @description Compare a typed answer with the question's evidence and upload passages.
+         *
+         *     Result is a verdict with a verbatim quote and an optional follow-up
+         *     question; no points or grades.
+         */
+        post: operations["start_answer_review_questions_answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/answers/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Answer Status */
+        get: operations["answer_status_questions_answers__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Question Status */
+        get: operations["question_status_questions_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sources": {
         parameters: {
             query?: never;
@@ -259,6 +340,50 @@ export interface components {
             config?: components["schemas"]["WordConfig"];
             /** Words */
             words: components["schemas"]["Word"][];
+        };
+        /** AnswerJob */
+        AnswerJob: {
+            /** Error */
+            error?: string | null;
+            /** Job Id */
+            job_id: string;
+            result?: components["schemas"]["AnswerReview"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+        };
+        /** AnswerRequest */
+        AnswerRequest: {
+            /** Answer */
+            answer: string;
+            /** Collection Id */
+            collection_id?: string | null;
+            config?: components["schemas"]["QuestionConfig"];
+            question: components["schemas"]["Question"];
+        };
+        /** AnswerReview */
+        AnswerReview: {
+            /**
+             * Checked
+             * @description Where the answer was compared
+             */
+            checked: ("upload" | "web")[];
+            evidence?: components["schemas"]["Evidence"] | null;
+            /** Explanation */
+            explanation: string;
+            follow_up?: components["schemas"]["Question"] | null;
+            /** Model */
+            model: string;
+            /** Notes */
+            notes?: string[];
+            /**
+             * Verdict
+             * @description `unchecked`: no passage to compare with or the check failed
+             * @enum {string}
+             */
+            verdict: "supports" | "contradicts" | "not_found" | "unchecked";
         };
         /** AudioAnalysis */
         AudioAnalysis: {
@@ -536,6 +661,125 @@ export interface components {
             kind: "page" | "slide" | "paragraph" | "line";
             /** Start */
             start: number;
+        };
+        /** Question */
+        Question: {
+            /**
+             * Claim
+             * @description Fact-check claim the question comes from
+             */
+            claim?: string | null;
+            /**
+             * Duration Ms
+             * @default 0
+             */
+            duration_ms: number;
+            /** @description Verified source passage behind the question */
+            evidence?: components["schemas"]["Evidence"] | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "contradiction" | "unsupported" | "gap" | "clarification" | "follow_up";
+            /**
+             * Query
+             * @description Search query used to compare the answer with the sources
+             */
+            query: string;
+            /** Question */
+            question: string;
+            /**
+             * Reason
+             * @description Why this question is asked, one sentence
+             */
+            reason: string;
+            /**
+             * T Ms
+             * @description Start of the spoken passage; null if it concerns the whole talk
+             */
+            t_ms: number | null;
+            /**
+             * Transcript
+             * @description Spoken sentence(s) the question refers to
+             */
+            transcript?: string | null;
+        };
+        /**
+         * QuestionConfig
+         * @description Prototype limits, not tuned. Returned with every result.
+         */
+        QuestionConfig: {
+            /**
+             * Max Questions
+             * @default 5
+             */
+            max_questions: number;
+            /**
+             * Min Quote Chars
+             * @description Shorter quotes are not accepted as evidence
+             * @default 12
+             */
+            min_quote_chars: number;
+            /**
+             * Source Passages
+             * @description Upload passages shown to the model to find gaps
+             * @default 6
+             */
+            source_passages: number;
+            /**
+             * Top K
+             * @description Upload passages per answer review
+             * @default 5
+             */
+            top_k: number;
+        };
+        /** QuestionJob */
+        QuestionJob: {
+            /** Error */
+            error?: string | null;
+            /** Job Id */
+            job_id: string;
+            result?: components["schemas"]["QuestionResult"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+        };
+        /** QuestionRequest */
+        QuestionRequest: {
+            /**
+             * Claims
+             * @description Fact-check findings of the same transcript
+             */
+            claims?: components["schemas"]["ClaimResult"][];
+            /**
+             * Collection Id
+             * @description Uploaded sources for gaps and answer reviews
+             */
+            collection_id?: string | null;
+            config?: components["schemas"]["QuestionConfig"];
+            /**
+             * Words
+             * @description Word timestamps relative to recording start
+             */
+            words: components["schemas"]["Word"][];
+        };
+        /** QuestionResult */
+        QuestionResult: {
+            config: components["schemas"]["QuestionConfig"];
+            /** Events */
+            events: components["schemas"]["Event"][];
+            /** Model */
+            model: string;
+            /** Notices */
+            notices: string[];
+            /** Questions */
+            questions: components["schemas"]["Question"][];
+            /** Sources Used */
+            sources_used: boolean;
         };
         /** RecordingAnalysis */
         RecordingAnalysis: {
@@ -850,6 +1094,134 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    start_questions_questions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_answer_review_questions_answers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_status_questions_answers__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnswerJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    question_status_questions_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuestionJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -73,9 +73,12 @@ ist weiterhin offen; die Karte behauptet keine gemessene persönliche Bewertung.
 - Was passiert, wenn keine Quelle gefunden wird?
 
 ### Frage-Simulator
-- Wie viele Fragen, welcher Schwierigkeitsgrad?
-- Nur Text oder auch Sprache?
-- Werden Antworten bewertet?
+- Umgesetzt (24.10.2026, Nutzerauftrag): bis zu 5 Fragen pro Runde, zuerst zu
+  Widersprüchen und nicht belegten Aussagen aus dem Fact-Check, dann zu
+  Quelleninhalten, die im Vortrag fehlen, dann zu unklaren Stellen.
+- Antworten nur als Text; Abgleich mit den Quellen (stützt / widerspricht /
+  nicht gefunden) plus optionale Nachfrage. Keine Punkte, keine Noten.
+- Offen: Spracheingabe für Antworten, Schwierigkeitsgrad, Anzahl der Fragen.
 
 ### Daten und Datenschutz
 - Lokales Grundgerüst: PostgreSQL und S3-Dateispeicher mit persistenten
@@ -103,7 +106,7 @@ ist weiterhin offen; die Karte behauptet keine gemessene persönliche Bewertung.
 - Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
 - Fact-Check umgesetzt mit OpenAI-kompatibler Schnittstelle; konkreter Anbieter,
   Modell und Hosting bleiben offen. Web-Zweitquelle: Wikipedia-API (Standard)
-  oder Tavily. Anbieter für den Frage-Agent ebenfalls offen.
+  oder Tavily. Der Frage-Simulator nutzt dasselbe Modell.
 - Latenz, Ausfall-Fallback, Kosten.
 - Browser- und Geräte-Support (Laptop und Smartphone).
 
@@ -135,4 +138,5 @@ einbauen**:
 | 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
 | 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |
+| 24.10.2026 | Frage-Simulator umgesetzt | Nutzerauftrag: Feature 5 vollständig einbauen; Fragen aus Fact-Check-Funden und Quellen, getippte Antworten gegen Quellen geprüft, ohne Bewertung. |
 | 24.10.2026 | Fact-Check mit RAG und Web-Zweitquelle | Nutzerauftrag: hochgeladene Quellen (z. B. Vorlesungsfolien) zuerst, Web nur als Fallback; LLM über OpenAI-kompatible API, Anbieter offen. Transkription im Live-Studio als Opt-in. |

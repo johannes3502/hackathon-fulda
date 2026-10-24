@@ -28,8 +28,9 @@ flowchart TB
         TR["Transcription-Router<br/>POST /transcription/analyze-words"]
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
         FC["Factcheck-Router<br/>POST /factcheck<br/>GET /factcheck/jobs/id, /settings"]
+        QR["Questions-Router<br/>POST /questions, /questions/answers<br/>GET /questions/jobs/id, /questions/answers/id"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -38,6 +39,7 @@ flowchart TB
         INGEST["RAG-Ingest<br/>Extrakt, Chunk, Embed"]
         EMB["Lokale Embeddings<br/>jina-embeddings-v2-base-de<br/>FastEmbed/ONNX"]
         FACT["Fact-Check<br/>Aussagen extrahieren, RAG zuerst,<br/>Web als Zweitquelle, Zitat-Check"]
+        QUEST["Frage-Simulator<br/>Fragen aus Funden + Quellen,<br/>Antwort-Abgleich mit Zitat-Check"]
     end
 
     subgraph Infra["Infrastruktur (Docker Compose)"]
@@ -54,7 +56,7 @@ flowchart TB
     WEB -- "Aufnahme" --> MR
     MOB -- "Kamera" --> MP_M
 
-    WEB -- "fetch: /speech, /sources,<br/>/transcription, /factcheck, /health" --> MAIN
+    WEB -- "fetch: /speech, /sources,<br/>/transcription, /factcheck,<br/>/questions, /health" --> MAIN
     MOB -- "Upload + Job-Polling" --> MAIN
     WEB -. "Typen" .-> OAS
     OAS -. "Quelle der Wahrheit" .-> MAIN
@@ -63,6 +65,7 @@ flowchart TB
     MAIN --> TR
     MAIN --> SO
     MAIN --> FC
+    MAIN --> QR
 
     SP -- "S3-Upload, Enqueue" --> S3
     SP -- "enqueue" --> CEL
@@ -70,6 +73,8 @@ flowchart TB
     SO -- "enqueue" --> CEL
     FC -- "Request in S3" --> S3
     FC -- "enqueue" --> CEL
+    QR -- "Request in S3" --> S3
+    QR -- "enqueue" --> CEL
 
     CEL --> RD
     RD --> TASKS
@@ -77,6 +82,10 @@ flowchart TB
     TASKS --> WORDS
     TASKS --> INGEST
     TASKS --> FACT
+    TASKS --> QUEST
+    QUEST -- "Auszüge für Lücken<br/>und Antwort-Abgleich" --> PG
+    QUEST -. "Sätze, Funde, Auszüge,<br/>getippte Antwort" .-> LLM
+    QUEST -- "Ergebnis, Request löschen" --> S3
     FACT -- "Hybrid-Suche je Aussage" --> PG
     FACT -. "Transkript-Sätze, Auszüge" .-> LLM
     FACT -. "Suchanfragen, nur wenn<br/>Quellen nichts belegen" .-> WEBS
@@ -177,7 +186,9 @@ flowchart TB
     HITS --> JUDGE["LLM-Urteil mit wörtlichem Zitat<br/>quote_in_text-Prüfung<br/>stützt / widerspricht / nicht gefunden"]
     JUDGE -. "nicht belegt" .-> WEBQ["Websuche als Zweitquelle<br/>(Wikipedia / Tavily)"]
     JUDGE --> EVT["fact-Events auf der Timeline"]
-    HITS -.-> FUTURE["Geplant: Frage-Agent<br/>(Quelle: agent, Typ: question)"]
+    HITS --> QA["Frage-Simulator<br/>(app/questions/pipeline.py)<br/>Lücken-Fragen + Antwort-Abgleich"]
+    EVT --> QA
+    QA --> QEVT["question-Events (source: agent)"]
 ```
 
 ## 5. Datenfluss: Fact-Check
@@ -218,6 +229,37 @@ sequenceDiagram
     FE->>FE: fact-Momente in der Timeline, Klick spielt die Stelle ab
 ```
 
+## 5b. Datenfluss: Frage-Simulator
+
+```mermaid
+sequenceDiagram
+    actor U as Nutzer
+    participant FE as Review (QuestionSimulator)
+    participant BE as FastAPI (questions/router)
+    participant S3 as SeaweedFS (S3)
+    participant W as Celery Worker
+    participant PG as Postgres + pgvector
+    participant L as LLM (OpenAI-kompatibel)
+
+    U->>FE: Start question round
+    FE->>BE: POST /questions (Wörter, Fact-Check-Funde, collection_id)
+    BE->>S3: question-jobs/id/request.json
+    BE-->>FE: 202 {job_id, status_url}
+    W->>PG: Hybrid-Suche mit dem Transkript (Auszüge für Lücken)
+    W->>L: Fragen mit Verweisen auf Befund-, Satz- und Auszugsnummern
+    W->>W: t_ms und Evidenz aus den Verweisen, nicht vom Modell,<br/>Widerspruch nur mit passendem Befund,<br/>Lücke nur mit wörtlichem Zitat
+    W->>S3: status.json (Fragen + question-Events), request.json löschen
+    FE->>BE: GET /questions/jobs/{job_id} (Polling)
+    U->>FE: Antwort tippen, "Compare with sources"
+    FE->>BE: POST /questions/answers (Frage, Antwort, collection_id)
+    W->>PG: Hybrid-Suche (Suchanfrage der Frage + Antwort)
+    W->>L: Urteil + wörtliches Zitat + optionale Nachfrage
+    W->>W: quote_in_text prüft Zitat, sonst „nicht gefunden“
+    W->>S3: status.json, request.json (Antworttext) löschen
+    FE->>BE: GET /questions/answers/{job_id} (Polling)
+    FE->>FE: Nachfrage unter der Frage einfügen, keine Punkte oder Noten
+```
+
 ## 6. Frontend-Navigation (Web)
 
 ```mermaid
@@ -237,8 +279,9 @@ flowchart TD
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]
     P1 --> PREV["/practice/sessionId/review<br/>ReviewWorkspace: Findings, Retry,<br/>Evidenz-Sprung"]
 
-    LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Statistiken,<br/>Transcript-Import, Fact-Check-Panel,<br/>Pose-Download"]
+    LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Statistiken,<br/>Transcript-Import, Fact-Check-Panel,<br/>Frage-Simulator, Pose-Download"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>gleiche collection_id wie /sources"]
+    LREV -->|"POST /questions,<br/>POST /questions/answers"| QAPI["Frage-Jobs<br/>Eingabe: Wörter + Fact-Check-Funde"]
     LREV --> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
     RP --> RA["ReviewAnalysis + PerformanceGraph<br/>gemeinsame video.currentTime-Zeitachse<br/>Anmerkungen, Quellen, Abschnitt-Loop"]
@@ -313,10 +356,11 @@ Zusätzlich (außerhalb Postgres):
 | SeaweedFS `sources/{id}/original` | Original-Uploads |
 | SeaweedFS `speech-jobs/{job_id}/` | Job-Konfig, Status, Analyse-Ergebnis (Original wird nach Abschluss gelöscht) |
 | SeaweedFS `factcheck-jobs/{job_id}/` | Status und Fact-Check-Ergebnis; `request.json` (Transkript) wird nach Abschluss gelöscht |
+| SeaweedFS `question-jobs/{job_id}/`, `answer-jobs/{job_id}/` | Status mit Fragen bzw. Antwort-Abgleich; `request.json` (Transkript, Antworttext) wird nach Abschluss gelöscht |
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), auch vom Fact-Check genutzt |
-| Browser-Speicher (Live-Workspace) | Wörter und Fact-Check-Ergebnis einer Aufnahme, nur bis zum Neuladen |
+| Browser-Speicher (Live-Workspace) | Wörter, Fact-Check-Ergebnis, Fragen und Antworten einer Aufnahme, nur bis zum Neuladen |
 
 ## 9. Event-Modell: gemeinsame Timeline
 
@@ -327,6 +371,7 @@ flowchart LR
         A["asr<br/>Füller, Wort-Timestamps"]
         S["speech<br/>pause, pace, volume, pitch"]
         F["factcheck<br/>fact: stützt (info), nicht gefunden (hint),<br/>widerspricht (warning)"]
+        G["agent<br/>question: Widerspruch (warning),<br/>nicht belegt (hint), sonst info;<br/>nur Fragen mit gesprochener Stelle"]
     end
 
     EV["Event<br/>t_ms, duration_ms<br/>type, severity (info/hint/warning)<br/>source, payload"]
@@ -335,6 +380,7 @@ flowchart LR
     A --> EV
     S --> EV
     F --> EV
+    G --> EV
 
     EV --> MT["merge_timeline()<br/>Deduplizierung<br/>(Tempo aus ASR,<br/>Pausen akustisch)"]
     MT --> UI["Timestamp-Timeline im Frontend<br/>Klick springt zum Videoclip ±2s"]
@@ -360,9 +406,13 @@ flowchart LR
         F1["GET /factcheck/settings"]
         F2["POST /factcheck"]
         F3["GET /factcheck/jobs/{job_id}"]
+        Q1["POST /questions"]
+        Q2["GET /questions/jobs/{job_id}"]
+        Q3["POST /questions/answers"]
+        Q4["GET /questions/answers/{job_id}"]
     end
 
-    WEBF["Web-Frontend"] --> H2 & S1 & S2 & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3
+    WEBF["Web-Frontend"] --> H2 & S1 & S2 & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4
     MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
 ```
 

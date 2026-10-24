@@ -12,6 +12,11 @@ import type { LiveRecording } from "./contracts";
 type LiveContext = {
   recordings: Record<string, LiveRecording>;
   save: (recording: LiveRecording) => void;
+  /** Apply `change` to the newest stored version; for async results. */
+  update: (
+    id: string,
+    change: (recording: LiveRecording) => LiveRecording,
+  ) => void;
 };
 const Context = createContext<LiveContext | null>(null);
 export function LiveSessionProvider({ children }: { children: ReactNode }) {
@@ -24,6 +29,13 @@ export function LiveSessionProvider({ children }: { children: ReactNode }) {
     urls.current.add(recording.videoUrl);
     setRecordings((prior) => ({ ...prior, [recording.id]: recording }));
   }, []);
+  const update = useCallback(
+    (id: string, change: (recording: LiveRecording) => LiveRecording) =>
+      setRecordings((prior) =>
+        prior[id] ? { ...prior, [id]: change(prior[id]) } : prior,
+      ),
+    [],
+  );
   useEffect(() => {
     const owned = urls.current;
     return () => {
@@ -32,7 +44,9 @@ export function LiveSessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
   return (
-    <Context.Provider value={{ recordings, save }}>{children}</Context.Provider>
+    <Context.Provider value={{ recordings, save, update }}>
+      {children}
+    </Context.Provider>
   );
 }
 export function useLiveSessions() {

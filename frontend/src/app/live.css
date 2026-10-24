@@ -852,3 +852,56 @@ body:has(.live-workspace-large) .app-footer,
   font-size: 12px;
   color: var(--muted);
 }
+.question-kind {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.question-card.contradiction {
+  border-left-color: var(--warning);
+}
+.question-card.unsupported,
+.question-card.gap {
+  border-left-color: var(--primary);
+}
+.question-card.follow_up {
+  margin-left: 18px;
+}
+.question-kind.contradiction {
+  color: var(--warning);
+}
+.question-kind.unsupported,
+.question-kind.gap {
+  color: var(--primary);
+}
+.question-answer {
+  display: block;
+  margin-top: 10px;
+}
+.question-answer textarea {
+  width: 100%;
+  resize: vertical;
+}
+.question-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+.answer-review {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.answer-review details {
+  margin-top: 8px;
+}
+.answer-review svg {
+  vertical-align: -2px;
+}
+@media (max-width: 640px) {
+  .question-card.follow_up {
+    margin-left: 8px;
+  }
+}

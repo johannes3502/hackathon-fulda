@@ -101,6 +101,155 @@
         "title": "AnalyzeRequest",
         "type": "object"
       },
+      "AnswerJob": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "AnswerJob",
+        "type": "object"
+      },
+      "AnswerRequest": {
+        "properties": {
+          "answer": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Answer",
+            "type": "string"
+          },
+          "collection_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Id"
+          },
+          "config": {
+            "$ref": "#/components/schemas/QuestionConfig"
+          },
+          "question": {
+            "$ref": "#/components/schemas/Question"
+          }
+        },
+        "required": [
+          "question",
+          "answer"
+        ],
+        "title": "AnswerRequest",
+        "type": "object"
+      },
+      "AnswerReview": {
+        "properties": {
+          "checked": {
+            "description": "Where the answer was compared",
+            "items": {
+              "enum": [
+                "upload",
+                "web"
+              ],
+              "type": "string"
+            },
+            "title": "Checked",
+            "type": "array"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Evidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "follow_up": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Question"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "verdict": {
+            "description": "`unchecked`: no passage to compare with or the check failed",
+            "enum": [
+              "supports",
+              "contradicts",
+              "not_found",
+              "unchecked"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verdict",
+          "explanation",
+          "checked",
+          "model"
+        ],
+        "title": "AnswerReview",
+        "type": "object"
+      },
       "AudioAnalysis": {
         "properties": {
           "events": {
@@ -809,6 +958,273 @@
         "title": "Location",
         "type": "object"
       },
+      "Question": {
+        "properties": {
+          "claim": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fact-check claim the question comes from",
+            "title": "Claim"
+          },
+          "duration_ms": {
+            "default": 0,
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Evidence"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Verified source passage behind the question"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "contradiction",
+              "unsupported",
+              "gap",
+              "clarification",
+              "follow_up"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "query": {
+            "description": "Search query used to compare the answer with the sources",
+            "title": "Query",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why this question is asked, one sentence",
+            "title": "Reason",
+            "type": "string"
+          },
+          "t_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Start of the spoken passage; null if it concerns the whole talk",
+            "title": "T Ms"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Spoken sentence(s) the question refers to",
+            "title": "Transcript"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "question",
+          "reason",
+          "t_ms",
+          "query"
+        ],
+        "title": "Question",
+        "type": "object"
+      },
+      "QuestionConfig": {
+        "description": "Prototype limits, not tuned. Returned with every result.",
+        "properties": {
+          "max_questions": {
+            "default": 5,
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Questions",
+            "type": "integer"
+          },
+          "min_quote_chars": {
+            "default": 12,
+            "description": "Shorter quotes are not accepted as evidence",
+            "minimum": 1.0,
+            "title": "Min Quote Chars",
+            "type": "integer"
+          },
+          "source_passages": {
+            "default": 6,
+            "description": "Upload passages shown to the model to find gaps",
+            "maximum": 12.0,
+            "minimum": 0.0,
+            "title": "Source Passages",
+            "type": "integer"
+          },
+          "top_k": {
+            "default": 5,
+            "description": "Upload passages per answer review",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "type": "integer"
+          }
+        },
+        "title": "QuestionConfig",
+        "type": "object"
+      },
+      "QuestionJob": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuestionResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "QuestionJob",
+        "type": "object"
+      },
+      "QuestionRequest": {
+        "properties": {
+          "claims": {
+            "description": "Fact-check findings of the same transcript",
+            "items": {
+              "$ref": "#/components/schemas/ClaimResult"
+            },
+            "maxItems": 30,
+            "title": "Claims",
+            "type": "array"
+          },
+          "collection_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Uploaded sources for gaps and answer reviews",
+            "title": "Collection Id"
+          },
+          "config": {
+            "$ref": "#/components/schemas/QuestionConfig"
+          },
+          "words": {
+            "description": "Word timestamps relative to recording start",
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "maxItems": 50000,
+            "minItems": 1,
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "words"
+        ],
+        "title": "QuestionRequest",
+        "type": "object"
+      },
+      "QuestionResult": {
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/QuestionConfig"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/Question"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "sources_used": {
+            "title": "Sources Used",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "questions",
+          "events",
+          "model",
+          "sources_used",
+          "config",
+          "notices"
+        ],
+        "title": "QuestionResult",
+        "type": "object"
+      },
       "RecordingAnalysis": {
         "properties": {
           "asr_provider": {
@@ -1397,6 +1813,176 @@
         "summary": "Ready",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/questions": {
+      "post": {
+        "description": "Generate follow-up questions from transcript, fact-check findings and uploads.\n\nSends transcript sentences, findings and upload passages to the configured\nOpenAI-compatible model (same as the fact-check). Questions with a spoken\npassage carry `t_ms` of the recording and appear as `question` events.",
+        "operationId": "start_questions_questions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Questions",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/answers": {
+      "post": {
+        "description": "Compare a typed answer with the question's evidence and upload passages.\n\nResult is a verdict with a verbatim quote and an optional follow-up\nquestion; no points or grades.",
+        "operationId": "start_answer_review_questions_answers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Answer Review",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/answers/{job_id}": {
+      "get": {
+        "operationId": "answer_status_questions_answers__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Status",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/jobs/{job_id}": {
+      "get": {
+        "operationId": "question_status_questions_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Question Status",
+        "tags": [
+          "questions"
         ]
       }
     },

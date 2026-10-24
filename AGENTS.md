@@ -50,7 +50,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 - **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
-**Offen:** konkreter LLM-Anbieter und Modell (Schnittstelle: OpenAI-kompatibel), Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
+**Offen:** konkreter LLM-Anbieter und Modell (Schnittstelle: OpenAI-kompatibel), Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Spracheingabe im Frage-Simulator (umgesetzt: nur Text, ohne Bewertung), Produktname.
 
 ## 4. Architektur
 
@@ -156,7 +156,13 @@ LLM extrahiert Aussagen mit Satznummern, Timestamps kommen aus den Wörtern;
 pro Aussage zuerst Retrieval in den hochgeladenen Quellen, danach optional
 Websuche (Wikipedia/Tavily); Zitate werden per `quote_in_text` geprüft,
 Ergebnisse sind `fact`-Events. LLM über OpenAI-kompatible API, Anbieter offen.
-Der Frage-Agent ist noch nicht implementiert. Im Live-Studio lässt sich die
+Der Frage-Simulator ist umgesetzt (`backend/app/questions/`, `POST /questions`,
+`POST /questions/answers`, Panel in `/live/[id]/review`): Fragen aus
+Fact-Check-Funden (Widerspruch, nicht belegt), Lücken gegenüber den Quellen und
+unklaren Stellen; `t_ms` und Evidenz kommen aus Verweisen, nicht vom Modell.
+Getippte Antworten werden mit den Quellen verglichen (Zitat-Prüfung, optionale
+Nachfrage), ohne Punkte oder Noten; Fragen mit gesprochener Stelle sind
+`question`-Events. Im Live-Studio lässt sich die
 Transkription (Deepgram) vor der Aufnahme zuschalten; die Wörter sind Eingabe
 für den Fact-Check. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
