@@ -64,6 +64,75 @@ async function enable(page: Page) {
     page.getByRole("button", { name: "Turn camera off" }),
   ).toBeVisible();
 }
+test("large view scales feedback and preserves an active recording", async ({
+  page,
+}, info) => {
+  await syntheticCamera(page);
+  await enable(page);
+  const video = page.getByLabel("Your local camera feed");
+  const originalVideo = await video.elementHandle();
+  const originalWidth = (await video.boundingBox())!.width;
+  const cue = page.locator(".cue-message");
+  const originalFontSize = await cue.evaluate((el) =>
+    parseFloat(getComputedStyle(el).fontSize),
+  );
+  await page.getByRole("button", { name: "Large view", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Standard view" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(
+    await cue.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+  ).toBeGreaterThan(originalFontSize * 1.5);
+  if (info.project.name === "desktop") {
+    expect((await video.boundingBox())!.width).toBeGreaterThan(
+      originalWidth * 1.5,
+    );
+  }
+  await page.getByRole("button", { name: "Record with demo feedback" }).click();
+  await expect(cue).toHaveText("Review this gesture moment", {
+    timeout: 12000,
+  });
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("large-live-view.png"),
+    fullPage: true,
+  });
+  if (info.project.name === "desktop") {
+    await expect(
+      page.getByRole("button", { name: "Finish & review" }),
+    ).toBeInViewport();
+    await expect(cue).toBeInViewport();
+  }
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Large view", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Large view", exact: true }).click();
+  await page.getByRole("button", { name: "Standard view" }).click();
+  expect(
+    await video.evaluate((el, original) => el === original, originalVideo),
+  ).toBe(true);
+  expect(
+    await video.evaluate(
+      (el: HTMLVideoElement) =>
+        (el.srcObject as MediaStream).getVideoTracks()[0].readyState,
+    ),
+  ).toBe("live");
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+    ),
+  ).toBe(0);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect
+    .poll(() =>
+      page
+        .getByLabel("Recorded pitch video")
+        .evaluate((el: HTMLVideoElement) => el.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+});
 test("raw camera recording, stats, filtered video sections, download and refresh recovery", async ({
   page,
 }, info) => {
