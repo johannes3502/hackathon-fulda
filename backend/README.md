@@ -156,6 +156,8 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
   this replaces the previous synchronous 200 response. Poll the status URL:
   `queued` → `running` → `completed` (with `result`) or `failed` (with `error`).
   Decode failures occur in the worker and are reported as failed jobs.
+- This is the backend audio API. The frontend's live-camera/SSE protocol is
+  separate; wiring these audio jobs into its UI remains a frontend integration.
 - `result.events` uses word-based tempo and acoustic pauses without duplicate
   events. Raw pipeline events remain in `audio.events` / `transcription.events`.
 - Silero v6.2 is installed and checksum-verified at image build time. CPU ONNX

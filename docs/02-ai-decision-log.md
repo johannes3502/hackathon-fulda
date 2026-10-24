@@ -116,3 +116,6 @@ Infrastrukturauftrags. Der lokale Stack bleibt gestartet.
   deutsche Füllwortqualität, menschliche Stimmen, Browser-/Geräteverhalten und
   ein öffentliches Deployment. Testclient meldet eine bestehende Deprecation
   für HTTPX; im Container war zusätzlich das Pytest-Cacheverzeichnis schreibgeschützt.
+- Während der Arbeit eingegangene Frontend-Teamänderungen aus `origin/main`
+  konfliktfrei in den Arbeitsbranch integriert. Deren Live-Kamera-/SSE-Protokoll
+  bleibt separat; die Audio-Job-API ist noch nicht in die neue Oberfläche eingebunden.
