@@ -94,33 +94,53 @@ from `.env`. Ports can be changed there. Keep S3 credentials in the backend.
 Future presigned URLs need an endpoint reachable by the browser; the internal
 `storage` hostname is not reachable from a browser.
 
-## Speech analysis (`app/speech/`)
+## Analysis pipelines
 
-Post-upload speech features from word timestamps (Feature 3 in `AGENTS.md`):
+Two independent pipelines write the shared `Event` schema (`app/events.py`,
+see `AGENTS.md`). Every timestamp is in ms relative to the recording start,
+so results can be combined later (`merge_timeline`). Nothing is stored yet;
+persistence, the upload route and clip cutting are not implemented.
+
+### Audio signal (`app/speech/`, `POST /speech/analyze`)
+
+Works on the sound only, no transcript:
 
 ```
-recording (WebM/MP4) → FFmpeg 16 kHz mono WAV → Transcriber → words
-  → analyze_words → summary + events (type pause | filler | pace, source speech)
+recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
+  → time series: level_db, f0_hz (YIN), active (voice activity), syllable peaks
+  → events: pause | volume | pitch | pace   (source "speech")
 ```
 
-- `Transcriber` protocol: `transcribe(audio_path) -> [Word(word, start_ms, end_ms)]`.
-  The ASR provider is still open; `JsonTranscriber` replays precomputed words
-  (demo session / tests).
-- Pauses: gap between words ≥ `pause_min_ms`; payload marks whether it falls
-  mid-sentence (only meaningful if the ASR returns punctuation).
-- Fillers: configurable token list (still open, see `docs/01-product.md`).
-  Repetitions ("ich ich") are `filler` events with `payload.kind = "repetition"`.
-- Pace: words per minute per window, excluding long pauses, relative to the
-  session's own median; adjacent windows with the same direction are merged.
-- All thresholds live in `SpeechConfig`, are unvalidated heuristics and are
-  returned in `heuristics` so the UI can label them. No scores.
-- `POST /speech/analyze` with `{"words": [...], "config": {...}}` runs the
-  analysis on given words and stores nothing. Persisting events, the upload
-  route and clip cutting are not implemented yet.
+- `series` is column-oriented: `t_ms[i]` (frame centre) belongs to
+  `level_db[i]`, `f0_hz[i]` (null if no pitch) and `active[i]`;
+  `syllable_peaks_ms` lists envelope maxima.
+- Pause: no voice activity for ≥ `pause_min_ms` between speech.
+- Volume: median level per window vs. baseline (`quiet` / `loud`).
+- Pitch: spread of F0 in semitones per window; low spread → `monotone`.
+  No statement about emotion.
+- Pace: syllable rate from the level envelope vs. baseline (`fast` / `slow`).
+- Baseline: the first `baseline_ms` (calibration) or, if unset, the whole
+  recording. Adjacent windows with the same direction become one event.
+- Upload as multipart field `recording`, optional field `config` with
+  `AudioConfig` JSON. Undecodable files return 422.
 
-Volume and pitch are analysed live in the browser (planned, not here).
+### Transcription (`app/transcription/`, `POST /transcription/analyze-words`)
 
-Tests (synthetic data only), from `backend/`:
+```
+recording → FFmpeg WAV → Transcriber → words {word, start_ms, end_ms}
+  → events: filler (incl. repetition) | pause | pace   (source "asr")
+```
+
+- `Transcriber` protocol keeps the ASR provider exchangeable; the provider is
+  still open, `JsonTranscriber` replays precomputed words (demo / tests).
+- Fillers use a configurable list (still open, see `docs/01-product.md`);
+  repetitions ("ich ich") are `filler` events with `payload.kind = "repetition"`.
+- Word-based pause and words-per-minute complement the signal-based values.
+
+All thresholds (`AudioConfig`, `WordConfig`) are unvalidated heuristics and
+are returned in `heuristics` so the UI can label them. No scores.
+
+Tests (synthetic tones and word lists only), from `backend/`:
 
 ```sh
 .venv/bin/python -m pip install -r requirements-dev.txt

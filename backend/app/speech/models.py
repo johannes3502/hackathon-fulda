@@ -1,48 +1,36 @@
-"""Data shapes shared by transcriber, analysis and API.
+from typing import Any
 
-`SpeechEvent` follows the Event schema in AGENTS.md; `session_id` and `id`
-are assigned when events are persisted, which is not implemented yet.
-"""
+from pydantic import BaseModel
 
-from typing import Any, Literal
-
-from pydantic import BaseModel, Field, model_validator
+from app.events import Event
 
 
-class Word(BaseModel):
-    word: str
-    start_ms: int = Field(ge=0)
-    end_ms: int = Field(ge=0)
+class AudioSeries(BaseModel):
+    """Frame-wise time series, column-oriented. `t_ms[i]` is the centre of frame i
+    relative to the recording start; `f0_hz` is null where no pitch was found."""
 
-    @model_validator(mode="after")
-    def _ordered(self) -> "Word":
-        if self.end_ms < self.start_ms:
-            raise ValueError("end_ms must not be before start_ms")
-        return self
-
-
-class SpeechEvent(BaseModel):
-    t_ms: int
-    duration_ms: int
-    type: Literal["filler", "pause", "pace"]
-    severity: Literal["info", "hint", "warning"]
-    source: Literal["speech"] = "speech"
-    payload: dict[str, Any]
+    hop_ms: int
+    t_ms: list[int]
+    level_db: list[float]
+    f0_hz: list[float | None]
+    active: list[bool]
+    syllable_peaks_ms: list[int]
 
 
-class SpeechSummary(BaseModel):
+class AudioSummary(BaseModel):
     """Measured values only; no score or grade."""
 
-    word_count: int
-    speaking_duration_ms: int
-    words_per_minute: float | None
+    duration_ms: int
+    active_ms: int
+    median_level_db: float | None
+    median_f0_hz: float | None
+    f0_range_st: float | None  # p10–p90 spread in semitones
+    syllables_per_second: float | None
     pause_count: int
-    filler_count: int
-    repetition_count: int
-    median_window_wpm: float | None
 
 
-class SpeechAnalysis(BaseModel):
-    summary: SpeechSummary
-    events: list[SpeechEvent]
+class AudioAnalysis(BaseModel):
+    summary: AudioSummary
+    series: AudioSeries
+    events: list[Event]
     heuristics: dict[str, Any]

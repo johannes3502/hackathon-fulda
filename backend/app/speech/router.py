@@ -1,19 +1,26 @@
-from fastapi import APIRouter
-from pydantic import BaseModel, Field
+import subprocess
 
-from app.speech.analysis import analyze_words
-from app.speech.config import SpeechConfig
-from app.speech.models import SpeechAnalysis, Word
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from pydantic import ValidationError
+
+from app.speech.analysis import analyze_upload
+from app.speech.config import AudioConfig
+from app.speech.models import AudioAnalysis
 
 router = APIRouter(prefix="/speech", tags=["speech"])
 
 
-class AnalyzeRequest(BaseModel):
-    words: list[Word] = Field(max_length=50000)
-    config: SpeechConfig = Field(default_factory=SpeechConfig)
-
-
 @router.post("/analyze")
-def analyze(request: AnalyzeRequest) -> SpeechAnalysis:
-    """Speech events from word timestamps (e.g. ASR output). Stores nothing."""
-    return analyze_words(request.words, request.config)
+def analyze(
+    recording: UploadFile = File(description="Audio or video recording (WebM, MP4, WAV, ...)"),
+    config: str | None = Form(default=None, description="Optional AudioConfig as JSON"),
+) -> AudioAnalysis:
+    """Time series and events from the audio signal only. Stores nothing."""
+    try:
+        parsed = AudioConfig.model_validate_json(config) if config else AudioConfig()
+    except ValidationError as error:
+        raise HTTPException(422, error.errors(include_url=False, include_context=False)) from error
+    try:
+        return analyze_upload(recording.file, parsed)
+    except subprocess.CalledProcessError as error:
+        raise HTTPException(422, "Recording could not be decoded") from error

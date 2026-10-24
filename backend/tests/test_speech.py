@@ -1,136 +1,128 @@
-"""Speech analysis on synthetic word timestamps only."""
+"""Audio-signal analysis on synthetic tones only, never a voice recording."""
 
-import json
+import io
 import shutil
-import subprocess
+import wave
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+from app.events import Event, merge_timeline
 from app.main import app
-from app.speech import JsonTranscriber, SpeechConfig, Word, analyze_words, run_speech_pipeline
+from app.speech import AudioConfig, analyze_samples
+
+SR = 16000
 
 
-def words_from(spec: list[tuple[str, int, int]]) -> list[Word]:
-    return [Word(word=w, start_ms=s, end_ms=e) for w, s, e in spec]
+def tone(seconds: float, f0: float = 150.0, amplitude: float = 0.3, syllables_hz: float = 4.0,
+         glide_st: float = 0.0) -> np.ndarray:
+    """Syllable-like bursts: a tone, amplitude-modulated at `syllables_hz`,
+    optionally with pitch moving ±`glide_st` semitones."""
+    t = np.arange(int(seconds * SR)) / SR
+    freq = f0 * 2 ** (glide_st * np.sin(2 * np.pi * 0.5 * t) / 12)
+    phase = 2 * np.pi * np.cumsum(freq) / SR
+    envelope = 0.5 - 0.5 * np.cos(2 * np.pi * syllables_hz * t) if syllables_hz else np.ones_like(t)
+    return (amplitude * envelope * np.sin(phase)).astype(np.float32)
 
 
-def steady(count: int, start_ms: int, step_ms: int, word: str = "wort") -> list[Word]:
-    """`count` distinct words, each lasting 80 % of `step_ms`."""
-    return [
-        Word(word=f"{word}{i}", start_ms=start_ms + i * step_ms, end_ms=start_ms + i * step_ms + step_ms * 4 // 5)
-        for i in range(count)
-    ]
+def silence(seconds: float) -> np.ndarray:
+    return np.zeros(int(seconds * SR), dtype=np.float32)
 
 
-def test_empty_transcript():
-    result = analyze_words([])
+def of_type(result, event_type):
+    return [e for e in result.events if e.type == event_type]
+
+
+def test_series_is_timestamped_per_frame():
+    result = analyze_samples(tone(2.0))
+    series = result.series
+    assert series.hop_ms == 10
+    assert series.t_ms[:3] == [0, 10, 20]
+    assert len(series.t_ms) == len(series.level_db) == len(series.f0_hz) == len(series.active)
+    assert result.summary.duration_ms == 2000
+
+
+def test_f0_estimate():
+    result = analyze_samples(tone(2.0, f0=200.0, syllables_hz=0.0))
+    assert result.summary.median_f0_hz == pytest.approx(200.0, rel=0.02)
+
+
+def test_pause_between_speech_only():
+    samples = np.concatenate([silence(1.0), tone(3.0), silence(2.5), tone(3.0), silence(1.0)])
+    [pause] = of_type(analyze_samples(samples), "pause")
+    assert pause.t_ms == pytest.approx(4000, abs=150)
+    assert pause.duration_ms == pytest.approx(2500, abs=250)
+
+
+def test_quiet_section_relative_to_baseline():
+    samples = np.concatenate([tone(6.0, amplitude=0.3), tone(4.0, amplitude=0.05), tone(6.0, amplitude=0.3)])
+    [quiet] = of_type(analyze_samples(samples), "volume")
+    assert quiet.payload["direction"] == "quiet"
+    assert quiet.t_ms == 6000 and quiet.duration_ms == 4000
+    assert quiet.payload["window_delta_db"][0] <= -AudioConfig().volume_quiet_db
+
+
+def test_monotone_only_without_pitch_variation():
+    varied = analyze_samples(tone(8.0, glide_st=4.0))
+    assert of_type(varied, "pitch") == []
+    flat = analyze_samples(tone(8.0))
+    [monotone] = of_type(flat, "pitch")
+    assert monotone.payload["direction"] == "monotone"
+    assert monotone.t_ms == 0 and monotone.duration_ms == 8000
+
+
+def test_syllable_rate_and_fast_section():
+    calm = analyze_samples(tone(10.0, syllables_hz=4.0))
+    assert calm.summary.syllables_per_second == pytest.approx(4.0, rel=0.25)
+    samples = np.concatenate([tone(10.0, syllables_hz=4.0), tone(5.0, syllables_hz=7.0), tone(10.0, syllables_hz=4.0)])
+    [fast] = of_type(analyze_samples(samples), "pace")
+    assert fast.payload["direction"] == "fast"
+    assert fast.t_ms == 10000 and fast.duration_ms == 5000
+
+
+def test_calibration_baseline():
+    # Calibrated on a quiet start, normal speech afterwards counts as loud.
+    samples = np.concatenate([tone(4.0, amplitude=0.05), tone(4.0, amplitude=0.3)])
+    assert of_type(analyze_samples(samples), "volume") != []
+    calibrated = analyze_samples(samples, AudioConfig(baseline_ms=4000))
+    assert [e.payload["direction"] for e in of_type(calibrated, "volume")] == ["loud"]
+
+
+def test_silence_only():
+    result = analyze_samples(silence(2.0))
     assert result.events == []
-    assert result.summary.word_count == 0
-    assert result.summary.words_per_minute is None
+    assert result.summary.active_ms == 0 and result.summary.median_f0_hz is None
 
 
-def test_pause_detected_with_context():
-    words = words_from([("Erstens.", 0, 500), ("Zweitens", 3000, 3500), ("und", 3600, 3800)])
-    result = analyze_words(words)
-    [pause] = [e for e in result.events if e.type == "pause"]
-    assert (pause.t_ms, pause.duration_ms) == (500, 2500)
-    assert pause.payload["before"] == "Erstens." and pause.payload["mid_sentence"] is False
+def test_merge_timeline_across_pipelines():
+    a = Event(t_ms=500, duration_ms=0, type="pause", severity="info", source="speech", payload={})
+    b = Event(t_ms=100, duration_ms=0, type="filler", severity="hint", source="asr", payload={})
+    assert merge_timeline([a], [b]) == [b, a]
 
 
-def test_pause_threshold_is_configurable():
-    words = words_from([("a", 0, 500), ("b", 1500, 2000)])
-    assert analyze_words(words).summary.pause_count == 0
-    assert analyze_words(words, SpeechConfig(pause_min_ms=1000)).summary.pause_count == 1
-
-
-def test_fillers_case_and_punctuation_insensitive():
-    words = words_from([("Also,", 0, 300), ("Äh,", 400, 600), ("ähm", 700, 900), ("gut", 1000, 1200)])
-    result = analyze_words(words)
-    assert [e.payload["word"] for e in result.events if e.payload.get("kind") == "filler"] == ["Äh,", "ähm"]
-    custom = analyze_words(words, SpeechConfig(fillers=["also"]))
-    assert custom.summary.filler_count == 1
-
-
-def test_repetition_ignores_filler_in_between():
-    words = words_from([("ich", 0, 200), ("äh", 300, 500), ("ich", 600, 800), ("denke", 900, 1200)])
-    result = analyze_words(words)
-    [repetition] = [e for e in result.events if e.payload.get("kind") == "repetition"]
-    assert (repetition.t_ms, repetition.duration_ms) == (0, 800)
-    assert result.summary.filler_count == 1 and result.summary.repetition_count == 1
-
-
-def test_repetition_requires_short_gap():
-    words = words_from([("so", 0, 200), ("so", 1500, 1700)])
-    assert analyze_words(words).summary.repetition_count == 0
-
-
-def test_pace_relative_to_session_median_and_merged():
-    # 3 normal windows (500 ms/word), then 2 fast windows (250 ms/word), then normal again.
-    words = (
-        steady(20, 0, 500, "n")
-        + steady(20, 10000, 500, "m")
-        + steady(20, 20000, 500, "o")
-        + steady(40, 30000, 250, "f")
-        + steady(20, 40000, 500, "p")
-        + steady(20, 50000, 500, "q")
-    )
-    result = analyze_words(words)
-    pace = [e for e in result.events if e.type == "pace"]
-    assert len(pace) == 1
-    assert pace[0].payload["direction"] == "fast"
-    assert pace[0].t_ms == 30000 and len(pace[0].payload["window_wpm"]) == 1
-    assert result.summary.median_window_wpm == pace[0].payload["baseline_wpm"]
-
-
-def test_pace_excludes_long_pauses():
-    # Same speaking rate in both windows; the second contains a 3 s pause.
-    words = steady(20, 0, 500, "a") + steady(5, 10000, 500, "b") + steady(15, 15000, 500, "c")
-    result = analyze_words(words)
-    assert result.summary.pause_count == 1
-    assert [e for e in result.events if e.type == "pace"] == []
-
-
-def test_unsorted_input_and_heuristics_returned():
-    words = words_from([("b", 3000, 3200), ("a", 0, 200)])
-    result = analyze_words(words)
-    assert result.events[0].payload["before"] == "a"
-    assert result.heuristics["pause_min_ms"] == 2000
-
-
-def test_invalid_word_rejected():
-    with pytest.raises(ValueError):
-        Word(word="x", start_ms=500, end_ms=100)
-
-
-def test_api_analyze():
-    client = TestClient(app)
-    response = client.post(
-        "/speech/analyze",
-        json={"words": [{"word": "äh", "start_ms": 0, "end_ms": 200}, {"word": "gut", "start_ms": 2500, "end_ms": 2800}]},
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert {e["type"] for e in body["events"]} == {"filler", "pause"}
-    assert all(e["source"] == "speech" for e in body["events"])
-    assert client.post("/speech/analyze", json={"words": [{"word": "x", "start_ms": 5, "end_ms": 1}]}).status_code == 422
+def wav_bytes(samples: np.ndarray) -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(SR)
+        wav.writeframes((samples * 32767).astype("<i2").tobytes())
+    return buffer.getvalue()
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="FFmpeg not installed")
-def test_pipeline_with_synthetic_recording(tmp_path):
-    recording = tmp_path / "recording.webm"
-    subprocess.run(
-        ["ffmpeg", "-nostdin", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=220:duration=2",
-         "-c:a", "libopus", str(recording)],
-        check=True,
+def test_api_analyze_upload():
+    client = TestClient(app)
+    samples = np.concatenate([tone(3.0), silence(2.5), tone(3.0)])
+    response = client.post(
+        "/speech/analyze",
+        files={"recording": ("synthetic.wav", wav_bytes(samples), "audio/wav")},
+        data={"config": '{"pause_min_ms": 1500}'},
     )
-    words_file = tmp_path / "words.json"
-    words_file.write_text(json.dumps([{"word": "hallo", "start_ms": 0, "end_ms": 400}, {"word": "ähm", "start_ms": 500, "end_ms": 700}]))
-
-    class RecordingCheck(JsonTranscriber):
-        def transcribe(self, audio_path):
-            assert audio_path.read_bytes()[:4] == b"RIFF"
-            return super().transcribe(audio_path)
-
-    words, result = run_speech_pipeline(recording, RecordingCheck(words_file))
-    assert len(words) == 2 and result.summary.filler_count == 1
+    assert response.status_code == 200
+    body = response.json()
+    assert [e["type"] for e in body["events"] if e["type"] == "pause"] == ["pause"]
+    assert body["heuristics"]["pause_min_ms"] == 1500
+    bad = client.post("/speech/analyze", files={"recording": ("x.wav", b"not audio", "audio/wav")})
+    assert bad.status_code == 422

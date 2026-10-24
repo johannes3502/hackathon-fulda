@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Protocol
 
-from app.speech.models import Word
+from app.transcription.models import Word
 
 
 class Transcriber(Protocol):
