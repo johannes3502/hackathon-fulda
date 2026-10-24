@@ -63,7 +63,10 @@ Produktentscheidung.
 ### Daten und Datenschutz
 - Lokales Grundgerüst: PostgreSQL und S3-Dateispeicher mit persistenten
   Docker-Volumes, ausschließlich für synthetische Entwicklungsdaten.
-  Kein Aufnahme-/Upload-Endpunkt und keine automatische Aufzeichnung.
+  Expliziter Audio-Upload unter `/speech/analyze`, keine automatische Aufzeichnung.
+  Celery verarbeitet Silero-VAD/RMS/YIN sowie optional Deepgram-ASR (EU, deutsch).
+  Originale werden nach terminaler Verarbeitung gelöscht; Ergebnisse verbleiben
+  in S3. Stalled Jobs und Speicherfehler benötigen noch eine Cleanup-Regel.
   Der Smoke-Test entfernt seine synthetischen Audiodaten wieder.
 - Redis hält Hintergrundjobs und kleine Status-/Referenzwerte in einem
   persistenten Docker-Volume. Task-Ergebnisse verfallen nach einer Stunde;
@@ -77,9 +80,11 @@ Produktentscheidung.
   MediaRecorder im Browser und SeaweedFS als S3-Dateispeicher;
   FFmpeg im Backend. Celery führt lange Arbeiten in einem separaten Worker
   aus, Redis dient als Queue und temporärer Ergebnisspeicher. Die
-  Transkriptions-Implementierung bleibt offen. Setup und Speicherverhalten:
+  Post-Transkription nutzt Deepgram Nova-3 hinter einem austauschbaren Interface.
+  Deutsche Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und Speicherverhalten:
   `backend/README.md`.
-- Hosting, konkrete Analysemodelle und externe Anbieter bleiben offen.
+- Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
+- Hosting und Anbieter für Fact-Check/Frage-Agent bleiben offen.
 - Latenz, Ausfall-Fallback, Kosten.
 - Browser- und Geräte-Support (Laptop und Smartphone).
 
@@ -110,3 +115,4 @@ einbauen**:
 | 24.10.2026 | Produkt angelegt | Thema auf Live-Präsentationstrainer festgelegt; fünf erste Features genannt. |
 | 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
+| 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |

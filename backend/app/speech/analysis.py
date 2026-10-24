@@ -13,6 +13,7 @@ from app.events import Event
 from app.speech.config import AudioConfig
 from app.speech.models import AudioAnalysis, AudioSeries, AudioSummary
 from app.speech.signal import decode_audio, envelope_peaks, frame_signal, level_db, yin_f0
+from app.speech.vad import speech_activity
 
 
 def analyze_recording(recording: Path, config: AudioConfig | None = None) -> AudioAnalysis:
@@ -37,7 +38,9 @@ def analyze_samples(samples: np.ndarray, config: AudioConfig | None = None) -> A
     t_ms = np.arange(len(frames)) * hop_ms
 
     level = level_db(frames)
-    if len(level):
+    if config.activity_detector == "silero":
+        active = speech_activity(samples, t_ms, config)
+    elif len(level):
         gate = max(config.activity_floor_db, np.percentile(level, 95) - config.activity_range_db)
         active = level > gate
     else:
@@ -66,7 +69,7 @@ def analyze_samples(samples: np.ndarray, config: AudioConfig | None = None) -> A
         key=lambda e: (e.t_ms, e.type),
     )
 
-    voiced_st = semitones[voiced]
+    voiced_st = semitones[voiced & np.isfinite(semitones)]
     summary = AudioSummary(
         duration_ms=round(len(samples) / sr * 1000),
         active_ms=int(active.sum()) * hop_ms,

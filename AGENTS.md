@@ -50,7 +50,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 - **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
-**Offen:** ASR- und LLM-Anbieter, Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
+**Offen:** LLM-Anbieter, Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
 
 ## 4. Architektur
 
@@ -141,18 +141,20 @@ templates/
 
 Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
 einen separaten Celery-Worker, Redis, PostgreSQL **ohne pgvector** und
-**SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job
-geprüft; Produkt-Tasks und Job-API-Endpunkte sind noch nicht implementiert. MinIO,
-pgvector und die vollständige Analyse-/Aufnahme-Pipeline aus der
+**SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job geprüft; Audio-/ASR-Jobs und
+Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO,
+pgvector und die vollständige Aufnahme-/Clip-/Review-Pipeline aus der
 Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
-Die Audio-Analyse nach Aufnahmestopp ist über die bestehenden HTTP-Endpunkte
-angebunden; die automatische Transkription benötigt weiterhin einen ASR-Anbieter.
-Umgesetzt sind zwei getrennte
-Analyse-Pipelines ohne Persistenz, beide mit `t_ms` ab Aufnahmestart im
+Der Aufnahme-Pfad nutzt die Audio-Job-API
+mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
+jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
+Analyse-Pipelines mit S3-Persistenz für kombinierte Jobs, beide mit `t_ms` ab Aufnahmestart im
 gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als
 Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription
-(`backend/app/transcription/`, noch ohne ASR-Anbieter). Die Umstellung des Speichers
+(`backend/app/transcription/`, Deepgram Nova-3 über EU-Endpunkt; deutsche
+Füllworterhaltung ungeprüft). Silero VAD v6.2 (ONNX, lokal) erkennt
+Sprachaktivität; RMS und YIN bleiben erhalten, Standard-Kalibrierung 3 s. Die Umstellung des Speichers
 ist eine separate Implementierungsaufgabe.
 
 Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes

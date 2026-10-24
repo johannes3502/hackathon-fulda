@@ -21,11 +21,21 @@ const result = {
     },
   ],
 };
+const jobId = "12345678-1234-1234-1234-123456789abc";
+const accepted = { job_id: jobId, status_url: `/speech/jobs/${jobId}` };
 it("uploads a complete recording only after stopping and maps real feedback", async () => {
   const fetcher = vi
     .fn()
     .mockResolvedValueOnce(Response.json({ status: "ok" }))
-    .mockResolvedValueOnce(Response.json(result));
+    .mockResolvedValueOnce(Response.json(accepted, { status: 202 }))
+    .mockResolvedValueOnce(Response.json({ job_id: jobId, status: "running" }))
+    .mockResolvedValueOnce(
+      Response.json({
+        job_id: jobId,
+        status: "completed",
+        result: { audio: result, events: result.events },
+      }),
+    );
   vi.stubGlobal("fetch", fetcher);
   const transport = new AnalysisTransport("http://localhost:8000");
   const receive = vi.fn();
@@ -38,6 +48,10 @@ it("uploads a complete recording only after stopping and maps real feedback", as
   );
   expect(fetcher.mock.calls[1][0]).toBe("http://localhost:8000/speech/analyze");
   const file = fetcher.mock.calls[1][1].body.get("recording") as File;
+  expect(fetcher.mock.calls[1][1].body.get("transcribe")).toBe("false");
+  expect(fetcher.mock.calls[2][0]).toBe(
+    `http://localhost:8000/speech/jobs/${jobId}`,
+  );
   expect(file.name).toBe("take.mp4");
   expect(await file.text()).toBe("complete recording");
   expect(receive.mock.calls[0][0].feedback).toMatchObject({
@@ -47,6 +61,35 @@ it("uploads a complete recording only after stopping and maps real feedback", as
   });
   expect(receive.mock.calls[1][0].metrics[1].value).toBeNull();
   transport.close();
+});
+it("reports failed jobs and cancels polling when the transport closes", async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ status: "ok" }))
+    .mockResolvedValueOnce(Response.json(accepted, { status: 202 }))
+    .mockResolvedValueOnce(Response.json({ job_id: jobId, status: "failed" }));
+  vi.stubGlobal("fetch", fetcher);
+  const transport = new AnalysisTransport("http://localhost:8000");
+  const receive = vi.fn();
+  await transport.connect({ sessionId: "test" }, receive);
+  await expect(transport.finish(1000, new Blob(["bad"]))).rejects.toThrow(
+    "local recording is preserved",
+  );
+  expect(receive).not.toHaveBeenCalled();
+  transport.close();
+
+  const aborting = new AnalysisTransport("http://localhost:8000");
+  fetcher
+    .mockResolvedValueOnce(Response.json({ status: "ok" }))
+    .mockResolvedValueOnce(Response.json(accepted, { status: 202 }))
+    .mockImplementationOnce(() => {
+      setTimeout(() => aborting.close(), 0);
+      return Promise.resolve(
+        Response.json({ job_id: jobId, status: "queued" }),
+      );
+    });
+  await aborting.connect({ sessionId: "test" }, receive);
+  await expect(aborting.finish(1000, new Blob(["data"]))).rejects.toThrow();
 });
 it("surfaces HTTP failures and aborts outstanding requests on close", async () => {
   const fetcher = vi

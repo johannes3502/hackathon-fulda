@@ -42,6 +42,53 @@ export async function request(
   return response.json() as Promise<unknown>;
 }
 
+export async function waitForAudioJob(
+  endpoint: string,
+  accepted: unknown,
+  signal: AbortSignal,
+) {
+  if (
+    !object(accepted) ||
+    typeof accepted.job_id !== "string" ||
+    !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(accepted.job_id)
+  )
+    throw new Error("The backend returned an invalid analysis job.");
+  const active = AbortSignal.any([signal, AbortSignal.timeout(660000)]);
+  while (true) {
+    active.throwIfAborted();
+    const job = await request(
+      endpoint,
+      `/speech/jobs/${accepted.job_id}`,
+      active,
+    );
+    if (!object(job) || job.job_id !== accepted.job_id)
+      throw new Error("The backend returned an invalid analysis job.");
+    if (job.status === "failed")
+      throw new Error(
+        "Audio analysis failed. Your local recording is preserved.",
+      );
+    if (job.status === "completed") {
+      if (!object(job.result) || !object(job.result.audio))
+        throw new Error("The backend returned an invalid analysis.");
+      return { summary: job.result.audio.summary, events: job.result.events };
+    }
+    if (job.status !== "queued" && job.status !== "running")
+      throw new Error("The backend returned an invalid analysis job.");
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => {
+        clearTimeout(timer);
+        reject(active.reason);
+      };
+      const timer = setTimeout(() => {
+        active.removeEventListener("abort", abort);
+        resolve();
+      }, 1000);
+      active.addEventListener("abort", abort, { once: true });
+      if (active.aborted) abort();
+    });
+  }
+}
+
 export function parseWords(value: unknown, durationMs: number): Word[] {
   if (
     !Array.isArray(value) ||

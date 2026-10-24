@@ -1,6 +1,69 @@
 {
   "components": {
     "schemas": {
+      "AcceptedJob": {
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status_url": {
+            "title": "Status Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status_url"
+        ],
+        "title": "AcceptedJob",
+        "type": "object"
+      },
+      "AnalysisJob": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecordingAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "AnalysisJob",
+        "type": "object"
+      },
       "AnalyzeRequest": {
         "properties": {
           "config": {
@@ -195,14 +258,20 @@
                 "type": "null"
               }
             ],
-            "description": "Optional AudioConfig as JSON",
+            "description": "AudioConfig JSON; first 3000 ms are calibration",
             "title": "Config"
           },
           "recording": {
             "contentMediaType": "application/octet-stream",
-            "description": "Audio or video recording (WebM, MP4, WAV, ...)",
+            "description": "Synthetic audio/video recording (WebM, MP4, WAV, ...)",
             "title": "Recording",
             "type": "string"
+          },
+          "transcribe": {
+            "default": true,
+            "description": "Send audio to configured ASR (default: Deepgram EU). false = local signal analysis only",
+            "title": "Transcribe",
+            "type": "boolean"
           }
         },
         "required": [
@@ -285,6 +354,69 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "RecordingAnalysis": {
+        "properties": {
+          "asr_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asr Provider"
+          },
+          "audio": {
+            "$ref": "#/components/schemas/AudioAnalysis"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "synthetic_demo": {
+            "default": false,
+            "title": "Synthetic Demo",
+            "type": "boolean"
+          },
+          "transcription": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WordAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "audio",
+          "words",
+          "transcription",
+          "events",
+          "asr_provider"
+        ],
+        "title": "RecordingAnalysis",
         "type": "object"
       },
       "ValidationError": {
@@ -546,7 +678,7 @@
     },
     "/speech/analyze": {
       "post": {
-        "description": "Time series and events from the audio signal only. Stores nothing.",
+        "description": "Store in S3 and enqueue analysis. Poll status_url for the result.\n\nGerman filler preservation is unverified. Originals are deleted after\nterminal processing. Demo recordings must be synthetic.",
         "operationId": "analyze_speech_analyze_post",
         "requestBody": {
           "content": {
@@ -559,11 +691,11 @@
           "required": true
         },
         "responses": {
-          "200": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AudioAnalysis"
+                  "$ref": "#/components/schemas/AcceptedJob"
                 }
               }
             },
@@ -581,6 +713,49 @@
           }
         },
         "summary": "Analyze",
+        "tags": [
+          "speech"
+        ]
+      }
+    },
+    "/speech/jobs/{job_id}": {
+      "get": {
+        "operationId": "job_status_speech_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Status",
         "tags": [
           "speech"
         ]

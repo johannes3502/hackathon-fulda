@@ -19,6 +19,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 11 | Sprachanalyse auf das Audiosignal umstellen, Transkription trennen | Claude Code: `app/speech/` analysiert nur das Signal (Pegel, F0 per YIN, Sprachaktivität, Silbenspitzen als Zeitreihe; Events pause/volume/pitch/pace); wortbasierter Code nach `app/transcription/` (Events mit `source="asr"`); gemeinsames `Event`-Schema in `app/events.py` | Signalbasierte Silbenrate und Monotonie sind Näherungen; nur mit synthetischen Tönen geprüft, nicht mit echter Sprache. Testerwartung für Lautstärke korrigiert: Referenz ist der Median der ganzen Aufnahme inkl. leisem Abschnitt (≈ −10 dB statt theoretisch −15,6 dB) | Nutzerauftrag (Signal-Zeitreihe, Transkription als eigene Pipeline, alles mit Timestamp) | `backend/tests/`: 22 Tests bestanden (Python 3.12, lokal); 60 s synthetisches Audio in ≈ 0,7 s analysiert |
 | 12 | API-Vertrag für TypeScript generieren | Codex: OpenAPI-Export aus FastAPI, TypeScript-Typen und Aktualitätscheck ergänzt; Merge mit Celery/Redis zusammengeführt | Generierte Typen prüfen nur zur Compile-Zeit; freie Event-Payloads und JSON im Multipart-String bleiben untypisiert. Kein laufender Server für den Export nötig | Ausdrücklicher Nutzerauftrag für TypeScript-Generierung und Integration nach main | `api/`, `package.json`, zentrale `README.md`; Generierung, Aktualitätscheck und TypeScript-Kompilierung bestanden; 22 Backend-Tests nach der Konfliktlösung bestanden (Python 3.14, temporäre Testumgebung) |
 | 13 | Frontend gemeinsam mit dem Backend starten | Eigener Next.js-Container, API-Proxy und gemeinsamer Compose-Start für beide IDEs; neue HTTP-Integration aus main übernommen | Browser können den Docker-Hostnamen `backend` nicht auflösen; `/api` wird auf derselben Origin an FastAPI weitergeleitet. Merge-Konflikt in `next.config.ts` gelöst, konfigurierbares Test-Build-Verzeichnis erhalten | Nutzerkorrektur: Frontend ebenfalls im Container statt lokalem npm-Run | `frontend/Dockerfile`, `compose.yaml`, `frontend/next.config.ts`; Prüfprotokoll unten |
+| 14 | ML-Audioanalyse mit Hintergrundjobs | Codex: Silero VAD v6.2 als gepinntes ONNX-Modell (SHA-256 geprüft), RMS/YIN beibehalten, 3-s-Kalibrierung; Deepgram Nova-3 (de, EU) hinter `Transcriber`; asynchroner Upload/Status und kombinierte Timeline, S3-Ergebnisse und Löschung der Originale | VAD nur an synthetischer Sprache/Rauschen geprüft; keine Genauigkeitsbehauptung. Deepgram-HTTP-Vertrag mit Mock geprüft, kein echter Anbieteraufruf ohne Schlüssel. Deutsche Füllworterhaltung laut Detaildokumentation nicht zugesichert; kein `filler_words=true`. Englische Feature-Unterstützung nicht auf Deutsch übertragen. JSON-Demo explizit markiert; kein stilles Ersetzen fehlgeschlagener ASR durch erfundene Wörter. S3-Ausfälle/abgebrochene Jobs können Cleanup verzögern; kein allgemeiner Retention-Job. Prozessabbruch zwischen bezahltem ASR-Aufruf und Speicherung kann diesen Aufruf wiederholen | Nutzer bestätigt vorgeschlagenes Vorgehen und eigenen Arbeitsbranch; Entscheidung für ersten austauschbaren ASR-Adapter innerhalb dieses Auftrags | `backend/tests/test_ml_audio.py`, `backend/tests/fixtures/`, `backend/scripts/smoke_audio.py`; Quellen und Prüfumfang unten |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -99,10 +100,61 @@ Infrastrukturauftrags. Der lokale Stack bleibt gestartet.
   Frontend-Proxy analysieren. Backend-Fehlercodes 404/422 bleiben erhalten.
 - Temporäre Testseite unter `frontend/src/` angelegt, geändert und über HTTP
   geprüft: beide Änderungen ohne Rebuild sichtbar. Testseite danach entfernt.
-- Im Frontend-Container: Typecheck, Lint und 26 Unit-Tests bestanden,
+- Nach Integration der Audio-Jobs: Upload der synthetischen Sprach-Fixture
+  über `/api/speech/analyze` mit `transcribe=false` liefert 202; Status-Polling
+  über den Frontend-Proxy liefert das Silero-Ergebnis. Original in S3 gelöscht,
+  Test-Metadaten anschließend entfernt; kein ASR-Anbieter aufgerufen.
+- Im Frontend-Container: Typecheck, Lint und 27 Unit-Tests bestanden,
   einschließlich relativer `/api`-URL mit HTTPS und abweichendem Browser-Port.
-- Backend-Smoke-Test mit PostgreSQL, S3 und Celery bestanden.
+- 33 Backend-Tests einschließlich echtem Silero-Modell im temporären Container,
+  Backend-Smoke-Test mit PostgreSQL/S3/Celery sowie OpenAPI-/TypeScript-
+  Aktualitätschecks bestanden. Beide Team-Updates aus main erhalten.
 - IntelliJ enthält wieder nur die gemeinsame Docker-Compose-Konfiguration;
   VS Code startet ebenfalls alle Dienste und bietet Frontend-Logs als Task.
 - Keine echte Kamera-/Mikrofonaufnahme, kein Smartphone- oder Deployment-Test
   in diesem Durchlauf. Der lokale Stack bleibt gestartet.
+
+## ML-Audioanalyse (24.10.2026)
+
+- Silero-Modell: [offizielles v6.2-Repository](https://github.com/snakers4/silero-vad/tree/v6.2),
+  [ONNX-Eingabelayout](https://github.com/snakers4/silero-vad/blob/v6.2/src/silero_vad/utils_vad.py).
+  Lizenz wird mit dem Modell in das Image geladen; Prüfsumme zusätzlich beim Laden geprüft.
+- Deepgram: [deutsche Modellunterstützung](https://developers.deepgram.com/docs/models-languages-overview/),
+  [Wort-Timestamps](https://developers.deepgram.com/reference/speech-to-text/listen-pre-recorded),
+  [EU-Endpunkt](https://developers.deepgram.com/changelog/2025/12/3),
+  [Füllwortfunktion](https://developers.deepgram.com/docs/filler-words).
+  Die Füllwort-Detailseite nennt Englisch. Deutsche Marketingaussagen reichen daher
+  nicht als Nachweis für „äh/ähm“. Dies bleibt eine offene Qualitätsprüfung.
+- In unserem Prototyp liefert die gemeinsame Timeline ASR-Tempo und akustische
+  Pausen, ohne diese Events doppelt anzuzeigen. Einzelpipelines bleiben einsehbar.
+- API-Vertragsänderung: `/speech/analyze` liefert jetzt 202/Job-ID statt synchroner
+  Analyse. Status/Ergebnis unter `/speech/jobs/{job_id}`; OpenAPI/TypeScript regeneriert.
+- Tests verwenden Töne, erfundene Wort-Timestamps sowie per eSpeak NG generierte
+  deutsche Sprache, Rauschen und Stille. Kein menschliches Audiomaterial.
+- Verifiziert in dieser Umsetzung: 33 Backend-Tests mit Python 3.12 im
+  Linux-AMD64-Container bestanden, einschließlich echter ONNX-Inferenz. Docker-
+  Build und fünf Healthchecks bestanden; `pip check` ohne Konflikte. Bestehender
+  Infrastruktur-Smoke und neuer Audio-Smoke über HTTP/Redis/Celery/S3 bestanden,
+  sowohl lokal ohne ASR als auch mit explizitem JSON-Demoprovider. Original und
+  Smoke-Objekte danach gelöscht. OpenAPI-/TypeScript-Aktualitätscheck bestanden.
+- Nicht verifiziert: echter Deepgram-Aufruf (kein API-Schlüssel eingerichtet),
+  deutsche Füllwortqualität, menschliche Stimmen, Browser-/Geräteverhalten und
+  ein öffentliches Deployment. Testclient meldet eine bestehende Deprecation
+  für HTTPX; im Container war zusätzlich das Pytest-Cacheverzeichnis schreibgeschützt.
+- Während der Arbeit eingegangene Frontend-Teamänderungen aus `origin/main`
+  konfliktfrei in den Arbeitsbranch integriert. Deren Live-Kamera-/SSE-Protokoll
+  bleibt separat; die Audio-Job-API ist noch nicht in die neue Oberfläche eingebunden.
+
+## Merge-Vorbereitung der Audio-PR (24.10.2026)
+
+Neue Teamänderung auf `main` verband die Kamera mit dem alten synchronen
+`/speech/analyze`. Vor dem Merge angepasst: vollständige Aufnahme weiter erst
+nach Stop hochladen, `transcribe=false` beibehalten, 202/Job-ID prüfen und
+Status bis completed/failed abfragen. Abbruch beendet Polling; Fehler lassen
+das lokale Video verfügbar. Zeitbudget des Pollings: elf Minuten, keine Aussage
+zur Modelllatenz. ASR bleibt separat über die API verfügbar. Damit ist die
+oben dokumentierte fehlende Audio-UI-Anbindung für die lokale Signalanalyse behoben.
+
+Prüfung vor PR/Merge: 33 Backend-Tests (echtes Silero-Modell), 26 Frontend-Tests,
+sechs Browser-Tests mit synthetischer Kamera auf Desktop/schmalem Viewport,
+TypeScript, ESLint, Produktionsbuild und API-Aktualitätscheck bestanden.
