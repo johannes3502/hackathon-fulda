@@ -31,6 +31,7 @@ it("forwards selected model/mode and exports the actual delegate per recording f
     model: "heavy",
     runningMode: "IMAGE",
     devMode: false,
+    handTracking: false,
   } as const;
   const capture = new PoseCapture(video, vi.fn(), options);
   capture.start();

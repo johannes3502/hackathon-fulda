@@ -27,19 +27,23 @@ const handConnections: [number, number][] = [
 
 export function PoseOverlay({
   sample,
+  image,
   largeView,
   hands = [],
   showHands = false,
   label = showHands ? "Live pose and hand landmarks" : "Live pose landmarks",
 }: {
-  sample: PoseSample;
+  sample: PoseSample | null;
+  image?: { width: number; height: number } | null;
   largeView: boolean;
   label?: string;
   hands?: HandSample[];
   showHands?: boolean;
 }) {
-  const points = visiblePosePoints(sample);
-  const { width, height } = sample.image;
+  const points = sample ? visiblePosePoints(sample) : {};
+  const dimensions = sample?.image ?? image;
+  if (!dimensions) return null;
+  const { width, height } = dimensions;
   return (
     <svg
       className="live-pose-overlay"

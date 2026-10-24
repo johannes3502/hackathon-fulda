@@ -17,10 +17,12 @@ const frame = (): Frame => ({ width: 640, height: 360, close: vi.fn() });
 function worker({
   software = false,
   noWebGl = false,
+  missingPose = false,
   fails = () => false,
 }: {
   software?: boolean;
   noWebGl?: boolean;
+  missingPose?: boolean;
   fails?: (kind: string, delegate: string, phase: string) => boolean;
 } = {}) {
   const tasks: {
@@ -40,7 +42,10 @@ function worker({
       const run = (image: Frame) => {
         if (fails(kind, delegate, image.width === 64 ? "warmup" : "frame"))
           throw new Error("synthetic inference failure");
-        return { landmarks: [[{ x: 0.5, y: 0.5, z: 0 }]] };
+        return {
+          landmarks:
+            kind === "pose" && missingPose ? [] : [[{ x: 0.5, y: 0.5, z: 0 }]],
+        };
       };
       const task = {
         close: vi.fn(),
@@ -99,11 +104,14 @@ function worker({
 
 describe("actual pose worker dispatch and fallback", () => {
   it.each(["IMAGE", "VIDEO"] as const)(
-    "runs %s with each selectable model and no hand task by default",
+    "runs %s with each selectable model and hands explicitly disabled",
     async (runningMode) => {
       for (const model of ["lite", "heavy"] as const) {
         const w = worker();
-        await w.send({ type: "init", options: { runningMode, model } });
+        await w.send({
+          type: "init",
+          options: { runningMode, model, handTracking: false },
+        });
         const image = frame();
         await w.send({ type: "frame", frame: image, timestamp: 1234 });
         const pose = w.tasks[0];
@@ -147,12 +155,13 @@ describe("actual pose worker dispatch and fallback", () => {
     expect(w.tasks[0].options.baseOptions.modelAssetPath).toBe(
       "/pose/pose_landmarker_lite.task",
     );
+    expect(w.createHand).toHaveBeenCalledOnce();
   });
   it.each([{ software: true }, { noWebGl: true }])(
     "uses CPU directly for unavailable hardware WebGL: %j",
     async (scenario) => {
       const w = worker(scenario);
-      await w.send({ type: "init" });
+      await w.send({ type: "init", options: { handTracking: false } });
       expect(w.tasks.map((t) => t.options.baseOptions.delegate)).toEqual([
         "CPU",
       ]);
@@ -176,7 +185,7 @@ describe("actual pose worker dispatch and fallback", () => {
       });
       await w.send({
         type: "init",
-        options: { model: "heavy", runningMode: "VIDEO" },
+        options: { model: "heavy", runningMode: "VIDEO", handTracking: false },
       });
       expect(w.tasks.at(-1)?.options).toMatchObject({
         runningMode: "VIDEO",
@@ -196,7 +205,10 @@ describe("actual pose worker dispatch and fallback", () => {
     const w = worker({
       fails: (_, delegate, phase) => delegate === "GPU" && phase === "frame",
     });
-    await w.send({ type: "init", options: { model: "heavy" } });
+    await w.send({
+      type: "init",
+      options: { model: "heavy", handTracking: false },
+    });
     await w.send({ type: "frame", frame: frame(), timestamp: 1000 });
     expect(w.messages).toHaveBeenLastCalledWith(
       expect.objectContaining({ type: "sample", points: [] }),
@@ -221,7 +233,7 @@ describe("actual pose worker dispatch and fallback", () => {
     const w = worker({
       fails: (_, delegate, phase) => phase === "frame" || delegate === "CPU",
     });
-    await w.send({ type: "init" });
+    await w.send({ type: "init", options: { handTracking: false } });
     const image = frame();
     await w.send({ type: "frame", frame: image, timestamp: 1000 });
     expect(w.messages).toHaveBeenLastCalledWith(
@@ -229,13 +241,16 @@ describe("actual pose worker dispatch and fallback", () => {
     );
     expect(image.close).toHaveBeenCalledOnce();
   });
-  it("runs hands only with dev mode and keeps pose running when hands fail", async () => {
+  it("keeps pose running when enabled hands fail outside dev mode", async () => {
     const w = worker({
       fails: (kind, _, phase) => kind === "hand" && phase === "frame",
     });
     await w.send({
       type: "init",
-      options: { devMode: true } satisfies Partial<PoseOptions>,
+      options: {
+        devMode: false,
+        handTracking: true,
+      } satisfies Partial<PoseOptions>,
     });
     await w.send({ type: "frame", frame: frame(), timestamp: 1000 });
     expect(
@@ -277,5 +292,27 @@ describe("actual pose worker dispatch and fallback", () => {
     expect(
       w.messages.mock.calls.filter(([m]) => m.type === "dropped"),
     ).toHaveLength(2);
+  });
+  it("tracks fingers without a visible torso, at a bounded rate, independently of the lab", async () => {
+    const w = worker({ missingPose: true });
+    await w.send({ type: "init" });
+    for (const timestamp of [1000, 1100, 1200])
+      await w.send({ type: "frame", frame: frame(), timestamp });
+    expect(w.messages).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: "sample",
+        points: [],
+        hands: expect.any(Array),
+      }),
+    );
+    expect(
+      w.tasks.find((t) => t.kind === "hand")!.task.detectForVideo,
+    ).toHaveBeenCalledTimes(3);
+    const off = worker();
+    await off.send({
+      type: "init",
+      options: { devMode: true, handTracking: false },
+    });
+    expect(off.createHand).not.toHaveBeenCalled();
   });
 });

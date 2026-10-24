@@ -5,11 +5,10 @@ import type { PoseRuntime } from "./options";
 // Engineering settings for a visible, reproducible prototype, NOT validated
 // presentation-quality cutoffs. Rationale and acceptance protocol: docs/04-gesture-evaluation.md.
 export const POSE_RULES = Object.freeze({
-  version: "pose-rules-v4",
+  version: "pose-rules-v5",
   calibrationMs: 3000,
   calibrationSamples: 15,
   maxGapMs: 350,
-  minimumShoulderWidth: 0.12,
   minimumTorsoHeight: 0.12,
   baselineLeanRangeDeg: 6,
   baselineHandRange: 0.3,
@@ -57,7 +56,7 @@ export type PoseEvent = {
     action: string;
     measurement: number;
     initial_measurement: number;
-    baseline: number;
+    baseline: number | null;
     threshold: number;
     unit: "shoulder widths" | "degrees";
     confirmed_at_ms: number;
@@ -71,14 +70,15 @@ type Features = {
   centerX: number;
   shoulderWidth: number;
   cross: number | null;
+  handsVisible: boolean;
 };
 type Baseline = {
   lean: number;
-  raised: number;
-  distance: number;
+  raised: number | null;
+  distance: number | null;
   centerX: number;
   shoulderWidth: number;
-  cross: number;
+  cross: number | null;
 };
 export type PoseEvaluation = {
   phase: "framing" | "calibrating" | "ready";
@@ -134,22 +134,20 @@ function features(sample: PoseSample | null): Features | null {
   const span = Math.hypot((ls[0] - rs[0]) * width, (ls[1] - rs[1]) * height);
   const top = (ls[1] + rs[1]) / 2;
   const bottom = (lh[1] + rh[1]) / 2;
-  if (
-    span / width < POSE_RULES.minimumShoulderWidth ||
-    bottom - top < POSE_RULES.minimumTorsoHeight
-  )
-    return null;
+  if (span <= 1e-8 || bottom - top < POSE_RULES.minimumTorsoHeight) return null;
   const hands = [
     p.left_elbow,
     p.right_elbow,
     p.left_wrist,
     p.right_wrist,
   ].every(usable);
-  const heights = [d.left_wrist_height, d.right_wrist_height];
-  const raised =
-    hands && heights.every((n) => n !== null && Number.isFinite(n))
-      ? Math.max(...(heights as number[]))
-      : null;
+  const heights = [d.left_wrist_height, d.right_wrist_height].filter(
+    (value, i): value is number =>
+      usable(i === 0 ? p.left_wrist : p.right_wrist) &&
+      value !== null &&
+      Number.isFinite(value),
+  );
+  const raised = heights.length ? Math.max(...heights) : null;
   // Only compare hands in the torso band; overlapping wrists elsewhere are not "together".
   const inBand =
     hands &&
@@ -169,6 +167,7 @@ function features(sample: PoseSample | null): Features | null {
     shoulderWidth: span / width,
     cross:
       cross.crossed === null ? null : Math.min(...(cross.cross as number[])),
+    handsVisible: hands,
   };
 }
 
@@ -224,29 +223,13 @@ export class PoseEvaluator {
     if (!f)
       return state(
         "framing",
-        "Step back: keep shoulders and hips visible, with one person facing the camera.",
+        "Keep shoulders and hips in frame, facing the camera. Move back if cropped, or closer if too small.",
       );
     if (!this.baseline) {
-      if (
-        f.raised === null ||
-        f.distance === null ||
-        f.raised > POSE_RULES.neutralRaisedMax ||
-        f.distance < POSE_RULES.neutralDistanceMin
-      ) {
-        this.calibration = [];
-        return state(
-          "calibrating",
-          "Rest your hands apart beside your waist; keep both elbows and wrists in view.",
-        );
-      }
       this.calibration.push({ t, f });
       const lean = this.calibration.map((s) => s.f.lean);
-      const raised = this.calibration.map((s) => s.f.raised!);
-      const distances = this.calibration.map((s) => s.f.distance!);
       if (
         spread(lean) > POSE_RULES.baselineLeanRangeDeg ||
-        spread(raised) > POSE_RULES.baselineHandRange ||
-        spread(distances) > POSE_RULES.baselineHandRange ||
         spread(this.calibration.map((s) => s.f.centerX)) / f.shoulderWidth >
           POSE_RULES.baselineHandRange
       ) {
@@ -267,24 +250,47 @@ export class PoseEvaluator {
           Math.min(1, duration / POSE_RULES.calibrationMs),
           true,
         );
+      // Moving or cropped hands must not block the torso baseline. Only record
+      // a neutral hand reference when enough genuinely neutral samples exist.
+      const neutral = this.calibration
+        .map((s) => s.f)
+        .filter(
+          (s) =>
+            s.raised !== null &&
+            s.distance !== null &&
+            s.raised <= POSE_RULES.neutralRaisedMax &&
+            s.distance >= POSE_RULES.neutralDistanceMin,
+        );
+      const handReference = (key: "raised" | "distance" | "cross") => {
+        const values = neutral
+          .map((s) => s[key])
+          .filter((v): v is number => v !== null);
+        return values.length >= POSE_RULES.calibrationSamples
+          ? median(values)
+          : null;
+      };
       this.baseline = {
         lean: median(lean),
-        raised: median(raised),
-        distance: median(distances),
+        raised: handReference("raised"),
+        distance: handReference("distance"),
         centerX: median(this.calibration.map((s) => s.f.centerX)),
         shoulderWidth: median(this.calibration.map((s) => s.f.shoulderWidth)),
-        cross: median(this.calibration.map((s) => s.f.cross ?? 0)),
+        cross: handReference("cross"),
       };
       this.calibration = [];
     }
     const baseline = this.baseline;
     const raisedThreshold = Math.max(
       POSE_RULES.raisedEnter,
-      baseline.raised + POSE_RULES.raisedDelta,
+      baseline.raised === null
+        ? POSE_RULES.raisedEnter
+        : baseline.raised + POSE_RULES.raisedDelta,
     );
     const togetherThreshold = Math.min(
       POSE_RULES.togetherEnter,
-      baseline.distance / 2,
+      baseline.distance === null
+        ? POSE_RULES.togetherEnter
+        : baseline.distance / 2,
     );
     const crossCheck = crossArmsCheck(sample);
     // Tolerant wrist geometry also matches hands held together on their own
@@ -370,11 +376,11 @@ export class PoseEvaluator {
     return {
       ...state(
         "ready",
-        f.raised === null
+        !f.handsVisible
           ? "Posture ready. Bring both elbows and wrists into view for gesture feedback."
           : "Ready. Raise a hand, bring your hands together, or move sideways with the camera fixed.",
         1,
-        f.raised !== null,
+        f.handsVisible,
         cue,
       ),
       measurements: { leanDelta, shiftDelta },
@@ -384,7 +390,7 @@ export class PoseEvaluator {
   private rule(
     rule: PoseRule,
     value: number | null,
-    baseline: number,
+    baseline: number | null,
     threshold: number,
     matches: boolean,
     dwell: number,

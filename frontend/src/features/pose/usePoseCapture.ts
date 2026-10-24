@@ -11,7 +11,12 @@ import { DEFAULT_POSE_OPTIONS, type PoseOptions } from "./options";
 export function usePoseCapture(
   video: RefObject<HTMLVideoElement | null>,
   enabled: boolean,
-  { model, runningMode, devMode }: PoseOptions = DEFAULT_POSE_OPTIONS,
+  {
+    model,
+    runningMode,
+    devMode,
+    handTracking,
+  }: PoseOptions = DEFAULT_POSE_OPTIONS,
 ) {
   const owner = useRef<PoseCapture | null>(null);
   const recording = useRef(false);
@@ -29,11 +34,11 @@ export function usePoseCapture(
         if (next.phase === "stopped" || next.phase === "error")
           setDownload(capture.log.blob());
       },
-      { model, runningMode, devMode },
+      { model, runningMode, devMode, handTracking },
     );
     owner.current = capture;
     capture.start();
-  }, [video, model, runningMode, devMode]);
+  }, [video, model, runningMode, devMode, handTracking]);
   useEffect(() => {
     if (!enabled) return;
     start();

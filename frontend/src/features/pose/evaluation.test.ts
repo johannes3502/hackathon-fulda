@@ -26,6 +26,37 @@ function ready() {
   return engine;
 }
 describe("observable gesture rules", () => {
+  it("calibrates a smaller, confidently detected torso while the hands move", () => {
+    const engine = new PoseEvaluator();
+    let state!: PoseEvaluation;
+    for (let t = 0; t <= 4000; t += 100) {
+      const points = syntheticPoints(
+        t % 400 < 200 ? "neutral" : "together",
+      ).map((p) => ({ ...p, x: 0.5 + (p.x - 0.5) * 0.45 }));
+      state = engine.update(poseSample(points, 640, 480, t), t);
+    }
+    expect(state.phase).toBe("ready");
+    expect(state.baseline!.shoulderWidth).toBeLessThan(0.12);
+  });
+  it("calibrates posture without hands and still detects an individually visible raised wrist", () => {
+    const engine = new PoseEvaluator();
+    let state!: PoseEvaluation;
+    for (let t = 0; t <= 3000; t += 100) {
+      const p = syntheticPoints("neutral");
+      p[15].visibility = 0;
+      p[16].visibility = 0;
+      state = engine.update(poseSample(p, 640, 480, t), t);
+    }
+    expect(state.phase).toBe("ready");
+    expect(state.baseline!.raised).toBeNull();
+    for (let t = 3100; t <= 4000; t += 100) {
+      const p = syntheticPoints("raised");
+      p[15].visibility = 0;
+      state = engine.update(poseSample(p, 640, 480, t), t);
+    }
+    expect(state.events.map((e) => e.payload.rule)).toEqual(["hand_raised"]);
+    expect(state.events[0].payload.baseline).toBeNull();
+  });
   it("retains tolerant midline crossed arms with hold time while distinguishing hands together", () => {
     const engine = ready();
     const points = syntheticPoints("crossed");

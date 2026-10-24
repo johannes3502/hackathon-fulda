@@ -18,6 +18,7 @@ export type PoseState = {
   count: number;
   message: string;
   latest: PoseSample | null;
+  image: { width: number; height: number } | null;
   evaluation: PoseEvaluation | null;
   timing: PoseTiming;
   handModel: boolean | null;
@@ -41,6 +42,7 @@ export class PoseCapture {
   private lastFrame = -Infinity;
   private timeout?: ReturnType<typeof setTimeout>;
   private latest: PoseSample | null = null;
+  private image: PoseState["image"] = null;
   private evaluator = new PoseEvaluator();
   private origin: number | null = null;
   private evaluation: PoseEvaluation | null = null;
@@ -62,6 +64,7 @@ export class PoseCapture {
       message,
       count: this.log.count,
       latest: this.latest,
+      image: this.image,
       evaluation: this.evaluation,
       timing: this.timing,
       handModel: this.handModel,
@@ -94,9 +97,9 @@ export class PoseCapture {
           this.hands = this.handModel ? [] : null;
           this.publish(
             "running",
-            !this.options.devMode || this.handModel
+            !this.options.handTracking || this.handModel
               ? "Waiting for a visible pose. Keep your upper body in frame."
-              : "Pose ready. Hand model unavailable; pocket check is off.",
+              : "Pose ready. Finger tracking is unavailable; gesture and posture feedback continues.",
           );
           this.tick();
         } else if (data.type === "backend") {
@@ -123,6 +126,7 @@ export class PoseCapture {
           // A delayed preview inference must never affect a new take.
           if (this.origin !== null && data.timestamp < this.origin) return;
           this.hands = Array.isArray(data.hands) ? data.hands : null;
+          this.image = { width: data.width, height: data.height };
           const elapsed = performance.now() - data.timestamp;
           this.timestamps = [...this.timestamps, data.timestamp].slice(-20);
           const duration = this.timestamps.at(-1)! - this.timestamps[0];

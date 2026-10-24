@@ -1,7 +1,12 @@
 /* MediaPipe runs off the UI thread; frames and landmarks stay in this browser. */
 globalThis.importScripts("/pose/runtime/vision_bundle.js");
 const CONFIDENCE = 0.5;
-let options = { runningMode: "VIDEO", model: "lite", devMode: false };
+let options = {
+  runningMode: "VIDEO",
+  model: "lite",
+  devMode: false,
+  handTracking: true,
+};
 let files;
 let poseLandmarker = null;
 let handLandmarker = null;
@@ -14,6 +19,9 @@ let handFallback = null;
 let runtimeFallback = false;
 let lastTimestamp = -Infinity;
 let lastInferenceTimestamp = 0;
+let lastHandTimestamp = -Infinity;
+let latestHands = null;
+const HAND_INTERVAL_MS = 200;
 
 const text = (error) =>
   error instanceof Error ? error.message : String(error);
@@ -130,6 +138,7 @@ async function init(config = {}) {
     model: config.model ?? "lite",
     runningMode: config.runningMode ?? "VIDEO",
     devMode: config.devMode === true,
+    handTracking: config.handTracking !== false,
   };
   if (
     !["lite", "heavy"].includes(options.model) ||
@@ -157,8 +166,8 @@ async function init(config = {}) {
     poseLandmarker = await createTask("pose", "CPU");
     poseDelegate = "CPU";
   }
-  // Hands are a diagnostic feature. Normal recording never loads this model.
-  if (options.devMode) {
+  // Finger tracking is independent of the diagnostic Pose Lab.
+  if (options.handTracking) {
     try {
       handLandmarker = await createTask("hand", poseDelegate);
       handDelegate = poseDelegate;
@@ -261,16 +270,19 @@ globalThis.onmessage = async ({ data }) => {
         // Clear the observation across this interruption; resume on the next frame.
         result = { landmarks: [] };
       }
-      const hands = result.landmarks.length
-        ? await inferHands(frame, timestamp)
-        : null;
+      // Hands can be visible even when the torso is cropped. Bound the extra
+      // model to 5 Hz; intermediate pose frames reuse at most 200 ms of hands.
+      if (timestamp - lastHandTimestamp >= HAND_INTERVAL_MS) {
+        lastHandTimestamp = timestamp;
+        latestHands = await inferHands(frame, timestamp);
+      }
       globalThis.postMessage({
         type: "sample",
         timestamp: data.timestamp,
         width: frame.width,
         height: frame.height,
         points: result.landmarks[0] ?? [],
-        hands,
+        hands: latestHands,
         inferenceMs: performance.now() - started,
       });
     }

@@ -26,7 +26,7 @@ const hand: HandSample = {
   ),
 };
 
-it("draws hand landmarks only in the pose lab", () => {
+it("draws optional finger landmarks independently of the pose lab", () => {
   const sample = poseSample(pose(), 800, 400, 0)!;
   const hidden = renderToStaticMarkup(
     <PoseOverlay sample={sample} largeView={false} hands={[hand]} />,
@@ -37,4 +37,16 @@ it("draws hand landmarks only in the pose lab", () => {
   );
   expect(shown).toContain('data-hand-landmark="8"');
   expect(shown).toContain("hand-connection");
+});
+it("draws a complete hand even when no torso is detected", () => {
+  const markup = renderToStaticMarkup(
+    <PoseOverlay
+      sample={null}
+      image={{ width: 640, height: 480 }}
+      largeView
+      hands={[hand]}
+      showHands
+    />,
+  );
+  expect(markup.match(/data-hand-landmark=/g)).toHaveLength(21);
 });

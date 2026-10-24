@@ -54,10 +54,20 @@ export function FeatureOptions({
             </NativeSelect>
           </div>
         </div>
+        <label className="live-transcribe">
+          <input
+            type="checkbox"
+            checked={flags.handTracking}
+            onChange={(e) =>
+              change({ ...flags, handTracking: e.target.checked })
+            }
+          />
+          Track fingers
+        </label>
         <p className="field-hint">
-          Both models run locally, prefer GPU and fall back to CPU. Changing
-          pose options restarts calibration. Heavy’s benefit has not been
-          measured on this device.
+          Fingers are tracked locally, up to 5 times per second. Both models
+          prefer GPU and fall back to CPU. Changing pose options restarts
+          calibration. Heavy’s benefit has not been measured on this device.
         </p>
         <label className="live-transcribe">
           <input
@@ -87,8 +97,8 @@ export function FeatureOptions({
         </fieldset>
         <p className="field-hint">
           {speechEnabled
-            ? "Speech feedback arrives after stopping. Filler words and word-based pace need a transcript."
-            : "Enable Speech analysis above the camera to receive speech feedback."}{" "}
+            ? "Pauses, volume, pitch variation and speaking rhythm are shown live. Filler words and word-based pace need the transcript after stopping."
+            : "Choose Live · in browser above the camera for local voice feedback."}{" "}
           These switches control feedback markers; analysis, measurements and
           transcription keep their own settings.
         </p>

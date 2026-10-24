@@ -1,6 +1,7 @@
 import { DEFAULT_POSE_OPTIONS, type PoseOptions } from "../pose/options";
 
 export type FeatureFlags = PoseOptions & {
+  liveSpeechFeedback: boolean;
   speechFeedback: boolean;
   pauseFeedback: boolean;
   paceFeedback: boolean;
@@ -12,6 +13,7 @@ export type FeatureFlags = PoseOptions & {
 // Speech analysis itself remains opt-in. These flags select its feedback types.
 export const DEFAULT_FEATURE_FLAGS: Readonly<FeatureFlags> = Object.freeze({
   ...DEFAULT_POSE_OPTIONS,
+  liveSpeechFeedback: true,
   speechFeedback: true,
   pauseFeedback: true,
   paceFeedback: true,

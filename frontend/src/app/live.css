@@ -1347,3 +1347,20 @@ body:has(.live-workspace-large) .app-footer,
 .studio-diagnostics > .button {
   margin-bottom: 12px;
 }
+.live-audio-hint {
+  flex-basis: 100%;
+  margin: 0;
+}
+.live-readiness {
+  margin: 0.75rem 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.live-readiness p {
+  margin: 0.25rem 0;
+}
+.live-readiness progress,
+.live-readiness meter {
+  width: 100%;
+  height: 0.5rem;
+}
