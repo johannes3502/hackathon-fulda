@@ -48,6 +48,11 @@ export const HEURISTICS = {
   thighConfidence: 0.2,
   thighMargin: 0.3,
   thighCrossMargin: 0.1,
+  // An extended-line crossing counts as imminent when the remaining distance
+  // from the furthest knee is at most this many mean thigh lengths. The
+  // predicted point must also stay near the hips horizontally.
+  thighCloseReach: 0.75,
+  thighAimMargin: 0.5,
 };
 type PointName = keyof typeof POINTS;
 type Vector = [number, number, number];
@@ -70,13 +75,15 @@ const inMargin = (p: Landmark, margin: number) =>
   p.y <= 1 + margin;
 type Point2 = { x: number; y: number };
 type EstimatedPoint = { point: Vector; estimated: boolean };
-// Interior intersection of two 2D segments; null for parallel/touching lines.
-const segmentIntersection = (
+type LineHit = Point2 & { t: number; u: number };
+// Infinite-line intersection; t/u are segment parameters (0..1 between
+// endpoints). Parallel and touching lines are left to the caller.
+const lineIntersection = (
   a: Point2,
   b: Point2,
   c: Point2,
   d: Point2,
-): Point2 | null => {
+): LineHit | null => {
   const r = { x: b.x - a.x, y: b.y - a.y };
   const s = { x: d.x - c.x, y: d.y - c.y };
   const denominator = r.x * s.y - r.y * s.x;
@@ -84,8 +91,7 @@ const segmentIntersection = (
   const q = { x: c.x - a.x, y: c.y - a.y };
   const t = (q.x * s.y - q.y * s.x) / denominator;
   const u = (q.x * r.y - q.y * r.x) / denominator;
-  if (t <= 0 || t >= 1 || u <= 0 || u >= 1) return null;
-  return { x: a.x + t * r.x, y: a.y + t * r.y };
+  return { x: a.x + t * r.x, y: a.y + t * r.y, t, u };
 };
 const sub = (a: Vector, b: Vector): Vector => [
   a[0] - b[0],
@@ -197,9 +203,9 @@ export function poseSample(
     const raw = angle(left, right);
     return raw === null ? null : Math.min(raw, 180 - raw);
   })();
-  const thighHit =
+  const thighLine =
     thighPoints && thighAngle !== null
-      ? segmentIntersection(
+      ? lineIntersection(
           {
             x: thighPoints.leftHip.point[0],
             y: thighPoints.leftHip.point[1],
@@ -218,6 +224,14 @@ export function poseSample(
           },
         )
       : null;
+  const thighHit =
+    thighLine &&
+    thighLine.t > 0 &&
+    thighLine.t < 1 &&
+    thighLine.u > 0 &&
+    thighLine.u < 1
+      ? thighLine
+      : null;
   const thighCrossed =
     thighAngle === null
       ? null
@@ -226,6 +240,59 @@ export function poseSample(
         thighHit.x <= (1 + HEURISTICS.thighCrossMargin) * width &&
         thighHit.y >= -HEURISTICS.thighCrossMargin * height &&
         thighHit.y <= (1 + HEURISTICS.thighCrossMargin) * height;
+  // Before the knees cross, extend both thighs and check where they meet.
+  // The hit must be below the hips and near the body; at least one knee must
+  // still be short of it, and that remaining gap must be small. A thigh that
+  // already spans the hit is the support leg and does not need to move.
+  const thighAhead = (() => {
+    if (!thighPoints || thighAngle === null || !thighLine || thighHit)
+      return null;
+    const { leftHip, rightHip, leftKnee, rightKnee } = thighPoints;
+    const hipSpan = Math.hypot(
+      rightHip.point[0] - leftHip.point[0],
+      rightHip.point[1] - leftHip.point[1],
+    );
+    if (hipSpan < 1e-8) return null;
+    const hipY = (leftHip.point[1] + rightHip.point[1]) / 2;
+    if (thighLine.y <= hipY) return null;
+    const minX = Math.min(leftHip.point[0], rightHip.point[0]);
+    const maxX = Math.max(leftHip.point[0], rightHip.point[0]);
+    if (
+      thighLine.x < minX - HEURISTICS.thighAimMargin * hipSpan ||
+      thighLine.x > maxX + HEURISTICS.thighAimMargin * hipSpan
+    )
+      return null;
+    if (thighLine.t < 0 || thighLine.u < 0) return null;
+    const leftGap =
+      thighLine.t > 1
+        ? Math.hypot(
+            thighLine.x - leftKnee.point[0],
+            thighLine.y - leftKnee.point[1],
+          )
+        : null;
+    const rightGap =
+      thighLine.u > 1
+        ? Math.hypot(
+            thighLine.x - rightKnee.point[0],
+            thighLine.y - rightKnee.point[1],
+          )
+        : null;
+    if (leftGap === null && rightGap === null) return null;
+    const leftLength = Math.hypot(
+      leftKnee.point[0] - leftHip.point[0],
+      leftKnee.point[1] - leftHip.point[1],
+    );
+    const rightLength = Math.hypot(
+      rightKnee.point[0] - rightHip.point[0],
+      rightKnee.point[1] - rightHip.point[1],
+    );
+    const meanLength = (leftLength + rightLength) / 2;
+    if (meanLength < 1e-8) return null;
+    const gap = Math.max(leftGap ?? 0, rightGap ?? 0);
+    if (gap > HEURISTICS.thighCloseReach * meanLength) return null;
+    return { y: thighLine.y / height, gap: gap / meanLength };
+  })();
+  const thighClosing = thighAngle === null ? null : thighAhead !== null;
   const thighsEstimated =
     !!thighPoints &&
     (thighPoints.leftKnee.estimated || thighPoints.rightKnee.estimated);
@@ -369,6 +436,9 @@ export function poseSample(
       thigh_angle_deg: thighAngle,
       thighs_crossed: thighCrossed,
       thigh_cross_y: thighHit ? thighHit.y / height : null,
+      thighs_closing: thighClosing,
+      thigh_close_y: thighAhead?.y ?? null,
+      thigh_close_gap: thighAhead?.gap ?? null,
       left_hand_visibility: hand(17, 19, 21),
       right_hand_visibility: hand(18, 20, 22),
       left_hand_found: found(0, 17, 19, 21),

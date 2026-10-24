@@ -3,6 +3,7 @@ import { poseSample, type HandSample, type Landmark } from "./sample";
 import {
   POSE_TESTS,
   PoseTestTracker,
+  coachMessage,
   faceDistance,
   headTurn,
   poseFeedback,
@@ -104,6 +105,31 @@ function openThighsOutOfFrame(): Landmark[] {
   Object.assign(p[26], { y: 1.25 });
   p[27].visibility = 0;
   p[28].visibility = 0;
+  return p;
+}
+
+function closingThighs(): Landmark[] {
+  const p = base();
+  Object.assign(p[25], { x: 0.42, y: 0.8 });
+  Object.assign(p[26], { x: 0.58, y: 0.8 });
+  Object.assign(p[27], { x: 0.42, y: 0.95 });
+  Object.assign(p[28], { x: 0.58, y: 0.95 });
+  return p;
+}
+
+function approachingThighs(): Landmark[] {
+  const p = base();
+  Object.assign(p[25], { x: 0.6 });
+  Object.assign(p[27], { x: 0.6 });
+  return p;
+}
+
+function convergingThighs(): Landmark[] {
+  const p = base();
+  Object.assign(p[25], { x: 0.35, y: 0.8 });
+  Object.assign(p[26], { x: 0.65, y: 0.8 });
+  Object.assign(p[27], { x: 0.35, y: 0.95 });
+  Object.assign(p[28], { x: 0.65, y: 0.95 });
   return p;
 }
 
@@ -214,6 +240,7 @@ it("uses thighs when the lower legs are cut off", () => {
   const thigh = evaluate("crossed-legs", crossedThighs());
   expect(thigh.pass).toBe(true);
   expect(thigh.values.thighs_crossed).toBe(true);
+  expect(thigh.values.thighs_closing).toBe(false);
   expect(thigh.values.shins_crossed).toBeNull();
   expect(thigh.values.thighs_estimated).toBe(false);
   expect(thigh.values.thigh_angle_deg).toBeCloseTo(28.07, 1);
@@ -223,6 +250,34 @@ it("uses thighs when the lower legs are cut off", () => {
   expect(estimated.values.thighs_estimated).toBe(true);
   expect(estimated.values.legs_visible).toBe(false);
   expect(evaluate("crossed-legs", openThighsOutOfFrame()).pass).toBe(false);
+});
+
+it("warns before the thighs actually cross", () => {
+  const closing = evaluate("crossed-legs", closingThighs());
+  expect(closing.pass).toBe(true);
+  expect(closing.display).toBe("thighs closing");
+  expect(closing.values.thighs_crossed).toBe(false);
+  expect(closing.values.thighs_closing).toBe(true);
+  expect(closing.values.thigh_close_gap).toBeLessThan(0.75);
+
+  const oneLeg = evaluate("crossed-legs", approachingThighs());
+  expect(oneLeg.pass).toBe(true);
+  expect(oneLeg.values.thighs_crossed).toBe(false);
+  expect(oneLeg.values.thighs_closing).toBe(true);
+
+  expect(coachMessage("crossed-legs", "thighs closing")).toBe(
+    "Keep your legs apart.",
+  );
+});
+
+it("keeps the early warning quiet when the thighs would meet far below", () => {
+  const check = evaluate("crossed-legs", convergingThighs());
+  expect(check.pass).toBe(false);
+  expect(check.values.thighs_closing).toBe(false);
+  expect(check.values.thigh_close_gap).toBeNull();
+  expect(coachMessage("crossed-legs", "thighs crossed")).toBe(
+    "Uncross your legs.",
+  );
 });
 
 it("reports which condition failed", () => {

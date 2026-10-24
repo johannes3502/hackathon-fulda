@@ -98,6 +98,9 @@ Diese Werte werden aus den geloggten Punkten berechnet, nicht zusätzlich getrac
 | `thigh_angle_deg` | spitzer Winkel zwischen den projizierten Oberschenkellinien Hüfte → Knie, 0–90°; 0 = parallel |
 | `thighs_crossed` | projizierte Oberschenkel schneiden sich im Bild (plus 10 % Rand); `null`, wenn Hüften oder Knie fehlen |
 | `thigh_cross_y` | normierte y-Position des Oberschenkel-Schnittpunkts; `null` ohne Schnittpunkt |
+| `thighs_closing` | verlängerte Oberschenkellinien würden sich in Kürze schneiden, die Strecken schneiden sich noch nicht; `null`, wenn die Oberschenkel-Geometrie fehlt |
+| `thigh_close_y` | normierte y-Position des vorhergesagten Schnittpunkts; `null` ohne Vorhersage |
+| `thigh_close_gap` | Reststrecke vom weiter entfernten Knie zum vorhergesagten Schnittpunkt in mittleren Oberschenkellängen; `null` ohne Vorhersage |
 | `left_hand_visibility`, `right_hand_visibility` | höchste Sichtbarkeit von Pinky/Zeigefinger/Daumen (17–22); `null`, wenn ein Punkt außerhalb des Bildes liegt |
 | `left_hand_found`, `right_hand_found` | Hand Landmarker hat eine Hand an diesem Handgelenk gefunden; `null` ohne Hand-Modell oder wenn die Hand außerhalb des Bildes liegt |
 | `legs_visible` (unter `quality`) | Knie und Knöchel ausreichend sichtbar |
@@ -192,9 +195,19 @@ innerhalb des Bildes (mit 10 % Rand), gilt die Pose als erkannt. Dafür dürfen
 die Knie bis 30 % außerhalb des Bildes liegen oder eine niedrige Sichtbarkeit
 haben; `thighs_estimated` markiert diese Schätzung. Zusätzlich werden – wenn
 Knie und Knöchel sichtbar sind – die Unterschenkel geprüft. Ein Treffer in
-einem der beiden Paare reicht. Sind weder Oberschenkel noch Unterschenkel
-auswertbar, ist das Ergebnis `null` (grau). Kein Event, keine Aussage über
-Sitzhaltung.
+einem der beiden Paare reicht.
+
+`thighs_closing` warnt bereits vor der eigentlichen Kreuzung: Die verlängerten
+Oberschenkellinien müssen sich hinter mindestens einem Knie treffen, der
+Schnittpunkt muss unterhalb der Hüftlinie und horizontal im Hüftbereich
+(±50 % Hüftbreite) liegen, und die Reststrecke vom weiter entfernten Knie darf
+höchstens 0,75 mittlere Oberschenkellängen betragen. Ein Knie darf den
+Schnittpunkt bereits überschritten haben; das andere liegt noch davor. So
+schlägt T12 an, sobald sich die Beine sichtbar aufeinander zubewegen, ohne
+dass die Strecken schon kreuzen. Der Coach sagt dann „Keep your legs apart.“
+statt „Uncross your legs.“
+Sind weder Oberschenkel noch Unterschenkel auswertbar, ist das Ergebnis `null`
+(grau). Kein Event, keine Aussage über Sitzhaltung.
 
 Die Erkennung ist eine 2D-Projektion: Tiefe und Perspektive können die
 Oberschenkel kreuzen lassen, obwohl sie es räumlich nicht tun. Deshalb bleibt
@@ -273,6 +286,12 @@ Prototyp-Konfiguration, keine validierte Genauigkeit.
   rechte Hüfte → rechtes Knie. Der Schnittpunkt muss im Bild (plus 10 % Rand)
   liegen; Endpunkte zählen nicht. `thigh_angle_deg` ist der spitze Winkel
   zwischen beiden Strecken, kein Beweis für eine Kreuzung.
+- Thigh-Close: Schnitt derselben verlängerten Linien, bevor sich die Strecken
+  schneiden. Der Punkt muss unterhalb der Hüftmitte und innerhalb der
+  Hüftbreite ±50 % liegen; mindestens ein Knie muss noch vor dem Punkt liegen,
+  und die Reststrecke vom weiter entfernten Knie darf 0,75 mittlere
+  Oberschenkellängen nicht überschreiten. `thigh_close_gap` und
+  `thigh_close_y` dokumentieren die Vorhersage.
 - Hand-Zuordnung: Hand-Punkt 0 (Handgelenk) wird dem näheren Pose-Handgelenk
   (15/16) zugeordnet, höchstens 0,5 Schulterbreiten entfernt; bei zwei Händen
   am selben Handgelenk gewinnt die nähere. `*_hand_found` ist `true`, wenn eine

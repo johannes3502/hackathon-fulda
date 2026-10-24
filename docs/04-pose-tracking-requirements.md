@@ -334,7 +334,7 @@ Events, keine Scores und keine Backend-Aufrufe.
 | T09 | Hüften außerhalb | Schultern sichtbar, `trunkLean` nicht auswertbar | sofort |
 | T10 | Hände verdeckt | beide Handgelenkhöhen nicht messbar | sofort |
 | T11 | Hand in der Hosentasche | Handgelenk ≤ 0,45 Schulterbreiten zur Hüfte und keine erkannte Hand daran (FR-POSE-20) | sofort |
-| T12 | Beine gekreuzt | Oberschenkel schneiden sich (Hüfte + Knie, Knie auch außerhalb des Bildes) oder Unterschenkel schneiden sich (Knie + Knöchel sichtbar) | sofort |
+| T12 | Beine gekreuzt | Oberschenkel schneiden sich (Hüfte + Knie, Knie auch außerhalb des Bildes), Unterschenkel schneiden sich (Knie + Knöchel sichtbar) oder verlängerte Oberschenkellinien kreuzen sich in Kürze (Reststrecke ≤ 0,75 Oberschenkellängen) | sofort |
 
 **MUSS:** T10 ist ein **Sichtbarkeitstest**, kein Taschenbeweis. T07 ist ein
 **Kopforientierungs-Proxy**, kein Gaze. T11 ist eine Heuristik, kein Beweis
@@ -342,8 +342,13 @@ für eine Hosentasche. T12 prüft zuerst die projizierten Oberschenkel
 (Hüfte → Knie) und zusätzlich die Unterschenkel (Knie → Knöchel), wenn diese
 sichtbar sind. So funktioniert die Pose auch, wenn das Bild nur bis zu den
 Oberschenkeln reicht; Knie dürfen dafür bis 30 % außerhalb des Bildes liegen
-und werden als Schätzung markiert. Es ist keine Aussage über Sitzhaltung. Die
-UI muss das so benennen.
+und werden als Schätzung markiert. Zusätzlich warnt T12, sobald die
+verlängerten Oberschenkellinien sich in Kürze schneiden würden: mindestens
+ein Knie liegt noch vor dem Schnittpunkt, der Punkt liegt unterhalb der
+Hüftlinie und im Hüftbereich (±50 % Hüftbreite), und die Reststrecke beträgt
+höchstens 0,75 mittlere Oberschenkellängen. Das ist eine Vorhersage, keine
+bereits erfolgte Kreuzung; die UI benennt sie als „thighs closing“. Es ist
+keine Aussage über Sitzhaltung.
 
 **MUSS:** Der Dev mode ist nicht die Produkt-UI. Er dient nur zum Testen der
 Heuristiken und wird nicht als Event, Clip oder Backend-Payload gespeichert.
@@ -860,8 +865,9 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
     Löschung funktioniert.
 13. **Beine:** T12 erkennt gekreuzte Ober- oder Unterschenkel; Oberschenkel
     auch bei abgeschnittenen Unterschenkeln, wenn Hüften und Knie (ggf.
-    geschätzt) auswertbar sind. Ohne jede Bein-Geometrie bleibt die Anzeige
-    grau. Kein Event.
+    geschätzt) auswertbar sind. Zusätzlich warnt die Vorhersage „thighs
+    closing“, wenn sich die verlängerten Oberschenkellinien in Kürze kreuzen
+    würden. Ohne jede Bein-Geometrie bleibt die Anzeige grau. Kein Event.
 
 ## 10. Offene Entscheidungen
 
@@ -934,3 +940,4 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 | 24.10.2026 | Hassans Hand-Modell und Pocket-Logik übernommen | Hand-Modell läuft auf jedem Pose-Frame mit Confidence 0,5; Pocket = Handgelenk ≤ 0,45 Schulterbreiten zur eigenen Hüfte und keine erkannte Hand an diesem Handgelenk; Hand-Landmarks bleiben im Browser. |
 | 24.10.2026 | GPU-first mit CPU-Fallback im Pose-Worker | Modell-Assets und Settings unverändert von Hassan (Pose Lite, Hand, `IMAGE`, 0,5/0,5); WebGL2-/Software-Renderer-Probe, Warm-up und einmaliger Laufzeit-Fallback; Dev-Status zeigt Delegate, Renderer und Fallback-Grund. |
 | 24.10.2026 | T12 um Oberschenkel-Kreuzung erweitert | Oberschenkel (Hüfte → Knie) werden zusätzlich zu den Unterschenkeln geprüft; Knie dürfen bis 30 % außerhalb des Bildes liegen und werden als Schätzung markiert. So bleibt „Beine gekreuzt“ bei einem Bild bis zu den Oberschenkeln erkennbar. |
+| 24.10.2026 | T12 warnt vor der Kreuzung | Verlängerte Oberschenkellinien werden auf einen bevorstehenden Schnitt geprüft: mindestens ein Knie vor dem Punkt, Reststrecke ≤ 0,75 Oberschenkellängen, Punkt unterhalb der Hüftlinie und im Hüftbereich. Anzeige „thighs closing“, Coach „Keep your legs apart.“; keine Event-Erzeugung. |

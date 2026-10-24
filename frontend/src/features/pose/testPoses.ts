@@ -135,13 +135,14 @@ const segmentsIntersect = (a: Point, b: Point, c: Point, d: Point) => {
 
 export type CrossedLegsCheck = {
   crossed: boolean | null;
+  closing: boolean | null;
   values: Record<string, PoseValue>;
 };
 
 export function crossedLegsCheck(
   sample: PoseSample | null,
 ): CrossedLegsCheck {
-  if (!sample) return { crossed: null, values: {} };
+  if (!sample) return { crossed: null, closing: null, values: {} };
   const { image, pose } = sample;
   const point = (p: RawPoint | null) => (usable(p) ? px(p, image) : null);
   const leftKnee = point(pose.left_knee);
@@ -153,6 +154,7 @@ export function crossedLegsCheck(
       ? segmentsIntersect(leftKnee, leftAnkle, rightKnee, rightAnkle)
       : null;
   const thighsCrossed = sample.derived.thighs_crossed;
+  const thighsClosing = sample.derived.thighs_closing;
   const crossed =
     thighsCrossed === true || shinsCrossed === true
       ? true
@@ -161,14 +163,18 @@ export function crossedLegsCheck(
         : null;
   return {
     crossed,
+    closing: thighsClosing,
     values: {
       left_knee_x: leftKnee?.x ?? null,
       right_knee_x: rightKnee?.x ?? null,
       left_ankle_x: leftAnkle?.x ?? null,
       right_ankle_x: rightAnkle?.x ?? null,
       thighs_crossed: thighsCrossed,
+      thighs_closing: thighsClosing,
       shins_crossed: shinsCrossed,
       thigh_angle_deg: sample.derived.thigh_angle_deg,
+      thigh_close_y: sample.derived.thigh_close_y,
+      thigh_close_gap: sample.derived.thigh_close_gap,
       thighs_estimated: sample.quality.thighs_estimated,
       legs_visible: sample.quality.legs_visible,
       crossed,
@@ -243,22 +249,26 @@ function headTiltCheck(sample: PoseSample | null): PoseCheck {
 
 function crossedLegsPoseCheck(sample: PoseSample | null): PoseCheck {
   const result = crossedLegsCheck(sample);
-  if (result.crossed === null)
+  if (result.crossed === null && result.closing !== true)
     return missing("legs not visible", ["legs"]);
-  const display =
-    result.crossed
-      ? result.values.thighs_crossed === true &&
-        result.values.shins_crossed !== true
-        ? result.values.thighs_estimated
-          ? "thighs crossed (estimated)"
-          : "thighs crossed"
-        : "legs crossed"
+  const pass = result.crossed === true || result.closing === true;
+  const display = result.crossed
+    ? result.values.thighs_crossed === true &&
+      result.values.shins_crossed !== true
+      ? result.values.thighs_estimated
+        ? "thighs crossed (estimated)"
+        : "thighs crossed"
+      : "legs crossed"
+    : result.closing
+      ? result.values.thighs_estimated
+        ? "thighs closing (estimated)"
+        : "thighs closing"
       : "open";
   return check(
-    result.crossed,
+    pass,
     display,
     result.values,
-    result.crossed ? [] : ["legs crossed"],
+    pass ? [] : ["legs crossed"],
   );
 }
 
@@ -718,6 +728,8 @@ const COACH_MESSAGES: Record<PoseTestId, string> = {
   pocket: "Take your hand out of your pocket.",
 };
 
-export function coachMessage(id: PoseTestId | null) {
+export function coachMessage(id: PoseTestId | null, detail = "") {
+  if (id === "crossed-legs" && detail.includes("closing"))
+    return "Keep your legs apart.";
   return id ? COACH_MESSAGES[id] : "Hold a test pose.";
 }

@@ -46,7 +46,7 @@ export function PoseDevMode({
   if (view === "coach")
     return (
       <CoachCue
-        message={coachMessage(id)}
+        message={coachMessage(id, detail)}
         detail={
           handModel === false
             ? `${acceleration}${handError ? `: ${handError}` : ""}`

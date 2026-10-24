@@ -170,6 +170,8 @@ Hardware-WebGL2, Software-Renderer oder Fehlern in Erstellung, Warm-up oder
 Inferenz wechseln sie einmalig auf CPU. Das Dev-Statusfeld zeigt Delegate,
 Fallback-Grund und Renderer. T12 erkennt gekreuzte Ober- oder Unterschenkel;
 Oberschenkel auch dann, wenn das Bild nur bis zu den Oberschenkeln reicht.
+Zusätzlich warnt T12 bereits, wenn sich die verlängerten Oberschenkellinien
+in Kürze schneiden würden („thighs closing“).
 Treffer bleiben Dev-only, ohne Event. Die finalen Pose-/Feedback-Regeln stehen
 in `docs/04-pose-tracking-requirements.md`; die Umsetzung ist noch offen
 (`frontend/DATA_POINTS.md` beschreibt das Roh-Logging).
