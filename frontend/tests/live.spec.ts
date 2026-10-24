@@ -579,9 +579,16 @@ async function backend(
   await expect(
     studio.getByText("analysis results remain stored", { exact: false }),
   ).toBeVisible();
-  await page.getByLabel("Create a transcript").setChecked(transcribe);
+  await studio
+    .getByRole("checkbox", { name: "Create a transcript", exact: true })
+    .setChecked(transcribe);
   if (transcribe)
-    await page.getByLabel("Stream transcription with Deepgram (EU)").uncheck();
+    await studio
+      .getByRole("checkbox", {
+        name: "Stream transcription with Deepgram (EU)",
+        exact: true,
+      })
+      .uncheck();
   await configure?.();
   await page.getByRole("button", { name: "Enable camera" }).click();
   await page.getByRole("button", { name: "Start recording" }).click();
@@ -1894,6 +1901,11 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   const stats = page.getByRole("heading", { name: "Your take at a glance" });
   await expect(stats).toBeVisible();
   await expect(stats).toBeFocused();
+  await expect(page.locator(".performance-score")).toHaveText("100/100");
+  await page.screenshot({
+    path: info.outputPath("final-overall-score.png"),
+    fullPage: true,
+  });
   await expect(
     page.getByRole("heading", { name: "Meet your teacher." }),
   ).not.toBeVisible();
