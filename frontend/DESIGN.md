@@ -37,6 +37,10 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   Escape returns to normal view. Large view fills the available height with the
   camera on the left and an equally wide feedback panel on the right, with shared
   controls above. Below 1001px they stack. Recording options and diagnostics are disclosures.
+  Live cues use large text and contextual SVG icons. Red means an adjustment to
+  consider; green means explicit positive feedback or labelled tracking readiness.
+  Ordinary gestures, pauses, calibration and hidden hints remain neutral. Color
+  always has a text label; tracking readiness is not a performance assessment.
 - **Review:** use the same type scale, controls, and surfaces as the studio.
   Video, timeline, selected observation, and moment list remain connected to the
   existing video clock. On phones, playback and timeline precede the observation.

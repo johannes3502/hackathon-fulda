@@ -24,6 +24,7 @@ import { useCameraPreview } from "@/hooks/useCameraPreview";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { LiveCaptions } from "@/features/live/captions";
 import { speechCue } from "@/features/live/speech-feedback";
+import { cueAppearance } from "@/features/live/cue-appearance";
 import { feedbackEnabled } from "@/features/live/feature-flags";
 import { upsertFeedback } from "@/features/live/protocol";
 import {
@@ -390,6 +391,15 @@ export function LiveStudio() {
     voiceCue && (!poseCue || voiceCue.startMs >= poseCue.startMs)
       ? voiceCue
       : poseCue;
+  const appearance = cueAppearance(
+    latest,
+    !showCues
+      ? "hidden"
+      : pose.state?.phase === "error"
+        ? "unavailable"
+        : (evaluation?.phase ?? "framing"),
+  );
+  const FeedbackIcon = appearance.Icon;
   return (
     <AppShell experience="live">
       <div
@@ -864,7 +874,7 @@ export function LiveStudio() {
           </div>
           {(cameraStatus === "active" || progress) && (
             <aside className="coaching-column">
-              <section className="cue-panel">
+              <section className="cue-panel" data-feedback={appearance.tone}>
                 <div className="panel-title-row">
                   <h2>
                     <Eye size={18} /> Live feedback
@@ -872,6 +882,14 @@ export function LiveStudio() {
                   <span>Heuristic</span>
                 </div>
                 <div aria-live="polite" aria-atomic="true">
+                  <div className="live-cue-status">
+                    <FeedbackIcon
+                      className="live-cue-icon"
+                      aria-hidden="true"
+                      strokeWidth={1.5}
+                    />
+                    <span className="live-cue-label">{appearance.label}</span>
+                  </div>
                   <p className="cue-message">
                     {!showCues
                       ? "Live hints hidden"

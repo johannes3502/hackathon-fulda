@@ -151,12 +151,27 @@ test("local microphone feedback emits live volume/pause markers and preserves th
     "Voice louder than your baseline",
     { timeout: 7000 },
   );
+  await expect(page.locator(".cue-panel")).toHaveAttribute(
+    "data-feedback",
+    "attention",
+  );
+  await expect(page.locator(".live-cue-label")).toHaveText("Try adjusting");
+  await expect(page.locator("svg.live-cue-icon.lucide-volume-2")).toBeVisible();
+  await expect(page.locator(".cue-message")).toHaveCSS(
+    "color",
+    "rgb(180, 35, 50)",
+  );
   await page.evaluate(() => {
     (window as unknown as { speechGain: GainNode }).speechGain.gain.value = 0;
   });
   await expect(page.locator(".cue-message")).toHaveText("Pause in speaking", {
     timeout: 7000,
   });
+  await expect(page.locator(".cue-panel")).toHaveAttribute(
+    "data-feedback",
+    "neutral",
+  );
+  await expect(page.locator("svg.live-cue-icon.lucide-pause")).toBeVisible();
   await noOverflow(page);
   await page.screenshot({
     path: info.outputPath("live-pause-feedback.png"),
@@ -269,10 +284,23 @@ test("large view scales feedback and preserves an active recording", async ({
     const feedback = (await page.locator(".cue-panel").boundingBox())!;
     expect(feedback.y).toBeGreaterThanOrEqual(camera.y + camera.height);
   }
+  await expect(page.locator(".live-cue-label")).toHaveText("Tracking ready", {
+    timeout: 10000,
+  });
+  await expect(page.locator(".cue-panel")).toHaveAttribute(
+    "data-feedback",
+    "positive",
+  );
+  await expect(cue).toHaveCSS("color", "rgb(37, 101, 68)");
   await startPoseSequence(page);
   await expect(cue).toHaveText("Hand above shoulder", {
     timeout: 12000,
   });
+  await expect(page.locator(".cue-panel")).toHaveAttribute(
+    "data-feedback",
+    "neutral",
+  );
+  await expect(page.locator("svg.live-cue-icon.lucide-hand")).toBeVisible();
   await noOverflow(page);
   await page.screenshot({
     path: info.outputPath("large-live-view.png"),
@@ -899,6 +927,21 @@ test("sideways motion and crossed arms reach review while live hints can be mute
     { timeout: 7000 },
   );
   await expect(page.locator(".cue-message")).toHaveText("Live hints hidden");
+  await expect(page.locator(".cue-panel")).toHaveAttribute(
+    "data-feedback",
+    "neutral",
+  );
+  await page.getByLabel("Show live hints").check();
+  await expect(page.locator(".cue-message")).toHaveText(
+    "Arms crossed in front of torso",
+  );
+  await expect(page.locator(".cue-panel")).toHaveAttribute(
+    "data-feedback",
+    "attention",
+  );
+  await expect(
+    page.locator("svg.live-cue-icon.lucide-unfold-horizontal"),
+  ).toBeVisible();
   await noOverflow(page);
   await page.screenshot({
     path: info.outputPath("pose-debug.png"),

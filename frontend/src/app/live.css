@@ -25,6 +25,52 @@
 .live-studio-grid {
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
 }
+.live-workspace .cue-panel {
+  --cue-color: var(--muted);
+  background: color-mix(in srgb, var(--cue-color) 7%, var(--surface));
+  border-color: color-mix(in srgb, var(--cue-color) 30%, var(--surface));
+}
+.live-workspace .cue-panel[data-feedback="positive"] {
+  --cue-color: var(--success);
+}
+.live-workspace .cue-panel[data-feedback="attention"] {
+  --cue-color: var(--error);
+}
+.live-workspace .cue-panel .panel-title-row,
+.live-cue-label,
+.live-workspace .cue-message {
+  color: var(--cue-color);
+}
+.live-cue-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 20px;
+}
+.live-cue-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  flex-shrink: 0;
+  color: var(--cue-color);
+}
+.live-cue-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.live-workspace .cue-message {
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  font-weight: 600;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.live-workspace .live-cue-detail {
+  font-size: 1.25rem;
+  line-height: 1.4;
+}
 .studio-session-status {
   display: flex;
   flex-wrap: wrap;
@@ -149,17 +195,27 @@ body:has(.live-workspace-large) .app-footer,
   padding: 24px 0;
 }
 .live-workspace-large .cue-message {
-  font-size: 3rem;
+  font-size: clamp(3.25rem, 4.5vw, 4.5rem);
   font-weight: 600;
   line-height: 1.15;
   margin-top: 0;
   overflow-wrap: anywhere;
 }
 .live-workspace-large .live-cue-detail {
-  font-size: 1.75rem;
+  font-size: 2rem;
   line-height: 1.35;
   color: var(--foreground);
   margin: 0;
+}
+.live-workspace-large .live-cue-status {
+  margin-top: 0;
+}
+.live-workspace-large .live-cue-icon {
+  width: 5rem;
+  height: 5rem;
+}
+.live-workspace-large .live-cue-label {
+  font-size: 1.25rem;
 }
 .live-workspace-large .cue-caption,
 .live-workspace-large .cue-panel .panel-title-row > span {
@@ -195,10 +251,10 @@ body:has(.live-workspace-large) .app-footer,
     gap: 12px;
   }
   .live-workspace-large .cue-message {
-    font-size: 2rem;
+    font-size: 2.5rem;
   }
   .live-workspace-large .live-cue-detail {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
   }
 }
 .live-camera-stage .stage-placeholder .button {
