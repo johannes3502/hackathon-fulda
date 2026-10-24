@@ -28,6 +28,10 @@ In backend review, optionally upload a JSON array of `{word,start_ms,end_ms}` fr
 
 Missing endpoints remain mocked in the sample rehearsal. See [the integration handoff](../docs/pitch-coach-handoff.md) for pending work. No backend implementation is part of this integration.
 
+## Sources
+
+Open http://localhost:3000/sources or choose **Add your sources** on setup. Upload PDF, PPTX, DOCX, TXT or MD files (synthetic content, max 25 MB). The backend extracts text per page or slide, indexes it, and the page polls until each file is **Ready**. **What will the coach find?** runs the same search that fact-check and the question round will use and shows the passages with file and page/slide. The browser keeps one collection ID in `localStorage`; clearing site data starts a new, empty collection. Requires the backend stack (`NEXT_PUBLIC_API_URL`).
+
 ## Demo walkthrough
 
 1. Continue with demo preview. The three-second countdown starts the sample.

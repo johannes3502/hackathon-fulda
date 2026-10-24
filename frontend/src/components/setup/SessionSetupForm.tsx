@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   Clock3,
+  FileText,
   Lightbulb,
   MessageSquare,
   Play,
@@ -107,6 +108,16 @@ export function SessionSetupForm() {
             </Button>
             <span>
               Record your pitch, see feedback, and replay key moments.
+            </span>
+          </div>
+          <div className="live-entry">
+            <Button asChild variant="outline">
+              <Link href="/sources">
+                Add your sources <FileText size={17} />
+              </Link>
+            </Button>
+            <span>
+              Slides, papers or notes for fact-check and the question round.
             </span>
           </div>
         </div>
