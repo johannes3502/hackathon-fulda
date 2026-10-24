@@ -6,7 +6,7 @@ import csv
 import io
 import json
 from datetime import datetime, timezone
-from uuid import UUID, uuid4, uuid5, NAMESPACE_URL
+from uuid import UUID, uuid5, NAMESPACE_URL
 
 from app.progress import db, definitions, metrics, stats
 from app.progress.models import (
@@ -19,7 +19,6 @@ from app.progress.models import (
 )
 from app.review import db as review_db
 from app.review.errors import ReviewError
-from app.review.timeline import merge_events
 
 WINDOWS = {"all", "last_20", "last_10", "last_5"}
 PRIMARY_LIMITATIONS = [
@@ -75,41 +74,32 @@ def _definition(metric) -> MetricDefinitionOut:
 
 def _require_token(profile_id, token):
     with db.connect() as connection:
-        row = db.authenticate(connection, profile_id, token)
-        if row["retention_until"] is not None and row["retention_until"] < datetime.now(timezone.utc):
-            raise ReviewError(410, "E_PROFILE_EXPIRED", "Die Aufbewahrungsfrist dieses Profils ist abgelaufen.")
-        return row
+        return db.authenticate(connection, profile_id, token)
 
 
 def require_profile_token(profile_id, token):
     return _require_token(profile_id, token)
 
 
-def authorize_session(session_id, token):
-    """Validate X-Profile-Token only when the session is linked to a profile."""
+def authorize_resource(params, token, *, deleting=False):
+    """Anonymous reviews keep their existing access; linked resources require the profile token."""
+    queries = {
+        "session_id": "SELECT profile_id FROM sessions WHERE id=%s",
+        "take_id": "SELECT profile_id FROM takes WHERE id=%s",
+        "job_id": "SELECT t.profile_id FROM jobs j JOIN takes t ON t.id=j.take_id WHERE j.id=%s",
+    }
     with db.connect() as connection:
-        row = connection.execute("SELECT profile_id FROM sessions WHERE id=%s", (session_id,)).fetchone()
-        if row is None:
-            raise ReviewError(404, "E_SESSION_NOT_FOUND", "Session nicht gefunden.")
-        if row["profile_id"] is not None:
-            profile = db.authenticate(connection, row["profile_id"], token)
-            if profile["retention_until"] is not None and profile["retention_until"] < datetime.now(timezone.utc):
-                raise ReviewError(410, "E_PROFILE_EXPIRED", "Die Aufbewahrungsfrist dieses Profils ist abgelaufen.")
-    return True
-
-
-def authorize_take(take_id, token):
-    with db.connect() as connection:
-        row = connection.execute(
-            "SELECT s.profile_id FROM takes t JOIN sessions s ON s.id=t.session_id WHERE t.id=%s",
-            (take_id,)).fetchone()
-        if row is None:
-            raise ReviewError(404, "E_TAKE_NOT_FOUND", "Take nicht gefunden.")
-        if row["profile_id"] is not None:
-            profile = db.authenticate(connection, row["profile_id"], token)
-            if profile["retention_until"] is not None and profile["retention_until"] < datetime.now(timezone.utc):
-                raise ReviewError(410, "E_PROFILE_EXPIRED", "Die Aufbewahrungsfrist dieses Profils ist abgelaufen.")
-    return True
+        for name, query in queries.items():
+            if name not in params:
+                continue
+            try:
+                resource_id = UUID(str(params[name]))
+            except ValueError:
+                return  # Let FastAPI report invalid UUIDs as 422.
+            row = connection.execute(query, (resource_id,)).fetchone()
+            if row is not None and row["profile_id"] is not None:
+                db.authenticate(connection, row["profile_id"], token, allow_expired=deleting)
+            break
 
 
 def create_profile(request: ProfileCreate, key: str):
@@ -130,12 +120,12 @@ def get_profile(profile_id, token):
 
 
 def update_profile(profile_id, request: ProfilePatch, token, key):
-    request_hash = db.digest({"profileId": str(profile_id), **json_model(request)})
+    request_hash = db.digest({"profileId": str(profile_id), **request.model_dump(mode="json", by_alias=True, exclude_unset=True)})
     scope = f"profiles:{profile_id}:patch"
     with db.mutation(scope, key, request_hash) as (connection, previous):
+        db.authenticate(connection, profile_id, token, lock=True)
         if previous:
             return 200, previous["response"]
-        db.authenticate(connection, profile_id, token)
         row = db.update_profile(connection, profile_id, request)
         body = json_model(ProfileGetResponse(profile=_profile(row)))
         db.remember(connection, scope, key, request_hash, profile_id, 200, body)
@@ -151,7 +141,7 @@ def delete_profile(profile_id, token, key):
         row = connection.execute("SELECT id FROM speaker_profiles WHERE id=%s", (profile_id,)).fetchone()
         if row is None:
             return 204, None
-        db.authenticate(connection, profile_id, token)
+        db.authenticate(connection, profile_id, token, allow_expired=True, lock=True)
         db.delete_profile(connection, profile_id)
         db.remember(connection, scope, key, request_hash, None, 204, None)
         return 204, None
@@ -161,9 +151,9 @@ def rotate_token(profile_id, token, key):
     request_hash = db.digest({"profileId": str(profile_id), "rotate": True})
     scope = f"profiles:{profile_id}:rotate-token"
     with db.mutation(scope, key, request_hash) as (connection, previous):
+        db.authenticate(connection, profile_id, token, lock=True)
         if previous:
             return 200, {"token": None, "tokenIssued": False}
-        db.authenticate(connection, profile_id, token)
         raw = db.rotate_token(connection, profile_id)
         db.remember(connection, scope, key, request_hash, profile_id, 200,
                     {"token": None, "tokenIssued": False})
@@ -177,7 +167,7 @@ def _point(take, metric, metric_row, sequence):
     eligible = bool(quality.get("eligible", False)) and value is not None
     if metric_row is None:
         reasons.append("metric-not-computable")
-    rule_versions = sorted({item for item in (metric_row["rule_version"] or "").split(",") if item})
+    rule_versions = sorted({item for item in ((metric_row or {}).get("rule_version") or "").split(",") if item})
     return ProgressPoint.model_validate({
         "takeId": take["id"], "sessionId": take["session_id"],
         "recordedAt": take["recorded_at"], "recordedAtSource": take["recorded_at_source"],
@@ -204,7 +194,7 @@ def _point(take, metric, metric_row, sequence):
 def _goal_status(goal, trend, values):
     if goal is None:
         return "not_applicable"
-    if trend.n < 5 or trend.trend_status == "insufficient":
+    if trend.n < 5 or trend.trend_status in {"insufficient", "unclear"}:
         return "unknown"
     if goal["direction"] == "target_band":
         low, high = goal["target_min"], goal["target_max"]
@@ -213,6 +203,8 @@ def _goal_status(goal, trend, values):
         if len(distances) < 2:
             return "unknown"
         distance_trend = stats.analyse(distances)
+        if distance_trend.trend_status not in {"early_signal", "trend_up", "trend_down"}:
+            return "unknown"
         if distance_trend.direction == "down":
             return "on_track"
         if distance_trend.direction == "up":
@@ -254,8 +246,9 @@ def _change_point(profile_id, metric, points, values, trend, goal):
 def _series(profile_id, metric, points, goal, *, version_break=False):
     eligible = [point for point in points if point.eligible and point.value is not None]
     values = [point.value for point in eligible]
-    result = stats.analyse(values, total_n=len(points), version_break=version_break)
-    baseline_ids = [point.take_id for point in eligible[:3]]
+    result = stats.analyse(values, positions=[point.sequence for point in eligible],
+                           total_n=len(points), version_break=version_break)
+    baseline_ids = [point.take_id for point in eligible[:3]] if not version_break else []
     baseline = ProgressBaseline(
         kind="first_3_eligible" if baseline_ids else "none", value=result.baseline,
         n=len(baseline_ids), take_ids=baseline_ids)
@@ -265,13 +258,15 @@ def _series(profile_id, metric, points, goal, *, version_break=False):
         latest = ProgressLatest(
             take_id=latest_point.take_id, recorded_at=latest_point.recorded_at,
             value=latest_point.value,
-            change_vs_baseline=None if result.recent is None or result.baseline is None
-            else result.recent - result.baseline,
-            relative_change=result.relative_change,
+            change_vs_baseline=None if result.baseline is None else latest_point.value - result.baseline,
+            relative_change=None if result.baseline in (None, 0)
+            else (latest_point.value - result.baseline) / result.baseline,
             z_score=None if not result.noise_band or result.noise_band < 1e-6
-            or result.recent is None or result.baseline is None
-            else (result.recent - result.baseline) / result.noise_band,
-            reliable_change=result.reliable_change)
+            or result.baseline is None
+            else (latest_point.value - result.baseline) / result.noise_band,
+            reliable_change=bool(result.n >= 5 and result.minimum_detectable_change
+                                 and result.baseline is not None
+                                 and abs(latest_point.value - result.baseline) >= result.minimum_detectable_change))
     window = TrendWindow(
         from_take_id=points[0].take_id if points else None,
         to_take_id=points[-1].take_id if points else None,
@@ -279,7 +274,7 @@ def _series(profile_id, metric, points, goal, *, version_break=False):
         to_recorded_at=points[-1].recorded_at if points else None)
     trend = ProgressTrend(
         status=result.trend_status, direction=result.direction,
-        method="theil-sen+mann-kendall+ewma-cusum", algorithm_version=definitions.ALGORITHM_VERSION,
+        method="theil-sen+mann-kendall+cusum", algorithm_version=definitions.ALGORITHM_VERSION,
         n=result.n, window=window, slope_per_take=result.slope,
         slope_per_10_takes=result.slope_per_10, slope_ci95=result.slope_ci,
         relative_change=result.relative_change, effect_size=result.effect_size,
@@ -287,7 +282,8 @@ def _series(profile_id, metric, points, goal, *, version_break=False):
         minimum_detectable_change=result.minimum_detectable_change,
         mann_kendall_p=result.mann_kendall_p, adjusted_p=None,
         reliable_slope=result.reliable_slope, confidence=result.confidence)
-    change = _change_point(profile_id, metric, eligible, values, result, goal)
+    has_gaps = any(b.sequence != a.sequence + 1 for a, b in zip(eligible, eligible[1:]))
+    change = None if version_break or has_gaps else _change_point(profile_id, metric, eligible, values, result, goal)
     goal_status = _goal_status(goal, result, values)
     quality = ProgressSeriesQuality(
         total_points=len(points), eligible_points=len(eligible),
@@ -308,6 +304,9 @@ def _series(profile_id, metric, points, goal, *, version_break=False):
     if quality.status != "good":
         limitations.append(ProgressLimitation(code="quality-mix",
             message="Ein Teil der Aufnahmen ist für diese Metrik nicht vergleichbar; Lücken bleiben sichtbar."))
+    if has_gaps:
+        limitations.append(ProgressLimitation(code="gaps-no-change-points",
+            message="Die Messreihe enthält Lücken; Change-Points werden deshalb nicht bestimmt."))
     series = ProgressSeries(
         metric_id=metric.metric_id, metric_version=metric.version,
         label={"de": metric.label_de, "en": metric.label_en}, unit=metric.unit,
@@ -329,7 +328,7 @@ def _selected_ids(connection, profile_id, requested, include_exploratory):
         if not include_exploratory:
             return list(definitions.PRIMARY_IDS)
         return list(definitions.PRIMARY_IDS) + list(definitions.EXPLORATORY_IDS)
-    ids = [item.strip() for item in requested.split(",") if item.strip()]
+    ids = list(dict.fromkeys(item.strip() for item in requested.split(",") if item.strip()))
     unknown = [item for item in ids if item not in definitions.BY_ID]
     if unknown:
         raise ReviewError(422, "E_METRIC_UNKNOWN", "Unbekannte Metrik.", {"metrics": unknown})
@@ -339,231 +338,177 @@ def _selected_ids(connection, profile_id, requested, include_exploratory):
     return ids
 
 
-def recompute_profile(profile_id):
-    """Rebuild take_quality, take_metrics, snapshots and change points."""
-    with db.connect() as connection, connection.transaction():
-        db.require_profile(connection, profile_id, lock=True)
-        takes = db.take_rows(connection, profile_id)
-        db.clear_metrics(connection, profile_id)
-        computed = []
+def _ensure_metrics(connection, takes):
+    """Refresh changed takes once; review revisions invalidate the derived values."""
+    if not takes:
+        return {}
+    rows = db.load_metrics(connection, takes[0]["profile_id"])
+    stored = {(row["take_id"], row["metric_id"]): row for row in rows
+              if row["metric_id"] in definitions.BY_ID
+              and row["metric_version"] == definitions.BY_ID[row["metric_id"]].version}
+    for row in takes:
+        dirty = any(
+            (item := stored.get((row["id"], definition.metric_id))) is None
+            or item["quality"].get("sourceRevision") != row["revision"]
+            or item["computation_version"] != definitions.COMPUTATION_VERSION
+            for definition in definitions.ALL)
+        if not dirty:
+            continue
+        take = review_db.take_from(row)
+        quality, values = metrics.extract(take, db.events(connection, take.take_id))
+        db.upsert_quality(connection, take.take_id, quality)
+        for metric_id, item in values.items():
+            item["quality"]["sourceRevision"] = row["revision"]
+            version = definitions.BY_ID[metric_id].version
+            db.upsert_metric(connection, take.take_id, metric_id, version,
+                             item["value"], item["unit"], item["n"], item["denominator"],
+                             item["rule_version"], item["quality"])
+            stored[(take.take_id, metric_id)] = {**item, "metric_version": version}
+    # Re-evaluate device gates after deletions or backdated inserts as well.
+    for definition in definitions.ALL:
+        if not definition.device_sensitive:
+            continue
+        baseline_device = None
         for row in takes:
-            take = review_db.take_from(row)
-            events = db.events(connection, take.take_id)
-            quality, metric_values = metrics.extract(take, events)
-            db.upsert_quality(connection, take.take_id, quality)
-            for metric_id, item in metric_values.items():
-                db.upsert_metric(connection, take.take_id, metric_id, definitions.METRIC_VERSION,
+            item = stored[(row["id"], definition.metric_id)]
+            quality = dict(item["quality"])
+            reasons = set(quality["exclusionReasons"]) - {"device-unknown", "device-changed"}
+            if not reasons and item["value"] is not None:
+                device = row["device_key"]
+                if device is None:
+                    reasons.add("device-unknown")
+                elif baseline_device is None:
+                    baseline_device = device
+                elif device != baseline_device:
+                    reasons.add("device-changed")
+            quality.update(eligible=not reasons and item["value"] is not None,
+                           exclusionReasons=sorted(reasons))
+            if quality != item["quality"]:
+                db.upsert_metric(connection, row["id"], definition.metric_id, definition.version,
                                  item["value"], item["unit"], item["n"], item["denominator"],
-                                 item["rule_version"], item["quality"])
-            computed.append((row, quality, metric_values))
-        device_baseline = {}
-        for row, _, metric_values in computed:
-            for metric_id in definitions.EXPLORATORY_IDS:
-                definition = definitions.BY_ID[metric_id]
-                if not definition.device_sensitive:
-                    continue
-                item = metric_values.get(metric_id)
-                if item and item["quality"]["eligible"] and row["device_key"] is not None:
-                    device_baseline.setdefault(metric_id, row["device_key"])
-        for row, _, metric_values in computed:
-            for metric_id, item in metric_values.items():
-                definition = definitions.BY_ID[metric_id]
-                if not definition.device_sensitive:
-                    continue
-                baseline_device = device_baseline.get(metric_id)
-                reason = None
-                if item["quality"]["eligible"]:
-                    if row["device_key"] is None:
-                        reason = "device-unknown"
-                    elif baseline_device is not None and row["device_key"] != baseline_device:
-                        reason = "device-changed"
-                if reason:
-                    item["quality"]["eligible"] = False
-                    item["quality"]["exclusionReasons"] = sorted(
-                        set(item["quality"]["exclusionReasons"]) | {reason})
-                    db.upsert_metric(connection, row["id"], metric_id, definitions.METRIC_VERSION,
-                                     item["value"], item["unit"], item["n"], item["denominator"],
-                                     item["rule_version"], item["quality"])
-        for metric in definitions.ALL:
-            rows = connection.execute(
-                "SELECT m.*, t.recorded_at, t.created_at, t.id FROM take_metrics m"
-                " JOIN takes t ON t.id=m.take_id WHERE t.profile_id=%s AND m.metric_id=%s"
-                " AND m.metric_version=%s ORDER BY t.recorded_at,t.created_at,t.id",
-                (profile_id, metric.metric_id, metric.version)).fetchall()
-            if not rows:
-                continue
-            versions = sorted({item for row in rows for item in (row["rule_version"] or "").split(",") if item})
-            for window_kind, subset in (
-                    ("all", rows), ("last_20", rows[-20:]), ("last_10", rows[-10:]),
-                    ("last_5", rows[-5:])):
-                if not subset:
-                    continue
-                subset_values = [row["value"] for row in subset
-                                 if row["quality"].get("eligible") and row["value"] is not None]
-                result = stats.analyse(subset_values, total_n=len(subset),
-                                       version_break=len(versions) > 1)
-                goal = db.goal_for(connection, profile_id, metric.metric_id)
-                db.upsert_snapshot(connection, {
-                    "profile_id": profile_id, "metric_id": metric.metric_id,
-                    "metric_version": metric.version, "window_kind": window_kind,
-                    "window_end_take_id": subset[-1]["id"], "total_n": len(subset),
-                    "eligible_n": len(subset_values), "baseline_value": result.baseline,
-                    "latest_value": result.latest, "recent_value": result.recent,
-                    "noise_band": result.noise_band, "trend_status": result.trend_status,
-                    "goal_status": _goal_status(goal, result, subset_values),
-                    "slope_per_take": result.slope, "slope_per_10_takes": result.slope_per_10,
-                    "slope_ci_low": result.slope_ci[0] if result.slope_ci else None,
-                    "slope_ci_high": result.slope_ci[1] if result.slope_ci else None,
-                    "relative_change": result.relative_change, "effect_size": result.effect_size,
-                    "minimum_detectable_change": result.minimum_detectable_change,
-                    "mann_kendall_p": result.mann_kendall_p, "adjusted_p": None,
-                    "method": "theil-sen+mann-kendall+ewma-cusum",
-                    "algorithm_version": definitions.ALGORITHM_VERSION,
-                    "rule_versions": versions, "version_break": len(versions) > 1,
-                    "input_hash": db.digest([(str(row["id"]), row["value"], row["quality"].get("eligible"))
-                                             for row in subset]),
-                })
+                                 item["rule_version"], quality)
+                item["quality"] = quality
+    return stored
 
 
-def _ensure(profile_id, takes):
-    if len(takes) <= 200:
-        recompute_profile(profile_id)
-        return
-    with db.connect() as connection:
-        row = connection.execute(
-            "SELECT count(*) AS n FROM progress_snapshots WHERE profile_id=%s", (profile_id,)).fetchone()
-        if not row or row["n"] == 0:
-            recompute_profile(profile_id)
+def _snapshot(profile_id, series, result, window):
+    return {
+        "profile_id": profile_id, "metric_id": series.metric_id,
+        "metric_version": series.metric_version, "window_kind": window,
+        "window_end_take_id": series.points[-1].take_id,
+        "total_n": series.quality.total_points, "eligible_n": result.n,
+        "baseline_value": result.baseline, "latest_value": result.latest,
+        "recent_value": result.recent, "noise_band": result.noise_band,
+        "trend_status": series.trend.status, "goal_status": series.goal_status,
+        "slope_per_take": result.slope, "slope_per_10_takes": result.slope_per_10,
+        "slope_ci_low": result.slope_ci[0] if result.slope_ci else None,
+        "slope_ci_high": result.slope_ci[1] if result.slope_ci else None,
+        "relative_change": result.relative_change, "effect_size": result.effect_size,
+        "minimum_detectable_change": result.minimum_detectable_change,
+        "mann_kendall_p": result.mann_kendall_p, "adjusted_p": series.trend.adjusted_p,
+        "method": series.trend.method, "algorithm_version": definitions.ALGORITHM_VERSION,
+        "rule_versions": series.quality.rule_versions, "version_break": series.quality.version_break,
+        "input_hash": db.digest({"points": [json_model(point) for point in series.points],
+                                 "goal": json_model(series.goal) if series.goal else None}),
+    }
+
+
+def _validate_filters(window, from_at, to_at, presentation_mode):
+    if window not in WINDOWS:
+        raise ReviewError(422, "E_WINDOW_INVALID", "Unbekanntes Fenster.")
+    if any(value is not None and value.tzinfo is None for value in (from_at, to_at)):
+        raise ReviewError(422, "E_RANGE_INVALID", "Zeitraum muss eine Zeitzone enthalten.")
+    if from_at is not None and to_at is not None and from_at > to_at:
+        raise ReviewError(422, "E_RANGE_INVALID", "Der Beginn muss vor dem Ende liegen.")
+    if presentation_mode not in (None, "startup", "thesis", "school", "nonprofit"):
+        raise ReviewError(422, "E_PRESENTATION_MODE_INVALID", "Unbekannter Präsentationstyp.")
+
+
+def recompute_profile(profile_id, connection):
+    """Worker-only rebuild, using the worker's transaction and profile lock."""
+    row = db.require_profile(connection, profile_id, lock=True)
+    if row["retention_until"] is not None and row["retention_until"] <= datetime.now(timezone.utc):
+        raise ReviewError(410, "E_PROFILE_EXPIRED", "Die Aufbewahrungsfrist dieses Profils ist abgelaufen.")
+    db.clear_metrics(connection, profile_id)
+    return _progress(connection, row, window="all", requested_metrics="all", include_exploratory=True)
 
 
 def progress(profile_id, token, *, window="last_20", requested_metrics="primary",
              from_at=None, to_at=None, presentation_mode=None, include_excluded=True,
              include_exploratory=False):
-    if window not in WINDOWS:
-        raise ReviewError(422, "E_WINDOW_INVALID", "Unbekanntes Fenster.")
-    with db.connect() as connection:
-        db.authenticate(connection, profile_id, token)
-        all_takes = db.take_rows(connection, profile_id)
-        _ensure(profile_id, all_takes)
-        profile_row = db.require_profile(connection, profile_id)
-        goals = {row["metric_id"]: row for row in db.goals(connection, profile_id)}
-        selected = _selected_ids(connection, profile_id, requested_metrics, include_exploratory)
-        take_rows = db.take_rows(connection, profile_id, from_at=from_at, to_at=to_at,
-                                 presentation_mode=presentation_mode)
-        window_size = None if window == "all" else int(window.split("_")[1])
-        effective_window = window if window_size is None or len(take_rows) >= window_size else "all"
-        if window_size is not None and len(take_rows) > window_size:
-            take_rows = take_rows[-window_size:]
-        metric_rows = {
-            (row["take_id"], row["metric_id"]): row
-            for row in db.load_metrics(connection, profile_id)
-        }
-        sequence_by_id = {row["id"]: index for index, row in enumerate(all_takes, 1)}
-        series = []
-        all_results = {}
-        changes = []
-        for metric_id in selected:
-            metric = definitions.BY_ID[metric_id]
-            points = [_point(take, metric, metric_rows.get((take["id"], metric_id)),
-                             sequence_by_id[take["id"]]) for take in take_rows]
-            if not include_excluded:
-                points = [point for point in points if point.eligible]
-            version_break = len({item for point in points for item in point.context.rule_versions}) > 1
-            item_series, result, change, eligible = _series(
-                profile_id, metric, points, goals.get(metric_id), version_break=version_break)
-            series.append(item_series)
-            all_results[metric_id] = result
-            if change:
-                changes.append((metric, change, eligible))
-        pvalues = {metric_id: result.mann_kendall_p for metric_id, result in all_results.items()
-                   if definitions.BY_ID[metric_id].is_primary}
-        adjusted = stats.benjamini_hochberg(pvalues)
-        for item_series in series:
-            item_series.trend.adjusted_p = adjusted.get(item_series.metric_id)
-            item_series.goal_status = _goal_status(
-                goals.get(item_series.metric_id), all_results[item_series.metric_id],
-                [point.value for point in item_series.points if point.eligible and point.value is not None])
-        persisted = []
-        can_materialize = (from_at is None and to_at is None and presentation_mode is None
-                           and include_excluded)
-        for metric, change, eligible in changes:
-            goal = goals.get(metric.metric_id)
-            if change is None or not eligible:
-                continue
-            item = ProgressChangePoint.model_validate({
-                "id": change["id"], "metricId": metric.metric_id, "metricVersion": metric.version,
-                "takeId": change["take_id"], "sequence": change["sequence"],
-                "recordedAt": change["recorded_at"], "kind": change["kind"],
-                "fromValue": change["from_value"], "toValue": change["to_value"],
-                "magnitude": change["magnitude"], "confidence": change["confidence"],
-                "evidenceTakeIds": change["evidence_take_ids"],
-                "algorithmVersion": definitions.ALGORITHM_VERSION,
-            })
-            persisted.append({**change, "profile_id": profile_id})
-            for series_item in series:
-                if series_item.metric_id == metric.metric_id:
-                    series_item.change_points.append(item)
-        if persisted and can_materialize:
-            with db.connect() as write_connection, write_connection.transaction():
-                db.insert_change_points(write_connection, persisted)
-        with db.connect() as write_connection, write_connection.transaction():
-            for item_series in series:
-                if not item_series.points or not can_materialize:
-                    continue
-                for window_kind, subset in (
-                        ("all", item_series.points),
-                        ("last_20", item_series.points[-20:]),
-                        ("last_10", item_series.points[-10:]),
-                        ("last_5", item_series.points[-5:])):
-                    subset_values = [point.value for point in subset if point.eligible and point.value is not None]
-                    subset_result = stats.analyse(subset_values, total_n=len(subset),
-                                                  version_break=item_series.quality.version_break)
-                    db.upsert_snapshot(write_connection, {
-                        "profile_id": profile_id, "metric_id": item_series.metric_id,
-                        "metric_version": item_series.metric_version, "window_kind": window_kind,
-                        "window_end_take_id": subset[-1].take_id, "total_n": len(subset),
-                        "eligible_n": len(subset_values), "baseline_value": subset_result.baseline,
-                        "latest_value": subset_result.latest, "recent_value": subset_result.recent,
-                        "noise_band": subset_result.noise_band,
-                        "trend_status": subset_result.trend_status,
-                        "goal_status": item_series.goal_status,
-                        "slope_per_take": subset_result.slope,
-                        "slope_per_10_takes": subset_result.slope_per_10,
-                        "slope_ci_low": subset_result.slope_ci[0] if subset_result.slope_ci else None,
-                        "slope_ci_high": subset_result.slope_ci[1] if subset_result.slope_ci else None,
-                        "relative_change": subset_result.relative_change,
-                        "effect_size": subset_result.effect_size,
-                        "minimum_detectable_change": subset_result.minimum_detectable_change,
-                        "mann_kendall_p": subset_result.mann_kendall_p,
-                        "adjusted_p": item_series.trend.adjusted_p,
-                        "method": "theil-sen+mann-kendall+ewma-cusum",
-                        "algorithm_version": definitions.ALGORITHM_VERSION,
-                        "rule_versions": item_series.quality.rule_versions,
-                        "version_break": item_series.quality.version_break,
-                        "input_hash": db.digest([(str(point.take_id), point.value, point.eligible)
-                                                 for point in subset]),
-                    })
-        total_takes = len(all_takes)
-        eligible_takes = len({row["take_id"] for row in db.load_metrics(connection, profile_id)
-                              if row["metric_id"] in definitions.PRIMARY_IDS
-                              and row["quality"].get("eligible")})
-        identity = _profile(profile_row)
-        profile = ProgressProfile(
-            profile_id=identity.profile_id, display_name=identity.display_name,
-            locale=identity.locale, created_at=identity.created_at, consent=identity.consent,
-            total_takes=total_takes, eligible_takes=eligible_takes,
-            first_recorded_at=all_takes[0]["recorded_at"] if all_takes else None,
-            last_recorded_at=all_takes[-1]["recorded_at"] if all_takes else None)
-        limitations = list(PRIMARY_LIMITATIONS)
-        if any(item.quality.version_break for item in series):
-            limitations.append(ProgressLimitation(code="version-break",
-                message="Mindestens eine Reihe überschreitet eine Regelversion."))
-        return ProgressResponse(
-            generated_at=datetime.now(timezone.utc), profile=profile,
-            range=ProgressRange(from_=from_at, to=to_at, window=effective_window,
-                                presentation_mode=presentation_mode),
-            metric_definitions=[_definition(definitions.BY_ID[item]) for item in selected],
-            series=series, highlights=_highlights(series), limitations=limitations)
+    _validate_filters(window, from_at, to_at, presentation_mode)
+    with db.connect() as connection, connection.transaction():
+        row = db.authenticate(connection, profile_id, token, lock=True)
+        return _progress(connection, row, window=window, requested_metrics=requested_metrics,
+                         from_at=from_at, to_at=to_at, presentation_mode=presentation_mode,
+                         include_excluded=include_excluded, include_exploratory=include_exploratory)
+
+
+def _progress(connection, profile_row, *, window="last_20", requested_metrics="primary",
+              from_at=None, to_at=None, presentation_mode=None, include_excluded=True,
+              include_exploratory=False):
+    profile_id = profile_row["id"]
+    selected = _selected_ids(connection, profile_id, requested_metrics, include_exploratory)
+    all_takes = db.take_rows(connection, profile_id)
+    metric_rows = _ensure_metrics(connection, all_takes)
+    take_rows = [row for row in all_takes
+                 if (from_at is None or row["recorded_at"] >= from_at)
+                 and (to_at is None or row["recorded_at"] <= to_at)
+                 and (presentation_mode is None or row["presentation_mode"] == presentation_mode)]
+    window_size = None if window == "all" else int(window.split("_")[1])
+    if window_size is not None:
+        take_rows = take_rows[-window_size:]
+    sequence_by_id = {row["id"]: index for index, row in enumerate(all_takes, 1)}
+    goals = {row["metric_id"]: row for row in db.goals(connection, profile_id)}
+    series, results, changes = {}, {}, {}
+    # Keep the diagnostic BH family fixed when the client selects one metric.
+    analysis_ids = list(dict.fromkeys([*definitions.PRIMARY_IDS, *selected]))
+    for metric_id in analysis_ids:
+        metric = definitions.BY_ID[metric_id]
+        points = [_point(take, metric, metric_rows.get((take["id"], metric_id)),
+                         sequence_by_id[take["id"]]) for take in take_rows]
+        versions = {tuple(point.context.rule_versions) for point in points if point.eligible}
+        item, result, change, _ = _series(
+            profile_id, metric, points, goals.get(metric_id),
+            version_break=len(versions) > 1 or any(len(version) > 1 for version in versions))
+        series[metric_id], results[metric_id], changes[metric_id] = item, result, change
+    adjusted = stats.benjamini_hochberg({metric_id: results[metric_id].mann_kendall_p
+                                        for metric_id in definitions.PRIMARY_IDS})
+    can_materialize = from_at is None and to_at is None and presentation_mode is None
+    for metric_id, item in series.items():
+        item.trend.adjusted_p = adjusted.get(metric_id)
+        change = changes[metric_id]
+        if change:
+            item.change_points.append(ProgressChangePoint(
+                id=change["id"], metric_id=metric_id, metric_version=item.metric_version,
+                take_id=change["take_id"], sequence=change["sequence"], recorded_at=change["recorded_at"],
+                kind=change["kind"], from_value=change["from_value"], to_value=change["to_value"],
+                magnitude=change["magnitude"], confidence=change["confidence"],
+                evidence_take_ids=change["evidence_take_ids"], algorithm_version=definitions.ALGORITHM_VERSION))
+            if can_materialize:
+                db.insert_change_points(connection, [change])
+        if item.points and can_materialize:
+            db.upsert_snapshot(connection, _snapshot(profile_id, item, results[metric_id], window))
+    eligible_takes = len({take_id for (take_id, metric_id), row in metric_rows.items()
+                          if metric_id in definitions.PRIMARY_IDS and row["quality"].get("eligible")})
+    profile = ProgressProfile(**_profile(profile_row).model_dump(), total_takes=len(all_takes),
+                              eligible_takes=eligible_takes,
+                              first_recorded_at=all_takes[0]["recorded_at"] if all_takes else None,
+                              last_recorded_at=all_takes[-1]["recorded_at"] if all_takes else None)
+    selected_series = [series[metric_id] for metric_id in selected]
+    limitations = list(PRIMARY_LIMITATIONS)
+    if any(item.quality.version_break for item in selected_series):
+        limitations.append(ProgressLimitation(code="version-break",
+                                              message="Mindestens eine Reihe überschreitet eine Regelversion."))
+    highlights = _highlights(selected_series)
+    if not include_excluded:
+        for item in selected_series:
+            item.points = [point for point in item.points if point.eligible]
+    return ProgressResponse(
+        generated_at=datetime.now(timezone.utc), profile=profile,
+        range=ProgressRange(from_=from_at, to=to_at, window=window, presentation_mode=presentation_mode),
+        metric_definitions=[_definition(definitions.BY_ID[item]) for item in selected],
+        series=selected_series, highlights=highlights, limitations=limitations)
 
 
 def _highlights(series):
@@ -597,6 +542,8 @@ def _highlights(series):
 
 
 def metric_progress(profile_id, token, metric_id, **kwargs):
+    if metric_id not in definitions.BY_ID:
+        raise ReviewError(422, "E_METRIC_UNKNOWN", "Unbekannte Metrik.")
     response = progress(profile_id, token, requested_metrics=metric_id, **kwargs)
     return MetricProgressResponse(generated_at=response.generated_at, profile=response.profile,
                                   range=response.range, series=response.series[0])
@@ -612,9 +559,9 @@ def set_goal(profile_id, metric_id, request, token, key):
     request_hash = db.digest({"profileId": str(profile_id), "metric": metric_id, **json_model(request)})
     scope = f"profiles:{profile_id}:goals:{metric_id}"
     with db.mutation(scope, key, request_hash) as (connection, previous):
+        db.authenticate(connection, profile_id, token, lock=True)
         if previous:
             return 200, previous["response"]
-        db.authenticate(connection, profile_id, token)
         row = db.put_goal(connection, profile_id, metric_id, request)
         body = json_model(GoalResponse(goal=_goal(row)))
         db.remember(connection, scope, key, request_hash, profile_id, 200, body)
@@ -625,9 +572,9 @@ def remove_goal(profile_id, metric_id, token, key):
     request_hash = db.digest({"profileId": str(profile_id), "metric": metric_id, "delete": True})
     scope = f"profiles:{profile_id}:goals:{metric_id}:delete"
     with db.mutation(scope, key, request_hash) as (connection, previous):
+        db.authenticate(connection, profile_id, token, lock=True)
         if previous:
             return 204, None
-        db.authenticate(connection, profile_id, token)
         db.delete_goal(connection, profile_id, metric_id)
         db.remember(connection, scope, key, request_hash, profile_id, 204, None)
         return 204, None
@@ -636,18 +583,20 @@ def remove_goal(profile_id, metric_id, token, key):
 def takes(profile_id, token, *, limit=50, cursor=None):
     with db.connect() as connection:
         db.authenticate(connection, profile_id, token)
-        offset = max(0, int(cursor or 0))
+        if cursor is not None and (not cursor.isascii() or not cursor.isdecimal() or len(cursor) > 10):
+            raise ReviewError(422, "E_CURSOR_INVALID", "Ungültiger Cursor.")
+        offset = int(cursor or 0)
         rows = connection.execute(
             "SELECT t.*, s.presentation_mode FROM takes t JOIN sessions s ON s.id=t.session_id"
             " WHERE t.profile_id=%s ORDER BY t.recorded_at,t.created_at,t.id LIMIT %s OFFSET %s",
-            (profile_id, min(max(limit, 1), 200), offset)).fetchall()
+            (profile_id, limit + 1, offset)).fetchall()
         items = [ProfileTake.model_validate({
             "takeId": row["id"], "sessionId": row["session_id"],
             "recordedAt": row["recorded_at"], "recordedAtSource": row["recorded_at_source"],
             "durationMs": row["duration_ms"], "status": row["status"],
-            "presentationMode": row["presentation_mode"]}) for row in rows]
+            "presentationMode": row["presentation_mode"]}) for row in rows[:limit]]
         return ProfileTakesResponse(takes=items,
-                                    next_cursor=str(offset + len(items)) if len(items) == limit else None)
+                                    next_cursor=str(offset + len(items)) if len(rows) > limit else None)
 
 
 def export(profile_id, token, *, format="json"):

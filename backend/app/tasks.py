@@ -46,6 +46,20 @@ def worker_probe(self, token: str, delay_seconds: float = 0) -> dict[str, str]:
     return {"token": token, "worker": self.request.hostname}
 
 
+@celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=3)
+def recompute_progress(self, run_id: str) -> dict[str, str]:
+    from app.progress import jobs
+
+    try:
+        jobs.execute(UUID(run_id))
+    except Exception as error:
+        if self.request.retries >= self.max_retries:
+            jobs.fail(UUID(run_id), "E_PROGRESS_RECOMPUTE_FAILED")
+            raise
+        raise self.retry(countdown=5) from error
+    return {"run_id": run_id}
+
+
 @celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
 def ingest_source(self, source_id: str) -> dict[str, str]:
     """Extract, chunk and embed one uploaded source; status lives in PostgreSQL."""

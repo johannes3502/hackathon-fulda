@@ -29,10 +29,10 @@ flowchart TB
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
         FC["Factcheck-Router<br/>POST /factcheck<br/>GET /factcheck/jobs/id, /settings"]
         QR["Questions-Router<br/>POST /questions, /questions/answers,<br/>/questions/answers/voice<br/>GET /questions/jobs/id, /questions/answers/id"]
-        RV["Review-Router (additiv)<br/>/sessions, /takes, /jobs<br/>Idempotency-Key, camelCase"]
+        RV["Review-Router (additiv)<br/>/sessions, /takes, /jobs<br/>Idempotency-Key, camelCase<br/>verknüpft: X-Profile-Token"]
         PR["Progress-Router (additiv)<br/>/profiles, /progress, /goals<br/>X-Profile-Token, Idempotency-Key"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job, recompute_progress"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -91,6 +91,7 @@ flowchart TB
     RV -- "enqueue: nur Job-ID" --> CEL
     PR -- "Profil, Qualität, Metriken, Ziele" --> PG
     PR -- "deterministische Projektion" --> PROG
+    PR -- "Recompute: nur Run-ID, 202 + Status-URL" --> CEL
     PROG -- "Snapshots + Change-Points" --> PG
 
     SP -- "S3-Upload, Enqueue" --> S3
@@ -110,6 +111,7 @@ flowchart TB
     TASKS --> FACT
     TASKS --> QUEST
     TASKS --> REVIEW
+    TASKS -- "progress_runs: persistent, wiederholbar" --> PROG
     REVIEW --> PG
     REVIEW -- "Audio laden und löschen; keine Wiedergabe-Medien" --> S3
     REVIEW -. "nur geprüfte Karten, keine Tools" .-> LLM
@@ -517,6 +519,7 @@ erDiagram
     METRIC_DEFINITIONS ||--o{ TAKE_METRICS : "definiert"
     SPEAKER_PROFILES ||--o{ PROGRESS_SNAPSHOTS : "Trend"
     SPEAKER_PROFILES ||--o{ PROGRESS_CHANGE_POINTS : "Change-Points"
+    SPEAKER_PROFILES ||--o{ PROGRESS_RUNS : "Neuberechnung, Cascade"
 
     SPEAKER_PROFILES {
         uuid id PK
@@ -586,7 +589,7 @@ erDiagram
         text unit
         text rule_version
         text computation_version
-        jsonb quality "eligible + exclusionReasons"
+        jsonb quality "eligible + exclusionReasons + sourceRevision"
     }
     PROGRESS_SNAPSHOTS {
         uuid id PK
@@ -610,6 +613,14 @@ erDiagram
         text kind "step/regression/recovery"
         double magnitude
         text confidence
+    }
+    PROGRESS_RUNS {
+        uuid id PK
+        uuid profile_id FK
+        text status "queued/running/completed/failed"
+        text error "nur Fehlercode"
+        timestamptz created_at
+        timestamptz updated_at
     }
     PROFILE_GOALS {
         uuid profile_id PK,FK
@@ -784,7 +795,7 @@ flowchart LR
         V5["GET /jobs/id<br/>GET /takes/id/evaluation"]
         V6["POST /takes/id/factcheck<br/>POST / GET /takes/id/questions<br/>POST /takes/id/questions/answers"]
         P1["POST /profiles<br/>GET/PATCH/DELETE /profiles/id<br/>POST /profiles/id/rotate-token"]
-        P2["GET /profiles/id/progress<br/>GET /profiles/id/progress/metricId<br/>POST /profiles/id/progress/recompute"]
+        P2["GET /profiles/id/progress<br/>GET /profiles/id/progress/metricId<br/>POST /profiles/id/progress/recompute: 202<br/>GET /profiles/id/progress/runs/runId"]
         P3["GET/PUT/DELETE /profiles/id/goals/metricId<br/>GET /profiles/id/takes<br/>GET /profiles/id/export"]
     end
 
@@ -799,8 +810,12 @@ Der Vertrag wird über `npm run api:generate` aus dem FastAPI-Code generiert (`a
 Die Progress-Endpunkte sind serverseitig implementiert (`backend/app/progress/`),
 aber noch nicht in der Web-Navigation verdrahtet. `POST /sessions` akzeptiert
 optional `profileId` und verlangt dann `X-Profile-Token`;
-`POST /sessions/{id}/takes` prüft den Token, wenn die Session einem Profil
-gehört. Sessions ohne Profil bleiben unverändert. Die Profil-Löschung entkoppelt
+alle verknüpften Session-/Take-/Job-Routen prüfen diesen Token, auch beim Lesen,
+Upload, Löschen und bei Idempotenz-Retries. Abgelaufene Profile liefern `410`,
+Löschen bleibt erlaubt. Sessions ohne Profil bleiben unverändert.
+Explizites Recompute läuft über Celery und `progress_runs`; normale Reads
+extrahieren nur geänderte Takes und schreiben das tatsächlich angefragte Fenster.
+Die Profil-Löschung entkoppelt
 Sessions/Takes (`ON DELETE SET NULL`) und entfernt nur die abgeleiteten
 Progress-Daten; die Session-Löschung bleibt separat.
 

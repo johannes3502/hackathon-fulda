@@ -124,6 +124,6 @@ PRIMARY_IDS = tuple(item.metric_id for item in PRIMARY)
 EXPLORATORY_IDS = tuple(item.metric_id for item in EXPLORATORY)
 
 METRIC_VERSION = 1
-COMPUTATION_VERSION = "metrics-1"
-ALGORITHM_VERSION = "progress-stats-1"
+COMPUTATION_VERSION = "metrics-2"
+ALGORITHM_VERSION = "progress-stats-2"
 QUALITY_VERSION = "quality-1"

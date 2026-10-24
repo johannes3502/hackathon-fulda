@@ -14,13 +14,15 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from starlette.concurrency import run_in_threadpool
 
-from app.progress import db, service
+from app.jobs import QueueUnavailable, enqueue_task
+from app.progress import jobs, service
 from app.progress.models import (
     ErrorResponse, GoalInput, GoalListResponse, GoalResponse, MetricProgressResponse,
     ProfileCreate, ProfileCreateResponse, ProfileGetResponse, ProfilePatch,
-    ProfileTakesResponse, ProfileTokenRotateResponse, ProgressResponse,
+    ProfileTakesResponse, ProfileTokenRotateResponse, ProgressResponse, RecomputeAccepted, RecomputeRun,
 )
 from app.review.errors import ReviewError
+from app.tasks import recompute_progress
 
 
 class ProgressRoute(APIRoute):
@@ -32,13 +34,14 @@ class ProgressRoute(APIRoute):
             try:
                 response = await handler(request)
                 response.headers["X-Request-Id"] = request.state.request_id
+                response.headers["Cache-Control"] = "private, no-store"
                 return response
             except RequestValidationError as error:
                 raise ReviewError(422, "E_REQUEST_INVALID",
                                   "Ungültige Anfrage; Schema und Idempotency-Key prüfen.") from error
-            except psycopg.Error as error:
+            except (psycopg.Error, QueueUnavailable) as error:
                 raise ReviewError(503, "E_SERVICE_UNAVAILABLE",
-                                  "Datenbank nicht verfügbar.") from error
+                                  "Datenbank oder Queue nicht verfügbar.") from error
             except ReviewError:
                 raise
             except Exception as error:
@@ -136,22 +139,18 @@ def get_metric_progress(profile_id: UUID, metric_id: str, token: Token = None,
         include_excluded=include_excluded, include_exploratory=True)
 
 
-@router.post("/profiles/{profile_id}/progress/recompute", response_model=ProgressResponse)
+@router.post("/profiles/{profile_id}/progress/recompute", status_code=202, response_model=RecomputeAccepted)
 async def recompute(profile_id: UUID, idempotency_key: Key, token: Token = None):
-    key = checked_key(idempotency_key)
-    require_token(token)
-    request_hash = db.digest({"profileId": str(profile_id), "recompute": True})
-    scope = f"profiles:{profile_id}:recompute"
-    with db.mutation(scope, key, request_hash) as (connection, previous):
-        if previous:
-            return JSONResponse(status_code=200, content=previous["response"])
-        db.authenticate(connection, profile_id, token)
-        await run_in_threadpool(service.recompute_profile, profile_id)
-        response = await run_in_threadpool(
-            service.progress, profile_id, token, window="all")
-        body = service.json_model(response)
-        db.remember(connection, scope, key, request_hash, profile_id, 200, body)
-        return JSONResponse(status_code=200, content=body)
+    body = await run_in_threadpool(jobs.reserve, profile_id, require_token(token), checked_key(idempotency_key))
+    run = await run_in_threadpool(jobs.get, profile_id, token, UUID(body["runId"]))
+    if run.status == "queued":
+        await enqueue_task(recompute_progress, body["runId"])
+    return JSONResponse(status_code=202, content=body)
+
+
+@router.get("/profiles/{profile_id}/progress/runs/{run_id}", response_model=RecomputeRun)
+def get_recompute(profile_id: UUID, run_id: UUID, token: Token = None):
+    return jobs.get(profile_id, require_token(token), run_id)
 
 
 @router.get("/profiles/{profile_id}/goals", response_model=GoalListResponse)

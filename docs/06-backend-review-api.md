@@ -860,7 +860,8 @@ DELETE /api/profiles/{id}
 POST   /api/profiles/{id}/rotate-token
 GET    /api/profiles/{id}/progress
 GET    /api/profiles/{id}/progress/{metricId}
-POST   /api/profiles/{id}/progress/recompute
+POST   /api/profiles/{id}/progress/recompute  # 202 {runId,statusUrl}
+GET    /api/profiles/{id}/progress/runs/{runId}
 GET    /api/profiles/{id}/goals
 PUT    /api/profiles/{id}/goals/{metricId}
 DELETE /api/profiles/{id}/goals/{metricId}
@@ -868,6 +869,12 @@ GET    /api/profiles/{id}/takes
 GET    /api/profiles/{id}/export?format=json|csv
 ```
 
+- Recompute läuft als Celery-Job (`progress_runs`), ein aktiver Lauf pro Profil.
+  Status mit Token pollen; bei Queue-Ausfall dieselbe Anfrage mit demselben Key
+  wiederholen. Abgeschlossene Jobs sind bei erneuter Zustellung No-ops.
+- Alle verknüpften Session-/Take-/Job-Routen verlangen ebenfalls den Token;
+  Idempotenz-Replays prüfen den aktuellen Token. Abgelaufene Profile liefern
+  `410`; Profil-/Session-Löschung bleibt erlaubt. Antworten sind `private, no-store`.
 - Neue Mutationen brauchen `Idempotency-Key`; Profil-Erstellung liefert den
   Roh-Token nur in der ersten `201`-Antwort, ein Retry `200` ohne Token.
 - `DELETE /profiles/{id}` löscht Profil, Token, Ziele und abgeleitete

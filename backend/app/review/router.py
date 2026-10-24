@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi import APIRouter, File, Form, Header, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from fastapi.routing import APIRoute
@@ -34,8 +34,13 @@ class ReviewRoute(APIRoute):
         async def wrapped(request):
             request.state.request_id = str(uuid4())
             try:
+                if request.path_params:
+                    await run_in_threadpool(
+                        progress_service.authorize_resource, request.path_params,
+                        request.headers.get("X-Profile-Token"), deleting=request.method == "DELETE")
                 response = await handler(request)
                 response.headers["X-Request-Id"] = request.state.request_id
+                response.headers["Cache-Control"] = "private, no-store"
                 return response
             except RequestValidationError as error:
                 code = "E_REQUEST_INVALID"
@@ -52,8 +57,12 @@ class ReviewRoute(APIRoute):
         return wrapped
 
 
-router = APIRouter(tags=["review"], route_class=ReviewRoute,
-    responses={code: {"model": ErrorResponse} for code in (400, 404, 409, 413, 422, 500, 503)})
+def profile_token_header(profile_token: str | None = Header(default=None, alias="X-Profile-Token")):
+    """Advertise the optional header; ReviewRoute checks linked resources before media work."""
+
+
+router = APIRouter(tags=["review"], route_class=ReviewRoute, dependencies=[Depends(profile_token_header)],
+    responses={code: {"model": ErrorResponse} for code in (400, 401, 404, 409, 410, 413, 422, 500, 503)})
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=128)]
 
 
@@ -121,9 +130,7 @@ def delete_session(session_id: UUID):
 
 
 @router.post("/sessions/{session_id}/takes", status_code=201, response_model=TakeResponse)
-def create_take(session_id: UUID, request: TakeCreate, idempotency_key: Key,
-                profile_token: str | None = Header(default=None, alias="X-Profile-Token")):
-    progress_service.authorize_session(session_id, profile_token)
+def create_take(session_id: UUID, request: TakeCreate, idempotency_key: Key):
     return mutation_response(service.create_take(session_id, request, checked_key(idempotency_key)))
 
 

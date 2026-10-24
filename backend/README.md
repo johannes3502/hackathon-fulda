@@ -188,9 +188,20 @@ as before.
   `pp_…` token. Send it as `X-Profile-Token` for every profile route.
 - `POST /sessions` accepts `profileId` and `presentationMode`; when linked, the
   token is required. Takes inherit `profileId` and `capture.deviceKey`.
+  All linked session/take/job routes also require the token, including uploads
+  and deletion. Anonymous sessions retain their existing API.
 - `GET /profiles/{id}/progress` materializes `take_quality`, `take_metrics`,
-  snapshots and change-points for profiles up to 200 takes. Larger profiles use
-  the explicit `POST /profiles/{id}/progress/recompute`.
+  snapshots and change-points. Only takes with changed revisions/computation
+  versions are extracted again; new takes remain visible above 200 takes.
+  Use the default `last_20` window for interactive reads; `all` is unpaginated.
+- `POST /profiles/{id}/progress/recompute` queues a Celery rebuild and returns
+  `202 {runId,statusUrl}`. Poll `GET /profiles/{id}/progress/runs/{runId}`,
+  then reload progress when completed. The same idempotency key republishes a
+  queued run after a queue outage. Concurrent runs for a profile return `409`.
+  Restart the worker after updating the task code.
+- Retention is checked on every read/mutation, including idempotent replays.
+  Expired profiles return `410`; deletion remains available. Explicit
+  `PATCH {retentionUntil:null}` clears retention before expiry.
 - Metrics are heuristics, missing values stay unknown, and the response has no
   overall score. See `docs/12-long-term-progress-data-design.md` and
   `docs/13-long-term-progress-frontend-contract.md`.

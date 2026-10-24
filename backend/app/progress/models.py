@@ -15,7 +15,7 @@ class Model(BaseModel):
 
 PresentationMode = Literal["startup", "thesis", "school", "nonprofit"]
 TrendStatus = Literal["insufficient", "early_signal", "stable", "trend_up", "trend_down", "unclear"]
-GoalStatus = Literal["not_applicable", "unknown", "on_track", "off_track", "mixed"]
+GoalStatus = Literal["not_applicable", "unknown", "on_track", "off_track"]
 SuggestedDirection = Literal["increase", "decrease", "target_band", "neutral"]
 Confidence = Literal["low", "medium", "high"]
 
@@ -321,15 +321,22 @@ class ProfileTakesResponse(Model):
     next_cursor: str | None = None
 
 
-class ExportResponse(Model):
-    format: Literal["json", "csv"]
-    content: str
-    filename: str
-
-
 class ProfileTokenRotateResponse(Model):
     token: str | None = None
     token_issued: bool = True
+
+
+class RecomputeAccepted(Model):
+    run_id: UUID
+    status_url: str
+
+
+class RecomputeRun(Model):
+    run_id: UUID
+    status: Literal["queued", "running", "completed", "failed"]
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class ErrorBody(Model):

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from statistics import median
 
 from app.progress import definitions
 from app.review.models import ReviewEvent, Take
-from app.review.timeline import coverage, merge_events, union_ms
+from app.review.timeline import coverage, evaluable_intervals, union_ms
 
 
 def _payload(event: ReviewEvent) -> dict:
@@ -47,61 +48,8 @@ def _rule_version(events: list[ReviewEvent], *types: str) -> str | None:
     return ",".join(versions) if versions else None
 
 
-def _analysis_value(take: Take, camel: str, snake: str, default=None):
-    analysis = take.analysis
-    if isinstance(analysis, dict):
-        return analysis.get(camel, analysis.get(snake, default))
-    return getattr(analysis, snake, default)
-
-
-def _words(take: Take):
-    analysis = take.analysis
-    words = analysis.get("words", []) if isinstance(analysis, dict) else analysis.words
-    result = []
-    for word in words:
-        if isinstance(word, dict):
-            start, end = word.get("start_ms", word.get("startMs")), word.get("end_ms", word.get("endMs"))
-        else:
-            start, end = word.start_ms, word.end_ms
-        if isinstance(start, (int, float)) and isinstance(end, (int, float)):
-            result.append((float(start), float(end)))
-    return sorted(result)
-
-
-def _audio_summary(take: Take):
-    analysis = take.analysis
-    value = analysis.get("audioSummary") if isinstance(analysis, dict) else analysis.audio_summary
-    if value is None:
-        return None
-    if not isinstance(value, dict):
-        return value.model_dump() if hasattr(value, "model_dump") else None
-    return value
-
-
-def _claims(take: Take):
-    analysis = take.analysis
-    factcheck = analysis.get("factcheck") if isinstance(analysis, dict) else analysis.factcheck
-    if factcheck is None:
-        return None
-    if isinstance(factcheck, dict):
-        return factcheck.get("claims", [])
-    return factcheck.claims
-
-
-def _claim_verdict(claim):
-    return claim.get("verdict") if isinstance(claim, dict) else claim.verdict
-
-
-def _synthetic(take: Take):
-    return bool(_analysis_value(take, "syntheticDemo", "synthetic_demo", False))
-
-
-def _asr_provider(take: Take):
-    return _analysis_value(take, "asrProvider", "asr_provider")
-
-
 def _number(value):
-    return float(value) if isinstance(value, (int, float)) and value == value else None
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) else None
 
 
 def _ratio(numerator, denominator):
@@ -112,21 +60,25 @@ def _ratio(numerator, denominator):
 
 def extract(take: Take, events: list[ReviewEvent]):
     """Return quality plus one metric result per definition."""
-    events = merge_events(events)
+    events = [event for event in events if event.stage == "final"]
     measured = coverage(take, events)
-    audio = _audio_summary(take)
-    words = _words(take)
-    claims = _claims(take)
-    checked = [claim for claim in (claims or []) if _claim_verdict(claim) in
+    pose_intervals = evaluable_intervals(take, events)
+    audio = take.analysis.audio_summary.model_dump() if take.analysis.audio_summary is not None else None
+    words = sorted((word.start_ms, word.end_ms) for word in take.analysis.words)
+    claims = take.analysis.factcheck.claims if take.analysis.factcheck is not None else None
+    checked = [claim for claim in (claims or []) if claim.verdict in
                {"supports", "contradicts", "not_found"}]
     duration = take.duration_ms
     pose_ratio = _ratio(measured.evaluable_ms, duration)
     audio_active = _number(audio.get("active_ms")) if isinstance(audio, dict) else None
+    if audio_active is not None and not 0 <= audio_active <= duration:
+        audio_active = None
+        audio = {**audio, "active_ms": None}
     audio_ratio = _ratio(audio_active, duration)
     valid_values = [_valid_ratio(event) for event in events if event.type in {"posture", "head", "hands"}]
     valid_values = [value for value in valid_values if value is not None]
     pose_valid = median(valid_values) if valid_values else None
-    synthetic = _synthetic(take)
+    synthetic = take.analysis.synthetic_demo
     global_reasons = []
     if duration < 60_000:
         global_reasons.append("duration-too-short")
@@ -162,6 +114,8 @@ def extract(take: Take, events: list[ReviewEvent]):
                 reasons.append("pose-coverage-low")
             if definition.min_pose_valid_ratio is not None and pose_valid is not None and pose_valid < definition.min_pose_valid_ratio:
                 reasons.append("pose-valid-ratio-low")
+            if definition.min_pose_valid_ratio is not None and pose_valid is None:
+                reasons.append("pose-valid-ratio-unknown")
         if definition.min_audio_active_ratio is not None:
             if not audio:
                 reasons.append("audio-missing")
@@ -178,7 +132,9 @@ def extract(take: Take, events: list[ReviewEvent]):
             elif len(checked) < definition.min_claim_count:
                 reasons.append("claims-low")
         value, n, denominator, extra_reason, rule_version = _value(
-            definition.metric_id, take, events, measured, audio, words, checked, pose_ratio)
+            definition.metric_id, take, events, pose_intervals, audio, words, checked)
+        if definition.source == "asr":
+            rule_version = f"asr:{take.analysis.asr_provider or 'unknown'}"
         if extra_reason:
             reasons.append(extra_reason)
         if value is None:
@@ -198,7 +154,7 @@ def extract(take: Take, events: list[ReviewEvent]):
                 "audioActiveRatio": audio_ratio,
                 "wordCount": len(words),
                 "claimCount": len(checked),
-                "asrProvider": _asr_provider(take),
+                "asrProvider": take.analysis.asr_provider,
                 "syntheticDemo": synthetic,
                 "censored": definition.metric_id == "pose.trunk_lean_peak_deg",
             },
@@ -206,14 +162,15 @@ def extract(take: Take, events: list[ReviewEvent]):
     return quality, metrics
 
 
-def _events_for_take(take: Take):
-    # Kept for callers that need the empty fallback; extract always receives events.
-    return getattr(take, "_progress_events", [])
+def _event_time(events, intervals):
+    return union_ms([(max(event.t_ms, start), min(event.t_ms + event.duration_ms, end))
+                     for event in events for start, end in intervals
+                     if event.t_ms < end and event.t_ms + event.duration_ms > start])
 
 
-def _value(metric_id, take, events, measured, audio, words, checked, pose_ratio):
+def _value(metric_id, take, events, pose_intervals, audio, words, checked):
     duration = take.duration_ms
-    evaluable = measured.evaluable_ms
+    evaluable = union_ms(pose_intervals)
     if metric_id == "speech.pace_wpm":
         speaking_ms = sum(end - start for start, end in words)
         speaking_ms += sum(
@@ -224,7 +181,7 @@ def _value(metric_id, take, events, measured, audio, words, checked, pose_ratio)
         return value, len(words), speaking_ms or None, None, None
     if metric_id == "speech.pause_share":
         pauses = [event for event in events if event.type == "pause"]
-        total = union_ms([(event.t_ms, event.t_ms + event.duration_ms) for event in pauses])
+        total = _event_time(pauses, [(0, duration)])
         return min(1.0, total / duration) if duration else None, len(pauses), duration or None, None, None
     if metric_id == "speech.filler_rate_per_100_words":
         count = len([event for event in events if event.type == "filler" and _payload(event).get("kind") == "filler"])
@@ -237,7 +194,7 @@ def _value(metric_id, take, events, measured, audio, words, checked, pose_ratio)
         return (_ratio(active, duration) if active is not None else None), 1, duration or None, None, None
     if metric_id == "speech.volume_event_share":
         volume = [event for event in events if event.type == "volume"]
-        total = union_ms([(event.t_ms, event.t_ms + event.duration_ms) for event in volume])
+        total = _event_time(volume, [(0, duration)])
         active = _number(audio.get("active_ms")) if isinstance(audio, dict) else None
         return (min(1.0, total / active) if active else None), len(volume), active or None, None, None
     if metric_id == "speech.repetition_rate_per_100_words":
@@ -252,11 +209,14 @@ def _value(metric_id, take, events, measured, audio, words, checked, pose_ratio)
         else:
             selected = [event for event in events if event.type == "hands" and _kind(event) in
                         {"arms-closed", "arms_crossed"}]
-        total = union_ms([(event.t_ms, event.t_ms + event.duration_ms) for event in selected])
+        total = _event_time(selected, pose_intervals)
         value = min(1.0, total / evaluable) if evaluable else None
         return value, len(selected), evaluable or None, None, _rule_version(events, "posture", "head", "hands")
     if metric_id == "pose.gesture_rate_per_min":
-        selected = [event for event in events if event.type == "gesture"]
+        selected = [event for event in events if event.type == "gesture"
+                    and any(start <= event.peak_ms < end for start, end in pose_intervals)]
+        if not any(event.type == "gesture" for event in events):
+            return None, 0, evaluable or None, "gesture-measurement-missing", None
         value = len(selected) / evaluable * 60_000 if evaluable else None
         return value, len(selected), evaluable or None, None, _rule_version(events, "gesture")
     if metric_id == "pose.trunk_lean_peak_deg":
@@ -278,6 +238,6 @@ def _value(metric_id, take, events, measured, audio, words, checked, pose_ratio)
         verdict = {"content.contradiction_rate": "contradicts",
                    "content.supported_rate": "supports",
                    "content.not_found_rate": "not_found"}[metric_id]
-        hits = len([claim for claim in checked if _claim_verdict(claim) == verdict])
+        hits = len([claim for claim in checked if claim.verdict == verdict])
         return hits / count, count, count, None, "factcheck-v1"
     return None, 0, None, "metric-unknown", None

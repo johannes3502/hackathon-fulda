@@ -146,10 +146,10 @@ Korrekturen fest; sie ersetzt die früheren Aussagen an den betroffenen Stellen.
 | **Read-Model statt Event Sourcing** | Das System speichert bereits den aktuellen Session-/Take-Zustand und zusätzlich Events. Es ist kein Event-Sourced-System im engeren Sinn. | `take_metrics`/`progress_snapshots` werden als **materialisierte Projektion** (CQRS-nah) bezeichnet, nicht als Event Sourcing. Events bleiben die Evidenz für Review-Sprünge. |
 | **RCI/MDC** | Der RCI nutzt `S_diff = sqrt(2)·SEM`; ohne Reliabilität ist `SEM` unbekannt. Eine einzelne letzte Beobachtung ist als Veränderungsmaß rausch-anfällig. | `s` ist eine konservative robuste Fehlerschätzung, kein validierter SEM. `recent` ist der Median der letzten 3 eligible Takes, nicht der letzte Einzelwert. Die Formel heißt weiterhin **RCI-Analogon**, nie „klinisch signifikant“. |
 | **Rauschband** | `MAD` aus nur 3 Baseline-Werten ist instabil; ein linearer Trend kann als „Rauschen“ erscheinen. | Baseline-Niveau = Median der ersten 3; Rauschband = `1.4826·MAD` der **Residuen um die Theil–Sen-Gerade** über alle eligible Punkte. Bei <5 Punkten wird keine Trendaussage getroffen. |
-| **Theil–Sen-Konfidenzintervall** | Das mittlere 95-%-Intervall der paarweisen Steigungen ist belegt; „exakt bei n<10“ war falsch. | Exakte Berechnung bis n=50; darüber deterministische Stichprobe von ca. 600 Paaren (Seed aus dem Input). Kein Exaktheitsanspruch bei kleinen n. |
+| **Theil–Sen-Konfidenzintervall** | Paarweise 2,5-/97,5-Perzentile sind die Streuung der Steigungen, kein Konfidenzintervall des Schätzers. | Sen-Rangintervall mit Normalapproximation und Korrektur für gleiche y-Werte, wie `scipy.stats.theilslopes`. Keine Genauigkeitszusage für kleine oder abhängige Stichproben. |
 | **Mann–Kendall** | Der Test setzt Unabhängigkeit voraus; p-Werte bei n<10 sind praktisch nicht aussagekräftig. | p nur ab n≥10. Bei Lag-1-Autokorrelation wird die Varianz über eine AR(1)-Effektivstichprobe konservativ vergrößert; das ist eine Heuristik, keine exakte Hamed–Rao-Implementierung. p ist Diagnose, kein alleiniges Trend-Gate. |
 | **CUSUM** | NIST empfiehlt `k≈0.5` und `h≈4–5`; ein festes Ziel ist nötig. Ein einzelner Alarm ist kein belastbarer Change-Point. | CUSUM startet nach den ersten 3 Baseline-Punkten, nutzt `k=0.5`, `h=4.0` und **zwei aufeinanderfolgende** Überschreitungen als Produktschutz. Zusätzlich muss die Änderung die metrikspezifische praktische Mindestgröße (`min_effect`) überschreiten. Das ist keine Kausalaussage. |
-| **EWMA** | `λ=0.2–0.3` ist üblich; EWMA setzt Unabhängigkeit/Normalität für klassische Regelkarten voraus. | `λ=0.25`, nur deskriptiv. Keine Entscheidung allein aus EWMA; die Unsicherheit bleibt sichtbar. |
+| **EWMA** | Als deskriptive Glättung vorgeschlagen, aber in `progress.v1` nicht berechnet. | Keine EWMA-Aussage aus den aktuellen Antworten ableiten. |
 | **Trendstatus** | Ein signifikanter Slope und ein CUSUM-Alarm messen Verschiedenes. | `trend_up/down` benötigt einen belastbaren Theil–Sen-Slope (CI schließt 0 aus, Mindestgröße); CUSUM liefert separat Change-Points. Ein fehlender CUSUM-Alarm verhindert keinen Trend. |
 | **Mehrfachtests** | Sieben primäre Metriken wurden vorab festgelegt. | Benjamini–Hochberg `q=0.1` über die primären Metriken; `adjustedP` bleibt `null`, wenn kein p-Wert berechnet wurde. |
 | **Ziel-Valenz** | „Verbesserung/Rückschritt“ ist ohne Ziel nicht definierbar. `mixed` ist eine Aussage über mehrere Metriken, nicht über eine einzelne Reihe. | `goalStatus` pro Metrik kennt nur `not_applicable`, `unknown`, `on_track`, `off_track`. `mixed` bleibt ausschließlich eine mögliche spätere Profil-Zusammenfassung. Change-Point-Arten `regression`/`recovery` nur mit Ziel; sonst `step_up`/`step_down`. |
@@ -166,7 +166,7 @@ Jacobson–Truax (RCI), Barnett et al. (Regression to the Mean), Benjamini–Hoc
 und die PostgreSQL-Partitionierungsdokumentation. Zusätzlich wurden
 OWASP-Hinweise zu `localStorage` und die W3C-WAI-Tutorials geprüft.
 
-## 3. Ist-Zustand: vorhandene Datenpunkte, Modell und Speicherung
+## 3. Ausgangszustand vor der Progress-Implementierung
 
 ### 3.1 Was heute persistiert wird
 
@@ -896,6 +896,23 @@ CREATE TABLE IF NOT EXISTS profile_goals (
 Ein Ziel ist **optional**. Ohne Ziel bleibt die Richtung neutral; die UI sagt
 „gestiegen/gefallen“, nicht „besser/schlechter“.
 
+#### 5.2.9 Recompute-Läufe (implementiert)
+
+```sql
+CREATE TABLE IF NOT EXISTS progress_runs (
+    id uuid PRIMARY KEY,
+    profile_id uuid NOT NULL REFERENCES speaker_profiles(id) ON DELETE CASCADE,
+    status text NOT NULL CHECK (status IN ('queued','running','completed','failed')),
+    error text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS progress_runs_one_active_idx
+    ON progress_runs(profile_id) WHERE status IN ('queued','running');
+```
+
+Fehler enthalten nur Codes. Der Token schützt auch den Status-Endpunkt.
+
 ### 5.3 Feld- und Null-Semantik
 
 | Feld | Bedeutung | `null` bedeutet |
@@ -1112,79 +1129,49 @@ Regeln:
 
 ## 7. Schreib- und Lesepfad
 
-### 7.1 Schreibpfad
-
 ```mermaid
 sequenceDiagram
-    participant C as Client
+    participant C as Progress-Client
     participant A as FastAPI
-    participant P as Postgres
-    participant W as Worker
+    participant P as PostgreSQL
     participant R as Redis/Celery
-
-    C->>A: POST /profiles (Consent long-term-progress)
-    A->>P: speaker_profiles + profile_tokens (Hash)
-    A-->>C: profile + token (einmalig)
-
-    C->>A: POST /sessions (profileId, presentationMode)
-    A->>P: sessions.profile_id
-    C->>A: POST /sessions/{id}/takes (recordedAt, capture.deviceKey)
-    A->>P: takes.profile_id, recorded_at, device_key
-    C->>A: POST /takes/{id}/events + /audio
-    A->>P: events, analysis
-
-    W->>P: Take abgeschlossen (events_ready/review_ready)
-    C->>A: GET /profiles/{id}/progress
-    A->>P: take_quality + take_metrics (MVP, idempotent)
-    A->>P: Snapshots + Change-Points materialisieren
-    A-->>C: progress.v1
-    opt expliziter Recompute
-        C->>A: POST /profiles/{id}/progress/recompute
-        A->>P: dieselbe deterministische Projektion
-        A-->>C: progress.v1
-    end
+    participant W as Worker
+    C->>A: GET progress (Token, Fenster, Filter)
+    A->>P: Token + Retention prüfen, Profil sperren
+    A->>P: Geänderte Takes über revision/computation_version aktualisieren
+    A->>P: Gewähltes Fenster + Snapshot, nur vergleichbare Werte
+    A-->>C: progress.v1 mit Lücken und Qualität
+    C->>A: POST recompute (Token, Idempotency-Key)
+    A->>P: progress_runs queued, Antwort idempotent speichern
+    A->>R: Nur runId, enqueue_task
+    A-->>C: 202 runId + statusUrl
+    R->>W: recompute_progress(runId)
+    W->>P: Profil sperren, atomar neu berechnen, Lauf completed/failed
+    C->>A: GET progress/runs/runId (Token)
+    A-->>C: Laufstatus, danach progress erneut laden
 ```
 
-**Reihenfolge und Idempotenz**
-
-1. Take wird angelegt; `profile_id` wird aus der Session kopiert.
-2. Events/Wörter werden gespeichert (bestehender Pfad).
-3. Nur für Takes mit `profile_id` berechnet der **API-Prozess beim Progress-Read
-   oder Recompute** `take_quality` und leitet daraus pro Metrik die Eligibility
-   ab; `take_metrics` wird mit
-   `ON CONFLICT (take_id, metric_id, metric_version) DO UPDATE` idempotent
-   geschrieben. `take_metrics.quality` enthält `eligible` und
-   `exclusionReasons` für genau diese Metrik.
-4. Danach werden `progress_snapshots` und `progress_change_points` im selben
-   idempotenten Lauf materialisiert. Der Lauf ist deterministisch; ein
-   Redis-Lock ist für einen späteren Worker-Backfill vorgesehen, im MVP aber
-   nicht nötig.
-5. Bei Löschung eines Takes/Sessions werden die abgeleiteten Zeilen kaskadiert;
-   der nächste Progress-Read recomputet das Profil. `DELETE /sessions/{id}`
-   entfernt die Session; ein separates Profil bleibt bestehen.
-
-**Warum inline statt immer Celery?** Bei 20 Takes ist die Berechnung klein genug
-für den Request. Der aktuelle MVP recomputet beim Progress-Read für Profile bis
-200 Takes; größere Profile nutzen vorhandene Snapshots und den expliziten
-Recompute. Celery ist für Backfill/Recompute bei vielen Takes oder nach
-Metrik-Updates vorgesehen.
-
-### 7.2 Lesepfad
-
-`GET /profiles/{id}/progress`:
-
-1. Profil + Token prüfen.
-2. Takes des Profils im Zeitraum laden, inkl. `take_quality`.
-3. `take_metrics` für die angefragten Metriken laden.
-4. Vorhandene `progress_snapshots` für das Fenster laden; bei fehlendem/veraltetem
-   Snapshot synchron berechnen (MVP) oder bei sehr großen Profilen `202` +
-   Async-Backfill.
-5. Antwort als `progress.v1` serialisieren; keine Roh-Landmarks, keine Wörter,
-   keine Audiodaten.
-
-**Performance:** 20 Takes × 15 Metriken = 300 Punkte; die Antwort bleibt klein.
-Bei 1.000 Takes werden Snapshots gecacht und nur die letzten 20/50 Punkte
-ausgeliefert; die Detailansicht paginiert.
+- Normale Reads extrahieren nur neue/geänderte Takes. Es gibt keine 200-Take-
+  Sonderregel, die neue Aufnahmen aus größeren Profilen ausschließt.
+- Extraktion, Datenqualität und Snapshots werden pro Anfrage in einer
+  Transaktion geschrieben; keine verschachtelten Verbindungen oder doppelte
+  Berechnung aller Fenster. Ein `last_5`-Read überschreibt keinen `all`-Snapshot.
+- `includeExcluded=false` blendet nur die ausgegebenen Punkte aus. Zähler,
+  Steigung, Unsicherheit und Qualitätsstatus bleiben gleich. Die Steigung nutzt
+  die ursprüngliche `sequence`; Lücken werden nicht zusammengeschoben.
+- Regel- und ASR-Anbieterbrüche liefern `unclear`, keine Steigung/Baseline-Differenz, keinen
+  Zielstatus und keine Change-Points über den Bruch. Bei Lücken werden ebenfalls
+  keine Change-Points behauptet.
+- Pose-Dauer zählt nur innerhalb gemeldeter auswertbarer Intervalle. Fehlende
+  Pose-Validität bleibt unbekannt. Ohne persistierte Gestenmessung ist die
+  Gestenrate `null`; der bisherige Browser-Pose-Vertrag liefert keine
+  allgemeinen Gesture-Events.
+- `progress_runs` gehört zum Profil (`ON DELETE CASCADE`); ein aktiver Lauf pro
+  Profil. Retries nach Queue-Ausfall publizieren dieselbe Run-ID. Redelivery
+  überspringt abgeschlossene Läufe, Löschung kann keine Daten wiederherstellen.
+- `last_20` bleibt das interaktive Standardfenster. `all` und Export sind noch
+  unpaginiert; die vollständige Theil–Sen-Auswertung braucht quadratisch viele
+  Paare. Große Profile/Last sind damit noch nicht abgenommen.
 
 ## 8. Auswertungslogik: Fortschritt und Rückschritt zuverlässig erkennen
 
@@ -1238,29 +1225,30 @@ nicht „signifikant“ oder „klinisch relevant“.
 ### 8.4 Trend (Theil–Sen + Mann–Kendall)
 
 ```text
-β = median( (y_j - y_i) / (j - i) ) für alle i < j
+β = median( (y_j - y_i) / (sequence_j - sequence_i) ) für alle i < j
 β10 = 10 * β
-CI95 = mittleres 95-%-Intervall der paarweisen Steigungen
-       (bis n=50 exakt; darüber ca. 600 deterministisch gezogene Paare)
+CI95 = Sen-Rangintervall mit Normalapproximation, gleiche y-Werte korrigiert
+       (alle Paare; keine Perzentil-Streuung als Schätzer-CI)
 τ, p = Kendall's tau / Mann-Kendall
 ```
 
 - `β` ist robust gegen einzelne Ausreißer.
 - `CI95` zeigt die Unsicherheit; bei wenigen Punkten ist sie breit. Ein
-  „exaktes“ Intervall für n<10 gibt es ohne Verteilungsannahme nicht.
+  Exaktheits- oder Validierungsnachweis ist damit nicht verbunden. Referenz:
+  [SciPy `theilslopes`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.theilslopes.html).
 - `p` wird nur berichtet, wenn `n >= 10`; darunter ist der Test zu schwach.
 - Bei serieller Korrelation (Lag-1 > 0,3) wird die Varianz über eine
   AR(1)-Effektivstichprobe konservativ vergrößert; das ist eine Heuristik, keine
   exakte Hamed–Rao-Implementierung. Die UI zeigt dann `confidence=low`.
 - `reliable_slope = CI95 schließt 0 aus AND |β| >= mdc_slope`, mit
-  `mdc_slope = 1.96 * s * sqrt(12 / (n * (n² - 1)))` als konservative
+  `mdc_slope = 1.96 * s / sqrt(Σ(sequence_i - mean(sequence))²)` als
   OLS-Näherung. Das ist eine Heuristik, kein exakter Test.
 - `effect_size = β10 / s` (dimensionslos, nur zur Einordnung der Größenordnung;
   kein standardisierter Effektstärkenschätzer).
 
 ### 8.5 EWMA und CUSUM
 
-**EWMA** (aktuelles Niveau):
+**EWMA** (optionale deskriptive Glättung, in `progress.v1` nicht berechnet):
 
 ```text
 ewma_0 = baseline
@@ -1307,7 +1295,7 @@ Slope zu verwerfen.
 
 | Stufe | Bedingungen |
 |---|---|
-| `high` | `n >= 20`; eligible/total ≥ 0,8; CI-Breite ≤ 0,5 × |β10|; kein Versionsbruch; Lag-1 ≤ 0,3; keine mehrfachen Takes derselben Session |
+| `high` | `n >= 20`; eligible/total ≥ 0,8; CI-Breite ≤ 0,5 × |β|; kein Versionsbruch; Lag-1 ≤ 0,3; keine mehrfachen Takes derselben Session |
 | `medium` | `n >= 10`; CI schließt 0 aus; Qualität ok; kein Bruch |
 | `low` | `early_signal`, breite CI, viele fehlende Punkte, Autokorrelation oder geclusterte Takes derselben Session |
 
@@ -1457,7 +1445,8 @@ Umgang mit Datenqualität.
 | `GET` | `/profiles/{profileId}/goals` | Ziele lesen | `200 { goals }` |
 | `PUT` | `/profiles/{profileId}/goals/{metricId}` | Ziel setzen/aktualisieren | `200 { goal }` |
 | `DELETE` | `/profiles/{profileId}/goals/{metricId}` | Ziel löschen | `204` |
-| `POST` | `/profiles/{profileId}/progress/recompute` | Neuberechnung anstoßen | `200 ProgressResponse (progress.v1)`; `202` nur bei späterem Async-Backfill |
+| `POST` | `/profiles/{profileId}/progress/recompute` | Neuberechnung anstoßen | `202 {runId,statusUrl}` |
+| `GET` | `/profiles/{profileId}/progress/runs/{runId}` | Laufstatus | `queued/running/completed/failed` |
 | `GET` | `/profiles/{profileId}/export` | JSON/CSV-Export | `200` |
 | `GET` | `/profiles/{profileId}/takes` | Take-Liste für Tabelle | `200 { takes, nextCursor }` |
 
@@ -1563,17 +1552,16 @@ Antwort: `progress.v1` (vollständiger Vertrag in
 
 ### 9.5 `POST /profiles/{id}/progress/recompute`
 
-- `Idempotency-Key` erforderlich.
-- **MVP:** synchron; Antwort `200 ProgressResponse (progress.v1)`. Bei 20–1.000
-  Takes ist die Berechnung klein genug.
-- **Optionaler Async-Backfill:** Bei sehr großen Profilen oder nach einem
-  Metrik-Upgrade kann ein Celery-Lauf mit einer eigenen `progress_runs`-Tabelle
-  ergänzt werden; dann `202 { runId, statusUrl }` und ein separater
-  Status-Endpunkt. Das ist **nicht** Teil des MVP und nicht an die
-  Take-`jobs`-Tabelle gekoppelt.
-- Ein Lauf pro Profil; bei laufendem Async-Lauf
+- Token + `Idempotency-Key` erforderlich; Antwort `202 {runId,statusUrl}`.
+- Status: `GET /profiles/{id}/progress/runs/{runId}` mit demselben Token,
+  `queued`, `running`, `completed` oder `failed`; Fehler enthalten nur einen Code.
+- Danach `GET /profiles/{id}/progress` neu laden. Kein Warten auf Worker-Ergebnisse
+  im Request; Redis erhält nur die Run-ID.
+- Bei Queue-Ausfall `503`; Retry mit demselben Key publiziert denselben queued
+  Lauf erneut. Bei einem anderen Key während eines aktiven Laufs
   `409 E_PROGRESS_RECOMPUTE_IN_PROGRESS` mit `runId`.
-- Der Lauf ist deterministisch: gleicher `input_hash` → gleicher Snapshot.
+- Tokenprüfung erfolgt auch vor Idempotenz-Replays. Bei Tokenrotation kann der
+  alte Token auch keine gespeicherten Mutationsantworten mehr lesen.
 
 ### 9.6 Fehlercodes (Auszug)
 
@@ -1688,7 +1676,7 @@ Regeln:
   automatische Löschung ohne Entscheidung.
 - Löschung ist hart (keine versteckten Kopien): Profil, Token, Ziele,
   `take_quality`/`take_metrics`, `progress_snapshots`/`progress_change_points`
-  werden entfernt. Zugehörige Sessions/Takes werden per `ON DELETE SET NULL`
+  und `progress_runs` werden entfernt. Zugehörige Sessions/Takes werden per `ON DELETE SET NULL`
   **entkoppelt** und bleiben unter ihrer eigenen Session-Einwilligung bestehen.
   Für die vollständige Löschung von Analysedaten ist `DELETE /sessions/{id}`
   separat aufzurufen; die UI muss beide Wirkungen unterscheiden.
@@ -1701,7 +1689,11 @@ Regeln:
 
 - Token: 256 Bit Zufall, nur Hash gespeichert, Rotation/Revoke.
 - Rate Limits pro IP und Token; keine Profil-Enumeration.
-- Alle Profil-Routen prüfen Token → `profile_id`; Pfad-ID allein reicht nicht.
+- Alle Profil-Routen und alle verknüpften Session-/Take-/Job-Routen prüfen den
+  Token, einschließlich Lesen, Upload, Löschung und Idempotenz-Replays.
+- Abgelaufene Profile liefern `410`; Profil-/Session-Löschung bleibt mit gültigem
+  Token erlaubt. `PATCH {retentionUntil:null}` hebt eine Frist vor Ablauf auf.
+- Antworten und Fehler tragen `Cache-Control: private, no-store`.
 - `display_name` im Frontend escapen; keine HTML-Injection.
 - Keine Tokens/Profile in Standardlogs; Request-ID + Fehlercode genügen.
 - CORS bleibt restriktiv; Token-Header statt Cookie (kein CSRF).
@@ -1797,8 +1789,9 @@ oder Login. Das ist eine offene Entscheidung, keine stille Annahme.
 - `POST /sessions` mit `profileId` und `X-Profile-Token`; `POST /sessions/{id}/takes`
   prüft den Token, wenn die Session einem Profil gehört. Bestehende Sessions ohne
   Profil bleiben kompatibel.
-- 10 neue Tests in `backend/tests/test_progress.py`; Gesamtsuite 290 passed,
-  1 skipped (Docker/Postgres, keine externen Keys nötig).
+- Review-Runde: Gesamtsuite 320 passed, 1 optionaler Skip (lokales Postgres,
+  synthetische Daten, keine externen Keys nötig). Pure Statistik-/Metriktests
+  laufen auch ohne Postgres. Recompute zusätzlich mit echtem Celery/Redis geprüft.
 - Noch offen: Frontend-Anbindung, Retention-Cron, Rate Limiting, Multi-Device,
   echte Nutzerdaten-Validierung.
 

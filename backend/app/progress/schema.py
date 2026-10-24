@@ -229,4 +229,15 @@ CREATE TABLE IF NOT EXISTS profile_idempotency (
 );
 CREATE INDEX IF NOT EXISTS profile_idempotency_expiry_idx
     ON profile_idempotency(expires_at);
+
+CREATE TABLE IF NOT EXISTS progress_runs (
+    id uuid PRIMARY KEY,
+    profile_id uuid NOT NULL REFERENCES speaker_profiles(id) ON DELETE CASCADE,
+    status text NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed')),
+    error text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS progress_runs_one_active_idx
+    ON progress_runs(profile_id) WHERE status IN ('queued', 'running');
 """

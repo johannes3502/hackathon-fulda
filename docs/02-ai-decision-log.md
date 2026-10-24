@@ -1013,3 +1013,44 @@ Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
   keine Cloud-Keys für die Progress-Tests nötig.
 - Grenzen: Rate Limiting, Retention-Cron, Multi-Device und die Web-Anbindung
   bleiben offen. `progress.v1` ist ein Vertrag, keine UI-Umsetzung.
+
+## Long-Term-Progress: Review, Vereinfachung und Fixes (24.10.2026)
+
+- Nutzerauftrag: `feat/long-term-progress` reviewen, vereinfachen, Fehler beheben
+  und nach `main` mergen (Zielbranch vom Nutzer bestätigt).
+- Zugriff: Tokenprüfung vor gespeicherten Mutationsantworten; verknüpfte
+  Session-/Take-/Job-Routen inklusive Upload geschützt. Retention wird zentral
+  geprüft, Antworten/Fehler sind `private, no-store`. Löschen bleibt nach Ablauf
+  möglich; explizites `retentionUntil:null` ist von einem ausgelassenen Feld
+  unterschieden. Ungültige Cursor/Zeiträume sind `422`, keine internen Fehler.
+- Vereinfachung: eine Transaktion für Progress-Reads, Extraktion nur nach
+  geänderter Take-Revision/Berechnungsversion. Die doppelte Berechnung aller
+  Fenster und ungenutzte Adapter/Hilfen entfallen. Neue Takes oberhalb von 200
+  werden aktualisiert; ein `last_5`-Read überschreibt keinen `all`-Snapshot.
+- Recompute: Celery statt Warten im Request und verschachtelter Datenbank-
+  Verbindungen. `202 {runId,statusUrl}`, persistenter Status in `progress_runs`,
+  ein aktiver Lauf pro Profil, Wiederverwendung nach Queue-Ausfall, sichere
+  Redelivery und Kaskade bei Löschung. Backend und Worker nach Update neu starten.
+- Metriken: Pose-Dauer nur innerhalb auswertbarer Intervalle, vollständige Union
+  über überlappende Pausenquellen, Toleranz am Aufnahme-Ende abschneiden. Fehlende
+  Pose-Validität bzw. allgemeine Gestenmessung bleiben unbekannt.
+- Statistik: ausgeschlossene Punkte behalten ihre Abstände; Verbergen ändert
+  keine Qualitätszähler oder Trends. Regel-/ASR-Anbieterwechsel unterbrechen
+  Vergleiche und unterdrücken Ziele/Change-Points über den Bruch. Konstante Reihen
+  sind flach, Autokorrelation/geringe Abdeckung ergeben geringe Konfidenz.
+  `latest`-Differenzen beziehen sich auf denselben Einzelwert. Diagnostische
+  BH-Korrektur nutzt dieselbe primäre Metrikfamilie bei allen Auswahlen.
+- Korrektur der früheren CI-Aussage: Die Perzentile aller Paar-Steigungen sind
+  keine Schätzer-Konfidenzgrenzen. Implementiert ist jetzt das Sen-Rangintervall
+  mit Normalapproximation und Tie-Korrektur; Referenz:
+  [SciPy `theilslopes`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.theilslopes.html).
+  Keine Genauigkeits-/Wirksamkeitsvalidierung; p-Werte bleiben diagnostisch.
+- Geprüft: **320 Backend-Tests, 1 optionaler Skip**, inklusive isoliertem lokalen
+  Postgres; **232 Web-Tests**, Web-/Mobile-Typecheck, ESLint, Produktionsbuild
+  mit Node 22, OpenAPI/Type-Drift-Check, **15 Mermaid-Diagramme** geparst.
+  Separater Docker-Smoke mit echtem Celery/Redis und eigener Testdatenbank:
+  queued → running → completed, Metrikwert und Idempotenz geprüft.
+- Grenzen: nur synthetische Daten; kein neuer Geräte-/Mikrofon-/Provider- oder
+  pädagogischer Genauigkeitsnachweis. Web-Anbindung, Retention-Cron und Rate
+  Limiting bleiben offen. `all`/Export sind unpaginiert, die vollständige
+  Theil–Sen-Auswertung bleibt quadratisch und wurde nicht lastvalidiert.

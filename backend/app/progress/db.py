@@ -95,16 +95,20 @@ def require_profile(connection, profile_id, *, lock=False):
     return row
 
 
-def authenticate(connection, profile_id, token):
+def authenticate(connection, profile_id, token, *, allow_expired=False, lock=False):
     if not token:
         raise ReviewError(401, "E_PROFILE_TOKEN_INVALID", "Profil-Token fehlt.")
     row = connection.execute(
         "SELECT p.*, t.id AS token_id, t.last_used_at FROM speaker_profiles p"
         " JOIN profile_tokens t ON t.profile_id=p.id"
-        " WHERE p.id=%s AND t.token_hash=%s AND t.revoked_at IS NULL",
+        " WHERE p.id=%s AND t.token_hash=%s AND t.revoked_at IS NULL"
+        + (" FOR UPDATE OF p" if lock else ""),
         (profile_id, token_hash(token))).fetchone()
     if row is None:
         raise ReviewError(401, "E_PROFILE_TOKEN_INVALID", "Profil-Token ist ungültig.")
+    if (not allow_expired and row["retention_until"] is not None
+            and row["retention_until"] <= datetime.now(timezone.utc)):
+        raise ReviewError(410, "E_PROFILE_EXPIRED", "Die Aufbewahrungsfrist dieses Profils ist abgelaufen.")
     if row["last_used_at"] is None or row["last_used_at"] < datetime.now(timezone.utc) - timedelta(hours=1):
         connection.execute("UPDATE profile_tokens SET last_used_at=now() WHERE id=%s", (row["token_id"],))
     return row
@@ -128,10 +132,11 @@ def update_profile(connection, profile_id, request):
     current = require_profile(connection, profile_id, lock=True)
     display_name = current["display_name"] if request.display_name is None else request.display_name
     locale = current["locale"] if request.locale is None else request.locale
-    retention = current["retention_until"] if request.retention_until is None else request.retention_until
+    retention = current["retention_until"]
     consent = dict(current["consent"])
-    if request.retention_until is not None:
-        consent["retentionUntil"] = request.retention_until.isoformat()
+    if "retention_until" in request.model_fields_set:
+        retention = request.retention_until
+        consent["retentionUntil"] = retention.isoformat() if retention is not None else None
     return connection.execute(
         "UPDATE speaker_profiles SET display_name=%s,locale=%s,retention_until=%s,consent=%s,"
         "updated_at=now() WHERE id=%s RETURNING *",
@@ -184,22 +189,10 @@ def remember(connection, scope, key, request_hash, profile_id, status, response)
         (scope, key, request_hash, profile_id, status, Jsonb(response)))
 
 
-def take_rows(connection, profile_id, *, from_at=None, to_at=None, presentation_mode=None):
-    clauses = ["t.profile_id=%s"]
-    values = [profile_id]
-    if from_at is not None:
-        clauses.append("t.recorded_at >= %s")
-        values.append(from_at)
-    if to_at is not None:
-        clauses.append("t.recorded_at <= %s")
-        values.append(to_at)
-    if presentation_mode is not None:
-        clauses.append("s.presentation_mode=%s")
-        values.append(presentation_mode)
+def take_rows(connection, profile_id):
     return connection.execute(
         "SELECT t.*, s.presentation_mode FROM takes t JOIN sessions s ON s.id=t.session_id"
-        " WHERE " + " AND ".join(clauses) + " ORDER BY t.recorded_at,t.created_at,t.id",
-        values).fetchall()
+        " WHERE t.profile_id=%s ORDER BY t.recorded_at,t.created_at,t.id", (profile_id,)).fetchall()
 
 
 def take_ids(connection, profile_id):
@@ -304,22 +297,10 @@ def insert_change_points(connection, points):
             " DO UPDATE SET kind=EXCLUDED.kind,from_value=EXCLUDED.from_value,"
             " to_value=EXCLUDED.to_value,magnitude=EXCLUDED.magnitude,"
             " confidence=EXCLUDED.confidence,evidence_take_ids=EXCLUDED.evidence_take_ids",
-            (uuid4(), point["profile_id"], point["metric_id"], point["metric_version"],
+            (point["id"], point["profile_id"], point["metric_id"], point["metric_version"],
              point["take_id"], point["change_started_at_take_id"], point["kind"],
              point["from_value"], point["to_value"], point["magnitude"], point["confidence"],
              point["evidence_take_ids"], definitions.ALGORITHM_VERSION))
-
-
-def snapshots(connection, profile_id):
-    return connection.execute(
-        "SELECT * FROM progress_snapshots WHERE profile_id=%s ORDER BY metric_id,window_kind",
-        (profile_id,)).fetchall()
-
-
-def change_points(connection, profile_id):
-    return connection.execute(
-        "SELECT * FROM progress_change_points WHERE profile_id=%s ORDER BY metric_id,created_at",
-        (profile_id,)).fetchall()
 
 
 def goals(connection, profile_id, *, active_only=True):

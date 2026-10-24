@@ -176,6 +176,12 @@ Gesamtscore. Profil-Löschung entkoppelt Sessions/Takes und entfernt nur die
 abgeleiteten Progress-Daten; Session-Löschung bleibt separat. Details:
 `docs/12-long-term-progress-data-design.md`; Frontend-Vertrag:
 `docs/13-long-term-progress-frontend-contract.md`; die Web-Anbindung ist offen.
+Progress-Reads aktualisieren nur geänderte Takes (Review-Revision und
+Berechnungsversion). Explizites Recompute läuft als Celery-Job:
+`POST /profiles/{id}/progress/recompute` → `202 {runId,statusUrl}`,
+Status unter `GET /profiles/{id}/progress/runs/{runId}`. Auch verknüpfte
+Session-/Take-/Job-Routen verlangen den Profil-Token; anonyme Sessions bleiben
+kompatibel. Abgelaufene Profile liefern `410`, Löschen bleibt erlaubt.
 Quellen-Upload und Retrieval (RAG) sind umgesetzt
 (`backend/app/sources/`, Frontend-Seite `/sources`): PDF/PPTX/DOCX/TXT/MD →
 Chunks mit Seite/Folie → lokale Embeddings (`jina-embeddings-v2-base-de`) →

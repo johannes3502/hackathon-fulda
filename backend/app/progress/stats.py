@@ -7,8 +7,9 @@ significance tests and never produce a score or grade.
 from __future__ import annotations
 
 import math
-import random
+from collections import Counter
 from dataclasses import dataclass
+from statistics import NormalDist
 
 
 @dataclass(frozen=True)
@@ -52,21 +53,6 @@ def mad(values, centre=None):
     return median([abs(value - centre) for value in values])
 
 
-def quantile(values, probability):
-    ordered = sorted(values)
-    if not ordered:
-        return None
-    if len(ordered) == 1:
-        return float(ordered[0])
-    position = probability * (len(ordered) - 1)
-    lower = int(math.floor(position))
-    upper = int(math.ceil(position))
-    if lower == upper:
-        return float(ordered[lower])
-    weight = position - lower
-    return float(ordered[lower] * (1 - weight) + ordered[upper] * weight)
-
-
 def _pairwise_slopes(x, y):
     return [(y[j] - y[i]) / (x[j] - x[i]) for i in range(len(x)) for j in range(i + 1, len(x))]
 
@@ -80,18 +66,24 @@ def theil_sen(x, y):
     return slope, intercept
 
 
-def theil_sen_ci(x, y, *, seed=0):
-    """Middle 95% of pairwise slopes; sample ~600 pairs only for large series."""
+def theil_sen_ci(x, y):
+    """Sen rank interval (normal approximation), with ties in y accounted for.
+
+    Same rank bounds as scipy.stats.theilslopes; pairwise percentiles are
+    a spread of slopes, not a confidence interval for the median slope.
+    x is strictly increasing (the original take sequence).
+    """
     if len(x) < 3:
         return None
-    if len(x) <= 50:
-        slopes = _pairwise_slopes(x, y)
-    else:
-        generator = random.Random(seed)
-        pairs = [(i, j) for i in range(len(x)) for j in range(i + 1, len(x))]
-        chosen = generator.choices(pairs, k=600)
-        slopes = [(y[j] - y[i]) / (x[j] - x[i]) for i, j in chosen]
-    return quantile(slopes, 0.025), quantile(slopes, 0.975)
+    slopes = sorted(_pairwise_slopes(x, y))
+    n = len(y)
+    variance = (n * (n - 1) * (2 * n + 5)
+                - sum(count * (count - 1) * (2 * count + 5)
+                      for count in Counter(y).values())) / 18
+    spread = NormalDist().inv_cdf(0.975) * math.sqrt(variance)
+    low = max(0, round((len(slopes) - spread) / 2) - 1)
+    high = min(len(slopes) - 1, round((len(slopes) + spread) / 2))
+    return slopes[low], slopes[high]
 
 
 def lag1(values):
@@ -152,11 +144,10 @@ def benjamini_hochberg(pvalues):
     return adjusted
 
 
-def _noise_scale(values):
+def _noise_scale(values, x):
     """Robust residual scale. Detrending avoids counting a real trend as noise."""
     if len(values) < 3:
         return None
-    x = list(range(len(values)))
     slope, intercept = theil_sen(x, values)
     residuals = [value - (intercept + slope * position) for position, value in zip(x, values)]
     scale = mad(residuals)
@@ -227,28 +218,32 @@ def _change_payload(values, start, index, baseline, direction):
     }
 
 
-def analyse(values, *, total_n=None, version_break=False, seed=0,
+def analyse(values, *, positions=None, total_n=None, version_break=False,
             baseline_override=None, scale_override=None):
     """Analyse one eligible metric series in take order."""
     values = [float(value) for value in values]
     n = len(values)
     total_n = n if total_n is None else total_n
-    if n == 0:
-        return TrendResult(0, None, None, None, None, None, None, None, None, None, None, None,
-                           None, False, False, "insufficient", "unknown", "low", None, 0)
+    if n == 0 or version_break:
+        return TrendResult(n, None, None, values[-1] if values else None, None, None, None,
+                           None, None, None, None, None, None, False, False,
+                           "unclear" if version_break else "insufficient", "unknown", "low", None, n)
 
     baseline = median(values[:min(3, n)]) if baseline_override is None else baseline_override
     recent = median(values[-min(3, n):])
     latest = values[-1]
-    x = list(range(n))
+    x = list(range(n)) if positions is None else list(positions)
+    if len(x) != n or any(a >= b for a, b in zip(x, x[1:])):
+        raise ValueError("positions must be strictly increasing and match values")
     slope, _ = theil_sen(x, values)
     slope_10 = None if slope is None else slope * 10
-    ci = theil_sen_ci(x, values, seed=seed)
-    scale = _noise_scale(values) if scale_override is None else scale_override
+    ci = theil_sen_ci(x, values)
+    scale = _noise_scale(values, x) if scale_override is None else scale_override
     mdc_single = None if scale is None else 1.96 * math.sqrt(2) * scale
     mdc_slope = None
     if scale is not None and n >= 3:
-        mdc_slope = 1.96 * scale * math.sqrt(12 / (n * (n * n - 1)))
+        centre = sum(x) / n
+        mdc_slope = 1.96 * scale / math.sqrt(sum((position - centre) ** 2 for position in x))
     rci_like = None
     if scale and scale > 0 and recent is not None and baseline is not None:
         rci_like = (recent - baseline) / (scale * math.sqrt(2))
@@ -263,7 +258,7 @@ def analyse(values, *, total_n=None, version_break=False, seed=0,
     p_value = mann_kendall(values, effective_n=effective_n) if n >= 10 else None
     direction = "unknown"
     if slope is not None and n >= 5:
-        if mdc_slope is not None and abs(slope) < mdc_slope:
+        if slope == 0 or (mdc_slope is not None and abs(slope) < mdc_slope):
             direction = "flat"
         else:
             direction = "up" if slope > 0 else "down"
@@ -278,22 +273,20 @@ def analyse(values, *, total_n=None, version_break=False, seed=0,
 
     if n < 5 or baseline is None or scale is None:
         status = "insufficient"
-    elif version_break:
-        status = "unclear"
     elif n < 10:
         status = "early_signal" if (reliable_slope or confirmed_change) else "stable"
     elif reliable_slope:
         status = "trend_up" if slope > 0 else "trend_down"
-    elif confirmed_change and direction in {"up", "down"}:
-        status = "trend_up" if direction == "up" else "trend_down"
     else:
         status = "stable"
 
-    if n >= 20 and total_n and n / total_n >= 0.8 and not version_break and (
+    if (total_n and n / total_n < 0.8) or (correlation is not None and abs(correlation) > 0.3):
+        confidence = "low"
+    elif n >= 20 and total_n and n / total_n >= 0.8 and (
             correlation is None or abs(correlation) <= 0.3) and slope_10 and ci:
         width = ci[1] - ci[0]
-        confidence = "high" if width <= 0.5 * abs(slope_10) else "medium"
-    elif n >= 10 and not version_break and ci and (ci[0] > 0 or ci[1] < 0):
+        confidence = "high" if width <= 0.5 * abs(slope) else "medium"
+    elif n >= 10 and ci and (ci[0] > 0 or ci[1] < 0):
         confidence = "medium"
     else:
         confidence = "low"
