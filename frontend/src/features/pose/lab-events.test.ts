@@ -49,7 +49,10 @@ it("waits for the cooldown before a new episode of the same pose", () => {
   expect(
     tracker.update([result("pocket", "recognized", 2000)], end - 100).cue,
   ).toBe(null);
-  const next = tracker.update([result("pocket", "recognized", 6000)], end + 100);
+  const next = tracker.update(
+    [result("pocket", "recognized", 6000)],
+    end + 100,
+  );
   expect(next.events).toHaveLength(2);
   expect(next.events[1].t_ms).toBe(end);
 });
@@ -65,4 +68,20 @@ it("ignores poses that already have a calibrated live rule", () => {
     2000,
   );
   expect(state.events).toEqual([]);
+});
+
+it("follows the admin mode: off drops the rule, review hides the hint", () => {
+  const off = new LabEventTracker("take", { hand_in_pocket: "off" });
+  expect(
+    off.update([result("pocket", "recognized", 2000)], 2000).events,
+  ).toEqual([]);
+  const review = new LabEventTracker("take", { hand_near_face: "review" });
+  const state = review.update([result("self-touch", "recognized", 2000)], 2000);
+  expect(state.cue).toBe(null);
+  expect(state.events.map((e) => e.payload.rule)).toEqual(["hand_near_face"]);
+  review.setModes({});
+  expect(
+    review.update([result("self-touch", "recognized", 2100)], 2100).cue?.payload
+      .rule,
+  ).toBe("hand_near_face");
 });

@@ -25,7 +25,15 @@ import { cueAppearance } from "@/features/live/cue-appearance";
 import { feedbackEnabled } from "@/features/live/feature-flags";
 import { upsertFeedback } from "@/features/live/protocol";
 import { usePacedCue } from "@/features/live/cue-pacing";
-import { mergeSpeechFeedback } from "@/features/live/speech";
+import {
+  LIVE_SPEECH,
+  LiveSpeech,
+  PAUSE,
+  PAUSE_RATE,
+  isPauseRate,
+  mergeSpeechFeedback,
+  type SpeechState,
+} from "@/features/live/speech";
 import { LiveRecorder } from "@/features/live/recorder";
 import { createVideoTransport } from "@/features/live/transport";
 import { apiEndpoint, request } from "@/features/live/analysis";
@@ -79,6 +87,19 @@ export function LiveStudio() {
     useState<PresentationMode>("startup");
   const [targetMs, setTargetMs] = useState(180000);
   const serverSpeech = useRef<LiveCaptions | null>(null);
+  // Browser microphone measurements for the pause rules only: a pause shows
+  // once it lasts 2 s, without waiting for speech and the server window. The
+  // server keeps volume, pitch and pace, and its pauses reach the review.
+  const pauseRate = useRef<LiveSpeech | null>(null);
+  const browserPauses = useRef(false);
+  const [pauseRateCue, setPauseRateCue] = useState<LiveFeedback | null>(null);
+  const [pauseRateEvents, setPauseRateEvents] = useState<LiveFeedback[]>([]);
+  const [pauseMonitor, setPauseMonitor] = useState<{
+    phase: SpeechState["phase"];
+    ready: boolean;
+    count: number;
+    levelDb: number | null;
+  } | null>(null);
   const serverEvents = useRef<LiveFeedback[]>([]);
   const [serverFeedback, setServerFeedback] = useState<LiveFeedback[]>([]);
   const [serverStatus, setServerStatus] = useState("");
@@ -114,6 +135,7 @@ export function LiveStudio() {
       owner.current?.dispose();
       captions.current?.stop();
       serverSpeech.current?.stop();
+      pauseRate.current?.stop();
     },
     [],
   );
@@ -212,6 +234,8 @@ export function LiveStudio() {
         if (next.phase === "finishing") {
           pose.stop();
           serverSpeech.current?.stop();
+          pauseRate.current?.stop();
+          setPauseRateCue(null);
         }
         setProgress(next);
       },
@@ -238,6 +262,17 @@ export function LiveStudio() {
                 endMs: Math.min(item.endMs, recording.durationMs),
               })),
             ...poseEvents.map(poseFeedback),
+            // Not merged: a recorded pause must not hide the pause-rate window.
+            // Single pauses come from the recorded analysis instead.
+            ...(pauseRate.current?.events ?? [])
+              .filter(
+                (item) =>
+                  isPauseRate(item) && item.startMs < recording.durationMs,
+              )
+              .map((item) => ({
+                ...item,
+                endMs: Math.min(item.endMs, recording.durationMs),
+              })),
           ].sort((a, b) => a.startMs - b.startMs),
         });
         router.push(`/live/${recording.id}/review`);
@@ -265,11 +300,60 @@ export function LiveStudio() {
                 });
               setServerFeedback(serverEvents.current);
               const now = performance.now() - timestamp;
-              const event = speechCue(enabled, now, shown);
+              // The browser already shows pauses as they happen.
+              const event = speechCue(
+                browserPauses.current
+                  ? enabled.filter((item) => item.category !== "pause")
+                  : enabled,
+                now,
+                shown,
+              );
               setServerCue(event ? { event, untilMs: now + 5000 } : null);
             },
           );
           void serverSpeech.current.start(stream, destination, timestamp);
+        }
+        setPauseRateCue(null);
+        setPauseRateEvents([]);
+        setPauseMonitor(null);
+        browserPauses.current = feedbackEnabled("pause", featureFlags);
+        if (browserPauses.current) {
+          const speech = new LiveSpeech(
+            featureFlags,
+            (state) => {
+              // Fall back to the server's pause hints without a microphone.
+              if (state.phase === "unavailable") browserPauses.current = false;
+              setPauseRateCue((previous) =>
+                previous?.id === state.cue?.id ? previous : state.cue,
+              );
+              const next = {
+                phase: state.phase,
+                ready: !!state.pauseReady,
+                count: state.pauseCount ?? 0,
+                levelDb:
+                  state.levelDb === null ? null : Math.round(state.levelDb),
+              };
+              setPauseMonitor((previous) =>
+                previous &&
+                (Object.keys(next) as (keyof typeof next)[]).every(
+                  (key) => previous[key] === next[key],
+                )
+                  ? previous
+                  : next,
+              );
+              // Re-render only when an event starts or grows.
+              setPauseRateEvents((previous) =>
+                previous.length === state.events.length &&
+                previous.at(-1)?.endMs === state.events.at(-1)?.endMs
+                  ? previous
+                  : state.events,
+              );
+            },
+            new Set([PAUSE, PAUSE_RATE]),
+          );
+          pauseRate.current = speech;
+          speech.beginRecording(timestamp, recorder.id);
+          void speech.start(stream);
         }
         liveTranscript?.beginRecording();
       },
@@ -281,6 +365,7 @@ export function LiveStudio() {
       if (owner.current !== recorder) return;
       recorder.dispose();
       serverSpeech.current?.stop();
+      pauseRate.current?.stop();
       captions.current?.stop();
       owner.current = null;
       busy.current = false;
@@ -294,6 +379,8 @@ export function LiveStudio() {
     owner.current?.dispose();
     captions.current?.stop();
     serverSpeech.current?.stop();
+    pauseRate.current?.stop();
+    setPauseRateCue(null);
     owner.current = null;
     captions.current = null;
     busy.current = false;
@@ -312,6 +399,7 @@ export function LiveStudio() {
             featureFlags.speechFeedback ? serverFeedback : [],
           ),
           ...(pose.state?.evaluation?.events ?? []).map(poseFeedback),
+          ...pauseRateEvents.filter(isPauseRate),
         ].sort((a, b) => a.startMs - b.startMs)
       : [];
   const poseCue =
@@ -328,10 +416,14 @@ export function LiveStudio() {
     progress.elapsedMs < serverCue.untilMs
       ? serverCue.event
       : null;
+  const tooManyPauses =
+    showCues && progress?.phase === "recording" ? pauseRateCue : null;
+  // Browser pause hints win; a pause-rate start lies up to a window back.
   const latest = usePacedCue(
-    voiceCue && (!poseCue || voiceCue.startMs >= poseCue.startMs)
-      ? voiceCue
-      : poseCue,
+    tooManyPauses ??
+      (voiceCue && (!poseCue || voiceCue.startMs >= poseCue.startMs)
+        ? voiceCue
+        : poseCue),
     showCues,
   );
   const appearance = cueAppearance(
@@ -622,6 +714,15 @@ export function LiveStudio() {
                     <p role="status">
                       {serverStatus ||
                         "Live voice feedback starts with recording."}
+                    </p>
+                  )}
+                  {progress?.phase === "recording" && pauseMonitor && (
+                    <p role="status">
+                      {pauseMonitor.phase === "unavailable"
+                        ? "Pause counting unavailable"
+                        : pauseMonitor.ready
+                          ? `Pauses in the last ${LIVE_SPEECH.pauseRateWindowMs / 1000} s: ${pauseMonitor.count} (hint above ${LIVE_SPEECH.pauseRateMax})`
+                          : `Pause counting: speak normally to start${pauseMonitor.levelDb === null ? "" : ` (mic ${pauseMonitor.levelDb} dB)`}`}
                     </p>
                   )}
                 </div>

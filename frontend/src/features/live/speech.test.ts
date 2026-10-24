@@ -5,6 +5,8 @@ import { DEFAULT_FEATURE_FLAGS } from "./feature-flags";
 import {
   SpeechEvaluator,
   LiveSpeech,
+  PAUSE,
+  PAUSE_RATE,
   mergeSpeechFeedback,
   type SpeechState,
 } from "./speech";
@@ -227,3 +229,131 @@ it.each([16000, 48000])(
     expect(sent.every((f) => f.levelDb === -100 && f.f0Hz === null)).toBe(true);
   },
 );
+/** Alternates one second of speech with a silence; returns the next time. */
+function speakThenPause(
+  engine: SpeechEvaluator,
+  start: number,
+  pauseMs = 2200,
+) {
+  feed(engine, start, start + 1000);
+  feed(engine, start + 1040, start + 1000 + pauseMs, -100, null);
+  return start + 1040 + pauseMs;
+}
+it("flags too many pauses as soon as the fourth pause within 30 s is confirmed", () => {
+  const e = new SpeechEvaluator(
+    DEFAULT_FEATURE_FLAGS,
+    "take",
+    3000,
+    new Set([PAUSE_RATE]),
+  );
+  expect(feed(e, 0, 3000).phase).toBe("ready");
+  let t = 3040;
+  for (let i = 0; i < 3; i++) t = speakThenPause(e, t);
+  expect(e.events).toEqual([]);
+  feed(e, t, t + 1000);
+  // Fourth silence: not yet two seconds long, then confirmed.
+  expect(feed(e, t + 1040, t + 2960, -100, null).events).toEqual([]);
+  const state = feed(e, t + 3000, t + 3080, -100, null);
+  expect(state.cue).toMatchObject({
+    category: "pause",
+    kind: "suggestion",
+    title: "Too many pauses",
+  });
+  expect(state.events).toHaveLength(1);
+  expect(state.events[0].detail).toContain("4 pauses");
+});
+it("does not flag three pauses, and pauses older than 30 s drop out", () => {
+  const e = new SpeechEvaluator(
+    DEFAULT_FEATURE_FLAGS,
+    "take",
+    3000,
+    new Set([PAUSE_RATE]),
+  );
+  feed(e, 0, 3000);
+  let t = 3040;
+  for (let i = 0; i < 3; i++) t = speakThenPause(e, t);
+  // A long stretch of speech moves the first pauses out of the window.
+  feed(e, t, t + 30000);
+  t = speakThenPause(e, t + 30040);
+  expect(e.events).toEqual([]);
+});
+it("reports only the selected observations", () => {
+  const e = new SpeechEvaluator(
+    DEFAULT_FEATURE_FLAGS,
+    "take",
+    3000,
+    new Set([PAUSE_RATE]),
+  );
+  feed(e, 0, 3000);
+  // A single long pause and loud speech are left to the server.
+  feed(e, 3040, 8000, -100, null);
+  feed(e, 8040, 15000, -10);
+  expect(e.events).toEqual([]);
+  const off = new SpeechEvaluator(
+    { ...DEFAULT_FEATURE_FLAGS, pauseFeedback: false },
+    "take",
+    3000,
+    new Set([PAUSE_RATE]),
+  );
+  feed(off, 0, 3000);
+  let t = 3040;
+  for (let i = 0; i < 5; i++) t = speakThenPause(off, t);
+  expect(off.events).toEqual([]);
+});
+it("counts pauses over room noise that the old activity gate called speech", () => {
+  const e = new SpeechEvaluator(
+    DEFAULT_FEATURE_FLAGS,
+    "take",
+    3000,
+    new Set([PAUSE_RATE]),
+  );
+  feed(e, 0, 3000, -20);
+  let t = 3040;
+  // Hall noise at -40 dB lies above voice - 30 dB, but far below the voice.
+  for (let i = 0; i < 4; i++) {
+    feed(e, t, t + 1000, -20);
+    // A short noise burst inside the pause does not end it.
+    feed(e, t + 1040, t + 2000, -40, null);
+    feed(e, t + 2040, t + 2080, -15, null);
+    feed(e, t + 2120, t + 3600, -40, null);
+    t += 3640;
+  }
+  expect(e.events.map((event) => event.title)).toEqual(["Too many pauses"]);
+});
+it("shows a pause after two seconds of silence, before speech resumes", () => {
+  const e = new SpeechEvaluator(
+    DEFAULT_FEATURE_FLAGS,
+    "take",
+    3000,
+    new Set([PAUSE, PAUSE_RATE]),
+  );
+  feed(e, 0, 3000);
+  expect(feed(e, 3040, 4960, -100, null).cue).toBe(null);
+  expect(feed(e, 5000, 5040, -100, null).cue?.title).toBe("Pause in speaking");
+});
+it("counts pauses with a quiet microphone that never passes voice calibration", () => {
+  const e = new SpeechEvaluator(
+    DEFAULT_FEATURE_FLAGS,
+    "take",
+    3000,
+    new Set([PAUSE, PAUSE_RATE]),
+  );
+  // Speech at -58 dB stays below the -50 dB voice gate; the room sits at -75.
+  let state = feed(e, 0, 3000, -58, null);
+  expect(state.pauseReady).toBe(false);
+  let t = 3040;
+  for (let i = 0; i < 4; i++) {
+    feed(e, t, t + 1000, -75, null);
+    state = feed(e, t + 1040, t + 2000, -58, null);
+    t += 2040;
+  }
+  expect(state.phase).toBe("calibrating");
+  expect(state.pauseReady).toBe(true);
+  for (let i = 0; i < 4; i++) {
+    feed(e, t, t + 1000, -58, null);
+    state = feed(e, t + 1040, t + 3240, -75, null);
+    t += 3280;
+  }
+  expect(state.pauseCount).toBe(4);
+  expect(state.cue?.title).toBe("Too many pauses");
+});

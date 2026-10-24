@@ -3,6 +3,9 @@ import { PoseEvaluator, POSE_RULES, type PoseEvaluation } from "./evaluation";
 import { loadLiveHintSettings } from "../admin/settings";
 import { disabledLabTests, loadPoseFeedback } from "../admin/pose-feedback";
 
+// Dispatched by the admin pose switches in the same tab.
+const SETTINGS_CHANGED = "pitchcoach:pose-feedback";
+
 // Pose lab follows the admin hold; praise lasts one minimum display time.
 const labTiming = () => {
   const s = loadLiveHintSettings();
@@ -55,7 +58,7 @@ export class PoseCapture {
   private backend: PoseBackend | null = null;
   private tests = new PoseTestTracker(labTiming());
   private testResults: PoseTestResult[] = [];
-  private labEvents = new LabEventTracker();
+  private labEvents = new LabEventTracker("preview", loadPoseFeedback().rules);
   private worker: Worker | null = null;
   private frame = 0;
   private pending = false;
@@ -95,7 +98,16 @@ export class PoseCapture {
       tests: this.testResults,
     });
   }
+  // Admin switches apply to an open studio without a new calibration.
+  private applySettings = () => {
+    const { rules } = loadPoseFeedback();
+    this.evaluator.setModes(rules);
+    this.labEvents.setModes(rules);
+    this.tests.reset(labTiming());
+  };
   start() {
+    globalThis.addEventListener?.(SETTINGS_CHANGED, this.applySettings);
+    globalThis.addEventListener?.("storage", this.applySettings);
     this.publish("loading", "Loading the local pose model…");
     try {
       const worker = (this.worker = new Worker("/pose/worker.js"));
@@ -315,7 +327,7 @@ export class PoseCapture {
     this.hands = this.handModel ? [] : null;
     this.tests.reset(labTiming());
     this.testResults = [];
-    this.labEvents = new LabEventTracker(sessionId);
+    this.labEvents = new LabEventTracker(sessionId, loadPoseFeedback().rules);
   }
   // One cue at a time: a calibrated rule wins over a Pose lab rule.
   private withLab(
@@ -353,6 +365,8 @@ export class PoseCapture {
     this.publish("stopped", message);
   }
   dispose() {
+    globalThis.removeEventListener?.(SETTINGS_CHANGED, this.applySettings);
+    globalThis.removeEventListener?.("storage", this.applySettings);
     clearTimeout(this.timeout);
     clearTimeout(this.frameTimeout);
     cancelAnimationFrame(this.frame);

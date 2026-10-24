@@ -1,4 +1,10 @@
-import { POSE_RULES, type PoseEvent } from "./evaluation";
+import {
+  POSE_RULE_IDS,
+  POSE_RULES,
+  RULE_COPY,
+  type PoseEvent,
+  type PoseRuleMode,
+} from "./evaluation";
 import type { PoseTestId, PoseTestResult } from "./testPoses";
 
 // Pose lab tests without a calibrated live rule. They reach live feedback and
@@ -57,6 +63,23 @@ export const LAB_COPY: Record<
   ],
 };
 
+// Every rule with a live hint, in admin order: calibrated first, then lab.
+export const LIVE_RULE_IDS = [
+  ...POSE_RULE_IDS,
+  ...Object.values(LAB_RULES),
+] as const;
+export type LiveRule = (typeof LIVE_RULE_IDS)[number];
+export type LiveRuleModes = Partial<Record<LiveRule, PoseRuleMode>>;
+
+/** Title and detail for the admin list. */
+export const ruleCopy = (rule: LiveRule): readonly [string, string] =>
+  rule in LAB_COPY
+    ? (LAB_COPY[rule as LabRule].slice(1, 3) as [string, string])
+    : (RULE_COPY[rule as keyof typeof RULE_COPY].slice(0, 2) as [
+        string,
+        string,
+      ]);
+
 const isLabTest = (id: PoseTestId): id is LabTest => id in LAB_RULES;
 
 /**
@@ -68,13 +91,22 @@ export class LabEventTracker {
   private open = new Map<LabTest, PoseEvent>();
   private cooldown = new Map<LabTest, number>();
   private events: PoseEvent[] = [];
-  constructor(private sessionId = "preview") {}
+  constructor(
+    private sessionId = "preview",
+    // Admin switches per rule; missing rules are on.
+    private modes: LiveRuleModes = {},
+  ) {}
+
+  setModes(modes: LiveRuleModes) {
+    this.modes = modes;
+  }
 
   update(results: PoseTestResult[], t: number) {
     const active = new Set<LabTest>();
     for (const result of results) {
       if (!isLabTest(result.id) || result.state !== "recognized") continue;
       const test = result.id;
+      if (this.modes[LAB_RULES[test]] === "off") continue;
       let event = this.open.get(test);
       if (!event && t < (this.cooldown.get(test) ?? 0)) continue;
       active.add(test);
@@ -92,7 +124,11 @@ export class LabEventTracker {
           event.t_ms + event.duration_ms + POSE_RULES.cooldownMs,
         );
       }
-    return { cue: [...this.open.values()].at(-1) ?? null, events: this.events };
+    // Review only keeps the timeline event without a live hint.
+    const cue = [...this.open.values()]
+      .filter((e) => this.modes[e.payload.rule as LabRule] !== "review")
+      .at(-1);
+    return { cue: cue ?? null, events: this.events };
   }
 
   private event(

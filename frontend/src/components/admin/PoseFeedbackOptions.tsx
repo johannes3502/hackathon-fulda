@@ -8,11 +8,8 @@ import {
   savePoseFeedback,
   type PoseFeedbackSettings,
 } from "@/features/admin/pose-feedback";
-import {
-  POSE_RULE_IDS,
-  RULE_COPY,
-  type PoseRuleMode,
-} from "@/features/pose/evaluation";
+import type { PoseRuleMode } from "@/features/pose/evaluation";
+import { LIVE_RULE_IDS, ruleCopy } from "@/features/pose/lab-events";
 import { POSE_TESTS, coachMessage } from "@/features/pose/testPoses";
 import { AdminSection, Segmented, SwitchTile } from "./parts";
 
@@ -52,22 +49,22 @@ export function PoseFeedbackOptions() {
     save({
       ...settings,
       rules: Object.fromEntries(
-        POSE_RULE_IDS.map((id) => [id, mode]),
+        LIVE_RULE_IDS.map((id) => [id, mode]),
       ) as PoseFeedbackSettings["rules"],
     });
-  const live = POSE_RULE_IDS.filter((id) => settings.rules[id] === "on").length;
+  const live = LIVE_RULE_IDS.filter((id) => settings.rules[id] === "on").length;
 
   return (
     <AdminSection
       id="pose-feedback"
       icon={PersonStanding}
       title="Pose feedback"
-      badge={`${live} of ${POSE_RULE_IDS.length} live`}
+      badge={`${live} of ${LIVE_RULE_IDS.length} live`}
       description={
         <>
           <strong>On</strong> shows a live hint and a review marker.{" "}
           <strong>Review only</strong> keeps the timeline marker without a live
-          hint. Applies from the next calibration or recording.
+          hint. Applies immediately in an open studio.
         </>
       }
       actions={
@@ -92,13 +89,13 @@ export function PoseFeedbackOptions() {
       }
     >
       <ul className="admin-rule-list">
-        {POSE_RULE_IDS.map((id) => (
+        {LIVE_RULE_IDS.map((id) => (
           <li className="admin-rule" key={id} data-mode={settings.rules[id]}>
             <div className="admin-rule-copy">
               <span className="setting-label" id={`pose-rule-${id}`}>
-                {RULE_COPY[id][0]}
+                {ruleCopy(id)[0]}
               </span>
-              <p>{RULE_COPY[id][1]}</p>
+              <p>{ruleCopy(id)[1]}</p>
             </div>
             <Segmented
               name={`pose-rule-${id}`}
@@ -135,7 +132,7 @@ export function PoseLabOptions() {
       icon={FlaskConical}
       title="Pose lab tests"
       badge={`${labOn} of ${POSE_TESTS.length} on`}
-      description="Shown in the studio's Pose lab panel. Hand in pocket, hands hidden, hand near face, crossed legs, shoulder tilt and head tilt also create live hints and review events; switching a test off stops both."
+      description="Shown in the studio's Pose lab panel. A test switched off here also stops its live hint and review event; Pose feedback above sets On, Review only or Off for live feedback."
       actions={
         <div className="admin-bulk">
           <Button
