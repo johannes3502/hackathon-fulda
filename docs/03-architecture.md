@@ -44,7 +44,7 @@ flowchart TB
         S3[("SeaweedFS<br/>S3-kompatibel<br/>Port 8333")]
     end
 
-    EXT["Deepgram ASR<br/>nova-3, deutsch<br/>EU-Endpunkt (extern)"]
+    EXT["ASR-Adapter<br/>Whisper lokal (Standard)<br/>Deepgram nova-3, EU (optional)"]
 
     WEB -- "Kamera/Mikro" --> MP_W
     WEB -- "Aufnahme" --> MR
@@ -114,7 +114,7 @@ sequenceDiagram
     participant S3 as SeaweedFS (S3)
     participant R as Redis
     participant W as Celery Worker
-    participant DG as Deepgram (optional)
+    participant ASR as ASR<br/>(Whisper lokal / Deepgram optional)
 
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
     FE->>FE: MediaPipe Pose lokal (Web Worker)
@@ -129,8 +129,8 @@ sequenceDiagram
     W->>W: FFmpeg -> 16kHz mono, Frames 40ms/10ms
     W->>W: RMS-Pegel, YIN-Pitch, Silero VAD, Silben-Peaks
     opt transcribe=true
-        W->>DG: POST /v1/listen (nova-3, de)
-        DG-->>W: Wort-Timestamps
+        W->>ASR: Whisper lokal (de)
+        ASR-->>W: Wort-Timestamps, Text
         W->>W: Füller, Pausen, Tempo (Wort-Analyse)
     end
     W->>W: merge_timeline (Events deduplizieren)
