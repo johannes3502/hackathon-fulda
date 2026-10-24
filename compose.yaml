@@ -41,14 +41,14 @@ x-backend: &backend
     EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
     EMBEDDING_MODEL_PATH: /app/models/embedding
     SOURCE_MAX_BYTES: ${SOURCE_MAX_BYTES:-26214400}
-    LLM_BASE_URL: ${LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
-    LLM_MODEL: ${LLM_MODEL:-gemini-3.1-flash-lite}
+    LLM_BASE_URL: ${LLM_BASE_URL-https://generativelanguage.googleapis.com/v1beta/openai}
+    LLM_MODEL: ${LLM_MODEL-gemini-3.1-flash-lite}
     LLM_API_KEY: ${LLM_API_KEY:-}
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
     LLM_JSON_MODE: ${LLM_JSON_MODE:-true}
     LLM_TEMPERATURE: ${LLM_TEMPERATURE:-}
-    LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-90}
+    LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-45}
     LLM_CONCURRENCY: ${LLM_CONCURRENCY:-4}
     WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-none}
     WEB_SEARCH_LANGUAGE: ${WEB_SEARCH_LANGUAGE:-de}

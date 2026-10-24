@@ -326,6 +326,7 @@ sequenceDiagram
     FE->>BE: GET /factcheck/settings (Modell, LLM-Host, Web-Anbieter)
     U->>FE: Check facts (Wörter aus ASR oder Import, collection_id, use_web)
     FE->>BE: POST /factcheck
+    BE->>BE: URL, Schlüssel und Optionen prüfen (sonst 503 vor Speicherung)
     BE->>S3: factcheck-jobs/id/request.json
     BE-->>FE: 202 {job_id, status_url}
     W->>S3: Request laden
@@ -686,11 +687,14 @@ Der Vertrag wird über `npm run api:generate` aus dem FastAPI-Code generiert (`a
 
 ## Deep Research (24.10.2026)
 
-Die Architektur ist in `docs/11-deep-research-validation.md` gegen Forschung
-und offizielle API-Dokumentation geprüft. Drei Korrekturen sind bindend:
-Live-Analyse läuft **ereignisgetrieben auf finalisierten ASR-Segmenten**
+Die geplante inkrementelle LLM-/TTS-Pipeline ist in
+`docs/11-deep-research-validation.md` gegen Forschung und offizielle
+API-Dokumentation geprüft. Ihre Umsetzung ist noch offen. Drei Vorgaben:
+Live-Analyse soll **ereignisgetrieben auf finalisierten ASR-Segmenten** laufen
 (nicht auf einem festen 20–30-s-Takt), der finale Fact-Check ist
 **quellengebunden, aber nicht autoritativ** (keine Live-Urteile,
-„nicht gefunden“ ≠ „falsch“), und das Gespräch hat **harte Grenzen**
-(3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop). Gemini ist Cloud ohne
+„nicht gefunden“ ≠ „falsch“), und das Gespräch soll **harte Grenzen** haben
+(3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop). Im Code ist bisher nur
+das Maximum von fünf Anfangsfragen im getippten Pfad umgesetzt, kein
+Sitzungstimer oder globales Follow-up-Limit. Gemini ist Cloud ohne
 EU-Region-Pinning; nur synthetische Demo-Daten oder Vertex AI mit EU-Region.

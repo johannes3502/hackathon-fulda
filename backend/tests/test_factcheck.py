@@ -89,7 +89,7 @@ def test_sentences_follow_punctuation_gaps_and_length():
 def test_parse_json_object_tolerates_fences_and_prose():
     assert parse_json_object('```json\n{"a": 1}\n```') == {"a": 1}
     assert parse_json_object('Hier: {"a": {"b": 2}} fertig') == {"a": {"b": 2}}
-    for broken in ("keine Antwort", "{kaputt}", "[1, 2]"):
+    for broken in ("keine Antwort", "{kaputt}", "[1, 2]", '[{"claims": []}]', '[{"claims": []}'):
         with pytest.raises(LLMError):
             parse_json_object(broken)
 
@@ -116,6 +116,7 @@ def test_openai_compatible_contract(monkeypatch):
         configured_llm()
     monkeypatch.setenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai")
     monkeypatch.setenv("LLM_MODEL", "gemini-3.1-flash-lite")
+    monkeypatch.setenv("LLM_API_KEY", "test-only")
     monkeypatch.setenv("LLM_JSON_MODE", "false")
     monkeypatch.setenv("LLM_TEMPERATURE", "0")
     cloud = configured_llm()

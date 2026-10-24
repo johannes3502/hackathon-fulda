@@ -149,11 +149,12 @@ test("recording consent stays visible while diagnostics and server details are o
   page,
 }) => {
   await page.goto("/live");
+  const studio = page.getByRole("main");
   await expect(
     page.getByRole("button", { name: "Pose debug", exact: true }),
   ).toBeHidden();
-  await page.getByText("Recording options", { exact: true }).click();
-  await page.getByLabel("Speech analysis").selectOption("backend");
+  await studio.getByText("Recording options", { exact: true }).click();
+  await studio.getByLabel("Speech analysis").selectOption("backend");
   await expect(page.locator(".live-audio-hint")).toContainText(
     "Microphone audio is sent to your server",
   );

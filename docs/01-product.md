@@ -214,7 +214,9 @@ konfigurierte Gemini-Modell (Cloud). Einrichtung: `docs/07-review-and-agent.md`.
 Die Produktentscheidungen sind in `docs/11-deep-research-validation.md`
 evidenzgeordnet. Wichtig für die Produktzusage: Der Fact-Check ist eine
 quellengebundene Prüfung mit Zitat-Gate, keine Wahrheitsgarantie; „nicht
-gefunden“ ist nicht „falsch“. Der Voice-Agent gibt im Gespräch nur kurzes
+gefunden“ ist nicht „falsch“. Der geplante TTS-Voice-Agent soll im Gespräch kurzes
 aufgabenbezogenes Feedback, die vollständige Evidenz steht im Review. Harte
-Grenzen: 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop. Es gibt
+Grenzen des Plans: 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop. Umgesetzt
+ist bisher das Maximum von fünf Anfangsfragen im getippten Pfad; ein
+Sitzungstimer oder ein globales Follow-up-Limit ist noch nicht implementiert. Es gibt
 weiterhin keine Noten, Scores oder Personenbewertung.

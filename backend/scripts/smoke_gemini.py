@@ -16,22 +16,26 @@ def main():
     settings = llm_settings()
     if settings is None:
         raise SystemExit("LLM_BASE_URL and LLM_MODEL are not configured")
+    try:
+        model = configured_llm()
+    except ValueError as error:
+        raise SystemExit(str(error)) from None
     started = time.monotonic()
-    result = structured_json(
-        configured_llm(),
+    result = Probe.model_validate(structured_json(
+        model,
         "Return only the requested JSON object.",
         'Return exactly this object for ping: {"ok": true, "answer": "pong"}',
         Probe,
-    )
+    ))
     print(json.dumps({
-        "ok": result["ok"],
-        "answer": result["answer"],
+        "ok": result.ok,
+        "answer": result.answer,
         "model": settings["model"],
         "host": settings["host"],
         "provider": settings["provider"],
         "seconds": round(time.monotonic() - started, 2),
     }, ensure_ascii=False), flush=True)
-    if not result["ok"] or result["answer"] != "pong":
+    if not result.ok or result.answer != "pong":
         raise SystemExit("Gemini probe returned an unexpected object")
 
 

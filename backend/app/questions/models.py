@@ -28,7 +28,7 @@ Persona = Literal["student", "tutor"]
 class QuestionConfig(BaseModel):
     """Prototype limits, not tuned. Returned with every result."""
 
-    max_questions: int = Field(default=3, ge=1, le=5, description="Hard cap: no endless question loop")
+    max_questions: int = Field(default=3, ge=1, le=5, description="Maximum initial questions; follow-ups are separate")
     source_passages: int = Field(default=6, ge=0, le=12, description="Upload passages shown to the model to find gaps")
     top_k: int = Field(default=5, ge=1, le=10, description="Upload passages per answer review")
     min_quote_chars: int = Field(default=12, ge=1, description="Shorter quotes are not accepted as evidence")

@@ -18,7 +18,7 @@ test("shared loading and stats dependencies do not break page loading", async ({
       await expect(
         page.getByRole("button", { name: "Enable camera", exact: true }),
       ).toBeVisible();
-      await expect(page.locator(".live-camera-stage")).toHaveCSS(
+      await expect(page.getByRole("main").locator(".live-camera-stage")).toHaveCSS(
         "background-color",
         "rgb(28, 28, 31)",
       );

@@ -19,6 +19,12 @@ Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
 5. Video vor dem Neuladen herunterladen. Browser-Aufnahmen und Gesprächstext
    werden nicht über einen Reload hinaus gespeichert.
 
+Getippte Fragen und ihr Quellenvergleich nutzen das konfigurierte Sprachmodell,
+standardmäßig Gemini (Google). Dabei verlassen Transkript, passende
+Quellenauszüge und getippte Antworten den lokalen Rechner. Nur synthetische
+Demo-Daten verwenden. Die direkte ElevenLabs-Fragerunde benötigt keinen
+Gemini-Key; sie ist unabhängig vom getippten Fragepfad.
+
 ## ElevenLabs konfigurieren
 
 - Einen privaten Conversational Agent anlegen. In **Security** die Authentifizierung

@@ -171,8 +171,8 @@ export function FactCheckPanel({
       )}
       {settings && !settings.available && (
         <p className="status-warning" role="status">
-          The model is unavailable. Check the Gemini key and backend
-          configuration, then refresh its status.
+          The model is unavailable. Check the backend model settings and API
+          key, then refresh its status.
         </p>
       )}
       {settings?.available && (

@@ -22,3 +22,14 @@ test("worker uses the built API image and waits for its local dependencies", () 
   assert.equal(services.worker.pull_policy, "never");
   assert.equal(services.worker.depends_on.backend.condition, "service_healthy");
 });
+
+test("an explicitly empty LLM endpoint or model disables both API and worker configuration", () => {
+  for (const disabled of ["LLM_BASE_URL", "LLM_MODEL"]) {
+    const { services: configured } = JSON.parse(execFileSync("docker", [
+      "compose", "--env-file", ".env.example", "config", "--format", "json",
+    ], { encoding: "utf8", env: { ...process.env, [disabled]: "" } }));
+    for (const name of ["backend", "worker"]) {
+      assert.equal(configured[name].environment[disabled], "");
+    }
+  }
+});

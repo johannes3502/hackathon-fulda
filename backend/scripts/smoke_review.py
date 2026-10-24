@@ -15,8 +15,9 @@ import httpx
 
 
 def audio_bytes():
+    # Leave more than pause_min_ms of silence after the overlapping frame edges.
     samples = array("h", (round(5000 * math.sin(2 * math.pi * 180 * index / 16000))
-                          if index < 32000 or index >= 64000 else 0 for index in range(128000)))
+                          if index < 32000 or index >= 72000 else 0 for index in range(128000)))
     data = BytesIO()
     with wave.open(data, "wb") as output:
         output.setnchannels(1)

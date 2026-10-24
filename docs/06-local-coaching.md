@@ -42,7 +42,14 @@ Demo-Daten verwenden oder Vertex AI mit EU-Region prüfen.
 
 Compose reicht `LLM_*`, `GEMINI_API_KEY` und `GOOGLE_API_KEY` an backend und
 worker weiter. Der Schlüssel bleibt aus dem Frontend heraus. `LLM_API_KEY`
-gewinnt, falls gesetzt; sonst greift `GEMINI_API_KEY`, dann `GOOGLE_API_KEY`.
+gewinnt, falls gesetzt; für den exakten HTTPS-Host
+`generativelanguage.googleapis.com` greift sonst `GEMINI_API_KEY`, dann
+`GOOGLE_API_KEY`. Andere kompatible Endpoints bekommen diese Aliase nicht;
+deren Schlüssel muss ausdrücklich in `LLM_API_KEY` stehen. Leeres
+`LLM_BASE_URL` oder `LLM_MODEL` deaktiviert die LLM-Funktionen auch in Compose.
+Ungültige URLs, fehlender Gemini-Key und ungültige Zahlenoptionen werden vor
+Speicherung oder Queue-Auftrag abgewiesen. `available` prüft nur die
+Konfiguration, nicht Erreichbarkeit, Kontingent oder Modellzugang.
 
 ## In der Oberfläche
 

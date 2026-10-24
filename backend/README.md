@@ -745,7 +745,8 @@ questions with four presentation contexts. Configure `ELEVENLABS_API_KEY` and
 `GET /questions/agent/settings` reports configuration presence. Context preparation
 is queued through `POST /questions/agent`, polled at `/questions/agent/jobs/{id}`.
 `POST /questions/agent/session` issues an uncached signed WebSocket URL. It does
-not require Ollama. Typed questions still use the configured local model.
+not require Gemini. Typed questions use the configured LLM (Gemini by default);
+transcript, retrieved passages and typed answers are sent to that provider.
 Setup, privacy, retention and verification limits: [Review and agent](../docs/07-review-and-agent.md).
 
 ## Synthetischer Datenbank-Seed

@@ -1,8 +1,12 @@
 # Voice-Agent: Umsetzungsplan
 
-Status: **Plan, keine Umsetzung.** Branch `voice-agent-plan`, Basis `main`
-(567ba1d). Die Research-Dokumente 07–09 sind die Begründung; dieses Dokument
-ist die checklistenförmige Umsetzung.
+Status: **Plan für eine getrennte LLM-/TTS-Pipeline; Phasen 1–6 sind offen.**
+Umgesetzt sind die Gemini-Konfiguration und maximal fünf Anfangsfragen im
+getippten Pfad. Der aus `main` integrierte direkte ElevenLabs-Dialog ist ein
+separater Pfad (siehe `docs/07-review-and-agent.md`); er setzt diese geplanten
+Question-Lanes, TTS-Prerendering und Sitzungsgrenzen noch nicht um.
+Die Research-Dokumente 07–09 sind die Begründung; dieses Dokument ist der
+Umsetzungsplan.
 
 ## 1. Ziel
 
