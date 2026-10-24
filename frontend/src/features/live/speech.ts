@@ -21,6 +21,21 @@ export const LIVE_SPEECH = Object.freeze({
   floorDb: -50,
   activityRangeDb: 30,
   pauseMs: 2000,
+  // Too many pauses: more than pauseRateMax pauses of at least pauseMs within
+  // the sliding window. User-chosen heuristic, not a validated limit.
+  pauseRateWindowMs: 30000,
+  pauseRateMax: 3,
+  // Pause silence sits halfway between the room's noise floor and the voice,
+  // as low and high level percentiles over the recent window, once they lie
+  // pauseRangeDb apart. Room noise above voice - activityRangeDb then still
+  // counts as silence. Engineering values, not validated.
+  noiseWindowMs: 15000,
+  noisePercentile: 0.1,
+  voicePercentile: 0.9,
+  pauseRangeDb: 8,
+  pauseReadyMs: 3000,
+  // Louder blips shorter than this do not end a pause.
+  pauseResumeMs: 160,
   volumeWindowMs: 2000,
   volumeDeltaDb: 6,
   pitchWindowMs: 4000,
@@ -47,7 +62,15 @@ export type SpeechState = {
   levelDb: number | null;
   cue: LiveFeedback | null;
   events: LiveFeedback[];
+  // Confirmed pauses in the pause-rate window, for the studio readout.
+  pauseCount?: number;
+  pauseReady?: boolean;
 };
+// Observation keys of the pause rules, for callers that only want them.
+export const PAUSE = "pause-quiet";
+export const PAUSE_RATE = "pause-frequent";
+export const isPauseRate = (event: LiveFeedback) =>
+  event.id.includes(`-${PAUSE_RATE}-`);
 const median = (values: number[]) => {
   const s = [...values].sort((a, b) => a - b),
     m = Math.floor(s.length / 2);
@@ -64,6 +87,12 @@ export class SpeechEvaluator {
   private frames: SignalFrame[] = [];
   private previous = -Infinity;
   private pauseStart: number | null = null;
+  // Confirmed pauses in the rate window: start and confirmation time.
+  private pauses: { start: number; at: number }[] = [];
+  private pauseCounted = false;
+  private loudMs = 0;
+  private gate: number | null = null;
+  private levels: { tMs: number; levelDb: number }[] = [];
   private spoke = false;
   private lastPeak = -Infinity;
   private activeEvents = new Map<string, LiveFeedback>();
@@ -75,6 +104,8 @@ export class SpeechEvaluator {
     private flags: FeatureFlags = DEFAULT_FEATURE_FLAGS,
     private sessionId = "preview",
     private minDisplayMs: number = POSE_RULES.minDisplayMs,
+    // Observation keys to report; all when omitted.
+    private only?: ReadonlySet<string>,
   ) {}
   get events() {
     return [...this.observations];
@@ -90,6 +121,8 @@ export class SpeechEvaluator {
       levelDb: input.levelDb,
       cue,
       events: this.events,
+      pauseCount: this.pauses.length,
+      pauseReady: this.gate !== null,
     });
     if (
       !Number.isFinite(input.tMs) ||
@@ -102,6 +135,8 @@ export class SpeechEvaluator {
     if (Number.isFinite(this.previous) && gap > LIVE_SPEECH.maxGapMs) {
       this.frames = [];
       this.pauseStart = null;
+      this.pauseCounted = false;
+      this.loudMs = 0;
       this.spoke = false;
       this.visibleCue = null;
       this.cueUntil = 0;
@@ -110,6 +145,9 @@ export class SpeechEvaluator {
       this.reference.discardPending();
     }
     this.previous = input.tMs;
+    this.levels.push({ tMs: input.tMs, levelDb: input.levelDb });
+    while (input.tMs - this.levels[0].tMs > LIVE_SPEECH.noiseWindowMs)
+      this.levels.shift();
     const duration = Math.min(gap, LIVE_SPEECH.frameMs);
     const gate = this.baseline
       ? Math.max(
@@ -150,16 +188,6 @@ export class SpeechEvaluator {
     this.frames = this.frames.filter(
       (frame) => input.tMs - frame.tMs <= LIVE_SPEECH.paceWindowMs,
     );
-    if (!this.baseline) {
-      this.baseline = this.reference.observe(f);
-      if (!this.baseline)
-        return state(
-          "Start speaking normally. Calibration waits for your voice; silence does not count.",
-        );
-      this.frames = [];
-      this.spoke = true;
-      return state("Live voice feedback ready. Listening locally.");
-    }
     const matches = new Set<string>();
     const observe = (
       category: string,
@@ -168,9 +196,11 @@ export class SpeechEvaluator {
       title: string,
       detail: string,
       action: string,
+      kind: LiveFeedback["kind"] = "observation",
     ) => {
       if (!feedbackEnabled(category, this.flags)) return;
       const key = `${category}-${direction}`;
+      if (this.only && !this.only.has(key)) return;
       matches.add(key);
       const prior = this.activeEvents.get(key);
       if (!prior && input.tMs < (this.cooldown.get(key) ?? 0)) return;
@@ -179,7 +209,7 @@ export class SpeechEvaluator {
           prior?.id ??
           `${this.sessionId}-browser-speech-${key}-${Math.round(start)}`,
         category,
-        kind: "observation",
+        kind,
         startMs: prior?.startMs ?? Math.max(0, Math.round(start)),
         endMs: Math.round(input.tMs),
         title,
@@ -193,22 +223,92 @@ export class SpeechEvaluator {
         );
       else this.observations.push(event);
     };
-    if (f.active) {
-      this.spoke = true;
+    // Pause counting needs no voice calibration: a weak microphone without
+    // gain control may never pass it, while the room level range suffices.
+    this.gate = this.pauseGate();
+    if (this.gate === null) {
       this.pauseStart = null;
-    } else if (this.spoke) this.pauseStart ??= input.tMs - duration;
-    if (
-      this.pauseStart !== null &&
-      input.tMs - this.pauseStart >= LIVE_SPEECH.pauseMs
-    )
+      this.loudMs = 0;
+    } else if (input.levelDb >= this.gate) {
+      this.loudMs += duration;
+      if (this.loudMs >= LIVE_SPEECH.pauseResumeMs) {
+        this.spoke = true;
+        this.pauseStart = null;
+        this.pauseCounted = false;
+      }
+    } else {
+      this.loudMs = 0;
+      if (this.spoke) this.pauseStart ??= input.tMs - duration;
+    }
+    const pauseStart = this.pauseStart;
+    const pausing =
+      pauseStart !== null && input.tMs - pauseStart >= LIVE_SPEECH.pauseMs;
+    // A pause counts once, as soon as it is confirmed, not when speech resumes.
+    if (pausing && !this.pauseCounted) {
+      this.pauseCounted = true;
+      this.pauses.push({ start: pauseStart, at: input.tMs });
+      // Console trace for tuning, like the pose lab.
+      console.log(
+        `[speech] pause confirmed at ${(input.tMs / 1000).toFixed(1)} s (gate ${this.gate!.toFixed(1)} dB)`,
+      );
+    }
+    this.pauses = this.pauses.filter(
+      (pause) => input.tMs - pause.at < LIVE_SPEECH.pauseRateWindowMs,
+    );
+    if (this.pauses.length > LIVE_SPEECH.pauseRateMax)
+      observe(
+        "pause",
+        "frequent",
+        this.pauses[0].start,
+        "Too many pauses",
+        `${this.pauses.length} pauses of at least ${LIVE_SPEECH.pauseMs / 1000} seconds within the last ${LIVE_SPEECH.pauseRateWindowMs / 1000} seconds.`,
+        "Note one keyword per idea so you can continue smoothly.",
+        "suggestion",
+      );
+    if (pausing)
       observe(
         "pause",
         "quiet",
-        this.pauseStart,
+        pauseStart,
         "Pause in speaking",
-        "Microphone energy stayed below the activity gate for at least 2 seconds.",
+        "Microphone level stayed near the room's noise level for at least 2 seconds.",
         "Take your time. Continue when you are ready.",
       );
+    // Releases ended observations and picks the visible cue.
+    const finish = (message: string) => {
+      // Too many pauses first, then a single pause, then the newest finding.
+      const rank = (key: string) =>
+        key === PAUSE_RATE ? 0 : key.startsWith("pause-") ? 1 : 2;
+      const cue =
+        [...this.activeEvents]
+          .sort(
+            ([keyA, a], [keyB, b]) =>
+              rank(keyA) - rank(keyB) || b.startMs - a.startMs,
+          )
+          .map(([, event]) => event)[0] ?? null;
+      if (this.visibleCue && input.tMs < this.cueUntil) {
+        this.visibleCue =
+          this.observations.find((event) => event.id === this.visibleCue!.id) ??
+          this.visibleCue;
+      } else {
+        this.visibleCue = cue;
+        this.cueUntil = input.tMs + this.minDisplayMs;
+      }
+      return state(message, this.visibleCue);
+    };
+    if (!this.baseline) {
+      for (const key of this.activeEvents.keys())
+        if (!matches.has(key)) this.release(key, input.tMs);
+      this.baseline = this.reference.observe(f);
+      if (!this.baseline)
+        return finish(
+          "Start speaking normally. Calibration waits for your voice; silence does not count.",
+        );
+      this.frames = [];
+      // Calibration needs voiced speech, so a following silence is a pause.
+      this.spoke = true;
+      return finish("Live voice feedback ready. Listening locally.");
+    }
     for (const [category, windowMs] of [
       ["volume", LIVE_SPEECH.volumeWindowMs],
       ["pitch", LIVE_SPEECH.pitchWindowMs],
@@ -282,26 +382,31 @@ export class SpeechEvaluator {
       if (!matches.has(key)) this.release(key, input.tMs);
     // Judge against the prior reference before learning from this sample.
     this.baseline = this.reference.observe(f);
-    const cue =
-      [...this.activeEvents.values()].sort((a, b) =>
-        a.category === "pause"
-          ? -1
-          : b.category === "pause"
-            ? 1
-            : b.startMs - a.startMs,
-      )[0] ?? null;
-    if (this.visibleCue && input.tMs < this.cueUntil) {
-      this.visibleCue =
-        this.observations.find((event) => event.id === this.visibleCue!.id) ??
-        this.visibleCue;
-    } else {
-      this.visibleCue = cue;
-      this.cueUntil = input.tMs + this.minDisplayMs;
-    }
-    return state(
+    return finish(
       "Live voice feedback ready. Your reference adjusts gradually while you speak.",
-      this.visibleCue,
     );
+  }
+  /** Level below which a frame counts as pause silence; null if unknown. */
+  private pauseGate() {
+    const levels = this.levels.map((l) => l.levelDb).sort((a, b) => a - b);
+    const at = (p: number) => levels[Math.floor((levels.length - 1) * p)];
+    const span = this.levels.length
+      ? this.levels[this.levels.length - 1].tMs - this.levels[0].tMs
+      : 0;
+    const noise = at(LIVE_SPEECH.noisePercentile);
+    const voice = at(LIVE_SPEECH.voicePercentile);
+    if (
+      span >= LIVE_SPEECH.pauseReadyMs &&
+      voice - noise >= LIVE_SPEECH.pauseRangeDb
+    )
+      return (noise + voice) / 2;
+    // Without a clear room range, fall back to the calibrated voice reference.
+    return this.baseline
+      ? Math.max(
+          LIVE_SPEECH.floorDb,
+          this.baseline.level - LIVE_SPEECH.activityRangeDb,
+        )
+      : null;
   }
   private release(key: string, t: number) {
     this.activeEvents.delete(key);
@@ -341,11 +446,13 @@ export class LiveSpeech {
   constructor(
     private flags: FeatureFlags,
     private update: (state: SpeechState) => void,
+    private only?: ReadonlySet<string>,
   ) {
     this.engine = new SpeechEvaluator(
       flags,
       undefined,
       loadLiveHintSettings().minDisplayMs,
+      only,
     );
   }
   get events() {
@@ -357,6 +464,7 @@ export class LiveSpeech {
       this.flags,
       sessionId,
       loadLiveHintSettings().minDisplayMs,
+      this.only,
     );
     this.lastPublish = -Infinity;
     this.update({

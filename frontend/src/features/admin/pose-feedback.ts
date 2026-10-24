@@ -1,12 +1,9 @@
-import {
-  POSE_RULE_IDS,
-  type PoseRule,
-  type PoseRuleMode,
-} from "../pose/evaluation";
+import type { PoseRuleMode } from "../pose/evaluation";
+import { LIVE_RULE_IDS, type LiveRule } from "../pose/lab-events";
 import { POSE_TESTS, type PoseTestId } from "../pose/testPoses";
 
 export type PoseFeedbackSettings = {
-  rules: Record<PoseRule, PoseRuleMode>;
+  rules: Record<LiveRule, PoseRuleMode>;
   lab: Record<PoseTestId, boolean>;
 };
 
@@ -15,8 +12,8 @@ const MODES: readonly PoseRuleMode[] = ["on", "review", "off"];
 
 export function defaultPoseFeedback(): PoseFeedbackSettings {
   return {
-    rules: Object.fromEntries(POSE_RULE_IDS.map((id) => [id, "on"])) as Record<
-      PoseRule,
+    rules: Object.fromEntries(LIVE_RULE_IDS.map((id) => [id, "on"])) as Record<
+      LiveRule,
       PoseRuleMode
     >,
     lab: Object.fromEntries(POSE_TESTS.map((t) => [t.id, true])) as Record<
@@ -36,7 +33,7 @@ export function loadPoseFeedback(): PoseFeedbackSettings {
     if (!saved || typeof saved !== "object") return settings;
     const { rules, lab } = saved as Record<string, unknown>;
     if (rules && typeof rules === "object")
-      for (const id of POSE_RULE_IDS) {
+      for (const id of LIVE_RULE_IDS) {
         const mode = (rules as Record<string, unknown>)[id];
         if (MODES.includes(mode as PoseRuleMode))
           settings.rules[id] = mode as PoseRuleMode;

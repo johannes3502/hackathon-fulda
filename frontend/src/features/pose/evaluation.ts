@@ -260,6 +260,10 @@ export class PoseEvaluator {
     private modes: Partial<Record<PoseRule, PoseRuleMode>> = {},
   ) {}
 
+  setModes(modes: Partial<Record<PoseRule, PoseRuleMode>>) {
+    this.modes = modes;
+  }
+
   update(sample: PoseSample | null, t: number): PoseEvaluation {
     const state = (
       phase: PoseEvaluation["phase"],

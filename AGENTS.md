@@ -258,9 +258,9 @@ zeigt jeden Hinweis mindestens 3 s und lässt danach 2 s Lücke
 (`minDisplayMs`/`minDisplayGapMs`). `praiseAfterMs` wirkt seit Entfernen der
 Pose-lab-Coach-Ansicht nicht mehr sichtbar. Alle Werte sind unter `/admin`
 (Navbar, noch ohne Login) pro Browser in `localStorage` einstellbar. Dort lässt
-sich auch jede der 7 Pose-Regeln auf On (Hinweis + Review), Review only (nur
-Timeline) oder Off stellen und jeder der 12 Pose-lab-Tests abschalten (bei den
-sechs Live-Tests auch Hinweis und Review-Event).
+sich auch jede der 13 Live-Pose-Regeln (7 kalibrierte + 6 aus Pose lab) auf On
+(Hinweis + Review), Review only (nur Timeline) oder Off stellen, wirksam sofort im
+offenen Studio, und jeder der 12 Pose-lab-Tests abschalten.
 Sprachfeedback ist insgesamt und für Pausen, Tempo, Füllwörter, Lautstärke und
 Tonhöhe einzeln schaltbar. Jede Web-Aufnahme nutzt auf Nutzerwunsch Live-Feedback
 und volle Backend-Analyse;
@@ -294,6 +294,15 @@ Ein Live-Slot pro API-Prozess, maximal 5 min; PCM nur im RAM. Die Vorschau
 läuft unabhängig von optionalen Whisper-Captions, zeigt höchstens einen
 Hinweis mit 15-s-Cooldown pro Typ und stoppt bei mehr als 15 s Rückstand.
 Vollständige Analyse und wortbasierte Merkmale bleiben nach dem Stoppen.
+Zusätzlich zählt der Browser während der Aufnahme Pausen live
+(`SpeechEvaluator` in `frontend/src/features/live/speech.ts`, nur Regeln
+`pause-quiet` und `pause-frequent`): eine Pause zeigt sich nach 2 s Stille
+sofort, noch während der Stille; mehr als 3 Pausen ≥ 2 s in einem gleitenden
+30-s-Fenster ergeben „Too many pauses“ (Nutzerwahl, Heuristik, nicht validiert).
+Stille liegt unter der Mitte zwischen 10. und 90. Pegel-Perzentil der letzten
+15 s (ab 8 dB Abstand), ohne Stimmkalibrierung, weil das Mikro ohne Gain Control
+oft unter −50 dB bleibt; Energie statt Silero. Der späte Server-Pausenhinweis entfällt
+dann; Server-Pausen bleiben im Review. Schalter: Sprachfeedback „Pauses“.
 Benchmark auf dem M5 Pro/24 GB: synthetischer 30-s-Stream mit 80–182 ms
 Signal-Verarbeitungs-/Lieferzeit zusätzlich zum 5-s-Sammelintervall.
 Echtes Mikrofon/Safari und Genauigkeit sind damit nicht abgenommen.
