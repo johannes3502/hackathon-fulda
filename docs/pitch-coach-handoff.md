@@ -31,8 +31,10 @@ sending landmarks to the backend. Preview and recording logs use separate time
 anchors; a take resets the preview log. The recording log remains downloadable
 in review. [Data points and heuristics](../frontend/DATA_POINTS.md).
 
-The old video WebSocket prototype has been removed. A separate live audio
-transcription design remains [planned, not implemented](../backend/app/transcription/README.md).
+The old video WebSocket prototype has been removed. Live audio transcription
+exists as a [running backend prototype](../backend/app/transcription/README.md)
+(`WS /speech/live`, local Whisper); the browser sender is not wired.
+[Quickstart for integration](./04-integration.md).
 
 ## Sample transcript and judge flow
 

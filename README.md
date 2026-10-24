@@ -14,4 +14,4 @@ All six services start together; no local Node.js or Python installation needed.
 (`Cmd/Ctrl+Shift+B`). Stop: `docker compose stop`.
 
 Details: [Frontend](frontend/README.md) · [Backend](backend/README.md) ·
-[API types](api/README.md).
+[API types](api/README.md) · [Integration & Quickstart](docs/04-integration.md).
