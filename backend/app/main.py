@@ -8,6 +8,7 @@ from redis.exceptions import RedisError
 
 from app.connections import connect_db, redis_client, s3_client
 from app.factcheck.router import router as factcheck_router
+from app.progress.router import router as progress_router
 from app.questions.router import router as questions_router
 from app.review.errors import ReviewError, handle_review_error
 from app.review.router import router as review_router
@@ -24,6 +25,7 @@ app.include_router(sources_router)
 app.include_router(factcheck_router)
 app.include_router(questions_router)
 app.include_router(review_router)
+app.include_router(progress_router)
 app.add_exception_handler(ReviewError, handle_review_error)
 app.add_middleware(
     CORSMiddleware,
@@ -32,8 +34,8 @@ app.add_middleware(
         for origin in os.getenv("CORS_ORIGINS", "").split(",")
         if origin.strip()
     ],
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type", "Idempotency-Key"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", "Idempotency-Key", "X-Profile-Token"],
     expose_headers=["X-Request-Id"],
 )
 

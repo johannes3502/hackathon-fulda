@@ -66,8 +66,7 @@ def union_ms(intervals: list[tuple[int, int]]) -> int:
     return total
 
 
-def coverage(take: Take, events: list[ReviewEvent]) -> Coverage:
-    """Unknown time is never inferred to be valid from absence of findings."""
+def _coverage_segments(take: Take, events: list[ReviewEvent]):
     intervals = [(item.t_ms, item.t_ms + item.duration_ms, item.evaluable,
                   item.reason or "not-evaluable") for item in take.coverage]
     intervals.extend((event.t_ms, min(take.duration_ms, event.t_ms + event.duration_ms), False,
@@ -75,15 +74,25 @@ def coverage(take: Take, events: list[ReviewEvent]) -> Coverage:
                      for event in events if event.type in {"framing", "data-quality"})
     boundaries = sorted({0, take.duration_ms, *(max(0, min(take.duration_ms, value))
                          for item in intervals for value in item[:2])})
-    valid, reasons = 0, {}
     for start, end in zip(boundaries, boundaries[1:]):
         active = [item for item in intervals if item[0] <= start and item[1] >= end]
         invalid = sorted({item[3] for item in active if not item[2]})
+        yield start, end, invalid, not invalid and any(item[2] for item in active)
+
+
+def evaluable_intervals(take: Take, events: list[ReviewEvent]) -> list[tuple[int, int]]:
+    return [(start, end) for start, end, _, valid in _coverage_segments(take, events) if valid]
+
+
+def coverage(take: Take, events: list[ReviewEvent]) -> Coverage:
+    """Unknown time is never inferred to be valid from absence of findings."""
+    valid, reasons = 0, {}
+    for start, end, invalid, evaluable in _coverage_segments(take, events):
         if invalid:
             # Multiple reasons may overlap; total coverage is a union, not their sum.
             for reason in invalid:
                 reasons[reason] = reasons.get(reason, 0) + end - start
-        elif any(item[2] for item in active):
+        elif evaluable:
             valid += end - start
         else:
             reasons["coverage-not-reported"] = reasons.get("coverage-not-reported", 0) + end - start

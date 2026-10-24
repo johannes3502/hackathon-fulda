@@ -186,6 +186,7 @@ einbauen**:
 | 24.10.2026 | Live-Transkription als optionale Web-Vorschau | Nutzerauftrag: Transcript nahezu in Echtzeit während der Aufnahme (`WS /speech/live`); AudioWorklet-Sender und Ausfallhinweis im Web integriert. |
 | 24.10.2026 | Pose-/Feedback-Anforderungen festgelegt | Deep Research zu Haltung, Kopforientierung, Händen, Füßen und Gesten; Research-Ziele in `docs/04-pose-tracking-requirements.md`; aktueller Integrationsstand dort separat markiert. |
 | 24.10.2026 | Gemini statt lokalem Ollama | Nutzerauftrag: Gemini-Key aus dem Image-Skill in die lokale `.env`, Ollama aus dem Projekt entfernen, schwache Gemini-Modelle testen. Die frühere Local-only-Zusage ist hinfällig; nur synthetische Demo-Daten oder Vertex AI mit EU-Region. |
+| 24.10.2026 | Long-Term-Progress-Backend | Nutzerauftrag: Frontend-Plan auf `main`, Backend-Plan validieren und implementieren. Pseudonymes Profil, versionierte Metriken, robuste Trends, Change-Points, optionale Ziele, Export/Löschung; kein Gesamtscore. Frontend-Anbindung bleibt offen. |
 
 ## Integrierte Analyse-Schalter (24.10.2026)
 

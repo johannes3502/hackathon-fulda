@@ -3,13 +3,14 @@
 import hashlib
 import json
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from app.connections import connect_db
+from app.progress.schema import PROGRESS_SCHEMA
 from app.review.errors import ReviewError
 from app.review.models import Job, ReviewEvent, Session, SessionCreate, Take, TakeCreate
 
@@ -83,6 +84,7 @@ def connect():
             with connection.transaction():
                 connection.execute("SELECT pg_advisory_xact_lock(hashtext('review-schema-v1'))")
                 connection.execute(SCHEMA)
+                connection.execute(PROGRESS_SCHEMA)
             _schema_ready = True
         except BaseException:
             connection.close()
@@ -115,12 +117,14 @@ def remember(connection, scope, key, request_hash, session_id, status, response)
 
 def session_from(row) -> Session:
     return Session(session_id=row["id"], title=row["title"], collection_id=row["collection_id"],
+        profile_id=row["profile_id"], presentation_mode=row["presentation_mode"],
         status=row["status"], consent=row["consent"], capture=row["capture"], created_at=row["created_at"])
 
 
 def take_from(row) -> Take:
     return Take(take_id=row["id"], **{key: row[key] for key in (
-        "session_id", "status", "duration_ms", "mime_type", "timebase", "coverage", "audio_probe", "analysis", "warnings", "created_at")})
+        "session_id", "profile_id", "recorded_at", "recorded_at_source", "status", "duration_ms", "mime_type",
+        "timebase", "coverage", "audio_probe", "analysis", "warnings", "created_at")})
 
 
 def require_session(connection, session_id, *, lock=False):
@@ -145,22 +149,29 @@ def require_take(connection, take_id, *, lock=False):
 
 
 def create_session(connection, request: SessionCreate) -> Session:
-    row = connection.execute("INSERT INTO sessions(id,title,collection_id,status,consent,capture)"
-        " VALUES (%s,%s,%s,'created',%s,%s) RETURNING *", (uuid4(), request.title, request.collection_id,
+    row = connection.execute("INSERT INTO sessions(id,title,collection_id,profile_id,presentation_mode,status,consent,capture)"
+        " VALUES (%s,%s,%s,%s,%s,'created',%s,%s) RETURNING *", (uuid4(), request.title, request.collection_id,
+        request.profile_id, request.presentation_mode,
         Jsonb(request.consent.model_dump(mode="json", by_alias=True)),
         Jsonb(request.capture.model_dump(mode="json", by_alias=True)))).fetchone()
     return session_from(row)
 
 
 def create_take(connection, session_id, request: TakeCreate) -> Take:
-    require_session(connection, session_id, lock=True)
+    parent = require_session(connection, session_id, lock=True)
     warnings = []
     if request.timebase.container_duration_ms is not None and abs(request.timebase.container_duration_ms - request.duration_ms) > 2000:
         warnings.append("E_DURATION_MISMATCH")
     if request.timebase.av_offset_ms is not None and abs(request.timebase.av_offset_ms) > 500:
         warnings.append("E_AV_OFFSET_IMPLAUSIBLE")
-    row = connection.execute("INSERT INTO takes(id,session_id,status,duration_ms,mime_type,timebase,coverage,warnings)"
-        " VALUES (%s,%s,'created',%s,%s,%s,%s,%s) RETURNING *", (uuid4(), session_id,
+    now = datetime.now(timezone.utc)
+    recorded_at, source = request.recorded_at, "client"
+    if recorded_at is None or recorded_at > now + timedelta(minutes=5) or recorded_at < now - timedelta(days=30):
+        recorded_at, source = now, "server"
+    row = connection.execute("INSERT INTO takes(id,session_id,profile_id,recorded_at,recorded_at_source,device_key,"
+        "status,duration_ms,mime_type,timebase,coverage,warnings)"
+        " VALUES (%s,%s,%s,%s,%s,%s,'created',%s,%s,%s,%s,%s) RETURNING *", (uuid4(), session_id,
+        parent["profile_id"], recorded_at, source, (parent["capture"] or {}).get("deviceKey"),
         request.duration_ms, request.mime_type, Jsonb(request.timebase.model_dump(mode="json", by_alias=True, exclude_unset=True)),
         Jsonb([item.model_dump(mode="json", by_alias=True) for item in request.coverage]), Jsonb(warnings))).fetchone()
     return take_from(row)

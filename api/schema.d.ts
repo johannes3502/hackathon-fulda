@@ -116,6 +116,196 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Profile */
+        post: operations["create_profile_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profile */
+        get: operations["get_profile_profiles__profile_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Profile */
+        delete: operations["delete_profile_profiles__profile_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Profile */
+        patch: operations["patch_profile_profiles__profile_id__patch"];
+        trace?: never;
+    };
+    "/profiles/{profile_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export */
+        get: operations["export_profiles__profile_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profile_id}/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Goals */
+        get: operations["get_goals_profiles__profile_id__goals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profile_id}/goals/{metric_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Goal */
+        put: operations["put_goal_profiles__profile_id__goals__metric_id__put"];
+        post?: never;
+        /** Delete Goal */
+        delete: operations["delete_goal_profiles__profile_id__goals__metric_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profile_id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Progress */
+        get: operations["get_progress_profiles__profile_id__progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profile_id}/progress/recompute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recompute */
+        post: operations["recompute_profiles__profile_id__progress_recompute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profile_id}/progress/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Recompute */
+        get: operations["get_recompute_profiles__profile_id__progress_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profile_id}/progress/{metric_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Metric Progress */
+        get: operations["get_metric_progress_profiles__profile_id__progress__metric_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profile_id}/rotate-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate Token */
+        post: operations["rotate_token_profiles__profile_id__rotate_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/profiles/{profile_id}/takes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Takes */
+        get: operations["get_takes_profiles__profile_id__takes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/questions": {
         parameters: {
             query?: never;
@@ -951,6 +1141,8 @@ export interface components {
              * @enum {string}
              */
             audienceMode: "camera" | "room";
+            /** Devicekey */
+            deviceKey?: string | null;
             /**
              * Fps
              * @default 30
@@ -1331,6 +1523,57 @@ export interface components {
             /** Promptversion */
             promptVersion?: string | null;
         };
+        /** GoalInput */
+        GoalInput: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "increase" | "decrease" | "target_band";
+            /** Targetmax */
+            targetMax?: number | null;
+            /** Targetmin */
+            targetMin?: number | null;
+            /** Targetvalue */
+            targetValue?: number | null;
+        };
+        /** GoalListResponse */
+        GoalListResponse: {
+            /** Goals */
+            goals: components["schemas"]["GoalRecord"][];
+        };
+        /** GoalRecord */
+        GoalRecord: {
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "increase" | "decrease" | "target_band";
+            /** Metricid */
+            metricId: string;
+            /** Metricversion */
+            metricVersion: number;
+            /** Targetmax */
+            targetMax: number | null;
+            /** Targetmin */
+            targetMin: number | null;
+            /** Targetvalue */
+            targetValue: number | null;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
+        /** GoalResponse */
+        GoalResponse: {
+            goal: components["schemas"]["GoalRecord"];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1386,12 +1629,111 @@ export interface components {
             /** Start */
             start: number;
         };
+        /** MetricDefinitionOut */
+        MetricDefinitionOut: {
+            /** Description */
+            description: {
+                [key: string]: string;
+            };
+            /** Heuristic */
+            heuristic: boolean;
+            /** Isprimary */
+            isPrimary: boolean;
+            /** Label */
+            label: {
+                [key: string]: string;
+            };
+            /** Metricid */
+            metricId: string;
+            quality: components["schemas"]["MetricQuality"];
+            /** Source */
+            source: string;
+            /**
+             * Suggesteddirection
+             * @enum {string}
+             */
+            suggestedDirection: "increase" | "decrease" | "target_band" | "neutral";
+            /** Unit */
+            unit: string;
+            /** Valuetype */
+            valueType: string;
+            /** Version */
+            version: number;
+        };
+        /** MetricProgressResponse */
+        MetricProgressResponse: {
+            /**
+             * Generatedat
+             * Format: date-time
+             */
+            generatedAt: string;
+            profile: components["schemas"]["ProgressProfile"];
+            range: components["schemas"]["ProgressRange"];
+            /**
+             * Schemaversion
+             * @default progress.v1
+             * @constant
+             */
+            schemaVersion: "progress.v1";
+            series: components["schemas"]["ProgressSeries"];
+        };
+        /** MetricQuality */
+        MetricQuality: {
+            /**
+             * Devicesensitive
+             * @default false
+             */
+            deviceSensitive: boolean;
+            /** Minaudioactiveratio */
+            minAudioActiveRatio?: number | null;
+            /** Minclaimcount */
+            minClaimCount?: number | null;
+            /** Mindurationms */
+            minDurationMs: number;
+            /** Minposecoverage */
+            minPoseCoverage?: number | null;
+            /** Minposevalidratio */
+            minPoseValidRatio?: number | null;
+            /** Minwordcount */
+            minWordCount?: number | null;
+        };
         /** NextAction */
         NextAction: {
             /** Suggestionid */
             suggestionId: string;
             /** Text */
             text: string;
+        };
+        /** PointContext */
+        PointContext: {
+            /** Devicekey */
+            deviceKey?: string | null;
+            /** Durationms */
+            durationMs: number;
+            /** Presentationmode */
+            presentationMode?: ("startup" | "thesis" | "school" | "nonprofit") | null;
+            /** Ruleversions */
+            ruleVersions?: string[];
+        };
+        /** PointQuality */
+        PointQuality: {
+            /** Asrprovider */
+            asrProvider?: string | null;
+            /** Audioactiveratio */
+            audioActiveRatio?: number | null;
+            /** Claimcount */
+            claimCount?: number | null;
+            /** Posecoverage */
+            poseCoverage?: number | null;
+            /** Posevalidratio */
+            poseValidRatio?: number | null;
+            /**
+             * Syntheticdemo
+             * @default false
+             */
+            syntheticDemo: boolean;
+            /** Wordcount */
+            wordCount?: number | null;
         };
         /** PoseEvidence */
         PoseEvidence: {
@@ -1470,6 +1812,480 @@ export interface components {
             thresholdsStatus: "heuristic-unvalidated";
             /** Version */
             version: number;
+        };
+        /** ProfileConsent */
+        ProfileConsent: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Granted
+             * @constant
+             */
+            granted: true;
+            /** Retentionuntil */
+            retentionUntil?: string | null;
+            /**
+             * Scope
+             * @constant
+             */
+            scope: "long-term-progress";
+            /** Version */
+            version: string;
+        };
+        /** ProfileConsentOut */
+        ProfileConsentOut: {
+            /**
+             * Grantedat
+             * Format: date-time
+             */
+            grantedAt: string;
+            /** Retentionuntil */
+            retentionUntil?: string | null;
+            /**
+             * Scope
+             * @default long-term-progress
+             * @constant
+             */
+            scope: "long-term-progress";
+            /** Version */
+            version: string;
+        };
+        /** ProfileCreate */
+        ProfileCreate: {
+            consent: components["schemas"]["ProfileConsent"];
+            /**
+             * Displayname
+             * @default
+             */
+            displayName: string;
+            /**
+             * Locale
+             * @default de
+             * @enum {string}
+             */
+            locale: "de" | "en";
+        };
+        /** ProfileCreateResponse */
+        ProfileCreateResponse: {
+            profile: components["schemas"]["ProfileIdentity"];
+            /** Token */
+            token?: string | null;
+            /** Tokenissued */
+            tokenIssued: boolean;
+        };
+        /** ProfileGetResponse */
+        ProfileGetResponse: {
+            profile: components["schemas"]["ProfileIdentity"];
+        };
+        /** ProfileIdentity */
+        ProfileIdentity: {
+            consent: components["schemas"]["ProfileConsentOut"];
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Displayname */
+            displayName: string;
+            /**
+             * Locale
+             * @enum {string}
+             */
+            locale: "de" | "en";
+            /**
+             * Profileid
+             * Format: uuid
+             */
+            profileId: string;
+        };
+        /** ProfilePatch */
+        ProfilePatch: {
+            /** Displayname */
+            displayName?: string | null;
+            /** Locale */
+            locale?: ("de" | "en") | null;
+            /** Retentionuntil */
+            retentionUntil?: string | null;
+        };
+        /** ProfileTake */
+        ProfileTake: {
+            /** Durationms */
+            durationMs: number;
+            /** Presentationmode */
+            presentationMode?: ("startup" | "thesis" | "school" | "nonprofit") | null;
+            /**
+             * Recordedat
+             * Format: date-time
+             */
+            recordedAt: string;
+            /**
+             * Recordedatsource
+             * @enum {string}
+             */
+            recordedAtSource: "client" | "server";
+            /**
+             * Sessionid
+             * Format: uuid
+             */
+            sessionId: string;
+            /** Status */
+            status: string;
+            /**
+             * Takeid
+             * Format: uuid
+             */
+            takeId: string;
+        };
+        /** ProfileTakesResponse */
+        ProfileTakesResponse: {
+            /** Nextcursor */
+            nextCursor?: string | null;
+            /** Takes */
+            takes: components["schemas"]["ProfileTake"][];
+        };
+        /** ProfileTokenRotateResponse */
+        ProfileTokenRotateResponse: {
+            /** Token */
+            token?: string | null;
+            /**
+             * Tokenissued
+             * @default true
+             */
+            tokenIssued: boolean;
+        };
+        /** ProgressBaseline */
+        ProgressBaseline: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "first_3_eligible" | "first_5_eligible" | "same_mode_first_3" | "rolling_5" | "none";
+            /**
+             * N
+             * @default 0
+             */
+            n: number;
+            /** Takeids */
+            takeIds?: string[];
+            /** Value */
+            value?: number | null;
+        };
+        /** ProgressChangePoint */
+        ProgressChangePoint: {
+            /** Algorithmversion */
+            algorithmVersion: string;
+            /**
+             * Confidence
+             * @default low
+             * @enum {string}
+             */
+            confidence: "low" | "medium" | "high";
+            /** Evidencetakeids */
+            evidenceTakeIds?: string[];
+            /** Fromvalue */
+            fromValue?: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "step_up" | "step_down" | "regression" | "recovery";
+            /** Magnitude */
+            magnitude?: number | null;
+            /** Metricid */
+            metricId: string;
+            /** Metricversion */
+            metricVersion: number;
+            /**
+             * Recordedat
+             * Format: date-time
+             */
+            recordedAt: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Takeid
+             * Format: uuid
+             */
+            takeId: string;
+            /** Tovalue */
+            toValue?: number | null;
+        };
+        /** ProgressHighlight */
+        ProgressHighlight: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "insufficient_data" | "trend_up" | "trend_down" | "goal_on_track" | "goal_off_track" | "change_point" | "quality_warning";
+            /** Metricid */
+            metricId: string;
+            /** Params */
+            params?: {
+                [key: string]: string | number;
+            };
+            /** Sequence */
+            sequence?: number | null;
+            /** Takeid */
+            takeId?: string | null;
+            /** Textkey */
+            textKey: string;
+        };
+        /** ProgressLatest */
+        ProgressLatest: {
+            /** Changevsbaseline */
+            changeVsBaseline?: number | null;
+            /**
+             * Recordedat
+             * Format: date-time
+             */
+            recordedAt: string;
+            /** Relativechange */
+            relativeChange?: number | null;
+            /**
+             * Reliablechange
+             * @default false
+             */
+            reliableChange: boolean;
+            /**
+             * Takeid
+             * Format: uuid
+             */
+            takeId: string;
+            /** Value */
+            value?: number | null;
+            /** Zscore */
+            zScore?: number | null;
+        };
+        /** ProgressLimitation */
+        ProgressLimitation: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /** ProgressPoint */
+        ProgressPoint: {
+            context: components["schemas"]["PointContext"];
+            /** Eligible */
+            eligible: boolean;
+            /** Exclusionreasons */
+            exclusionReasons?: string[];
+            quality: components["schemas"]["PointQuality"];
+            /**
+             * Recordedat
+             * Format: date-time
+             */
+            recordedAt: string;
+            /**
+             * Recordedatsource
+             * @enum {string}
+             */
+            recordedAtSource: "client" | "server";
+            /** Sequence */
+            sequence: number;
+            /**
+             * Sessionid
+             * Format: uuid
+             */
+            sessionId: string;
+            /**
+             * Takeid
+             * Format: uuid
+             */
+            takeId: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value?: number | null;
+        };
+        /** ProgressProfile */
+        ProgressProfile: {
+            consent: components["schemas"]["ProfileConsentOut"];
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Displayname */
+            displayName: string;
+            /** Eligibletakes */
+            eligibleTakes: number;
+            /** Firstrecordedat */
+            firstRecordedAt?: string | null;
+            /** Lastrecordedat */
+            lastRecordedAt?: string | null;
+            /**
+             * Locale
+             * @enum {string}
+             */
+            locale: "de" | "en";
+            /**
+             * Profileid
+             * Format: uuid
+             */
+            profileId: string;
+            /** Totaltakes */
+            totalTakes: number;
+        };
+        /** ProgressRange */
+        ProgressRange: {
+            /** From */
+            from?: string | null;
+            /** Presentationmode */
+            presentationMode?: ("startup" | "thesis" | "school" | "nonprofit") | null;
+            /** To */
+            to?: string | null;
+            /**
+             * Window
+             * @enum {string}
+             */
+            window: "all" | "last_20" | "last_10" | "last_5";
+        };
+        /** ProgressResponse */
+        ProgressResponse: {
+            /**
+             * Generatedat
+             * Format: date-time
+             */
+            generatedAt: string;
+            /** Highlights */
+            highlights?: components["schemas"]["ProgressHighlight"][];
+            /** Limitations */
+            limitations?: components["schemas"]["ProgressLimitation"][];
+            /** Metricdefinitions */
+            metricDefinitions: components["schemas"]["MetricDefinitionOut"][];
+            profile: components["schemas"]["ProgressProfile"];
+            range: components["schemas"]["ProgressRange"];
+            /**
+             * Schemaversion
+             * @default progress.v1
+             * @constant
+             */
+            schemaVersion: "progress.v1";
+            /** Series */
+            series: components["schemas"]["ProgressSeries"][];
+        };
+        /** ProgressSeries */
+        ProgressSeries: {
+            baseline?: components["schemas"]["ProgressBaseline"] | null;
+            /** Changepoints */
+            changePoints?: components["schemas"]["ProgressChangePoint"][];
+            goal?: components["schemas"]["GoalRecord"] | null;
+            /**
+             * Goalstatus
+             * @default not_applicable
+             * @enum {string}
+             */
+            goalStatus: "not_applicable" | "unknown" | "on_track" | "off_track";
+            /** Heuristic */
+            heuristic: boolean;
+            /** Isprimary */
+            isPrimary: boolean;
+            /** Label */
+            label: {
+                [key: string]: string;
+            };
+            latest?: components["schemas"]["ProgressLatest"] | null;
+            /** Limitations */
+            limitations?: components["schemas"]["ProgressLimitation"][];
+            /** Metricid */
+            metricId: string;
+            /** Metricversion */
+            metricVersion: number;
+            /** Points */
+            points: components["schemas"]["ProgressPoint"][];
+            quality: components["schemas"]["ProgressSeriesQuality"];
+            /**
+             * Suggesteddirection
+             * @enum {string}
+             */
+            suggestedDirection: "increase" | "decrease" | "target_band" | "neutral";
+            trend: components["schemas"]["ProgressTrend"];
+            /** Unit */
+            unit: string;
+        };
+        /** ProgressSeriesQuality */
+        ProgressSeriesQuality: {
+            /** Eligiblepoints */
+            eligiblePoints: number;
+            /** Excludedpoints */
+            excludedPoints: number;
+            /** Missingpoints */
+            missingPoints: number;
+            /** Ruleversions */
+            ruleVersions?: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "good" | "partial" | "poor";
+            /** Totalpoints */
+            totalPoints: number;
+            /**
+             * Versionbreak
+             * @default false
+             */
+            versionBreak: boolean;
+        };
+        /** ProgressTrend */
+        ProgressTrend: {
+            /** Adjustedp */
+            adjustedP?: number | null;
+            /** Algorithmversion */
+            algorithmVersion: string;
+            /**
+             * Confidence
+             * @default low
+             * @enum {string}
+             */
+            confidence: "low" | "medium" | "high";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "up" | "down" | "flat" | "unknown";
+            /** Effectsize */
+            effectSize?: number | null;
+            /** Mannkendallp */
+            mannKendallP?: number | null;
+            /** Method */
+            method: string;
+            /** Minimumdetectablechange */
+            minimumDetectableChange?: number | null;
+            /** N */
+            n: number;
+            /** Noiseband */
+            noiseBand?: number | null;
+            /** Relativechange */
+            relativeChange?: number | null;
+            /**
+             * Reliableslope
+             * @default false
+             */
+            reliableSlope: boolean;
+            /** Slopeci95 */
+            slopeCi95?: [
+                number,
+                number
+            ] | null;
+            /** Slopeper10Takes */
+            slopePer10Takes?: number | null;
+            /** Slopepertake */
+            slopePerTake?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "insufficient" | "early_signal" | "stable" | "trend_up" | "trend_down" | "unclear";
+            window: components["schemas"]["TrendWindow"];
         };
         /** Provenance */
         Provenance: {
@@ -1639,6 +2455,41 @@ export interface components {
         /** QuestionsResponse */
         QuestionsResponse: {
             questions: components["schemas"]["QuestionResult"] | null;
+        };
+        /** RecomputeAccepted */
+        RecomputeAccepted: {
+            /**
+             * Runid
+             * Format: uuid
+             */
+            runId: string;
+            /** Statusurl */
+            statusUrl: string;
+        };
+        /** RecomputeRun */
+        RecomputeRun: {
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Error */
+            error?: string | null;
+            /**
+             * Runid
+             * Format: uuid
+             */
+            runId: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
         };
         /** RecordingAnalysis */
         RecordingAnalysis: {
@@ -1835,6 +2686,10 @@ export interface components {
              * Format: date-time
              */
             createdAt: string;
+            /** Presentationmode */
+            presentationMode?: ("startup" | "thesis" | "school" | "nonprofit") | null;
+            /** Profileid */
+            profileId?: string | null;
             /**
              * Sessionid
              * Format: uuid
@@ -1854,6 +2709,10 @@ export interface components {
             /** Collectionid */
             collectionId?: string | null;
             consent: components["schemas"]["Consent"];
+            /** Presentationmode */
+            presentationMode?: ("startup" | "thesis" | "school" | "nonprofit") | null;
+            /** Profileid */
+            profileId?: string | null;
             /** Title */
             title: string;
         };
@@ -1964,6 +2823,16 @@ export interface components {
             durationMs: number;
             /** Mimetype */
             mimeType: string;
+            /** Profileid */
+            profileId?: string | null;
+            /** Recordedat */
+            recordedAt?: string | null;
+            /**
+             * Recordedatsource
+             * @default server
+             * @enum {string}
+             */
+            recordedAtSource: "client" | "server";
             /**
              * Sessionid
              * Format: uuid
@@ -2025,6 +2894,8 @@ export interface components {
             durationMs: number;
             /** Mimetype */
             mimeType: string;
+            /** Recordedat */
+            recordedAt?: string | null;
             timebase: components["schemas"]["Timebase"];
         };
         /** TakeJobAccepted */
@@ -2069,6 +2940,17 @@ export interface components {
         /** TimelineResponse */
         TimelineResponse: {
             timeline: components["schemas"]["Timeline"];
+        };
+        /** TrendWindow */
+        TrendWindow: {
+            /** Fromrecordedat */
+            fromRecordedAt?: string | null;
+            /** Fromtakeid */
+            fromTakeId?: string | null;
+            /** Torecordedat */
+            toRecordedAt?: string | null;
+            /** Totakeid */
+            toTakeId?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -2318,7 +3200,9 @@ export interface operations {
     job_jobs__job_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
             path: {
                 job_id: string;
             };
@@ -2344,6 +3228,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2362,8 +3255,1396 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Request Entity Too Large */
             413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_profile_profiles_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileCreateResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_profile_profiles__profile_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileGetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_profile_profiles__profile_id__delete: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patch_profile_profiles__profile_id__patch: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfilePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileGetResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_profiles__profile_id__export_get: {
+        parameters: {
+            query?: {
+                format?: string;
+            };
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_goals_profiles__profile_id__goals_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalListResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_goal_profiles__profile_id__goals__metric_id__put: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+                metric_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoalInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_goal_profiles__profile_id__goals__metric_id__delete: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+                metric_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_progress_profiles__profile_id__progress_get: {
+        parameters: {
+            query?: {
+                window?: string;
+                metrics?: string;
+                from?: string | null;
+                to?: string | null;
+                presentationMode?: string | null;
+                includeExcluded?: boolean;
+                includeExploratory?: boolean;
+            };
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    recompute_profiles__profile_id__progress_recompute_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecomputeAccepted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_recompute_profiles__profile_id__progress_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecomputeRun"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_metric_progress_profiles__profile_id__progress__metric_id__get: {
+        parameters: {
+            query?: {
+                window?: string;
+                from?: string | null;
+                to?: string | null;
+                presentationMode?: string | null;
+                includeExcluded?: boolean;
+            };
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+                metric_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricProgressResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rotate_token_profiles__profile_id__rotate_token_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileTokenRotateResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_takes_profiles__profile_id__takes_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileTakesResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2670,6 +4951,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2698,6 +4980,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2709,6 +5000,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2757,7 +5057,9 @@ export interface operations {
     session_detail_sessions__session_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
             path: {
                 session_id: string;
             };
@@ -2783,6 +5085,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2794,6 +5105,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2842,7 +5162,9 @@ export interface operations {
     delete_session_sessions__session_id__delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
             path: {
                 session_id: string;
             };
@@ -2866,6 +5188,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2877,6 +5208,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2927,6 +5267,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
             };
             path: {
                 session_id: string;
@@ -2957,6 +5298,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2968,6 +5318,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3237,7 +5596,9 @@ export interface operations {
     take_detail_takes__take_id__get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
             path: {
                 take_id: string;
             };
@@ -3263,6 +5624,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3274,6 +5644,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3324,6 +5703,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
             };
             path: {
                 take_id: string;
@@ -3354,6 +5734,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3365,6 +5754,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3413,7 +5811,9 @@ export interface operations {
     evaluation_takes__take_id__evaluation_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
             path: {
                 take_id: string;
             };
@@ -3439,6 +5839,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3450,6 +5859,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3500,6 +5918,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
             };
             path: {
                 take_id: string;
@@ -3530,6 +5949,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3541,6 +5969,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3591,6 +6028,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
             };
             path: {
                 take_id: string;
@@ -3621,6 +6059,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3632,6 +6079,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3680,7 +6136,9 @@ export interface operations {
     get_questions_takes__take_id__questions_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
             path: {
                 take_id: string;
             };
@@ -3706,6 +6164,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3717,6 +6184,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3767,6 +6243,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
             };
             path: {
                 take_id: string;
@@ -3797,6 +6274,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3808,6 +6294,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3858,6 +6353,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
             };
             path: {
                 take_id: string;
@@ -3888,6 +6384,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3899,6 +6404,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3947,7 +6461,9 @@ export interface operations {
     review_takes__take_id__review_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
             path: {
                 take_id: string;
             };
@@ -3973,6 +6489,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -3984,6 +6509,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4034,6 +6568,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Profile-Token"?: string | null;
             };
             path: {
                 take_id: string;
@@ -4073,6 +6608,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -4084,6 +6628,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4132,7 +6685,9 @@ export interface operations {
     timeline_takes__take_id__timeline_get: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Profile-Token"?: string | null;
+            };
             path: {
                 take_id: string;
             };
@@ -4158,6 +6713,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -4169,6 +6733,15 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };
