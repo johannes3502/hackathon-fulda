@@ -80,12 +80,8 @@ test("presentation introduction leads into preparation and recording", async ({
     .getByRole("link", { name: "Continue to recording", exact: true })
     .click();
   await expect(page).toHaveURL(/\/live$/);
-  await expect(journey).toBeVisible();
-  await expect(journey.getByRole("link", { name: /Record/ })).toHaveAttribute(
-    "aria-current",
-    "step",
-  );
-  await expect(page.getByRole("banner")).toBeVisible();
+  await expect(journey).toBeHidden();
+  await expect(page.getByRole("banner")).toBeHidden();
   await expect(
     page.getByRole("heading", {
       name: "Record your presentation",
@@ -141,7 +137,7 @@ test("saved appearance overrides the system across routes and reloads", async ({
   await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
   for (const path of ["/sources", "/live", "/demo", "/review-preview"]) {
     await page.goto(path);
-    await expect(appearance).toHaveValue("light");
+    if (path !== "/live") await expect(appearance).toHaveValue("light");
     await expect(page.locator("html")).toHaveCSS("color-scheme", "light");
     expect(
       await page.evaluate(

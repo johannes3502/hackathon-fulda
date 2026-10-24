@@ -191,7 +191,7 @@
 .page-intro > p {
   max-width: 68ch;
 }
-body:has(.live-workspace-large) .practice-journey {
+body:has(.live-workspace) .practice-journey {
   display: none;
 }
 @media (max-width: 1280px) {

@@ -250,16 +250,16 @@ test("every recording uses microphone, live backend feedback and a full upload w
   await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
 });
 
-test("camera setup keeps workflow navigation and full-size recording preserves the camera", async ({
+test("camera setup hides global navigation and full-size recording preserves the camera", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
   await syntheticPose(page);
   await enable(page);
-  await expect(page.getByRole("banner")).toBeVisible();
+  await expect(page.getByRole("banner")).toBeHidden();
   await expect(
     page.getByRole("navigation", { name: "Presentation workflow" }),
-  ).toBeVisible();
+  ).toBeHidden();
   await expect(
     page.getByRole("link", { name: "Back to sources", exact: true }),
   ).toHaveAttribute("href", "/sources");

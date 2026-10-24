@@ -459,7 +459,7 @@ kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
 
 ```mermaid
 flowchart TD
-    DRAWER["AppShell: modaler Drawer + Header außerhalb laufender Aufnahmen<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>Drawer: /, /live, /progress, /sources, /review-preview, /gestures, /demo<br/>Header-Nav zusätzlich: /admin"]
+    DRAWER["AppShell: modaler Drawer + Header außerhalb des Record-Screens<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>Drawer: /, /live, /progress, /sources, /review-preview, /gestures, /demo<br/>Header-Nav zusätzlich: /admin"]
     THEME["Root-Layout: gespeicherte Darstellung vor First Paint<br/>localStorage, CSS-Tokens, OS-Fallback"] -.-> DRAWER
     JOURNEY["Gemeinsamer Ablauf: Prepare / Record / Review<br/>aktuelle oder letzte Aufnahme, sonst markiertes Beispiel"] --> SRC
     JOURNEY --> LIVE
@@ -480,7 +480,7 @@ flowchart TD
     SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
-    LIVE["/live - LiveStudio<br/>Kamera-Setup: gleicher Header, Schritte und Seitenbreite wie Upload<br/>Ab Aufnahmestart: Vollbild ohne Navigation, Pose-Overlay<br/>Immer Live + Backend-Analyse,<br/>Options: Vortragstyp, Material und Transkript,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE["/live - LiveStudio<br/>Kamera-Setup: gleiche Seitenbreite wie Upload, ohne Header und Schrittleiste<br/>Back to sources vor Aufnahmestart<br/>Ab Aufnahmestart: Vollbild ohne Navigation, Pose-Overlay<br/>Immer Live + Backend-Analyse,<br/>Options: Vortragstyp, Material und Transkript,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider + IndexedDB<br/>Video, Analyse und Fragen je Aufnahme<br/>Wiederherstellung nach Reload"] -.-> LIVE
     STORE --> EVIDENCE["recordingReviewData + recordingFeedback<br/>Video, Dauer und Events der gewählten Aufnahme<br/>Quellen-Marker aus aktuellem Fact-Check<br/>Fragen zählen nicht als Präsentationsevidenz"]
     EVIDENCE --> LREV

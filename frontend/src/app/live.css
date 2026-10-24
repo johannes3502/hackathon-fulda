@@ -115,7 +115,7 @@
   font-size: 1.75rem;
   font-variant-numeric: tabular-nums;
 }
-body:has(.live-workspace-large) .app-header,
+body:has(.live-workspace) .app-header,
 body:has(.live-workspace-large) .app-footer {
   display: none;
 }

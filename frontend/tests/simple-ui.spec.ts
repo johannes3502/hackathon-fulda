@@ -112,7 +112,7 @@ test("home shows an empty recording overview without demo statistics and keeps n
   });
   await expect(
     page.getByRole("button", { name: "Menü", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.goto("/demo");
   await expect(page).toHaveURL(/\/demo$/);
   await expect(
@@ -129,10 +129,11 @@ test("home shows an empty recording overview without demo statistics and keeps n
 
   for (const path of ["/", "/live", "/sources", "/review-preview"]) {
     await page.goto(path);
-    await expect(page.getByRole("link", { name: "418 home" })).toBeVisible();
+    if (path !== "/live")
+      await expect(page.getByRole("link", { name: "418 home" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Menü", exact: true }),
-    ).toHaveCount(1);
+    ).toHaveCount(path === "/live" ? 0 : 1);
     await expect(page.locator("main")).toHaveCount(1);
     expect(
       await page.evaluate(
