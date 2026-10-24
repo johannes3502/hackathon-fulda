@@ -113,7 +113,12 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
   Schüler zum abgeschlossenen Vortrag befragt, kein Investor; ohne zusätzliche
   Begrüßung, Vorstellung oder Rückblick.
   Er prüft Verständnis, Zusammenhänge, Beispiele und Transfer anhand des
-  Vortrags oder Materials. Bei falschen, unvollständigen oder unbelegten
+  Vortrags oder Materials. Ist eine Antwort geprüft korrekt und beantwortet die
+  Frage, folgt nur ein kurzer Bestätigungssatz und direkt die nächste Hauptfrage
+  (nach der dritten die Abschlusshinweise). Keine Wiederholung der Antwort,
+  lange Erklärung, ausführliches Lob oder weitere Nachfrage zur beantworteten
+  Frage; notwendige Quellenangaben bleiben knapp. Mehr Erklärung nur auf Wunsch.
+  Bei falschen, unvollständigen oder unbelegten
   Antworten sind eine, höchstens zwei Nachfragen pro Hauptfrage vorgesehen;
   danach kurz quellenbelegt korrigieren oder Unsicherheit benennen und zur
   nächsten Hauptfrage wechseln, auch wenn die Antwort weiter falsch ist.

@@ -83,6 +83,19 @@ def test_teacher_moves_on_after_limited_follow_ups_even_if_the_answer_is_wrong()
     assert "Never repeat a question until they get it right" in prompt
 
 
+@pytest.mark.parametrize("mode", PRESENTATION_STYLES)
+def test_teacher_keeps_feedback_short_for_verified_correct_answers(mode):
+    prompt = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode)).prompt
+    assert "When an answer is verified as correct and answers the question" in prompt
+    assert "acknowledge it in one short sentence, then move directly to the next main question" in prompt
+    assert "or the closing suggestions after the third main question" in prompt
+    assert "Do not repeat the student's answer" in prompt
+    assert "or ask another follow-up on an already answered question" in prompt
+    assert "Keep any required source attribution brief; explain further only if the student asks" in prompt
+    assert "MUST call search_web and wait for its result" in prompt
+    assert "If an answer is incorrect, incomplete or unsupported" in prompt
+
+
 @pytest.mark.parametrize("has_sources", [False, True])
 def test_teacher_searches_when_sources_do_not_settle_a_claim(monkeypatch, has_sources):
     monkeypatch.setattr(agent.db, "list_sources", lambda _: [SimpleNamespace(status="ready")])
