@@ -73,3 +73,9 @@ Mobbin MCP references and their specific design influence are recorded in [DESIG
 In the sample rehearsal, custom title, context, audience, mode, duration, and focus areas are retained; **they do not generate new analysis**. Its metrics and questions remain fixtures; timestamps select transcript evidence. The camera workspace instead replays actual captured video and clearly labels the source of feedback. Scripted markers are not assessments. No accounts, persistent recording history, PDF parser, live AI, deployment, or actual human-performance evaluation is included.
 
 Real camera hardware, Safari/iOS behavior, and a public deployment still require acceptance in the actual presentation environment.
+
+The camera backend mode uses the asynchronous audio API: POST `/speech/analyze`
+with `transcribe=false`, then GET `/speech/jobs/{job_id}` until completed or
+failed. It polls for at most eleven minutes and cancels on exit. This UI uses
+local Silero/RMS/YIN analysis; no paid ASR request is made. Speak normally during
+the first three seconds for calibration. Word JSON import remains separate.
