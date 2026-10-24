@@ -22,7 +22,9 @@ npm run test --workspace mobile
 npm run export --workspace mobile
 ```
 
-`eas.json` contains development/simulator/preview profiles; no cloud project, paid build or store submission is configured. Generated `ios/` and `android/` projects are ignored. Config plugins bundle the same local pose model as the web app. Rebuild the development client after native dependency or plugin changes.
+`eas.json` contains development/simulator/preview profiles. The app is linked to [@michaelmurr/pitch-coach-mobile](https://expo.dev/accounts/michaelmurr/projects/pitch-coach-mobile) for remote distribution; no cloud build or store submission has been started. Generated `ios/` and `android/` projects are ignored. Config plugins bundle the same local pose model as the web app. Rebuild the development client after native dependency or plugin changes.
+
+Physical iPhone installs require Developer Mode (Settings → Privacy & Security → Developer Mode, then restart and confirm). The signed standalone Release build includes JavaScript and the pose model, so it does not require Metro. A successful build does not establish camera or pose acceptance on the phone.
 
 ## Working paths
 
