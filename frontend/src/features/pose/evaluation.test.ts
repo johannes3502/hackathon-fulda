@@ -49,7 +49,7 @@ describe("observable gesture rules", () => {
     }
     expect(state.phase).toBe("ready");
     expect(state.baseline!.raised).toBeNull();
-    for (let t = 3100; t <= 4000; t += 100) {
+    for (let t = 3100; t <= 5100; t += 100) {
       const p = syntheticPoints("raised");
       p[15].visibility = 0;
       state = engine.update(poseSample(p, 640, 480, t), t);
@@ -69,6 +69,40 @@ describe("observable gesture rules", () => {
     state = engine.update(poseSample(points, 640, 360, 5100), 5100);
     expect(state.events.map((e) => e.payload.rule)).toEqual(["arms_crossed"]);
     expect(state.events[0].payload.confirmed_at_ms).toBe(5100);
+  });
+  it("keeps a crossed-arms hold through briefly hidden wrists", () => {
+    const engine = ready();
+    const points = (t: number) => {
+      const p = syntheticPoints("crossed");
+      if (t % 300 === 200) p[15].visibility = p[16].visibility = 0.1;
+      return p;
+    };
+    let state!: PoseEvaluation;
+    for (let t = 3100; t <= 5100; t += 100)
+      state = engine.update(poseSample(points(t), 640, 360, t), t);
+    expect(state.events.map((e) => e.payload.rule)).toEqual(["arms_crossed"]);
+    expect(state.events[0].t_ms).toBe(3100);
+    // Wrists hidden longer than the grace period end the observation.
+    const lost = ready();
+    feed(lost, "crossed", 3100, 3500);
+    for (let t = 3600; t <= 5200; t += 100) {
+      const p = syntheticPoints("crossed");
+      p[15].visibility = p[16].visibility = 0.1;
+      state = lost.update(poseSample(p, 640, 360, t), t);
+    }
+    expect(feed(lost, "crossed", 5300, 5300).events).toEqual([]);
+  });
+  it("respects admin modes: off drops a rule, review keeps the event without a hint", () => {
+    const engine = new PoseEvaluator("take-1", POSE_RULES, {
+      hand_raised: "off",
+      body_shift: "review",
+    });
+    feed(engine, "neutral", 0, 3000);
+    expect(feed(engine, "raised", 3100, 6000).events).toEqual([]);
+    feed(engine, "neutral", 6100, 7000);
+    const state = feed(engine, "shift", 7100, 9500);
+    expect(state.events.map((e) => e.payload.rule)).toEqual(["body_shift"]);
+    expect(state.cue).toBeNull();
   });
   it("requires a stable visible baseline; motion, sparse samples and missing hips never pass calibration", () => {
     const engine = new PoseEvaluator();
@@ -95,44 +129,44 @@ describe("observable gesture rules", () => {
   });
   it("short gestures never emit; a sustained gesture has onset, confirmation and one growing event", () => {
     const engine = ready();
-    expect(feed(engine, "raised", 3100, 3800).events).toEqual([]);
-    const state = feed(engine, "raised", 3900, 6000);
+    expect(feed(engine, "raised", 3100, 5000).events).toEqual([]);
+    const state = feed(engine, "raised", 5100, 7000);
     expect(state.events).toHaveLength(1);
     expect(state.events[0]).toMatchObject({
       session_id: "take-1",
       t_ms: 3100,
-      duration_ms: 2900,
+      duration_ms: 3900,
       type: "gesture",
       source: "browser",
-      payload: { rule: "hand_raised", heuristic: true, confirmed_at_ms: 3900 },
+      payload: { rule: "hand_raised", heuristic: true, confirmed_at_ms: 5100 },
     });
     expect(state.cue?.id).toBe(state.events[0].id);
   });
   it("missing frames break dwell and do not interpolate the gap", () => {
     const engine = ready();
-    feed(engine, "raised", 3100, 3700);
-    engine.update(null, 3800);
-    expect(feed(engine, "raised", 3900, 4600).events).toEqual([]);
-    expect(feed(engine, "raised", 4700, 4700).events[0].t_ms).toBe(3900);
+    feed(engine, "raised", 3100, 4900);
+    engine.update(null, 5000);
+    expect(feed(engine, "raised", 5100, 7000).events).toEqual([]);
+    expect(feed(engine, "raised", 7100, 7100).events[0].t_ms).toBe(5100);
     const gapEngine = ready();
-    feed(gapEngine, "raised", 3100, 3700);
-    expect(feed(gapEngine, "raised", 4500, 5200).events).toEqual([]);
+    feed(gapEngine, "raised", 3100, 4900);
+    expect(feed(gapEngine, "raised", 5700, 7600).events).toEqual([]);
   });
   it("holds are not duplicated and cooldown applies after release or loss", () => {
     const engine = ready();
-    feed(engine, "raised", 3100, 5000);
-    engine.update(null, 5100);
-    expect(feed(engine, "raised", 5200, 9900).events).toHaveLength(1);
-    expect(feed(engine, "raised", 10000, 10800).events).toHaveLength(2);
+    feed(engine, "raised", 3100, 5100);
+    engine.update(null, 5200);
+    expect(feed(engine, "raised", 5300, 10000).events).toHaveLength(1);
+    expect(feed(engine, "raised", 10100, 12100).events).toHaveLength(2);
   });
   it("uses hysteresis near the raised-hand boundary", () => {
     const engine = ready();
-    feed(engine, "raised", 3100, 4000);
-    const sample = syntheticSample("raised", 4100)!;
+    feed(engine, "raised", 3100, 5100);
+    const sample = syntheticSample("raised", 5200)!;
     sample.derived.right_wrist_height = 0.1;
-    expect(engine.update(sample, 4100).events[0].duration_ms).toBe(1000);
+    expect(engine.update(sample, 5200).events[0].duration_ms).toBe(2100);
     sample.derived.right_wrist_height = 0;
-    expect(engine.update(sample, 4200).cue).toBeNull();
+    expect(engine.update(sample, 5300).cue).toBeNull();
   });
   it("suppresses gestures when hands are hidden without suppressing usable posture", () => {
     const engine = ready();
@@ -195,15 +229,15 @@ describe("observable gesture rules", () => {
   });
   it("recognizes the reported whole-body sideways motion without calling it a lean", () => {
     const engine = ready();
-    expect(feed(engine, "shift", 3100, 3800).events).toEqual([]);
-    const state = feed(engine, "shift", 3900, 6000);
+    expect(feed(engine, "shift", 3100, 5000).events).toEqual([]);
+    const state = feed(engine, "shift", 5100, 7000);
     expect(state.events.map((e) => e.payload.rule)).toEqual(["body_shift"]);
     expect(state.measurements?.leanDelta).toBeCloseTo(0);
     expect(state.measurements?.shiftDelta).toBeCloseTo(0.5);
     expect(state.events[0].payload).toMatchObject({
       threshold: 0.35,
       unit: "shoulder widths",
-      confirmed_at_ms: 3900,
+      confirmed_at_ms: 5100,
     });
   });
   it("does not mark small lateral jitter or calibrate while the body is moving", () => {
@@ -233,5 +267,81 @@ describe("observable gesture rules", () => {
     expect(
       feed(ready(), "together", 3100, 6000).events.map((e) => e.payload.rule),
     ).toEqual(["hands_together"]);
+  });
+  const head = (
+    engine: PoseEvaluator,
+    start: number,
+    end: number,
+    move: (p: ReturnType<typeof syntheticPoints>) => void,
+  ) => {
+    let state!: PoseEvaluation;
+    for (let t = start; t <= end; t += 100) {
+      const points = syntheticPoints("neutral");
+      move(points);
+      state = engine.update(poseSample(points, 640, 360, t), t);
+    }
+    return state;
+  };
+  it("marks a sustained sideways head turn as a gaze-type head proxy, not a short glance", () => {
+    const engine = ready();
+    expect(
+      engine.update(syntheticSample("neutral", 3000), 3000).baseline!.yaw,
+    ).toBeCloseTo(0);
+    const turn = (p: ReturnType<typeof syntheticPoints>) => {
+      p[0].x = 0.535;
+      // The far ear is partly occluded but still estimated in the image.
+      p[8].visibility = 0.3;
+    };
+    expect(head(engine, 3100, 4900, turn).events).toEqual([]);
+    expect(head(engine, 5000, 6000, () => {}).events).toEqual([]);
+    const state = head(engine, 6100, 8500, turn);
+    expect(state.events).toHaveLength(1);
+    expect(state.events[0]).toMatchObject({
+      t_ms: 6100,
+      type: "gaze",
+      payload: {
+        rule: "head_turned",
+        threshold: POSE_RULES.headTurnEnter,
+        unit: "ear-distance ratio",
+        confirmed_at_ms: 8100,
+      },
+    });
+    expect(state.measurements?.yawDelta).toBeCloseTo(7 / 12);
+    expect(state.cue?.payload.rule).toBe("head_turned");
+  });
+  it("marks a sustained downward head tilt relative to the calibrated head", () => {
+    const engine = ready();
+    const state = head(engine, 3100, 5500, (p) => {
+      p[0].y = 0.25;
+    });
+    expect(state.events.map((e) => [e.type, e.payload.rule])).toEqual([
+      ["gaze", "head_down"],
+    ]);
+    expect(state.events[0].payload.confirmed_at_ms).toBe(5100);
+    expect(state.measurements?.dropDelta).toBeGreaterThan(
+      POSE_RULES.headDownEnter,
+    );
+    // Looking up is not reported as looking down.
+    expect(
+      head(ready(), 3100, 6000, (p) => {
+        p[0].y = 0.14;
+      }).events,
+    ).toEqual([]);
+  });
+  it("keeps the head reference relative and pauses head rules without ears", () => {
+    // A comfortable tilted neutral head is not a fault.
+    const engine = new PoseEvaluator();
+    const state = head(engine, 0, 10000, (p) => {
+      p[0].x = 0.535;
+      p[0].y = 0.25;
+    });
+    expect(state.phase).toBe("ready");
+    expect(state.events).toEqual([]);
+    const hidden = head(ready(), 3100, 6000, (p) => {
+      p[0].y = 0.25;
+      p[7].visibility = 0.1;
+    });
+    expect(hidden.events).toEqual([]);
+    expect(hidden.measurements?.dropDelta).toBeNull();
   });
 });

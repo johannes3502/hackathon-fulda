@@ -2,6 +2,7 @@ import type { PoseEvent } from "../pose/evaluation";
 import type { FeatureFlags } from "./feature-flags";
 import type { QuestionAnswer, QuestionResult } from "../questions/api";
 import type { components } from "../../../../api/schema";
+import type { PresentationMode } from "../questions/presentation";
 export type Word = components["schemas"]["Word"];
 export type FactCheckResult = components["schemas"]["FactCheckResult"];
 export type TranscriptWord = components["schemas"]["Word"];
@@ -31,6 +32,8 @@ export type LiveMetric = {
   unit?: string;
 };
 export type LiveConfig = {
+  presentationMode?: PresentationMode;
+  sourceCollectionId?: string;
   title: string;
   targetMs: number;
   mode: "local" | "backend";
@@ -61,6 +64,8 @@ export type LiveProgress = {
   notice: string | null;
 };
 export type LiveRecording = {
+  analysisUploaded?: boolean;
+  conversation?: { role: "user" | "agent"; text: string }[];
   words?: Word[];
   factCheck?: FactCheckResult;
   questions?: QuestionResult;

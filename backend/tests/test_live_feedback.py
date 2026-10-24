@@ -33,6 +33,28 @@ def test_feedback_before_stop_preserves_calibration_and_requires_no_whisper(monk
         assert ws.receive_json() == {"type": "done"}
 
 
+def test_feedback_waits_for_speech_after_a_silent_start_and_batch_agrees(monkeypatch):
+    config = live.AudioConfig(activity_detector="energy")
+    monkeypatch.setattr(live, "analyze_samples", lambda samples, ignored: analyze_samples(samples, config))
+    t = np.arange(16000 * 15) / 16000
+    audio = (np.sin(2 * np.pi * 150 * t) * np.where(t < 5, 0, 0.1) * 32767).astype("<i2")
+    pcm = audio.tobytes()
+    with TestClient(app).websocket_connect("/speech/feedback") as ws:
+        ws.send_json({"type": "start", "sample_rate": 16000})
+        assert ws.receive_json()["type"] == "ready"
+        for offset in range(0, len(pcm), 3200):
+            ws.send_bytes(pcm[offset:offset + 3200])
+        messages = [ws.receive_json() for _ in range(3)]
+        assert [m["position_ms"] for m in messages] == [5000, 10000, 15000]
+        assert messages[0]["events"] == []
+        assert all(e["type"] != "volume" for message in messages for e in message["events"])
+        ws.send_json({"type": "stop"})
+        assert ws.receive_json() == {"type": "done"}
+    batch = analyze_samples(audio.astype(np.float32) / 32768, config)
+    assert batch.heuristics["baseline_ready"] is True
+    assert all(e.type != "volume" for e in batch.events)
+
+
 @pytest.mark.parametrize("raw", [b"x", bytes(32002)])
 def test_feedback_rejects_unaligned_or_oversized_frames_and_releases_slot(raw):
     with TestClient(app).websocket_connect("/speech/feedback") as ws:

@@ -12,10 +12,14 @@ export function PoseEvidence({ event }: { event?: PoseEvent }) {
           : p.rule === "body_shift"
             ? "Sideways position change from neutral"
             : p.rule === "arms_crossed"
-              ? "Smaller wrist crossing past the body midline"
+              ? "Wrist crossing past the body midline (the smaller one when both are visible)"
               : p.rule === "hand_raised"
                 ? "Wrist height above its shoulder"
-                : "Distance between wrists"}
+                : p.rule === "head_turned"
+                  ? "Sideways change of the nose between the ears from neutral"
+                  : p.rule === "head_down"
+                    ? "Downward change of the nose below the ear line from neutral"
+                    : "Distance between wrists"}
         : {p.initial_measurement.toFixed(2)} {p.unit} at confirmation.
       </p>
       <p>
@@ -28,8 +32,8 @@ export function PoseEvidence({ event }: { event?: PoseEvent }) {
       </p>
       <p>
         Last observed value: {p.measurement.toFixed(2)} {p.unit}. A wider
-        release boundary avoids flickering for hand height, hand distance and
-        sideways movement.
+        release boundary avoids flickering for hand height, hand distance,
+        sideways movement and head direction.
       </p>
       <p>
         Only visible landmarks count. Missing frames break the observation. This

@@ -6,21 +6,15 @@ import {
   Camera,
   CameraOff,
   CheckCircle2,
-  Clock3,
   Eye,
-  Maximize2,
   Mic,
   MicOff,
-  Minimize2,
   Radio,
   ShieldCheck,
   Square,
   Video,
 } from "lucide-react";
-import {
-  AppShell,
-  DrawerTriggerButton,
-} from "@/components/shared/AppShell";
+import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { useCameraPreview } from "@/hooks/useCameraPreview";
@@ -30,6 +24,7 @@ import { speechCue } from "@/features/live/speech-feedback";
 import { cueAppearance } from "@/features/live/cue-appearance";
 import { feedbackEnabled } from "@/features/live/feature-flags";
 import { upsertFeedback } from "@/features/live/protocol";
+import { usePacedCue } from "@/features/live/cue-pacing";
 import {
   LiveSpeech,
   mergeSpeechFeedback,
@@ -52,9 +47,10 @@ import { PoseDevMode, type PoseView } from "./PoseDevMode";
 import { poseFeedback as labFeedback } from "@/features/pose/testPoses";
 import { PoseDebug } from "./PoseDebug";
 import { PoseOverlay } from "./PoseOverlay";
-import { LiveBadge } from "./shared";
-import { FeatureOptions } from "./FeatureOptions";
 import { backendLabel, fallbackLabel } from "@/features/pose/backend";
+import { PresentationSetup } from "./PresentationSetup";
+import type { PresentationMode } from "@/features/questions/presentation";
+import { collectionId } from "@/features/sources/api";
 
 const cameraCopy = {
   idle: "Enable your camera to check your framing. Then start recording when you’re ready.",
@@ -83,6 +79,8 @@ export function LiveStudio() {
     featureFlags,
   );
   const [title, setTitle] = useState("My pitch rehearsal");
+  const [presentationMode, setPresentationMode] =
+    useState<PresentationMode>("startup");
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("local");
   const microphone = mode === "backend" || featureFlags.liveSpeechFeedback;
@@ -113,7 +111,6 @@ export function LiveStudio() {
   const [progress, setProgress] = useState<LiveProgress | null>(null);
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [largeView, setLargeView] = useState(false);
   const [showCues, setShowCues] = useState(true);
   const [poseDebug, setPoseDebug] = useState(false);
   const poseLab = featureFlags.devMode;
@@ -153,14 +150,6 @@ export function LiveStudio() {
       if (voice.current === capture) voice.current = null;
     };
   }, [voiceStream, featureFlags, mode]);
-  useEffect(() => {
-    if (!largeView) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setLargeView(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [largeView]);
   useEffect(() => {
     if (mode !== "backend") return;
     const controller = new AbortController();
@@ -210,6 +199,8 @@ export function LiveStudio() {
     busy.current = true;
     const generation = ++startGeneration.current;
     const config = {
+      presentationMode,
+      sourceCollectionId: collectionId(),
       title: title.trim(),
       targetMs,
       mode,
@@ -390,10 +381,12 @@ export function LiveStudio() {
           ? serverCue.event
           : null
         : speech?.cue;
-  const latest =
+  const latest = usePacedCue(
     voiceCue && (!poseCue || voiceCue.startMs >= poseCue.startMs)
       ? voiceCue
-      : poseCue;
+      : poseCue,
+    showCues,
+  );
   const appearance = cueAppearance(
     latest,
     !showCues
@@ -406,26 +399,10 @@ export function LiveStudio() {
   return (
     <AppShell experience="live">
       <div
-        className={`workspace live-workspace${largeView ? " live-workspace-large" : ""}`}
+        className="workspace live-workspace live-workspace-large"
+        data-feedback={appearance.tone}
       >
-        <div className="workspace-heading">
-          <div>
-            <h1>Record your presentation</h1>
-            <p>Enable your camera, check your framing, then start recording.</p>
-          </div>
-          <div className="studio-session-status">
-            <LiveBadge mode={mode} />
-            <div className="session-time">
-              <Clock3 size={18} />
-              <strong>{time(progress?.elapsedMs ?? 0)}</strong>
-              <span>
-                {progress
-                  ? "recording time"
-                  : `${targetMs / 60000}-minute limit`}
-              </span>
-            </div>
-          </div>
-        </div>
+        <h1 className="sr-only">Record your presentation</h1>
         {error && (
           <p className="status-error" role="alert">
             {error}
@@ -493,21 +470,10 @@ export function LiveStudio() {
                 </Button>
               )}
               <div className="live-view-toolbar">
-                {largeView && <DrawerTriggerButton />}
-                <Button
-                  variant="ghost"
-                  aria-pressed={largeView}
-                  aria-controls="live-studio"
-                  onClick={() => setLargeView(!largeView)}
-                >
-                  {largeView ? (
-                    <Minimize2 size={18} />
-                  ) : (
-                    <Maximize2 size={18} />
-                  )}
-                  {largeView ? "Standard view" : "Large view"}
-                </Button>
-                {largeView && progress && (
+                <a className="text-button" href="#live-options">
+                  Options
+                </a>
+                {progress && (
                   <strong className="live-view-time">
                     {time(progress?.elapsedMs ?? 0)}
                   </strong>
@@ -559,7 +525,7 @@ export function LiveStudio() {
                   <PoseOverlay
                     sample={pose.state.latest}
                     image={pose.state.image}
-                    largeView={largeView}
+                    largeView
                     hands={pose.state.hands}
                     showHands={featureFlags.handTracking}
                   />
@@ -676,205 +642,6 @@ export function LiveStudio() {
                 </span>
               )}
             </p>
-            <details className="live-settings recording-settings">
-              <summary>Recording options</summary>
-              <fieldset disabled={!!progress}>
-                <details className="connection-settings">
-                  <summary>Title and duration</summary>
-                  <div className="form-row">
-                    <div className="field">
-                      <label htmlFor="live-title">Recording title</label>
-                      <Input
-                        id="live-title"
-                        value={title}
-                        maxLength={100}
-                        onChange={(e) => setTitle(e.target.value)}
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="live-duration">Recording limit</label>
-                      <NativeSelect
-                        id="live-duration"
-                        value={targetMs}
-                        onChange={(e) => setTargetMs(Number(e.target.value))}
-                      >
-                        <option value={60000}>1 minute</option>
-                        <option value={180000}>3 minutes</option>
-                        <option value={300000}>5 minutes</option>
-                      </NativeSelect>
-                    </div>
-                  </div>
-                </details>
-                {mode === "backend" && (
-                  <div className="field">
-                    <details className="connection-settings">
-                      <summary>Server connection</summary>
-                      <label htmlFor="live-endpoint">Backend API URL</label>
-                      <Input
-                        id="live-endpoint"
-                        value={endpoint}
-                        placeholder="http://localhost:8000"
-                        onChange={(e) => setEndpoint(e.target.value)}
-                      />
-                    </details>
-                    {health && (
-                      <p className="field-hint" role="status">
-                        {health}
-                      </p>
-                    )}
-                    <label className="live-transcribe">
-                      <input
-                        type="checkbox"
-                        checked={transcribe}
-                        onChange={(e) => setTranscribe(e.target.checked)}
-                      />
-                      Create a transcript
-                    </label>
-                    {transcribe && (
-                      <label className="live-transcribe">
-                        <input
-                          type="checkbox"
-                          checked={liveCaptions}
-                          onChange={(e) => setLiveCaptions(e.target.checked)}
-                        />
-                        Stream transcription with Deepgram (EU)
-                      </label>
-                    )}
-                    <p className="field-hint">
-                      {transcribe
-                        ? "A completed live transcript is reused in your review. Local Whisper is the fallback. Review recognition errors before checking claims against your sources."
-                        : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
-                    </p>
-                  </div>
-                )}
-              </fieldset>
-            </details>
-            <FeatureOptions
-              flags={featureFlags}
-              change={setFeatureFlags}
-              disabled={!!progress}
-              speechEnabled={microphone}
-            />
-            <details className="live-settings gesture-settings">
-              <summary>Gesture guide and calibration</summary>
-              <GestureGuide evaluation={evaluation ?? null} />
-              <Button
-                variant="outline"
-                disabled={
-                  cameraStatus !== "active" ||
-                  pose.state?.phase !== "running" ||
-                  !!progress
-                }
-                onClick={pose.recalibrate}
-              >
-                Recalibrate neutral position
-              </Button>
-              <Link href="/gestures">Try synthetic walkthrough</Link>
-            </details>
-            <details
-              className="live-settings studio-diagnostics"
-              aria-label="Local pose capture"
-            >
-              <summary>Camera diagnostics</summary>
-              <p role="status">
-                {backendLabel(
-                  pose.state?.backend ?? null,
-                  pose.state?.handModel ?? null,
-                )}
-              </p>
-              {fallbackLabel(pose.state?.backend ?? null) && (
-                <p className="field-hint">
-                  CPU fallback: {fallbackLabel(pose.state?.backend ?? null)}
-                </p>
-              )}
-              <Button
-                variant="outline"
-                aria-pressed={poseLab}
-                disabled={!!progress}
-                onClick={() => {
-                  setPoseLab(!poseLab);
-                  setPoseDebug(false);
-                }}
-              >
-                Pose lab
-              </Button>
-              {poseLab && (
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    setPoseView(poseView === "coach" ? "status" : "coach")
-                  }
-                >
-                  {poseView === "coach" ? "Status view" : "Coach view"}
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                aria-pressed={poseDebug}
-                disabled={poseLab}
-                onClick={() => {
-                  setPoseDebug(!poseDebug);
-                }}
-              >
-                <Eye size={18} />
-                Pose debug
-              </Button>
-
-              <p>
-                Landmarks appear automatically while the camera is on. No pose
-                data is uploaded or used to score your presentation.
-              </p>
-              <p className="field-hint">
-                Gesture and posture observations are prototype heuristics. Eye
-                contact, emotion and presentation quality are not measured.
-              </p>
-              <div className="live-control-bar">
-                {pose.state?.phase === "error" && (
-                  <Button
-                    variant="outline"
-                    disabled={cameraStatus !== "active" || !!progress}
-                    onClick={pose.start}
-                  >
-                    Retry landmarks
-                  </Button>
-                )}
-                <PoseDownload blob={pose.download} />
-              </div>
-              <p role="status">
-                {pose.state?.message ?? "Enable your camera to see landmarks."}
-              </p>
-              <p>
-                {pose.state?.count ?? 0} pose samples ·{" "}
-                {pose.state?.latest?.quality.legs_visible
-                  ? "Legs visible"
-                  : pose.state?.latest?.quality.thighs_visible
-                    ? "Thighs visible"
-                    : pose.state?.latest?.quality.thighs_available
-                      ? "Thighs visible · lower legs estimated"
-                      : "Legs not confirmed visible"}
-              </p>
-              <p className="field-hint">
-                Turn the camera off to download preview JSONL. Starting a take
-                resets the preview log and aligns timestamps to the video.
-                Download preview samples first if you need them. Logs are
-                released when you leave.
-              </p>
-              <div className="stream-summary">
-                <span>
-                  {progress?.chunksSent ?? 0} recording parts{" "}
-                  {mode === "local"
-                    ? "handled locally"
-                    : "uploaded after stopping"}
-                </span>
-                <span>
-                  {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
-                </span>
-              </div>
-            </details>
-            <p className="local-recording-note">
-              <ShieldCheck size={16} /> Video is held in browser memory for
-              review. Download it before refreshing or leaving this workspace.
-            </p>
           </div>
           {(cameraStatus === "active" || progress) && (
             <aside className="coaching-column">
@@ -977,64 +744,284 @@ export function LiveStudio() {
                   Show live hints
                 </label>
               </section>
-              <section className="panel live-events">
-                <div className="panel-title-row">
-                  <h2>Session observations</h2>
-                  <span className="badge">{feedback.length}</span>
-                </div>
-                {feedback.length ? (
-                  <div className="event-feed">
-                    {feedback.toReversed().map((item) => (
-                      <div key={item.id}>
-                        <span className={`feedback-kind ${item.kind}`}>
-                          {item.category} · {time(item.startMs)}
-                        </span>
-                        <strong>{item.title}</strong>
-                        <p>{item.detail}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="live-empty">
-                    <CheckCircle2 size={24} />
-                    <p>No observations yet.</p>
-                    <span>
-                      Start a take to save observations for replay. No
-                      observations does not imply a perfect performance.
-                    </span>
-                  </div>
-                )}
-              </section>
-              {!!progress?.metrics.length && (
-                <section className="panel live-events">
-                  <h2>Backend metrics</h2>
-                  <dl className="backend-metrics">
-                    {progress.metrics.map((metric) => (
-                      <div key={metric.id}>
-                        <dt>{metric.label}</dt>
-                        <dd>
-                          {metric.value ?? "Not enough data"}{" "}
-                          {metric.value !== null && metric.unit}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </section>
-              )}
-              <div className="stream-summary">
-                <span>
-                  {progress?.chunksSent ?? 0} recording parts{" "}
-                  {mode === "local"
-                    ? "handled locally"
-                    : "uploaded after stopping"}
-                </span>
-                <span>
-                  {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
-                </span>
-              </div>
             </aside>
           )}
         </div>
+        <section
+          id="live-options"
+          className="live-options"
+          aria-label="Studio options"
+          tabIndex={-1}
+        >
+          <PresentationSetup
+            mode={presentationMode}
+            onMode={setPresentationMode}
+            endpoint={endpoint}
+            disabled={!!progress}
+            prepared={mode === "backend" && transcribe}
+            onPrepare={() => {
+              stopCamera();
+              setMode("backend");
+              setTranscribe(true);
+              setLiveCaptions(true);
+            }}
+          />
+          <details className="live-settings recording-settings">
+            <summary>Recording options</summary>
+            <fieldset disabled={!!progress}>
+              <details className="connection-settings">
+                <summary>Title and duration</summary>
+                <div className="form-row">
+                  <div className="field">
+                    <label htmlFor="live-title">Recording title</label>
+                    <Input
+                      id="live-title"
+                      value={title}
+                      maxLength={100}
+                      onChange={(e) => setTitle(e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="live-duration">Recording limit</label>
+                    <NativeSelect
+                      id="live-duration"
+                      value={targetMs}
+                      onChange={(e) => setTargetMs(Number(e.target.value))}
+                    >
+                      <option value={60000}>1 minute</option>
+                      <option value={180000}>3 minutes</option>
+                      <option value={300000}>5 minutes</option>
+                    </NativeSelect>
+                  </div>
+                </div>
+              </details>
+              {mode === "backend" && (
+                <div className="field">
+                  <details className="connection-settings">
+                    <summary>Server connection</summary>
+                    <label htmlFor="live-endpoint">Backend API URL</label>
+                    <Input
+                      id="live-endpoint"
+                      value={endpoint}
+                      placeholder="http://localhost:8000"
+                      onChange={(e) => setEndpoint(e.target.value)}
+                    />
+                  </details>
+                  {health && (
+                    <p className="field-hint" role="status">
+                      {health}
+                    </p>
+                  )}
+                  <label className="live-transcribe">
+                    <input
+                      type="checkbox"
+                      checked={transcribe}
+                      onChange={(e) => setTranscribe(e.target.checked)}
+                    />
+                    Create a transcript
+                  </label>
+                  {transcribe && (
+                    <label className="live-transcribe">
+                      <input
+                        type="checkbox"
+                        checked={liveCaptions}
+                        onChange={(e) => setLiveCaptions(e.target.checked)}
+                      />
+                      Stream transcription with Deepgram (EU)
+                    </label>
+                  )}
+                  <p className="field-hint">
+                    {transcribe
+                      ? "A completed live transcript is reused in your review. Local Whisper is the fallback. Review recognition errors before checking claims against your sources."
+                      : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
+                  </p>
+                </div>
+              )}
+            </fieldset>
+          </details>
+          <p className="field-hint">
+            Pose model, finger tracking and feedback types are set in{" "}
+            <Link href="/admin">Admin</Link>.
+          </p>
+          <details className="live-settings gesture-settings">
+            <summary>Gesture guide and calibration</summary>
+            <GestureGuide evaluation={evaluation ?? null} />
+            <Button
+              variant="outline"
+              disabled={
+                cameraStatus !== "active" ||
+                pose.state?.phase !== "running" ||
+                !!progress
+              }
+              onClick={pose.recalibrate}
+            >
+              Recalibrate neutral position
+            </Button>
+            <Link href="/gestures">Try synthetic walkthrough</Link>
+          </details>
+          <details
+            className="live-settings studio-diagnostics"
+            aria-label="Local pose capture"
+          >
+            <summary>Camera diagnostics</summary>
+            <p role="status">
+              {backendLabel(
+                pose.state?.backend ?? null,
+                pose.state?.handModel ?? null,
+              )}
+            </p>
+            {fallbackLabel(pose.state?.backend ?? null) && (
+              <p className="field-hint">
+                CPU fallback: {fallbackLabel(pose.state?.backend ?? null)}
+              </p>
+            )}
+            <Button
+              variant="outline"
+              aria-pressed={poseLab}
+              disabled={!!progress}
+              onClick={() => {
+                setPoseLab(!poseLab);
+                setPoseDebug(false);
+              }}
+            >
+              Pose lab
+            </Button>
+            {poseLab && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  setPoseView(poseView === "coach" ? "status" : "coach")
+                }
+              >
+                {poseView === "coach" ? "Status view" : "Coach view"}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              aria-pressed={poseDebug}
+              disabled={poseLab}
+              onClick={() => {
+                setPoseDebug(!poseDebug);
+              }}
+            >
+              <Eye size={18} />
+              Pose debug
+            </Button>
+
+            <p>
+              Landmarks appear automatically while the camera is on. No pose
+              data is uploaded or used to score your presentation.
+            </p>
+            <p className="field-hint">
+              Gesture and posture observations are prototype heuristics. Eye
+              contact, emotion and presentation quality are not measured.
+            </p>
+            <div className="live-control-bar">
+              {pose.state?.phase === "error" && (
+                <Button
+                  variant="outline"
+                  disabled={cameraStatus !== "active" || !!progress}
+                  onClick={pose.start}
+                >
+                  Retry landmarks
+                </Button>
+              )}
+              <PoseDownload blob={pose.download} />
+            </div>
+            <p role="status">
+              {pose.state?.message ?? "Enable your camera to see landmarks."}
+            </p>
+            <p>
+              {pose.state?.count ?? 0} pose samples ·{" "}
+              {pose.state?.latest?.quality.legs_visible
+                ? "Legs visible"
+                : pose.state?.latest?.quality.thighs_visible
+                  ? "Thighs visible"
+                  : pose.state?.latest?.quality.thighs_available
+                    ? "Thighs visible · lower legs estimated"
+                    : "Legs not confirmed visible"}
+            </p>
+            <p className="field-hint">
+              Turn the camera off to download preview JSONL. Starting a take
+              resets the preview log and aligns timestamps to the video.
+              Download preview samples first if you need them. Logs are released
+              when you leave.
+            </p>
+            <div className="stream-summary">
+              <span>
+                {progress?.chunksSent ?? 0} recording parts{" "}
+                {mode === "local"
+                  ? "handled locally"
+                  : "uploaded after stopping"}
+              </span>
+              <span>
+                {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
+              </span>
+            </div>
+          </details>
+          <p className="local-recording-note">
+            <ShieldCheck size={16} /> Video is held in browser memory for
+            review. Download it before refreshing or leaving this workspace.
+          </p>
+          <details className="live-settings">
+            <summary>Session observations</summary>
+            <section className="panel live-events">
+              <div className="panel-title-row">
+                <h2>Session observations</h2>
+                <span className="badge">{feedback.length}</span>
+              </div>
+              {feedback.length ? (
+                <div className="event-feed">
+                  {feedback.toReversed().map((item) => (
+                    <div key={item.id}>
+                      <span className={`feedback-kind ${item.kind}`}>
+                        {item.category} · {time(item.startMs)}
+                      </span>
+                      <strong>{item.title}</strong>
+                      <p>{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="live-empty">
+                  <CheckCircle2 size={24} />
+                  <p>No observations yet.</p>
+                  <span>
+                    Start a take to save observations for replay. No
+                    observations does not imply a perfect performance.
+                  </span>
+                </div>
+              )}
+            </section>
+            {!!progress?.metrics.length && (
+              <section className="panel live-events">
+                <h2>Backend metrics</h2>
+                <dl className="backend-metrics">
+                  {progress.metrics.map((metric) => (
+                    <div key={metric.id}>
+                      <dt>{metric.label}</dt>
+                      <dd>
+                        {metric.value ?? "Not enough data"}{" "}
+                        {metric.value !== null && metric.unit}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
+            <div className="stream-summary">
+              <span>
+                {progress?.chunksSent ?? 0} recording parts{" "}
+                {mode === "local"
+                  ? "handled locally"
+                  : "uploaded after stopping"}
+              </span>
+              <span>
+                {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
+              </span>
+            </div>
+          </details>
+        </section>
         {Object.values(recordings).length > 0 && (
           <section className="recent-recordings">
             <h2>Recordings in this workspace</h2>

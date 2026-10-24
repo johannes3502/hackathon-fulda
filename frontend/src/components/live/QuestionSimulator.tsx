@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
+  ArrowLeft,
+  ArrowRight,
   CornerDownRight,
   ExternalLink,
-  MessagesSquare,
   Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,13 @@ import type { LiveFeedback, LiveRecording } from "@/features/live/contracts";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import {
   factCheckSettings,
-  type FactCheckSettings,
+  factFeedback,
+  runFactCheck,
 } from "@/features/factcheck/api";
 import {
   ANSWER_LABELS,
   generateQuestions,
   KIND_LABELS,
-  PERSONA_LABELS,
   questionFeedback,
   reviewAnswer,
   withFollowUp,
@@ -27,13 +27,12 @@ import {
   type Question,
   type QuestionResult,
 } from "@/features/questions/api";
-import { VoiceConversation } from "./VoiceConversation";
+import { PRESENTATION_MODES } from "@/features/questions/presentation";
 import { collectionId, listSources } from "@/features/sources/api";
 import type { components } from "../../../../api/schema";
 import { time } from "@/lib/utils";
 
 type Evidence = components["schemas"]["Evidence"];
-
 function Source({ evidence }: { evidence: Evidence }) {
   return (
     <blockquote>
@@ -58,46 +57,19 @@ export function QuestionSimulator({
   recording: LiveRecording;
   onSelect: (feedback: LiveFeedback) => void;
 }) {
-  // Async results merge into the newest recording, not the one at request time.
   const { update } = useLiveSessions();
-  const endpoint = recording.config.endpoint;
-  const [settings, setSettings] = useState<FactCheckSettings | null>(null);
-  // Same browser collection as the /sources page; never rendered on the server.
-  const [collection] = useState(collectionId);
-  const [readySources, setReadySources] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [persona, setPersona] = useState<Persona>(
-    recording.questions?.persona ?? "tutor",
+  const [collection] = useState(
+    () => recording.config.sourceCollectionId ?? collectionId(),
   );
-  // A new round remounts the voice conversation, which ends a running one.
-  const [round, setRound] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [index, setIndex] = useState(0);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
-  useEffect(() => {
-    const active = new AbortController();
-    factCheckSettings(endpoint, active.signal)
-      .then(setSettings)
-      .catch(() => {
-        if (!active.signal.aborted)
-          setNotice("Model settings could not be loaded from the backend.");
-      });
-    listSources(endpoint, collection)
-      .then((sources) => {
-        if (!active.signal.aborted)
-          setReadySources(sources.filter((s) => s.status === "ready").length);
-      })
-      .catch(() => {
-        if (!active.signal.aborted) setReadySources(null);
-      });
-    return () => active.abort();
-  }, [endpoint, collection]);
-
   const words = recording.words ?? [];
-  const claims = recording.factCheck?.claims ?? [];
   const result = recording.questions;
-  const askedBy = result?.persona ?? "tutor";
-  const canRun = !busy && !!settings?.available && words.length > 0;
+  const question = result?.questions[index];
+  const persona = result?.persona ?? "tutor";
 
   function withQuestions(
     current: LiveRecording,
@@ -114,38 +86,82 @@ export function QuestionSimulator({
   }
 
   async function generate() {
+    if (busy) return;
     const active = new AbortController();
-    controller.current?.abort();
     controller.current = active;
     setBusy(true);
-    setNotice(null);
-    setRound((n) => n + 1);
+    setNotice("Reading your presentation…");
     try {
+      const settings = await factCheckSettings(
+        recording.config.endpoint,
+        active.signal,
+      );
+      if (!settings.available)
+        throw new Error(
+          "Typed questions are unavailable. Start the language model on your backend and retry.",
+        );
+      let claims = recording.factCheck?.claims ?? [];
+      const sources = await listSources(recording.config.endpoint, collection);
+      if (
+        sources.some((s) => s.status === "processing" || s.status === "queued")
+      )
+        throw new Error(
+          "Your material is still processing. Please retry when it is ready.",
+        );
+      if (!recording.factCheck && sources.some((s) => s.status === "ready")) {
+        setNotice("Comparing your presentation with the material…");
+        const checked = await runFactCheck(
+          recording.config.endpoint,
+          { words, collectionId: collection, useWeb: false },
+          active.signal,
+        );
+        claims = checked.claims;
+        if (active.signal.aborted) return;
+        update(recording.id, (take) =>
+          take.words !== words
+            ? take
+            : {
+                ...take,
+                factCheck: checked,
+                feedback: [
+                  ...take.feedback.filter(
+                    (item) => !item.id.startsWith("fact-"),
+                  ),
+                  ...factFeedback(checked, take.durationMs),
+                ].sort((a, b) => a.startMs - b.startMs),
+              },
+        );
+      }
+      setNotice("Preparing your questions…");
       const generated = await generateQuestions(
-        endpoint,
-        { words, collectionId: collection, claims, persona },
+        recording.config.endpoint,
+        {
+          words,
+          collectionId: collection,
+          claims,
+          persona: "tutor",
+          presentationMode: recording.config.presentationMode ?? "startup",
+        },
         active.signal,
       );
       if (active.signal.aborted) return;
-      update(recording.id, (current) =>
-        current.words !== words
-          ? current
-          : {
-              ...withQuestions(current, generated),
-              answers: {},
-            },
+      update(recording.id, (take) =>
+        take.words !== words
+          ? take
+          : { ...withQuestions(take, generated), answers: {} },
       );
+      setIndex(0);
       setNotice(
         generated.questions.length
-          ? `${generated.questions.length} ${generated.questions.length === 1 ? "question" : "questions"} ready. Questions about a passage were added to your feedback moments.`
-          : "The model did not propose any well-founded questions for this transcript.",
+          ? ""
+          : "No grounded questions were found. Try again with more material or a longer take.",
       );
     } catch (error) {
       if (!active.signal.aborted)
         setNotice(
           error instanceof Error
             ? error.message
-            : "The question simulator failed.",
+            : "Questions could not be prepared. Please retry.",
         );
     } finally {
       if (!active.signal.aborted) setBusy(false);
@@ -153,172 +169,120 @@ export function QuestionSimulator({
   }
 
   function answered(question: Question, answer: string, review: AnswerReview) {
-    update(recording.id, (current) => {
+    update(recording.id, (take) => {
       if (
-        !current.questions ||
-        current.words !== recording.words ||
-        !current.questions.questions.some(
+        !take.questions ||
+        take.words !== recording.words ||
+        !take.questions.questions.some(
           (q) => q.id === question.id && q.question === question.question,
         )
       )
-        return current;
+        return take;
       const questions = review.follow_up
-        ? withFollowUp(
-            current.questions.questions,
-            question.id,
-            review.follow_up,
-          )
-        : current.questions.questions;
+        ? withFollowUp(take.questions.questions, question.id, review.follow_up)
+        : take.questions.questions;
       return {
-        ...withQuestions(current, { ...current.questions, questions }),
-        answers: { ...current.answers, [question.id]: { answer, review } },
+        ...withQuestions(take, { ...take.questions, questions }),
+        answers: { ...take.answers, [question.id]: { answer, review } },
       };
     });
   }
 
-  const answeredCount = Object.keys(recording.answers ?? {}).length;
   return (
-    <section
-      className="panel fact-check questions"
-      aria-labelledby="questions-title"
-    >
-      <div className="panel-title-row">
-        <h2 id="questions-title">
-          <MessagesSquare size={18} /> Question simulator
-        </h2>
-        {result && (
-          <span className="badge">
-            {answeredCount}/{result.questions.length} answered
-          </span>
-        )}
-      </div>
-      <p>
-        After your talk, a simulated listener asks follow-up questions: first
-        about statements your sources contradict or don’t back, then about
-        source content you left out. Talk with them by voice or type your
-        answers; each answer is compared with your sources. No points, no
-        grades.
-      </p>
-      <dl className="fact-check-inputs">
-        <div>
-          <dt>Transcript</dt>
-          <dd>
-            {words.length
-              ? `${words.length} words`
-              : "None yet. Turn on transcription before recording or import word timestamps above."}
-          </dd>
-        </div>
-        <div>
-          <dt>Fact-check findings</dt>
-          <dd>
-            {recording.factCheck
-              ? `${claims.length} ${claims.length === 1 ? "statement" : "statements"}`
-              : "Not run yet. Run the fact-check above for sharper questions."}
-          </dd>
-        </div>
-        <div>
-          <dt>Your sources</dt>
-          <dd>
-            {readySources === null ? "Unavailable" : `${readySources} ready`} ·{" "}
-            <Link href="/sources" target="_blank" rel="noopener noreferrer">
-              Manage sources (new tab)
-            </Link>
-          </dd>
-        </div>
-      </dl>
-      {settings && !settings.available && (
-        <p className="status-warning" role="status">
-          The language model is not configured on the backend (LLM_BASE_URL,
-          LLM_MODEL).
-        </p>
+    <div className="typed-question-round">
+      {!result?.questions.length && (
+        <>
+          <p>
+            Questions use your transcript and material. Answer in your own
+            words; follow-ups help you go deeper.
+          </p>
+          <Button
+            disabled={busy || !words.length}
+            onClick={() => void generate()}
+          >
+            {busy ? "Preparing questions…" : "Start question round"}
+          </Button>
+          <p className="field-hint">
+            This sends your transcript, matching material and typed answers to
+            the language model configured on your backend.
+          </p>
+        </>
       )}
-      {settings?.available && (
-        <p className="field-hint">
-          Starting sends your transcript sentences, fact-check findings and
-          matching source passages to {settings.llm_host} (model{" "}
-          {settings.model}). Each answer you submit is sent there too. Spoken
-          answers first go to the speech recognition service configured on the
-          backend (Deepgram EU by default) and are deleted after processing;
-          questions are read aloud by your browser.
-        </p>
-      )}
-      <fieldset className="persona-picker" disabled={busy}>
-        <legend>Who asks?</legend>
-        {(Object.keys(PERSONA_LABELS) as Persona[]).map((key) => (
-          <label key={key} className={persona === key ? "selected" : ""}>
-            <input
-              type="radio"
-              name="persona"
-              value={key}
-              checked={persona === key}
-              onChange={() => setPersona(key)}
-            />
-            <strong>{PERSONA_LABELS[key].name}</strong>
-            <span className="muted small">{PERSONA_LABELS[key].detail}</span>
-          </label>
-        ))}
-      </fieldset>
-      <Button onClick={() => void generate()} disabled={!canRun}>
-        {busy
-          ? "Preparing questions…"
-          : result
-            ? "Ask new questions"
-            : "Start question round"}
-      </Button>
       <p role="status" className="field-hint">
         {notice}
       </p>
-      {result && (
+      {result && question && (
         <>
-          {result.persona && result.persona !== persona && (
-            <p className="field-hint">
-              These questions were asked by the{" "}
-              {PERSONA_LABELS[askedBy].name.toLowerCase()}. Ask new questions to
-              switch roles.
-            </p>
-          )}
-          {result.questions.length > 0 && (
-            <VoiceConversation
-              key={round}
-              recording={recording}
-              persona={askedBy}
-              collection={collection}
-              disabled={!settings?.available}
-              onAnswered={answered}
-            />
-          )}
+          <div className="panel-title-row">
+            <span className="muted">
+              Question {index + 1} of {result.questions.length}
+            </span>
+            <span className="badge">
+              {Object.keys(recording.answers ?? {}).length} answered
+            </span>
+          </div>
           <ol className="fact-claims">
-            {result.questions.map((question, index) => (
-              <QuestionCard
-                // Remount when a spoken answer arrives so the draft shows it.
-                key={`${question.id}:${recording.answers?.[question.id]?.answer ?? ""}`}
-                number={index + 1}
-                question={question}
-                recording={recording}
-                persona={askedBy}
-                collection={collection}
-                disabled={!settings?.available}
-                onSelect={() => {
-                  const moment = questionFeedback(
-                    [question],
-                    recording.durationMs,
-                  )[0];
-                  if (moment) onSelect({ ...moment });
-                }}
-                onAnswered={(answer, review) =>
-                  answered(question, answer, review)
-                }
-              />
-            ))}
+            <QuestionCard
+              key={question.id + question.question}
+              number={index + 1}
+              question={question}
+              recording={recording}
+              persona={persona}
+              collection={collection}
+              disabled={busy}
+              onSelect={() => {
+                const moment = questionFeedback(
+                  [question],
+                  recording.durationMs,
+                )[0];
+                if (moment) onSelect(moment);
+              }}
+              onAnswered={(answer, review) =>
+                answered(question, answer, review)
+              }
+            />
           </ol>
-          <ul className="fact-notices">
-            {result.notices.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+          <div className="question-navigation">
+            <Button
+              variant="ghost"
+              disabled={index === 0 || busy}
+              onClick={() => setIndex((n) => n - 1)}
+            >
+              <ArrowLeft size={16} /> Previous
+            </Button>
+            {index + 1 < result.questions.length ? (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => setIndex((n) => n + 1)}
+              >
+                Next question <ArrowRight size={16} />
+              </Button>
+            ) : (
+              <span className="field-hint">
+                End of this round. Take one improvement into your next
+                rehearsal.
+              </span>
+            )}
+          </div>
+          <details className="review-details">
+            <summary>Sources and round details</summary>
+            <ul className="fact-notices">
+              {result.notices.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => void generate()}
+            >
+              Ask new questions
+            </Button>
+          </details>
         </>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -360,7 +324,13 @@ function QuestionCard({
     try {
       const reviewed = await reviewAnswer(
         recording.config.endpoint,
-        { question, answer, collectionId: collection, persona },
+        {
+          question,
+          answer,
+          collectionId: collection,
+          persona,
+          presentationMode: recording.config.presentationMode ?? "startup",
+        },
         active.signal,
       );
       if (!active.signal.aborted) onAnswered(answer, reviewed);
@@ -436,7 +406,15 @@ function QuestionCard({
           </span>
           {review.reply && (
             <p>
-              <strong>{PERSONA_LABELS[persona].name}:</strong> {review.reply}
+              <strong>
+                {
+                  PRESENTATION_MODES[
+                    recording.config.presentationMode ?? "startup"
+                  ].listener
+                }
+                :
+              </strong>{" "}
+              {review.reply}
             </p>
           )}
           {review.explanation && (
@@ -460,7 +438,8 @@ function QuestionCard({
           </p>
           {review.follow_up && (
             <p className="muted small">
-              <CornerDownRight size={12} /> Follow-up added below.
+              <CornerDownRight size={12} /> A follow-up is ready. Choose Next
+              question to answer it.
             </p>
           )}
         </div>

@@ -52,7 +52,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
   Web-Zweitquelle über Team-API vorhanden, standardmäßig aus; kein eigenes
   Scraping. Die frühere Local-only-Zusage ist hinfällig: Gemini ist Cloud ohne
   EU-Region-Pinning, daher nur synthetische Demo-Daten senden.
-- **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
+- **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Referenz erst aus ca. 3 s erkannter stimmhafter Sprache (keine Anfangsstille/unvoiced Raumgeräusche), danach langsam adaptiv in 1-s-Blöcken; 30 s Halbwertszeit in stimmhafter Zeit, Median und begrenzte Updates gegen kurze Ausreißer. Lautstärkevergleich nur auf stimmhaften Frames; F0 in Halbtönen, Pitch-Streuung unabhängig von der Referenzbewegung. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
 - **Hosting:** Nutzer bestätigt lokale Vorführung auf `localhost`; kein öffentliches Deployment nötig. Für andere Geräte/öffentliche Hosts bleibt HTTPS für `getUserMedia` erforderlich.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
@@ -191,7 +191,8 @@ für den Fact-Check. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
 Darauf laufen lokale, kalibrierte Gesten-/Haltungsheuristiken (Hand hoch,
-Hände zusammen, Arme verschränkt, seitliche Neigung/Position) mit
+Hände zusammen, Arme verschränkt, seitliche Neigung/Position, Kopf seitlich
+abgewandt/gesenkt als Kopforientierungs-Proxy) mit
 Live-Hinweis, Review-Markern und Evidenz-Export. `/gestures` zeigt denselben
 Regelablauf mit synthetischen Landmarks; keine Genauigkeitsvalidierung.
 Recherche und Regeln: `docs/04-gesture-evaluation.md`; Jury-Abnahme und
@@ -199,7 +200,7 @@ noch offene Geräte-Gates: `docs/05-jury-demo.md`. Nutzerentscheidung:
 lokale Vorführung reicht; kein öffentliches Deployment erforderlich.
 Eye Contact wird nicht aus Pose-/Iris-Punkten behauptet.
 Der integrierte Web-Worker startet standardmäßig mit Lite/VIDEO. Unter
-„Analysis features“ sind IMAGE/VIDEO sowie Lite/Heavy unabhängig auswählbar;
+„Analysis features“ in `/admin` sind IMAGE/VIDEO sowie Lite/Heavy unabhängig auswählbar;
 GPU-first mit CPU-Fallback bei Start- oder Laufzeitfehlern, kein Modellwechsel.
 JSONL/Event-Payload enthalten `runtime` (Modell, Modus, Delegate). VIDEO-Logs
 enthalten zeitlich geglättete Modell-Ausgaben; IMAGE-Logs unabhängige Frames.
@@ -208,14 +209,23 @@ Pose Lab T1–T12 bleibt ein Dev-Werkzeug. Fingertracking ist separat unter
 es funktioniert auch ohne sichtbaren Torso. Es erzeugt keine Pocket-Events.
 Die Haltungsreferenz kalibriert ohne Hand-Stillhaltepflicht. Fehlende neutrale
 Handreferenzen bleiben im Payload `null`; Gesten nutzen dann Schultergeometrie.
-Die tolerantere Arm-Geometrie verwendet weiter 2 s Hold / 20 s Cooldown.
+Alle Pose-Regeln halten einheitlich 2 s (`POSE_RULES.stabilizeHoldMs`); Arme
+verschränkt behalten 20 s Cooldown. Die Live-Hinweisblase (Pose und Stimme)
+zeigt jeden Hinweis mindestens 3 s und lässt danach 2 s Lücke
+(`minDisplayMs`/`minDisplayGapMs`). Pose-lab-Lob („Nice, open posture.“) erscheint
+nur nach 10 s ohne Korrekturhinweis einmalig (`praiseAfterMs`). Alle Werte sind unter `/admin`
+(Navbar, noch ohne Login) pro Browser in `localStorage` einstellbar. Dort lässt
+sich auch jede der 7 Pose-Regeln auf On (Hinweis + Review), Review only (nur
+Timeline) oder Off stellen und jeder der 12 Pose-lab-Tests abschalten.
 Sprachfeedback ist insgesamt und für Pausen, Tempo, Füllwörter, Lautstärke und
 Tonhöhe einzeln schaltbar. „Live · in browser“ ist Standard: Kamera/Mikro bleiben
 lokal, ein AudioWorklet liefert RMS/YIN und einen Energiehüllkurven-Tempo-Proxy.
 Pausen, Lautstärke, Tonhöhenvariation und Rhythmus erscheinen während der Aufnahme.
 „Off · gestures only“ schaltet das Mikro aus. Der Backend-Modus nutzt den separaten
 Signal-Stream unten; Füllwörter und Wort-Tempo bleiben nachgelagert. Live-Captions
-sind separat. Schalter werden pro Aufnahme gespeichert und sind währenddessen gesperrt.
+sind separat. Die Analysis-features-Schalter liegen in `/admin`, bleiben pro
+Browser in `localStorage` und werden mit jeder Aufnahme gespeichert; Änderungen gelten
+ab der nächsten Aufnahme. Speech analysis und Pose lab bleiben im Studio.
 Die ausführlichen Research-Ziele in `docs/04-pose-tracking-requirements.md`
 sind nicht vollständig implementiert und überschreiben diese Entscheidung nicht.
 Der Aufnahme-Pfad nutzt die Audio-Job-API
@@ -234,7 +244,7 @@ Die bisherigen `/speech`-/`factcheck`-/`questions`-Routen bleiben kompatibel;
 der neue Take-Pfad persistiert Ergebnisse in Postgres und temporäres Audio in S3.
 
 Live-Sprechfeedback ist im Web-Backend-Modus umgesetzt: `WS /speech/feedback`
-analysiert Mikrofon-PCM alle 5 s mit denselben Signalregeln und 3-s-Baseline.
+analysiert Mikrofon-PCM alle 5 s mit denselben Signalregeln und kausaler adaptiver Stimmreferenz (zunächst 3 s stimmhafte Sprache; Stille trainiert nicht).
 Ein Live-Slot pro API-Prozess, maximal 5 min; PCM nur im RAM. Die Vorschau
 läuft unabhängig von optionalen Whisper-Captions, zeigt höchstens einen
 Hinweis mit 15-s-Cooldown pro Typ und stoppt bei mehr als 15 s Rückstand.
@@ -275,3 +285,16 @@ serverseitig in `.env`; ohne Schlüssel oder bei unvollständigem Stream bleibt
 Whisper der lokale Ersatzweg. Signal-Analyse und Upload bleiben nach Stop nötig.
 Details: `backend/app/transcription/README.md`. Keine Genauigkeits- oder
 Latenzzusage aus den synthetischen Protokolltests ableiten.
+
+## Review und ElevenLabs (24.10.2026)
+
+Web-Review: zwei Hauptansichten, **Review moments** mit zeitgenauen Anmerkungen
+und begrenzter Wiedergabe im lokalen Vollvideo, **Practice questions** mit einer
+Frage pro Schritt. Transkript, Quellencheck und Exporte sind aufklappbare Details.
+Vor der Aufnahme stehen Material-Upload und vier Präsentationstypen bereit:
+`startup`, `thesis`, `school`, `nonprofit`. `sourceCollectionId` und
+`presentationMode` werden im Take festgehalten und an beide Fragepfade übergeben.
+ElevenLabs ist auf Nutzerwunsch als optionaler Sprachdialog integriert; Nutzer
+konfiguriert `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` selbst. Kontext als
+Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Keine Bewertungs-Scores; Sprachreaktionen sind nicht zitateverifiziert.
+Einrichtung und offene Grenzen: `docs/07-review-and-agent.md`.

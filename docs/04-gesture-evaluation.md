@@ -1,7 +1,7 @@
 # Gesten und Haltung: Was wir beobachten und warum
 
 Stand: 24.10.2026. **Prototyp, keine validierte Beurteilung.**
-Implementierung: `frontend/src/features/pose/evaluation.ts` (`pose-rules-v5`).
+Implementierung: `frontend/src/features/pose/evaluation.ts` (`pose-rules-v7`).
 Kamera: `/live`. Synthetischer, reproduzierbarer Rundgang: `/gestures`.
 Diese Regeln beschreiben den Web-Pfad. Die native App verwendet weiterhin
 ihren separaten `CrossArmsCue`-Adapter; dessen bisherige Release-Zeiten wurden
@@ -70,6 +70,8 @@ zur Orientierung gespiegelt; die Daten sind ungespiegelt.
 | **Sideways lean** | Absoluter Unterschied des Torso-Bildwinkels zur persönlichen Neutralstellung | Sichtbarer Vergleich mit der eigenen Ausgangslage; auch sitzend möglich. | Keine medizinische Haltungsbewertung, kein Vor-/Zurücklehnen, keine Aussage über Sicherheit. |
 | **Sideways position change** | Horizontale Änderung des Mittelpunkts der beiden Schultern und Hüften, geteilt durch die neutrale Schulterbreite | Erfasst auch eine seitliche Versetzung des ganzen Körpers ohne Torso-Neigung; aus dem Nutzer-Test ergänzt. | Kein Nachweis von Unruhe oder schlechter Position; eine Kamerabewegung kann dasselbe Bildsignal erzeugen. |
 | **Arms crossed in front of torso** | Handgelenke an/nahe der Körpermitte, im Rumpfbereich, Ellbogen gebeugt, Unterarme grob parallel zur Schulterlinie | Macht die vorhandene Team-Regel auch timestamp-genau zurückspulbar. | Keine Aussage über Abwehr, Gefühle oder Persönlichkeit; verdeckte Handgelenke bleiben unbekannt. |
+| **Head turned to the side** | Lage der Nase zwischen den Ohren im Bild: (Abstand zum einen Ohr − Abstand zum anderen) / Summe, 0 = mittig, ±1 = an/hinter einem Ohr; Betrag der Änderung zur Neutralstellung | Längeres Abwenden, z. B. zum Ablesen der Folien, wird zurückspulbar. Kopforientierung als Proxy. | Kein Blick-/Eye-Contact-Tracking, keine Aussage über Aufmerksamkeit oder Publikum; kurze Blicke in den Raum bleiben unmarkiert. |
+| **Head tilted down** | Nase unter der Ohrlinie, geteilt durch Schulterbreite; nur Zunahme gegenüber neutral | Längeres Senken des Kopfes, z. B. Ablesen von Notizen. | Kein Blick-Tracking; Hochschauen wird nicht markiert; keine Aussage über Unsicherheit. |
 
 Beine sind für diese Regeln nicht erforderlich. Ein leicht schiefer, aber
 stabiler neutraler Torso ist eine gültige Referenz. Nicht bequeme Bewegungen
@@ -92,11 +94,16 @@ Regelversion, Tests und erneute Prüfung vor Ort.
 | Neutrale Hände | Optional: Höhe ≤ −0,15 Schulterbreiten, Abstand ≥ 0,65 Schulterbreiten; im Torso-Band | Mindestens 15 geeignete Samples für eine Handreferenz. Sonst `null`; Handhöhe/-abstand nutzen die bestehende Schultergeometrie-Schwelle. Hände blockieren keine Haltungsreferenz. |
 | Stabilität der Kalibrierung | Spannweite Torso ≤ 6°; seitliche Position ≤ 0,3 Schulterbreiten | Handbewegungen setzen die Haltungsreferenz nicht zurück. Körperbewegung startet die Kalibrierung neu. |
 | Maximaler Sample-Abstand | 350 ms | Lücken nicht als gehaltene Bewegung zählen. Sehr langsame Geräte können so nicht kalibrieren. |
-| Hand hoch | Eintritt max(0,15; neutrale Höhe + 0,5); Austritt 0,1 darunter | Klar über der Schulter; Hysterese reduziert Flackern an der Grenze. 0,8 s halten. |
-| Hände zusammen | Eintritt min(0,35; neutraler Abstand / 2); Austritt 0,15 darüber | Deutlich näher als neutral. 1,2 s halten, nur im Torso-Band. |
-| Seitlicher Torso | Eintritt 12° Veränderung; Austritt 8° | Nur größere Bildwinkeländerungen markieren. 1,5 s halten. |
-| Seitliche Position | Eintritt 0,35 neutrale Schulterbreiten; Austritt 0,2; 0,8 s halten | Erkennt den vom Nutzer getesteten seitlichen Körperversatz. Auf Rückmeldung zur Verzögerung von 1,5 s verkürzt. Bei ≥ 8° Torsoänderung wird die Position nicht zusätzlich markiert; dafür gilt die Neigungsregel. |
-| Arme verschränkt | Beide Wrist-Cross-Werte ≥ −0,25; Höhen in [−1,3; 0,2]; Ellbogen ≤ 120°; Unterarme ≤ 40°; 2 s halten | Übernimmt die Team-Geometrie. Im gemeinsamen Evaluator: keine Überbrückung fehlender Frames, 20 s Cooldown. Nahe Hände, deren Wrist-Cross-Werte beide negativ sind, bleiben Hände-zusammen; bestehende Abstandsschwelle und Hysterese gelten. Keine gleichzeitigen gegensätzlichen Marker. |
+| Hand hoch | Eintritt max(0,15; neutrale Höhe + 0,5); Austritt 0,1 darunter | Klar über der Schulter; Hysterese reduziert Flackern an der Grenze. |
+| Hände zusammen | Eintritt min(0,35; neutraler Abstand / 2); Austritt 0,15 darüber | Deutlich näher als neutral, nur im Torso-Band. |
+| Seitlicher Torso | Eintritt 12° Veränderung; Austritt 8° | Nur größere Bildwinkeländerungen markieren. |
+| Seitliche Position | Eintritt 0,35 neutrale Schulterbreiten; Austritt 0,2 | Erkennt den vom Nutzer getesteten seitlichen Körperversatz. Bei ≥ 8° Torsoänderung wird die Position nicht zusätzlich markiert; dafür gilt die Neigungsregel. |
+| Arme verschränkt | Beide Wrist-Cross-Werte ≥ −0,25; Höhen in [−1,3; 0,2]; Ellbogen ≤ 120°; Unterarme ≤ 40° | Übernimmt die Team-Geometrie. Im gemeinsamen Evaluator: unbekannte Frames (verdeckte Handgelenke) überbrückt bis 1,5 s während der Haltezeit, fehlende Person beendet sie; 20 s Cooldown. Pose lab nutzt dieselbe 1,5-s-Überbrückung. Zusätzlich einseitig: Ein Arm erfüllt alle Kriterien und kreuzt die Körpermitte (≥ 0), die andere Hand ist verdeckt oder mit gebeugtem Ellbogen auf Brusthöhe, Handgelenke ≥ 0,35 Schulterbreiten auseinander. Grund (Kameratest 24.10.2026): Die unter dem Arm verdeckte Hand wird von MediaPipe nahe dem eigenen Ellbogen geschätzt. Nahe Hände, deren Wrist-Cross-Werte beide negativ sind, bleiben Hände-zusammen; bestehende Abstandsschwelle und Hysterese gelten. Keine gleichzeitigen gegensätzlichen Marker. |
+| Kopfrichtung | Seitlich: Eintritt 0,5 Änderung, Austritt 0,35; unten: Eintritt 0,1 Schulterbreiten, Austritt 0,06; Nase und beide Ohren im Bild mit visibility ≥ 0,2 | Ein verdecktes fernes Ohr senkt die visibility; daher lockerer als 0,5. Neutrale Kopfreferenz = Median aller Kalibrierungs-Frames mit messbarem Kopf (≥ 15), sonst seitlich 0 und keine Unten-Regel. Bei stärkerer Drehung kann das ferne Ohr wegfallen; dann pausiert die Regel. Event-Typ `gaze`, Kategorie „Head“. |
+| Haltezeit (`stabilizeHoldMs`) | 2 s für jede Regel | Nutzerentscheidung (24.10.2026): eine einheitliche Haltezeit statt 0,8–2 s je Regel; kurze Bewegungen und Blicke erzeugen weder Event noch Hinweis. |
+| Live-Hinweis-Takt (`minDisplayMs`, `minDisplayGapMs`) | Mindestens 3 s sichtbar; danach 2 s leere Blase; 0 = direkter Wechsel | Gilt für Haltungs- und Stimmhinweise in derselben Blase (`frontend/src/features/live/cue-pacing.ts`), damit nicht mehrere Hinweise kurz hintereinander erscheinen. Während der Lücke übersprungene Hinweise bleiben als Events in der Timeline. Werte stehen in `POSE_RULES` und sind für ein späteres Admin-Panel vorgesehen. |
+| Pose-lab-Lob (`praiseAfterMs`) | 10 s ohne gehaltenen oder anstehenden Korrekturhinweis, dann einmal für `minDisplayMs` | Nur Dev-Werkzeug Pose lab (Coach-Ansicht); verhindert ein dauerhaft sichtbares „Nice, open posture.“. Ohne Hinweis bleibt die Blase leer. Status-Ansicht zeigt weiterhin jeden Frame. |
+| Admin-Schalter je Regel | On / Review only / Off; Pose-lab-Tests an/aus | Off: Regel wird nicht beobachtet. Review only: Event in der Timeline, kein Live-Hinweis. Abgeschaltete Pose-lab-Tests melden „off“. Gilt ab nächster Kalibrierung oder Aufnahme. |
 | Cooldown | 5 s (Arme verschränkt: 20 s) nach Ende der letzten bestätigten Beobachtung dieses Typs | Eine gehaltene Bewegung bleibt ein Event. Rückkehr/Lücke plus erneute Mindestdauer nötig. |
 | Kameraframe wird alt | nach 700 ms Overlay/aktuellen Hinweis ausblenden; nach 5 s hängender Inferenz Fehler | Keine eingefrorene Erkennung als aktuellen Zustand zeigen. |
 

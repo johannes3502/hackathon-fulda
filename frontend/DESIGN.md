@@ -29,25 +29,36 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
 - `/` and `/stats-preview` show counts, durations and observations from actual
   recordings in the current workspace, with an empty state before the first take.
   No synthetic percentages, monthly histories or performance scores appear.
-  `AppShell` provides header navigation and a navigation drawer across views.
+  `AppShell` provides header navigation and a navigation drawer outside the full-size live studio.
   The active destination is identified visually and with `aria-current`.
 
 ## Screens
 
-- **Studio:** normal view is the default, with visible navigation, speech choice,
-  timer, and camera stage. Before feedback exists, the stage uses the available
-  width. Large view is optional and preserves the active camera and recording;
-  Escape returns to normal view. Large view fills the available height with the
-  camera on the left and an equally wide feedback panel on the right, with shared
-  controls above. Below 1001px they stack. Recording options and diagnostics are disclosures.
-  Live cues use large text and contextual SVG icons. Red means an adjustment to
+- **Studio:** the full-size camera and feedback layout is the only view. The
+  camera fills the available width before feedback exists; during preview and
+  recording it sits beside an equally wide feedback panel. Below 1001px they
+  stack. Shared controls, speech choice and recording timer sit
+  above the camera. Options links to setup, recording options and diagnostics
+  below the studio. The live toolbar has no navigation menu.
+  Live cues use large text, contextual SVG icons, a clear panel tint and a lighter
+  tint across the live workspace. Red means an adjustment to
   consider; green means explicit positive feedback or labelled tracking readiness.
   Ordinary gestures, pauses, calibration and hidden hints remain neutral. Color
   always has a text label; tracking readiness is not a performance assessment.
-- **Review:** use the same type scale, controls, and surfaces as the studio.
-  Video, timeline, selected observation, and moment list remain connected to the
-  existing video clock. On phones, playback and timeline precede the observation.
-  The chart may scroll within its container; the page must not scroll sideways.
+- **Review:** two primary views, Review moments and Practice questions. Large
+  playback sits beside one selected observation and a compact list of replay
+  sections. Annotations follow video.currentTime; ordinary gestures are not
+  labelled bad performance. On phones, playback precedes the feedback.
+  Timestamp jump buttons show the time and feedback title, wrapping without
+  overlapping even when observations cover the same time range. Timestamp labels
+  use the live feedback colors: red for adjustments, green for positive feedback,
+  neutral for observations. The violet selection outline remains separate.
+  Transcript, source checks, metrics and exports live in disclosures.
+  Questions show one exchange at a time, with voice or typed answers. The
+  presentation mode and material collection are fixed when a take starts.
+  ElevenLabs only starts on an explicit click after its data-sharing notice;
+  leaving the question view disconnects the agent. Missing configuration,
+  unavailable services and missing transcripts have visible recovery paths.
 - **Sources:** place the document library and source search beside one another on
   desktop and stack them on phones. Show supported formats, upload state, errors,
   and when search becomes available. Continue to recording is the main action.

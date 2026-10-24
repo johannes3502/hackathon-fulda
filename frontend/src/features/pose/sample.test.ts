@@ -44,6 +44,8 @@ it("exports exactly the requested raw points and unsmoothed geometry", () => {
     eyes_forward: true,
     pitch_deg: 0,
     roll_deg: 0,
+    yaw_ratio: 0,
+    drop_ratio: 0,
   });
   expect(sample.derived).toMatchObject({
     shoulder_tilt_deg: 0,

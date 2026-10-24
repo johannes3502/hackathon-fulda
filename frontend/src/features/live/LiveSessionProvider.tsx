@@ -6,10 +6,17 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { LiveRecording } from "./contracts";
-import { DEFAULT_FEATURE_FLAGS, type FeatureFlags } from "./feature-flags";
+import {
+  DEFAULT_FEATURE_FLAGS,
+  featureFlagsSnapshot,
+  storeFeatureFlags,
+  subscribeFeatureFlags,
+  type FeatureFlags,
+} from "./feature-flags";
 type LiveContext = {
   featureFlags: FeatureFlags;
   setFeatureFlags: (flags: FeatureFlags) => void;
@@ -23,9 +30,13 @@ type LiveContext = {
 };
 const Context = createContext<LiveContext | null>(null);
 export function LiveSessionProvider({ children }: { children: ReactNode }) {
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(
-    DEFAULT_FEATURE_FLAGS,
+  // Defaults on the server and during hydration; saved options afterwards.
+  const featureFlags = useSyncExternalStore(
+    subscribeFeatureFlags,
+    featureFlagsSnapshot,
+    () => DEFAULT_FEATURE_FLAGS,
   );
+  const setFeatureFlags = storeFeatureFlags;
   // shortcut: recordings last only in this workspace; add persistent storage when saved history is required.
   const [recordings, setRecordings] = useState<Record<string, LiveRecording>>(
     {},

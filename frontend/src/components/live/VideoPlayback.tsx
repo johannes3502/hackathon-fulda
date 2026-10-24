@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Download, Play, RotateCcw } from "lucide-react";
+import { Download, Play, RotateCcw, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { LiveFeedback, LiveRecording } from "@/features/live/contracts";
 import { clipRange } from "@/features/live/protocol";
+import { playbackAnnotation, reviewMoments } from "@/features/live/review";
+import { cueAppearance } from "@/features/live/cue-appearance";
 import { time } from "@/lib/utils";
 export function VideoPlayback({
   recording,
@@ -19,9 +21,14 @@ export function VideoPlayback({
   const [position, setPosition] = useState(0);
   const [loop, setLoop] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const annotation = playbackAnnotation(recording.feedback, position, selected);
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !selected) return;
+    if (!video) return;
+    if (!selected) {
+      rangeRef.current = null;
+      return;
+    }
     const range = clipRange(selected, recording.durationMs);
     rangeRef.current = range;
     const seek = () => {
@@ -53,45 +60,56 @@ export function VideoPlayback({
       className="panel playback-panel"
       aria-label="Recorded video playback"
     >
-      <video
-        ref={videoRef}
-        src={recording.videoUrl}
-        controls
-        playsInline
-        preload="metadata"
-        aria-label="Recorded pitch video"
-        onError={() =>
-          setError(
-            "This browser could not decode the recording. Download it to play in another player.",
-          )
-        }
-        onEnded={(event) => {
-          // Encoded media can end before the capture clock reaches the selected range's end.
-          const range = rangeRef.current;
-          if (range && loop) {
-            event.currentTarget.currentTime = range.start;
-            void event.currentTarget
-              .play()
-              .catch(() =>
-                setError("Press Replay section to continue playback."),
-              );
+      <div className="review-video-stage">
+        <video
+          ref={videoRef}
+          src={recording.videoUrl}
+          controls
+          playsInline
+          preload="metadata"
+          aria-label="Recorded pitch video"
+          onError={() =>
+            setError(
+              "This browser could not decode the recording. Download it to play in another player.",
+            )
           }
-        }}
-        onTimeUpdate={(event) => {
-          const video = event.currentTarget;
-          setPosition(video.currentTime * 1000);
-          const range = rangeRef.current;
-          if (range && video.currentTime >= range.end) {
-            if (loop) {
-              video.currentTime = range.start;
-              void video.play().catch(() => {});
-            } else {
-              video.pause();
-              rangeRef.current = null;
+          onEnded={(event) => {
+            // Encoded media can end before the capture clock reaches the selected range's end.
+            const range = rangeRef.current;
+            if (range && loop) {
+              event.currentTarget.currentTime = range.start;
+              void event.currentTarget
+                .play()
+                .catch(() =>
+                  setError("Press Replay section to continue playback."),
+                );
             }
-          }
-        }}
-      />
+          }}
+          onTimeUpdate={(event) => {
+            const video = event.currentTarget;
+            setPosition(video.currentTime * 1000);
+            const range = rangeRef.current;
+            if (range && video.currentTime >= range.end) {
+              if (loop) {
+                video.currentTime = range.start;
+                void video.play().catch(() => {});
+              } else {
+                video.pause();
+                rangeRef.current = null;
+              }
+            }
+          }}
+        />
+        {annotation && (
+          <div
+            className={`playback-annotation ${annotation.kind}`}
+            data-testid="playback-annotation"
+          >
+            <MessageSquare size={18} aria-hidden="true" />
+            <span>{annotation.title}</span>
+          </div>
+        )}
+      </div>
       <div className="playback-body">
         <div className="panel-title-row">
           <h2>
@@ -101,25 +119,30 @@ export function VideoPlayback({
             {time(position)} / {time(recording.durationMs)}
           </span>
         </div>
-        <div className="video-timeline" aria-label="Feedback timeline">
-          {recording.feedback.map((item) => (
+        <div
+          className="video-timeline"
+          role="group"
+          aria-label="Feedback timeline"
+        >
+          {reviewMoments(recording.feedback).map((item) => (
             <button
               key={item.id}
               className={`timeline-marker ${item.kind} ${selected?.id === item.id ? "selected" : ""}`}
-              style={{
-                left: `${Math.min(98, (item.startMs / Math.max(recording.durationMs, 1)) * 100)}%`,
-                width: `${Math.max(1.5, Math.min(100, ((item.endMs - item.startMs) / Math.max(recording.durationMs, 1)) * 100))}%`,
-              }}
+              data-feedback={cueAppearance(item, "ready").tone}
               aria-label={`Replay ${item.category}: ${item.title} at ${time(item.startMs)}`}
+              aria-pressed={selected?.id === item.id}
               onClick={() => onSelect(item)}
-            />
+            >
+              <span className="timeline-time">{time(item.startMs)}</span>
+              <span className="timeline-title">{item.title}</span>
+            </button>
           ))}
         </div>
         <p className="field-hint">
           {selected
             ? `Replaying ${time(clipRange(selected, recording.durationMs).start * 1000)}–${time(clipRange(selected, recording.durationMs).end * 1000)} with up to 2 seconds of context on each side.`
             : recording.feedback.length
-              ? "Choose a marker to watch the moment behind the feedback."
+              ? "Choose a timestamp to replay that feedback moment."
               : "No feedback markers were received for this recording."}
         </p>
         <div className="playback-controls">

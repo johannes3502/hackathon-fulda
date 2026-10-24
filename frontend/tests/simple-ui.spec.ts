@@ -23,10 +23,7 @@ test("home shows an empty recording overview without demo statistics and keeps n
       name: "Deine Aufnahmen im Überblick.",
       exact: true,
     }),
-  ).toHaveCSS(
-    "font-family",
-    '\"Open Sans Variable\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Arial, sans-serif',
-  );
+  ).toHaveCSS("font-family", /^"Open Sans Variable",/);
   await expect(page.locator(".stats418-kpi-grid")).toContainText("0:00");
   await expect(page.locator("main")).not.toContainText("%");
   await expect(page.locator("main")).not.toContainText("Mai 2026");
@@ -76,8 +73,8 @@ test("home shows an empty recording overview without demo statistics and keeps n
     }),
   ).toHaveCSS("font-family", /Open Sans Variable/);
   await expect(
-    page.getByRole("button", { name: "Large view", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
+    page.getByRole("button", { name: /^(Large|Standard) view$/ }),
+  ).toHaveCount(0);
   await expect(
     page.getByRole("region", { name: "Live camera preview" }),
   ).toBeVisible();
@@ -107,17 +104,14 @@ test("home shows an empty recording overview without demo statistics and keeps n
   const workspace = await page.locator(".live-studio-grid").boundingBox();
   // Before feedback exists, the camera must not reserve an empty sidebar.
   expect(monitor!.width / workspace!.width).toBeGreaterThan(0.98);
-  await expect(
-    page.getByRole("navigation", { name: "Main navigation" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Studio", exact: true }),
-  ).toHaveAttribute("aria-current", "page");
   await page.screenshot({
     path: info.outputPath("monitoring-entry.png"),
     fullPage: true,
   });
-  await page.getByRole("link", { name: "Sample demo", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Menü", exact: true }),
+  ).toHaveCount(0);
+  await page.goto("/demo");
   await expect(page).toHaveURL(/\/demo$/);
   await expect(
     page.getByRole("button", { name: "Try sample demo" }),
@@ -133,10 +127,11 @@ test("home shows an empty recording overview without demo statistics and keeps n
 
   for (const path of ["/", "/live", "/sources", "/review-preview"]) {
     await page.goto(path);
-    await expect(page.getByRole("link", { name: "418 home" })).toBeVisible();
+    if (path !== "/live")
+      await expect(page.getByRole("link", { name: "418 home" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Menü", exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(path === "/live" ? 0 : 1);
     await expect(page.locator("main")).toHaveCount(1);
     expect(
       await page.evaluate(
@@ -179,15 +174,8 @@ test("recording consent stays visible while diagnostics and server details are o
     "By starting, you agree to send your video and microphone audio",
   );
   await expect(page.locator(".recording-consent")).toBeVisible();
-  await page.getByRole("button", { name: "How it works" }).click();
-  await expect(page.getByRole("dialog")).toContainText(
-    "captures video and microphone audio",
-  );
-  await expect(page.getByRole("dialog")).toContainText(
+  await expect(page.locator(".recording-consent")).toContainText(
     "Deepgram’s EU endpoint",
-  );
-  await expect(page.getByRole("dialog")).not.toContainText(
-    "No microphone is captured",
   );
 });
 
@@ -253,9 +241,6 @@ test("camera permission is requested only on click, with a clear retry after den
   await expect(
     page.getByRole("button", { name: "Enable camera", exact: true }),
   ).toBeEnabled();
-  await expect(
-    page.getByRole("link", { name: "Sample demo", exact: true }),
-  ).toBeVisible();
 });
 
 test("shared navigation and help work with keyboard focus", async ({
@@ -291,14 +276,17 @@ test("shared navigation and help work with keyboard focus", async ({
   for (const [label, path] of [
     ["Sources", "/sources"],
     ["Sample demo", "/demo"],
+    ["Admin", "/admin"],
     ["Studio", "/live"],
   ]) {
     const link = navigation.getByRole("link", { name: label, exact: true });
     await link.focus();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(new RegExp(`${path}$`));
-    await expect(link).toHaveAttribute("aria-current", "page");
+    if (path !== "/live")
+      await expect(link).toHaveAttribute("aria-current", "page");
   }
+  await page.goBack();
   const help = page.getByRole("button", { name: "How it works" });
   await help.focus();
   await page.keyboard.press("Enter");
@@ -324,9 +312,15 @@ test("shared surfaces stay readable in light and dark appearance", async ({
       "/stats-preview",
     ]) {
       await page.goto(path);
-      await expect(
-        page.getByRole("navigation", { name: "Main navigation" }),
-      ).toBeVisible();
+      if (path === "/live") {
+        await expect(
+          page.getByRole("link", { name: "Options", exact: true }),
+        ).toBeVisible();
+      } else {
+        await expect(
+          page.getByRole("navigation", { name: "Main navigation" }),
+        ).toBeVisible();
+      }
       await expect(page.locator("html")).toHaveCSS("color-scheme", colorScheme);
       const ratios = await page.evaluate(() => {
         const canvas = document.createElement("canvas");
@@ -381,9 +375,15 @@ test("enlarged text reflows without hiding navigation or primary controls", asyn
   );
   for (const path of ["/", "/live", "/sources", "/demo", "/review-preview"]) {
     await page.goto(path);
-    await expect(
-      page.getByRole("navigation", { name: "Main navigation" }),
-    ).toBeVisible();
+    if (path === "/live") {
+      await expect(
+        page.getByRole("link", { name: "Options", exact: true }),
+      ).toBeVisible();
+    } else {
+      await expect(
+        page.getByRole("navigation", { name: "Main navigation" }),
+      ).toBeVisible();
+    }
     await page.evaluate(() => {
       document.documentElement.style.fontSize = "200%";
     });
@@ -393,7 +393,7 @@ test("enlarged text reflows without hiding navigation or primary controls", asyn
       ),
       path,
     ).toBe(true);
-    for (const link of await page.locator(".app-nav a").all()) {
+    for (const link of await page.locator(".app-nav a:visible").all()) {
       await expect(link).toBeVisible();
       expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     }

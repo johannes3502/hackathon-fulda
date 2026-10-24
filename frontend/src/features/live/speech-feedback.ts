@@ -3,11 +3,11 @@ import type { LiveFeedback } from "./contracts";
 const cues: Record<string, [string, string]> = {
   "volume · quiet": [
     "Your voice is quieter",
-    "Try speaking at your starting volume.",
+    "Check your speaking volume and microphone distance.",
   ],
   "volume · loud": [
     "Your voice is louder",
-    "Try returning to your starting volume.",
+    "Check your speaking volume and microphone distance.",
   ],
   "pitch · monotone": [
     "Little pitch variation",

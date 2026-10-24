@@ -5,11 +5,18 @@ import {
   type FeatureFlags,
 } from "./feature-flags";
 import { POSE_RULES } from "../pose/evaluation";
+import {
+  AdaptiveSpeechBaseline,
+  SPEECH_BASELINE,
+  voiced,
+  type SpeechReference,
+} from "./speech-baseline";
+import { loadLiveHintSettings } from "../admin/settings";
 
 // Prototype settings reused from backend/app/speech/config.py. Live activity
 // uses energy, not the backend's Silero VAD. No WPM or filler claims from audio.
 export const LIVE_SPEECH = Object.freeze({
-  baselineMs: 3000,
+  baselineMs: SPEECH_BASELINE.calibrationMs,
   frameMs: 40,
   floorDb: -50,
   activityRangeDb: 30,
@@ -52,15 +59,10 @@ const rate = (frames: SignalFrame[]) => {
 };
 
 export class SpeechEvaluator {
-  private baseline: {
-    level: number;
-    pitch: number | null;
-    rate: number;
-  } | null = null;
-  private calibration: SignalFrame[] = [];
+  private baseline: SpeechReference | null = null;
+  private reference = new AdaptiveSpeechBaseline();
   private frames: SignalFrame[] = [];
   private previous = -Infinity;
-  private voicedMs = 0;
   private pauseStart: number | null = null;
   private spoke = false;
   private lastPeak = -Infinity;
@@ -72,6 +74,7 @@ export class SpeechEvaluator {
   constructor(
     private flags: FeatureFlags = DEFAULT_FEATURE_FLAGS,
     private sessionId = "preview",
+    private minDisplayMs: number = POSE_RULES.minDisplayMs,
   ) {}
   get events() {
     return [...this.observations];
@@ -83,7 +86,7 @@ export class SpeechEvaluator {
     ): SpeechState => ({
       phase: this.baseline ? "ready" : "calibrating",
       message,
-      calibrationProgress: Math.min(1, this.voicedMs / LIVE_SPEECH.baselineMs),
+      calibrationProgress: this.reference.progress,
       levelDb: input.levelDb,
       cue,
       events: this.events,
@@ -104,10 +107,7 @@ export class SpeechEvaluator {
       this.cueUntil = 0;
       for (const key of this.activeEvents.keys())
         this.release(key, this.previous);
-      if (!this.baseline) {
-        this.calibration = [];
-        this.voicedMs = 0;
-      }
+      this.reference.discardPending();
     }
     this.previous = input.tMs;
     const duration = Math.min(gap, LIVE_SPEECH.frameMs);
@@ -119,6 +119,13 @@ export class SpeechEvaluator {
       : LIVE_SPEECH.floorDb;
     const f: SignalFrame = {
       ...input,
+      f0Hz:
+        input.f0Hz !== null &&
+        Number.isFinite(input.f0Hz) &&
+        input.f0Hz >= SPEECH_BASELINE.minPitchHz &&
+        input.f0Hz <= SPEECH_BASELINE.maxPitchHz
+          ? input.f0Hz
+          : null,
       active: input.levelDb > gate,
       peak: false,
       duration,
@@ -144,23 +151,11 @@ export class SpeechEvaluator {
       (frame) => input.tMs - frame.tMs <= LIVE_SPEECH.paceWindowMs,
     );
     if (!this.baseline) {
-      if (f.active) {
-        this.calibration.push(f);
-        this.voicedMs += duration;
-      }
-      if (this.voicedMs < LIVE_SPEECH.baselineMs)
+      this.baseline = this.reference.observe(f);
+      if (!this.baseline)
         return state(
-          "Speak normally for 3 seconds to calibrate live voice feedback.",
+          "Start speaking normally. Calibration waits for your voice; silence does not count.",
         );
-      const pitches = this.calibration
-        .map((f) => f.f0Hz)
-        .filter((v): v is number => v !== null && Number.isFinite(v) && v > 0);
-      this.baseline = {
-        level: median(this.calibration.map((f) => f.levelDb)),
-        pitch: pitches.length ? median(pitches) : null,
-        rate: rate(this.calibration),
-      };
-      this.calibration = [];
       this.frames = [];
       this.spoke = true;
       return state("Live voice feedback ready. Listening locally.");
@@ -227,16 +222,16 @@ export class SpeechEvaluator {
         input.tMs - window[0].tMs + LIVE_SPEECH.frameMs < windowMs
       )
         continue;
-      const active = window.filter((frame) => frame.active);
+      const speech = window.filter(voiced);
       if (
-        active.length / window.length < LIVE_SPEECH.minimumActiveRatio ||
+        speech.length / window.length < LIVE_SPEECH.minimumActiveRatio ||
         !f.active
       )
         continue;
       const start = window[0].tMs - window[0].duration;
       if (category === "volume") {
         const delta =
-          median(active.map((frame) => frame.levelDb)) - this.baseline.level;
+          median(speech.map((frame) => frame.levelDb)) - this.baseline.level;
         if (Math.abs(delta) >= LIVE_SPEECH.volumeDeltaDb)
           observe(
             category,
@@ -245,13 +240,11 @@ export class SpeechEvaluator {
             delta > 0
               ? "Voice louder than your baseline"
               : "Voice quieter than your baseline",
-            `Median microphone level changed by ${delta.toFixed(1)} dB from calibration.`,
-            "If comfortable, return to your normal speaking volume.",
+            `Median voiced microphone level differs by ${delta.toFixed(1)} dB from your adapting reference.`,
+            "Check your speaking volume and microphone distance.",
           );
       } else if (category === "pitch" && this.baseline.pitch) {
-        const pitches = active.filter(
-          (frame) => frame.f0Hz !== null && frame.f0Hz > 0,
-        );
+        const pitches = speech;
         if (pitches.length / window.length < LIVE_SPEECH.minimumActiveRatio)
           continue;
         const st = pitches.map(
@@ -280,13 +273,15 @@ export class SpeechEvaluator {
             ratio > 1
               ? "Speaking rhythm increased"
               : "Speaking rhythm decreased",
-            "The rate of audio-envelope peaks changed from your baseline; this is not words per minute.",
+            "The rate of audio-envelope peaks changed from your adapting reference; this is not words per minute.",
             "Choose a pace that helps explain your next point.",
           );
       }
     }
     for (const key of this.activeEvents.keys())
       if (!matches.has(key)) this.release(key, input.tMs);
+    // Judge against the prior reference before learning from this sample.
+    this.baseline = this.reference.observe(f);
     const cue =
       [...this.activeEvents.values()].sort((a, b) =>
         a.category === "pause"
@@ -301,10 +296,10 @@ export class SpeechEvaluator {
         this.visibleCue;
     } else {
       this.visibleCue = cue;
-      this.cueUntil = input.tMs + POSE_RULES.cueDwellMs;
+      this.cueUntil = input.tMs + this.minDisplayMs;
     }
     return state(
-      "Live voice feedback ready. Listening locally.",
+      "Live voice feedback ready. Your reference adjusts gradually while you speak.",
       this.visibleCue,
     );
   }
@@ -347,18 +342,27 @@ export class LiveSpeech {
     private flags: FeatureFlags,
     private update: (state: SpeechState) => void,
   ) {
-    this.engine = new SpeechEvaluator(flags);
+    this.engine = new SpeechEvaluator(
+      flags,
+      undefined,
+      loadLiveHintSettings().minDisplayMs,
+    );
   }
   get events() {
     return this.engine.events;
   }
   beginRecording(timestamp: number, sessionId: string) {
     this.origin = timestamp;
-    this.engine = new SpeechEvaluator(this.flags, sessionId);
+    this.engine = new SpeechEvaluator(
+      this.flags,
+      sessionId,
+      loadLiveHintSettings().minDisplayMs,
+    );
     this.lastPublish = -Infinity;
     this.update({
       phase: "calibrating",
-      message: "Speak normally for 3 seconds to calibrate live voice feedback.",
+      message:
+        "Start speaking normally. Calibration waits for your voice; silence does not count.",
       calibrationProgress: 0,
       levelDb: null,
       cue: null,

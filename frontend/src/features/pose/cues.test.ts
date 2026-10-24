@@ -4,6 +4,7 @@ import {
   POCKET,
   CrossArmsCue,
   armsCrossed,
+  crossArmsCheck,
   pocketCheck,
 } from "./cues";
 import { poseSample, type HandSample, type Landmark } from "./sample";
@@ -90,10 +91,45 @@ it("rejects a single crossed wrist, raised hands and straight arms", () => {
   Object.assign(straight[13], { x: 0.45, y: 0.32 });
   expect(armsCrossed(sample(straight))).toBe(false);
 });
+it("recognizes one crossed arm with the other hand tucked under it", () => {
+  // Pixel positions from a real-camera report: one forearm crosses the chest,
+  // the hidden wrist is placed near its own elbow.
+  const p = points(true);
+  const px = (i: number, x: number, y: number) =>
+    Object.assign(p[i], { x: x / 1400, y: y / 700 });
+  px(11, 613, 363);
+  px(12, 748, 366);
+  px(13, 585, 464);
+  px(14, 801, 437);
+  px(15, 702, 453);
+  px(16, 783, 473);
+  px(23, 641, 615);
+  px(24, 729, 615);
+  const check = crossArmsCheck(poseSample(p, 1400, 700, 0));
+  expect(check).toMatchObject({ crossed: true, tucked: 1 });
+  expect(check.measure).toBeCloseTo(0.16, 1);
+  // Fully hidden tucked wrist still counts while the other arm crosses.
+  p[16].visibility = 0;
+  expect(crossArmsCheck(poseSample(p, 1400, 700, 0)).crossed).toBe(true);
+});
+it("does not call close hands a tucked crossing", () => {
+  // One wrist just past the midline, the other close to it with a steep
+  // forearm: only the wrist gap separates this from a tucked hand.
+  const p = points(true);
+  Object.assign(p[15], { x: 0.52, y: 0.45 });
+  Object.assign(p[16], { x: 0.62, y: 0.4 });
+  expect(crossArmsCheck(sample(p))).toMatchObject({
+    crossed: false,
+    tucked: null,
+  });
+  Object.assign(p[16], { x: 0.72, y: 0.4 });
+  expect(crossArmsCheck(sample(p)).tucked).toBe(1);
+});
 it("returns null instead of guessing when points are not usable", () => {
   expect(armsCrossed(null)).toBeNull();
   const hidden = points(true);
   hidden[15].visibility = 0;
+  hidden[16].visibility = 0;
   expect(armsCrossed(sample(hidden))).toBeNull();
 });
 const timed = CROSS_ARMS;

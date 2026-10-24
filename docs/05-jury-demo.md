@@ -115,7 +115,7 @@ Daten. Das Team darf sie nicht als Analyse der Live-Aufnahme vorstellen.
 
 ## Analyse-Schalter im Integrationsbranch
 
-Im Studio **Standard view → Analysis features** öffnen. VIDEO und Lite sind
+Im Studio **Options → Analysis features** öffnen. VIDEO und Lite sind
 Standard. IMAGE verarbeitet Frames unabhängig; VIDEO nutzt Tracking und
 zeitliche Modell-Glättung. Heavy ist auswählbar, sein Qualitätsvorteil ist
 nicht gemessen. Alle Assets sind lokal. GPU wird bevorzugt, CPU-Fallback

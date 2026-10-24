@@ -140,6 +140,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/questions/agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Agent Context */
+        post: operations["start_agent_context_questions_agent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/agent/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent Context Status */
+        get: operations["agent_context_status_questions_agent_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/agent/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Agent Session */
+        post: operations["start_agent_session_questions_agent_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/questions/agent/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent Settings */
+        get: operations["agent_settings_questions_agent_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/questions/answers": {
         parameters: {
             query?: never;
@@ -571,6 +639,40 @@ export interface components {
             /** Status Url */
             status_url: string;
         };
+        /** AgentContext */
+        AgentContext: {
+            /** Notices */
+            notices: string[];
+            /** Prompt */
+            prompt: string;
+            /** Source Count */
+            source_count: number;
+        };
+        /** AgentJob */
+        AgentJob: {
+            /** Error */
+            error?: string | null;
+            /** Job Id */
+            job_id: string;
+            result?: components["schemas"]["AgentContext"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+        };
+        /** AgentSession */
+        AgentSession: {
+            /** Signed Url */
+            signed_url: string;
+        };
+        /** AgentSettings */
+        AgentSettings: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+        };
         /** Aggregate */
         Aggregate: {
             /** Id */
@@ -630,6 +732,12 @@ export interface components {
              * @enum {string}
              */
             persona: "student" | "tutor";
+            /**
+             * Presentation Mode
+             * @default thesis
+             * @enum {string}
+             */
+            presentation_mode: "startup" | "thesis" | "school" | "nonprofit";
             question: components["schemas"]["Question"];
         };
         /** AnswerReview */
@@ -719,7 +827,7 @@ export interface components {
         Body_analyze_speech_analyze_post: {
             /**
              * Config
-             * @description AudioConfig JSON; first 3000 ms are calibration
+             * @description AudioConfig JSON; calibrates on voiced speech, then adapts gradually; silence does not train the reference
              */
             config?: string | null;
             /**
@@ -1481,6 +1589,12 @@ export interface components {
              */
             persona: "student" | "tutor";
             /**
+             * Presentation Mode
+             * @default thesis
+             * @enum {string}
+             */
+            presentation_mode: "startup" | "thesis" | "school" | "nonprofit";
+            /**
              * Words
              * @description Word timestamps relative to recording start
              */
@@ -1501,6 +1615,12 @@ export interface components {
              * @enum {string}
              */
             persona: "student" | "tutor";
+            /**
+             * Presentation Mode
+             * @default thesis
+             * @enum {string}
+             */
+            presentation_mode: "startup" | "thesis" | "school" | "nonprofit";
             /** Questions */
             questions: components["schemas"]["Question"][];
             /** Sources Used */
@@ -2308,6 +2428,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_agent_context_questions_agent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuestionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_context_status_questions_agent_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_agent_session_questions_agent_session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSession"];
+                };
+            };
+        };
+    };
+    agent_settings_questions_agent_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSettings"];
                 };
             };
         };

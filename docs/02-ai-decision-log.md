@@ -764,6 +764,26 @@ neue Erfolgsfall. Die lokale `.env` stand noch auf Deepgram ohne Schlüssel;
 geändert oder eingecheckt. Aktivierung: `DEEPGRAM_API_KEY` setzen und Frontend,
 Backend sowie Worker neu bauen/starten. Kein echter Anbieteraufruf getestet.
 
+## Review und ElevenLabs (24.10.2026)
+
+Nutzerauftrag: Review im Stil des Live-Monitorings vereinfachen, Material vorab
+hochladen und anschließend durch einen ElevenLabs-Agenten befragen lassen.
+Vier Modi (Startup, Thesis, Schule, Nonprofit) verändern die Schwerpunkte der
+Fragen. Nutzer bestätigt: Integration bauen, Agent-Konfiguration trägt er später ein.
+
+Codex: vorhandene Wiedergabe-, Quellen-, Celery- und Frage-APIs wiederverwendet;
+Review auf zwei Ansichten reduziert, kurze Replay-Abschnitte mit Video-Anmerkungen,
+Einzelfragen mit getipptem Quellenvergleich und optionalem ElevenLabs-Dialog.
+Collection-ID und Präsentationstyp werden bei Aufnahmestart festgehalten.
+Das offizielle ElevenLabs-SDK übernimmt Audio und Verbindung; Schlüssel nur im
+Backend, Signed URL ohne Cache. Kontext-Aufbereitung als wiederholbarer Job.
+
+Grenzen: keine echten ElevenLabs-Zugangsdaten in diesem Lauf, keine Aussage
+zur Audio- oder pädagogischen Qualität. Sprachreaktionen haben keinen
+serverseitigen Zitat-Check. Replay nutzt weiterhin das lokale Vollvideo;
+Clips werden bewusst lokal wiedergegeben; persistente Browser-Aufnahmehistorie bleibt offen.
+Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
+
 ## Persistente Backend-Review ohne Server-Clips (24.10.2026)
 
 - Nutzerauftrag: `docs/06-backend-review-api.md` prüfen und umsetzen,
@@ -810,6 +830,45 @@ Backend sowie Worker neu bauen/starten. Kein echter Anbieteraufruf getestet.
   keine öffentliche Deployment-Abnahme. Abgebrochene Publikation braucht
   denselben POST/Key oder Session-Löschung; harter Worker-Verlust verzögert
   temporäres Audio-Cleanup bis zur erneuten Zustellung.
+
+## Adaptive Stimmreferenz und stiller Aufnahmestart (24.10.2026)
+
+- Nutzerauftrag: Referenz kontinuierlich nachführen und den Fall beheben, dass
+  am Anfang noch nicht gesprochen wird und danach ständig ein Lautstärkehinweis
+  erscheint. Browser und Backend sammeln zunächst 3 s erkannte stimmhafte Sprache.
+  Lautstärkereferenz und Vergleich nutzen nur Frames mit plausibler Tonhöhe und
+  Aktivität. Anfangsstille und Rauschen ohne erkannte Tonhöhe zählen nicht.
+- Umsetzung: qualifizierte, nicht überlappende 1-s-Blöcke mit mindestens 30 %
+  stimmhaften Messungen. Median gegen kurze Spitzen, exponentielle Nachführung
+  mit 30 s Halbwertszeit in stimmhafter Zeit, begrenzte Pegel-/Pitch-Kandidaten
+  (12 dB/Halbtöne) und Rhythmus-Kandidaten (Faktor 2). Diese Einstellungen wurden
+  im Change als konfigurierbare Prototyp-Heuristiken gewählt, nicht empirisch
+  validiert. Längere Änderungen erzeugen zunächst Feedback und werden danach
+  schrittweise zur Referenz. Keine absolute Bewertung der Sprechlautstärke.
+- Zustände: Pausen und unvoiced Rauschen frieren die Referenz ein. Mikrofonlücken
+  verwerfen unvollständige Messblöcke; eine bereits gelernte Referenz bleibt
+  erhalten. Eine neue Aufnahme kalibriert neu. Bei anfangs fehlenden Hüllkurven-
+  Peaks kann die Rhythmusreferenz später starten. Ungültige Tonhöhen und doppelte
+  oder ungültige Zeitstempel dürfen die Browser-Kalibrierung nicht vorantreiben.
+- Backend: Referenzaufbau chronologisch aus den Messframes; spätere Frames
+  trainieren keine früheren Referenzen. Live-Vorschau und Batch nutzen denselben
+  Ablauf. Volume-/Pace-Events speichern die verwendete Referenz je Messfenster;
+  bestehende skalare Felder und explizites `baseline_ms: null` bleiben lesbar.
+  Der Writer benennt die adaptive Referenz in Deutsch und Englisch. UI-Hinweise,
+  API-Beschreibung, Produkt-/Architekturdokumentation und `AGENTS.md` aktualisiert.
+- Geprüft: 190 Frontend-Tests, 188 Backend-Tests einschließlich lokalem Silero ONNX
+  auf synthetischer Sprache und 12 gezielte Chromium-Prüfungen in Desktop-/Mobile-
+  Viewports. Gemeinsame deterministische Fixture für beide Tracker, Anfangsstille,
+  Raumrauschen, lange Pausen, Ausreißer, verzögerter Sprachbeginn, Mikrofonlücken,
+  Referenz-Nachführung, Event-Evidenz und Vorschau-/Batch-Vertrag geprüft.
+  Die Browserprüfung nutzt den echten AudioWorklet mit synthetischem Rauschen und
+  Ton, keine Behauptung über Erkennungsgenauigkeit bei Menschen. Lint, Typecheck,
+  Produktionsbuild, API-Aktualitätscheck und Parsing aller 12 Architekturdiagramme
+  bestanden. 14 bestehende PostgreSQL-/pgvector-Prüfungen ohne laufende Datenbank
+  übersprungen; keine neue Infrastruktur-Abnahme.
+- Offen: physische Mikrofone, Safari/iOS und schwierige akustische Umgebungen.
+  Browser-Pitch/Aktivitätsheuristik ist kein validierter Sprachdetektor; periodische
+  Störgeräusche können weiterhin Sprachmessungen ähneln.
 
 ## Gemini statt Ollama (24.10.2026)
 

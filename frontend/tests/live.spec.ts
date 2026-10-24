@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function syntheticCamera(page: Page) {
-  await page.addInitScript(() => {
+async function syntheticCamera(page: Page, startWithNoise = false) {
+  await page.addInitScript((startWithNoise) => {
     const state = window as unknown as {
       stoppedTracks: number;
       mediaConstraints: MediaStreamConstraints | undefined;
       speechGain: GainNode;
+      noiseGain?: GainNode;
     };
     state.stoppedTracks = 0;
     navigator.mediaDevices.getUserMedia = async (constraints) => {
@@ -32,12 +33,35 @@ async function syntheticCamera(page: Page) {
       if (constraints?.audio) {
         const audio = new AudioContext();
         const oscillator = audio.createOscillator();
+        oscillator.frequency.value = 200;
         const gain = audio.createGain();
-        gain.gain.value = 0.05;
+        gain.gain.value = startWithNoise ? 0 : 0.05;
         state.speechGain = gain;
         const destination = audio.createMediaStreamDestination();
         oscillator.connect(gain);
         gain.connect(destination);
+        if (startWithNoise) {
+          const buffer = audio.createBuffer(
+            1,
+            audio.sampleRate * 2,
+            audio.sampleRate,
+          );
+          const samples = buffer.getChannelData(0);
+          let seed = 42;
+          for (let i = 0; i < samples.length; i++) {
+            seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+            samples[i] = seed / 0x80000000 - 1;
+          }
+          const noise = audio.createBufferSource();
+          noise.buffer = buffer;
+          noise.loop = true;
+          const noiseGain = audio.createGain();
+          noiseGain.gain.value = 0.02;
+          state.noiseGain = noiseGain;
+          noise.connect(noiseGain);
+          noiseGain.connect(destination);
+          noise.start();
+        }
         oscillator.start();
         const track = destination.stream.getAudioTracks()[0];
         track.addEventListener("ended", () => void audio.close());
@@ -53,7 +77,7 @@ async function syntheticCamera(page: Page) {
       }
       return stream;
     };
-  });
+  }, startWithNoise);
 }
 // Controlled landmarks exercise the real evaluator, recording and UI, not model accuracy.
 async function syntheticPose(page: Page) {
@@ -108,11 +132,19 @@ async function startPoseSequence(page: Page, kind = "raised") {
   );
 }
 async function noOverflow(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+  const layout = await page.evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    viewport: innerWidth,
+    overflowing: [...document.querySelectorAll("body *")]
+      .filter(
+        (element) => element.getBoundingClientRect().right > innerWidth + 1,
+      )
+      .slice(0, 8)
+      .map((element) => `${element.tagName}.${element.getAttribute("class")}`),
+  }));
+  expect(layout.width, JSON.stringify(layout)).toBeLessThanOrEqual(
+    layout.viewport,
+  );
 }
 async function enable(page: Page) {
   await page.goto("/live");
@@ -122,6 +154,47 @@ async function enable(page: Page) {
     page.getByRole("button", { name: "Turn camera off" }),
   ).toBeVisible();
 }
+test("startup room noise waits for speech and normal speech never becomes a loudness warning", async ({
+  page,
+}) => {
+  await syntheticCamera(page, true);
+  await syntheticPose(page);
+  await page.goto("/live");
+  await page
+    .getByRole("button", { name: "Enable camera", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  // Feed the real AudioWorklet room noise longer than the old calibration.
+  await page.waitForTimeout(4500);
+  await expect(page.getByLabel("Voice calibration")).toBeVisible();
+  await expect(page.getByLabel("Voice calibration")).toHaveAttribute(
+    "value",
+    "0",
+  );
+  await expect(page.locator(".cue-message")).not.toHaveText(
+    "Voice louder than your baseline",
+  );
+  await page.evaluate(() => {
+    const audio = window as unknown as {
+      speechGain: GainNode;
+      noiseGain: GainNode;
+    };
+    audio.noiseGain.gain.value = 0;
+    audio.speechGain.gain.value = 0.05;
+  });
+  await expect(page.getByLabel("Tracking status")).toContainText(
+    "Live voice feedback ready",
+    { timeout: 10000 },
+  );
+  await page.waitForTimeout(3500);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(page.locator(".review-clip-list")).not.toContainText(
+    "Voice louder than your baseline",
+  );
+});
 test("local microphone feedback emits live volume/pause markers and preserves them in review without an analysis upload", async ({
   page,
 }, info) => {
@@ -179,10 +252,11 @@ test("local microphone feedback emits live volume/pause markers and preserves th
   });
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
-  await expect(page.locator(".review-moments")).toContainText(
+  await page.getByRole("button", { name: /All observations/ }).click();
+  await expect(page.locator(".review-clip-list")).toContainText(
     "Pause in speaking",
   );
-  await expect(page.locator(".review-moments")).toContainText(
+  await expect(page.locator(".review-clip-list")).toContainText(
     "Voice louder than your baseline",
   );
   expect(uploads).toBe(0);
@@ -227,7 +301,7 @@ test("normal preview displays all finger points without enabling the lab, includ
   ).toHaveAttribute("aria-pressed", "false");
 });
 
-test("speech analysis is visible above the camera and in large view", async ({
+test("speech analysis is visible above the full-size camera", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
@@ -239,7 +313,6 @@ test("speech analysis is visible above the camera and in large view", async ({
   const speech = page.getByLabel("Speech analysis", { exact: true });
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(speech).toBeInViewport();
-  await page.getByRole("button", { name: "Large view", exact: true }).click();
   await expect(speech).toBeInViewport();
   await speech.selectOption("backend");
   await expect(
@@ -264,7 +337,7 @@ test("speech analysis is visible above the camera and in large view", async ({
   });
 });
 
-test("large view scales feedback and preserves an active recording", async ({
+test("full-size view is the default and options preserve an active recording", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
@@ -272,25 +345,20 @@ test("large view scales feedback and preserves an active recording", async ({
   await enable(page);
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
-  const originalHeight = (await video.boundingBox())!.height;
   await page
     .getByRole("button", { name: "Start recording", exact: true })
     .click();
   const cue = page.locator(".cue-message");
-  const originalFontSize = await cue.evaluate((el) =>
-    parseFloat(getComputedStyle(el).fontSize),
-  );
-  await page.getByRole("button", { name: "Large view", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Standard view" }),
-  ).toHaveAttribute("aria-pressed", "true");
+    page.getByRole("button", { name: /^(Large|Standard) view$/ }),
+  ).toHaveCount(0);
   expect(
     await cue.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
-  ).toBeGreaterThan(originalFontSize * 1.5);
+  ).toBeGreaterThanOrEqual(info.project.name === "desktop" ? 52 : 40);
   if (info.project.name === "desktop") {
     const camera = (await page.locator(".live-camera-stage").boundingBox())!;
     const feedback = (await page.locator(".cue-panel").boundingBox())!;
-    expect(camera.height).toBeGreaterThan(originalHeight);
+    expect(camera.height).toBeGreaterThan(480);
     expect(feedback.x).toBeGreaterThanOrEqual(camera.x + camera.width);
     expect(feedback.y).toBeCloseTo(camera.y, 0);
     expect(feedback.height).toBeCloseTo(camera.height, 0);
@@ -328,12 +396,26 @@ test("large view scales feedback and preserves an active recording", async ({
     ).toBeInViewport();
     await expect(cue).toBeInViewport();
   }
-  await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("button", { name: "Large view", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
-  await page.getByRole("button", { name: "Large view", exact: true }).click();
-  await page.getByRole("button", { name: "Standard view" }).click();
+    page.getByRole("button", { name: "Menü", exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.getByRole("link", { name: "Options", exact: true }).click();
+  await page.getByText("Analysis features", { exact: true }).click();
+  await expect(page.getByLabel("Track fingers")).toBeVisible();
+  await expect(page.getByLabel("Track fingers")).toBeDisabled();
+  await page
+    .getByText("Gesture guide and calibration", { exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Recalibrate neutral position" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Recalibrate neutral position" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: /^(Large|Standard) view$/ }),
+  ).toHaveCount(0);
   expect(
     await video.evaluate((el, original) => el === original, originalVideo),
   ).toBe(true);
@@ -358,6 +440,68 @@ test("large view scales feedback and preserves an active recording", async ({
     )
     .toBeGreaterThanOrEqual(2);
 });
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`live feedback visibly tints green and red in ${colorScheme} appearance`, async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ colorScheme });
+    await syntheticCamera(page);
+    await syntheticPose(page);
+    await enable(page);
+    await page.getByRole("button", { name: "Start recording" }).click();
+    const workspace = page.locator(".live-workspace");
+    const panel = page.locator(".cue-panel");
+    const pixels = (selector: string) =>
+      page.locator(selector).evaluate((element) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext("2d")!;
+        context.fillStyle = getComputedStyle(element).backgroundColor;
+        context.fillRect(0, 0, 1, 1);
+        return [...context.getImageData(0, 0, 1, 1).data];
+      });
+    await expect(workspace).toHaveAttribute("data-feedback", "positive", {
+      timeout: 10000,
+    });
+    const green = await pixels(".cue-panel");
+    expect(green[1] - green[0]).toBeGreaterThanOrEqual(10);
+    const greenWorkspace = await pixels(".live-workspace");
+    expect(greenWorkspace[1]).toBeGreaterThan(greenWorkspace[0]);
+    await panel.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath(`green-feedback-${colorScheme}.png`),
+    });
+
+    await startPoseSequence(page, "crossed");
+    await expect(workspace).toHaveAttribute("data-feedback", "attention", {
+      timeout: 12000,
+    });
+    await expect(page.locator(".live-cue-label")).toHaveText("Try adjusting");
+    const red = await pixels(".cue-panel");
+    expect(red[0] - red[1]).toBeGreaterThanOrEqual(10);
+    const redWorkspace = await pixels(".live-workspace");
+    expect(redWorkspace[0]).toBeGreaterThan(redWorkspace[1]);
+    await panel.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath(`red-feedback-${colorScheme}.png`),
+    });
+
+    await page.evaluate(() =>
+      (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
+        type: "test-kind",
+        kind: "neutral",
+      }),
+    );
+    await expect(workspace).toHaveAttribute("data-feedback", "positive");
+    await expect(page.locator(".live-cue-label")).toHaveText("Tracking ready");
+    await page.getByLabel("Show live hints").uncheck();
+    await expect(workspace).toHaveAttribute("data-feedback", "neutral");
+    expect((await pixels(".live-workspace"))[3]).toBe(0);
+    await page.getByRole("button", { name: "Finish & review" }).click();
+    await expect(page).toHaveURL(/\/review$/);
+  });
+}
+
 test("raw camera recording, stats, filtered video sections, download and refresh recovery", async ({
   page,
 }, info) => {
@@ -379,7 +523,7 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/live\/[^/]+\/review$/);
   await expect(
-    page.getByRole("heading", { name: "A closer look at your take." }),
+    page.getByRole("heading", { name: "Make your next take stronger." }),
   ).toBeVisible();
   const video = page.getByLabel("Recorded pitch video");
   await expect
@@ -408,6 +552,9 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("link", { name: "Download video" }).click();
   expect((await downloadPromise).suggestedFilename()).toMatch(/\.webm$/);
+  await page
+    .getByText("Recording details and exports", { exact: true })
+    .click();
   const evidenceDownload = page.waitForEvent("download");
   await page
     .getByRole("link", { name: "Download gesture evidence JSON" })
@@ -427,10 +574,9 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   expect(
     evidence[0].payload.confirmed_at_ms - evidence[0].t_ms,
   ).toBeGreaterThanOrEqual(800);
-  await page.getByRole("link", { name: "Rewatch feedback sections" }).click();
-  await page.getByLabel("Filter by category").selectOption("Gestures");
-  await expect(page.locator(".moment-browser-list button")).toHaveCount(1);
-  await expect(page.locator(".replay-detail h2")).toHaveText(
+  await expect(page.locator(".review-clip-list button")).toHaveCount(1);
+  await page.locator(".review-clip-list button").click();
+  await expect(page.locator(".review-observation h3")).toHaveText(
     "Hand above shoulder",
   );
   await expect
@@ -515,7 +661,7 @@ async function backend(
   await page.waitForTimeout(1200);
 }
 
-test("feature options lock per take, filter speech markers and survive review navigation", async ({
+test("admin feature options persist, filter speech markers and lock the take", async ({
   page,
 }, info) => {
   await syntheticPose(page);
@@ -548,21 +694,18 @@ test("feature options lock per take, filter speech markers and survive review na
       },
     }),
   );
+  await page.goto("/admin");
+  await expect(page.getByLabel("Pose processing")).toHaveValue("VIDEO");
+  await expect(page.getByLabel("Pose model")).toHaveValue("lite");
+  await page.getByLabel("Pose processing").selectOption("IMAGE");
+  await page.getByLabel("Pose model").selectOption("heavy");
+  await page.getByLabel("Pauses", { exact: true }).uncheck();
   await backend(page, false, async () => {
-    await page.getByText("Analysis features", { exact: true }).click();
-    await expect(page.getByLabel("Pose processing")).toHaveValue("VIDEO");
-    await expect(page.getByLabel("Pose model")).toHaveValue("lite");
-    await page.getByLabel("Pose processing").selectOption("IMAGE");
-    await page.getByLabel("Pose model").selectOption("heavy");
-    await page.getByLabel("Pauses", { exact: true }).uncheck();
+    await expect(
+      page.getByRole("link", { name: "Admin" }).last(),
+    ).toBeVisible();
     await page.getByText("Camera diagnostics", { exact: true }).click();
   });
-  await expect(page.getByLabel("Pose processing")).toBeDisabled();
-  await expect(page.getByLabel("Pose model")).toBeDisabled();
-  await expect(
-    page.getByLabel("Speech feedback", { exact: true }),
-  ).toBeDisabled();
-  await expect(page.getByLabel("Pauses", { exact: true })).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "Pose lab", exact: true }),
   ).toBeDisabled();
@@ -574,12 +717,21 @@ test("feature options lock per take, filter speech markers and survive review na
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
   await expect(page.getByText("pause", { exact: true })).toHaveCount(0);
+  await page
+    .getByText("Recording details and exports", { exact: true })
+    .click();
   await expect(
     page.getByText("Audio: pause count", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("pitch", { exact: true }).first()).toBeVisible();
+  await expect(page.locator(".review-clip-list")).toContainText("pitch");
   await page
-    .getByText("Import or replace word timestamps", { exact: true })
+    .getByText("Recording details and exports", { exact: true })
+    .locator("..")
+    .evaluate((el) => {
+      (el as HTMLDetailsElement).open = true;
+    });
+  await page
+    .getByText("Replace transcript timestamps", { exact: true })
     .click();
   await page.getByLabel("Word timestamps (JSON)").setInputFiles({
     name: "words.json",
@@ -590,8 +742,13 @@ test("feature options lock per take, filter speech markers and survive review na
     page.getByText("Transcript analysis added to this take."),
   ).toBeVisible();
   await expect(page.getByText("pause", { exact: true })).toHaveCount(0);
-  await page.getByRole("link", { name: "Record another take" }).click();
+  await page.getByRole("link", { name: "Record again" }).click();
   await page.getByText("Analysis features", { exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .getByRole("link", { name: "Admin", exact: true })
+    .click();
+  await page.reload();
   await expect(page.getByLabel("Pose processing")).toHaveValue("IMAGE");
   await expect(page.getByLabel("Pose model")).toHaveValue("heavy");
   await expect(page.getByLabel("Pauses", { exact: true })).not.toBeChecked();
@@ -601,7 +758,8 @@ test("feature options lock per take, filter speech markers and survive review na
 
 test("REST analysis uploads recorded audio/video and merges word feedback into review", async ({
   page,
-}) => {
+}, info) => {
+  await page.emulateMedia({ colorScheme: "dark" });
   let uploads = 0;
   await page.route("**/api/speech/analyze", async (route) => {
     uploads++;
@@ -666,9 +824,15 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
   expect(uploads).toBe(1);
+  await page
+    .getByText("Recording details and exports", { exact: true })
+    .locator("..")
+    .evaluate((el) => {
+      (el as HTMLDetailsElement).open = true;
+    });
   await expect(page.getByText("Audio: pause count")).toBeVisible();
   await page
-    .getByText("Import or replace word timestamps", { exact: true })
+    .getByText("Replace transcript timestamps", { exact: true })
     .click();
   await page.getByLabel("Word timestamps (JSON)").setInputFiles({
     name: "words.json",
@@ -681,6 +845,37 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
     page.getByText("Transcript analysis added to this take."),
   ).toBeVisible();
   await expect(page.getByText("Transcript: filler count")).toBeVisible();
+  // Both events begin at 100 ms: duration bars used to obscure each other.
+  const timeline = page.getByRole("group", { name: "Feedback timeline" });
+  const jumps = timeline.getByRole("button");
+  await expect(jumps).toHaveCount(2);
+  const bounds = [];
+  for (const jump of await jumps.all()) {
+    await expect(jump.locator(".timeline-time")).toHaveText("0:01");
+    await expect(jump.locator(".timeline-time")).toBeVisible();
+    const title = await jump.locator(".timeline-title").innerText();
+    await jump.focus();
+    await page.keyboard.press("Enter");
+    await expect(jump).toHaveAttribute("aria-pressed", "true");
+    await expect(jump).toHaveAttribute("data-feedback", "attention");
+    await expect(jump.locator(".timeline-time")).toHaveCSS(
+      "color",
+      "rgb(255, 171, 180)",
+    );
+    await expect(page.locator(".review-observation h3")).toHaveText(title);
+    bounds.push((await jump.boundingBox())!);
+  }
+  const [first, second] = bounds;
+  expect(first.height).toBeGreaterThanOrEqual(44);
+  expect(second.height).toBeGreaterThanOrEqual(44);
+  expect(
+    second.x >= first.x + first.width || second.y >= first.y + first.height,
+  ).toBe(true);
+  await noOverflow(page);
+  await timeline.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: info.outputPath("readable-timestamp-jumps.png"),
+  });
 });
 
 test("analysis failure preserves playable recording", async ({ page }) => {
@@ -765,6 +960,9 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
   });
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
+  await page
+    .getByText("Recording details and exports", { exact: true })
+    .click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("link", { name: "Download pose JSONL" }).click();
   const download = await downloadPromise;
@@ -794,7 +992,7 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
   });
 });
 
-test("automatic landmarks align with the mirrored video in both sizes and clear when lost", async ({
+test("automatic landmarks align with the full-size mirrored video and clear when lost", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
@@ -832,41 +1030,33 @@ test("automatic landmarks align with the mirrored video in both sizes and clear 
   await expect(overlay.locator("circle")).toHaveCount(16);
   await expect(overlay.locator('[data-landmark="left_elbow"]')).toHaveCount(0);
   await expect(overlay.locator('[data-landmark="left_knee"]')).toHaveCount(0);
-  for (const large of [false, true]) {
-    if (large)
-      await page
-        .getByRole("button", { name: "Large view", exact: true })
-        .click();
-    const expected = await page
-      .getByLabel("Your local camera feed")
-      .evaluate((video: HTMLVideoElement) => {
-        const rect = video.getBoundingClientRect();
-        const scale =
-          getComputedStyle(video).objectFit === "contain"
-            ? Math.min(
-                rect.width / video.videoWidth,
-                rect.height / video.videoHeight,
-              )
-            : Math.max(
-                rect.width / video.videoWidth,
-                rect.height / video.videoHeight,
-              );
-        return {
-          x: rect.x + rect.width / 2 + 0.1 * video.videoWidth * scale,
-          y: rect.y + rect.height / 2 - 0.3 * video.videoHeight * scale,
-        };
-      });
-    const nose = (await overlay
-      .locator('[data-landmark="nose"]')
-      .boundingBox())!;
-    expect(nose.x + nose.width / 2).toBeCloseTo(expected.x, 0);
-    expect(nose.y + nose.height / 2).toBeCloseTo(expected.y, 0);
-    await noOverflow(page);
-    await page.screenshot({
-      path: info.outputPath(`landmarks-${large ? "large" : "standard"}.png`),
-      fullPage: true,
+  const expected = await page
+    .getByLabel("Your local camera feed")
+    .evaluate((video: HTMLVideoElement) => {
+      const rect = video.getBoundingClientRect();
+      const scale =
+        getComputedStyle(video).objectFit === "contain"
+          ? Math.min(
+              rect.width / video.videoWidth,
+              rect.height / video.videoHeight,
+            )
+          : Math.max(
+              rect.width / video.videoWidth,
+              rect.height / video.videoHeight,
+            );
+      return {
+        x: rect.x + rect.width / 2 + 0.1 * video.videoWidth * scale,
+        y: rect.y + rect.height / 2 - 0.3 * video.videoHeight * scale,
+      };
     });
-  }
+  const nose = (await overlay.locator('[data-landmark="nose"]').boundingBox())!;
+  expect(nose.x + nose.width / 2).toBeCloseTo(expected.x, 0);
+  expect(nose.y + nose.height / 2).toBeCloseTo(expected.y, 0);
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("landmarks-full-size.png"),
+    fullPage: true,
+  });
   await page.evaluate(() =>
     (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
       type: "visible",
@@ -938,6 +1128,7 @@ test("sideways motion and crossed arms reach review while live hints can be mute
       kind: "crossed",
     }),
   );
+  await page.getByText("Session observations", { exact: true }).first().click();
   await expect(page.locator(".event-feed")).toContainText(
     "Arms crossed in front of torso",
     { timeout: 7000 },
@@ -968,9 +1159,11 @@ test("sideways motion and crossed arms reach review while live hints can be mute
   await expect(
     page.getByLabel("Feedback timeline").getByRole("button"),
   ).toHaveCount(2);
-  await page.getByRole("link", { name: "Rewatch feedback sections" }).click();
-  await page.getByLabel("Filter by category").selectOption("Gestures");
-  await expect(page.locator(".replay-detail h2")).toHaveText(
+  await page
+    .locator(".review-clip-list button")
+    .filter({ hasText: "Arms crossed in front of torso" })
+    .click();
+  await expect(page.locator(".review-observation h3")).toHaveText(
     "Arms crossed in front of torso",
   );
 });
@@ -1149,6 +1342,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
   await backend(page, true);
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
+  await page.getByText("Transcript and source checks", { exact: true }).click();
   const factCheck = page.locator('[aria-labelledby="fact-check-title"]');
   const inputs = factCheck.locator(".fact-check-inputs");
   await expect(inputs).toContainText("4 words");
@@ -1160,7 +1354,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
   await expect(page.locator(".fact-verdict")).toHaveText(
     "Source says otherwise",
   );
-  await expect(page.locator(".review-moments")).toContainText(
+  await expect(page.locator(".review-clip-list")).toContainText(
     "Source says otherwise",
   );
   await expect(page.locator(".fact-claim blockquote")).toContainText(
@@ -1169,20 +1363,19 @@ test("transcribed take is fact-checked against sources and links back to the vid
   expect(request).toMatchObject({ words, use_web: false });
   expect(request!.collection_id).toMatch(/^[0-9a-f-]{36}$/);
   await page.locator(".fact-claim-head button").click();
-  await expect(page.locator(".selected-feedback")).toContainText(
+  await expect(page.locator(".review-observation")).toContainText(
     "Source says otherwise",
   );
   await noOverflow(page);
   await factCheck.screenshot({
     path: `test-results/fact-check-${info.project.name}.png`,
   });
-  await page.getByRole("link", { name: "Feedback moments" }).click();
-  await page.getByLabel("Filter by category").selectOption("fact");
-  await expect(
-    page.getByText("Source says otherwise", { exact: false }).first(),
-  ).toBeVisible();
   await page
-    .getByRole("link", { name: "Stats & playback", exact: true })
+    .getByRole("group", { name: "Review steps" })
+    .getByRole("button", { name: "Practice questions" })
+    .click();
+  await page
+    .getByRole("button", { name: "Practice by typing", exact: true })
     .click();
   await page.getByRole("button", { name: "Start question round" }).click();
   await expect(
@@ -1199,7 +1392,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
   ).toBeVisible();
   await noOverflow(page);
   await page
-    .locator(".questions")
+    .locator(".question-practice")
     .screenshot({ path: info.outputPath("local-question-answer.png") });
 });
 
@@ -1323,7 +1516,7 @@ test("signal feedback appears during recording without captions and failure pres
     { timeout: 15000 },
   );
   await expect(page.locator(".live-cue-detail")).toHaveText(
-    "Try speaking at your starting volume.",
+    "Check your speaking volume and microphone distance.",
   );
   disconnect();
   await expect(page.locator(".camera-message")).toContainText(
@@ -1480,10 +1673,181 @@ test("Deepgram streaming waits for the last word and reuses the final transcript
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
   expect(uploaded).toBe(true);
+  await page.getByText("Transcript and source checks", { exact: true }).click();
   await expect(page.locator(".recorded-transcript")).toContainText("deepgram");
   await expect(
     page
       .locator(".recorded-transcript")
       .getByRole("button", { name: "Fulda." }),
   ).toBeVisible();
+});
+
+test("material upload and thesis mode reach ElevenLabs; leaving review ends the voice session", async ({
+  page,
+}, info) => {
+  const jobId = "12345678-1234-1234-1234-123456789abc";
+  const sourceId = "87654321-4321-4321-4321-cba987654321";
+  let material: Record<string, unknown> | null = null;
+  let savedCollection = "";
+  await page.route("**/api/sources?*", (route) =>
+    route.fulfill({ json: material ? [material] : [] }),
+  );
+  await page.route("**/api/sources", async (route) => {
+    expect(route.request().postData()).toContain("Synthetic thesis notes");
+    savedCollection = /name="collection_id"\r\n\r\n([^\r]+)/.exec(
+      route.request().postData()!,
+    )![1];
+    material = {
+      id: sourceId,
+      collection_id: savedCollection,
+      filename: "thesis.txt",
+      status: "ready",
+      chunk_count: 1,
+      size_bytes: 22,
+      content_type: "text/plain",
+      created_at: "2026-10-24T12:00:00Z",
+    };
+    await route.fulfill({ status: 202, json: { source: material } });
+  });
+  await page.route("**/api/speech/analyze", (route) =>
+    route.fulfill({ status: 202, json: { job_id: jobId } }),
+  );
+  await page.route("**/api/speech/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        job_id: jobId,
+        status: "completed",
+        result: {
+          audio: { summary: {} },
+          events: [],
+          words: [
+            { word: "Synthetic thesis result.", start_ms: 0, end_ms: 500 },
+          ],
+          asr_provider: "whisper",
+          synthetic_demo: true,
+          notices: [],
+        },
+      },
+    }),
+  );
+  await page.route("**/api/questions/agent/settings", (route) =>
+    route.fulfill({ json: { available: true } }),
+  );
+  await page.route("**/api/questions/agent", async (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({
+      presentation_mode: "thesis",
+      collection_id: savedCollection,
+    });
+    await route.fulfill({ status: 202, json: { job_id: jobId } });
+  });
+  await page.route("**/api/questions/agent/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        job_id: jobId,
+        status: "completed",
+        result: {
+          prompt: "Synthetic thesis context with source notes",
+          source_count: 1,
+          notices: [],
+        },
+      },
+    }),
+  );
+  await page.route("**/api/questions/agent/session", (route) =>
+    route.fulfill({
+      json: {
+        signed_url:
+          "wss://api.elevenlabs.io/v1/convai/conversation?agent_id=synthetic",
+      },
+    }),
+  );
+  let closed = 0;
+  let override = "";
+  await page.routeWebSocket("wss://api.elevenlabs.io/**", (socket) => {
+    socket.onClose(() => closed++);
+    socket.onMessage((raw) => {
+      if (typeof raw !== "string") return;
+      const message = JSON.parse(raw);
+      if (message.type === "conversation_initiation_client_data") {
+        override = message.conversation_config_override.agent.prompt.prompt;
+        socket.send(
+          JSON.stringify({
+            type: "conversation_initiation_metadata",
+            conversation_initiation_metadata_event: {
+              conversation_id: "synthetic-conversation",
+              agent_output_audio_format: "pcm_16000",
+              user_input_audio_format: "pcm_16000",
+            },
+          }),
+        );
+        setTimeout(
+          () =>
+            socket.send(
+              JSON.stringify({
+                type: "agent_response",
+                agent_response_event: {
+                  agent_response: "Why did you choose this research method?",
+                },
+              }),
+            ),
+          600,
+        );
+      }
+    });
+  });
+  await backend(page, true, async () => {
+    await page.getByText("Presentation & material", { exact: false }).click();
+    await page.getByLabel("What are you preparing for?").selectOption("thesis");
+    await page.getByLabel("Upload presentation material").setInputFiles({
+      name: "thesis.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Synthetic thesis notes"),
+    });
+    await expect(
+      page.getByLabel("Presentation material", { exact: true }),
+    ).toContainText("Ready");
+  });
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  // A later browser collection choice must not retarget an already recorded take.
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "pitchcoach.sourceCollection",
+      "00000000-0000-4000-8000-000000000099",
+    ),
+  );
+  await page
+    .getByRole("group", { name: "Review steps" })
+    .getByRole("button", { name: "Practice questions" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Meet your university professor." }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Start voice questions" }).click();
+  await expect(
+    page.getByRole("button", { name: "End conversation" }),
+  ).toBeVisible({ timeout: 15000 });
+  expect(override).toBe("Synthetic thesis context with source notes");
+  await expect(
+    page.getByRole("heading", {
+      name: "Why did you choose this research method?",
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Mute microphone", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Unmute microphone", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("professor-question.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("group", { name: "Review steps" })
+    .getByRole("button", { name: "Review moments" })
+    .click();
+  await expect.poll(() => closed).toBe(1);
+  await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
 });

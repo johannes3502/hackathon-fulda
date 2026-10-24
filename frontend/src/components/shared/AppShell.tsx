@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { BrandLogo } from "./BrandLogo";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
@@ -145,7 +146,7 @@ export function AppShell({
             <span className="drawer-trigger-label">Menü</span>
           </Button>
           <Link href="/" className="brand" aria-label="418 home">
-            <span className="brand-mark">418</span>
+            <BrandLogo />
             <span className="brand-caption">Presentation studio</span>
           </Link>
         </div>
@@ -171,6 +172,12 @@ export function AppShell({
             }
           >
             Sample demo
+          </Link>
+          <Link
+            href="/admin"
+            aria-current={pathname === "/admin" ? "page" : undefined}
+          >
+            Admin
           </Link>
         </nav>
         <Dialog
@@ -209,10 +216,10 @@ export function AppShell({
                 backend analysis captures video and microphone audio, sends
                 audio during recording for live feedback and uploads the
                 complete take after stopping. Live transcription additionally
-                streams audio to Deepgram’s EU endpoint when enabled in Recording
-                options; local Whisper is the fallback. Camera and voice
-                observations are prototype heuristics, not quality scores. The
-                synthetic walkthrough is separately labelled and needs no
+                streams audio to Deepgram’s EU endpoint when enabled in
+                Recording options; local Whisper is the fallback. Camera and
+                voice observations are prototype heuristics, not quality scores.
+                The synthetic walkthrough is separately labelled and needs no
                 camera.
               </p>
               <p>
@@ -261,7 +268,7 @@ export function AppShell({
           >
             <div className="nav-drawer-header">
               <div className="brand">
-                <span className="brand-mark">418</span>
+                <BrandLogo />
                 <div>
                   <strong className="nav-drawer-title">Navigation</strong>
                   <span className="nav-drawer-subtitle">
