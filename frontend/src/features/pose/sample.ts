@@ -152,6 +152,17 @@ export function poseSample(
     const span = shoulders ? Math.hypot(...sub(shoulders[0], shoulders[1])) : 0;
     return p && span > 1e-8 ? (p[0][1] - p[1][1]) / span : null;
   };
+  // Wrist position along the shoulder line, in shoulder widths from the body
+  // midline. Positive means the wrist has crossed over to the other side.
+  const cross = (w: number, side: 1 | -1) => {
+    const p = get(w)?.map(planar);
+    if (!p || !shoulders) return null;
+    const axis = sub(shoulders[0], shoulders[1]);
+    const span = axis[0] ** 2 + axis[1] ** 2;
+    if (span < 1e-8) return null;
+    const v = sub(p[0], mid(shoulders[0], shoulders[1]));
+    return (side * (v[0] * axis[0] + v[1] * axis[1])) / span;
+  };
   return {
     t_ms: Math.round(tMs),
     image: { width, height },
@@ -174,6 +185,8 @@ export function poseSample(
       right_arm_open_deg: arm(12, 14),
       left_wrist_height: wrist(11, 15),
       right_wrist_height: wrist(12, 16),
+      left_wrist_cross: cross(15, -1),
+      right_wrist_cross: cross(16, 1),
     },
     quality: {
       pose_present: true,

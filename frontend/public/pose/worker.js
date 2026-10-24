@@ -26,6 +26,7 @@ globalThis.onmessage = async ({ data }) => {
       );
       globalThis.postMessage({ type: "ready" });
     } else if (data.type === "frame") {
+      const started = performance.now();
       const result = landmarker.detect(data.frame);
       globalThis.postMessage({
         type: "sample",
@@ -33,6 +34,7 @@ globalThis.onmessage = async ({ data }) => {
         width: data.frame.width,
         height: data.frame.height,
         points: result.landmarks[0] ?? [],
+        inferenceMs: performance.now() - started,
       });
     }
   } catch (error) {

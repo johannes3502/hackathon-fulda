@@ -65,16 +65,21 @@ async function syntheticPose(page: Page) {
   await page.route("**/pose/worker.js", (route) =>
     route.fulfill({
       contentType: "text/javascript",
-      body: `let origin = null;
+      body: `let origin = null, kind = 'raised';
       onmessage = ({data}) => {
         if (data.type === 'init') postMessage({type:'ready'});
-        if (data.type === 'test-start') origin = data.timestamp;
+        if (data.type === 'test-start') { origin = data.timestamp; kind = data.kind ?? 'raised'; }
+        if (data.type === 'test-kind') kind = data.kind;
         if (data.type === 'frame') {
           const points = Array.from({length:33}, () => ({x:.5,y:.2,z:0,visibility:.99,presence:.99}));
           const set = (i,x,y) => Object.assign(points[i],{x,y});
           set(11,.38,.38); set(12,.62,.38); set(13,.34,.55); set(14,.66,.55);
           set(15,.34,.72); set(16,.66,.72); set(23,.41,.82); set(24,.59,.82);
-          if (origin !== null && data.timestamp - origin >= 4000) { set(14,.73,.35); set(16,.72,.12); }
+          if (origin !== null && data.timestamp - origin >= 4000) {
+            if (kind === 'raised') { set(14,.73,.35); set(16,.72,.12); }
+            if (kind === 'shift') for (const point of points) point.x += .12;
+            if (kind === 'crossed') { set(15,.59,.49); set(16,.41,.49); }
+          }
           for(let i=25;i<33;i++) points[i].visibility=.1;
           postMessage({type:'sample',timestamp:data.timestamp,width:data.frame.width,height:data.frame.height,points});
           data.frame.close();
@@ -83,13 +88,18 @@ async function syntheticPose(page: Page) {
     }),
   );
 }
-async function startPoseSequence(page: Page) {
-  await expect(page.getByRole("button", { name: "Finish & review" })).toBeVisible();
-  await page.evaluate(() =>
-    (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
-      type: "test-start",
-      timestamp: performance.now(),
-    }),
+async function startPoseSequence(page: Page, kind = "raised") {
+  await expect(
+    page.getByRole("button", { name: "Finish & review" }),
+  ).toBeVisible();
+  await page.evaluate(
+    (kind) =>
+      (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
+        type: "test-start",
+        timestamp: performance.now(),
+        kind,
+      }),
+    kind,
   );
 }
 async function noOverflow(page: Page) {
@@ -244,7 +254,7 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   expect(evidence[0].payload).toMatchObject({
     rule: "hand_raised",
     heuristic: true,
-    rule_version: "pose-rules-v1",
+    rule_version: "pose-rules-v3",
   });
   expect(evidence[0].t_ms).toBeGreaterThanOrEqual(4000);
   expect(
@@ -266,18 +276,34 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   await expect
     .poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime))
     .toBeLessThan(4);
-  // The last section reaches the file's end; MediaRecorder's clock can be slightly longer than the encoded video.
-  await video.evaluate((el: HTMLVideoElement) => {
-    el.playbackRate = 4;
-  });
-  await expect
-    .poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime))
-    .toBeGreaterThan(4);
-  await expect
-    .poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime), {
-      timeout: 5000,
-    })
-    .toBeLessThan(4);
+  // Observe a real loop instead of polling a short, accelerated section at
+  // intervals that can repeatedly miss its latter half.
+  const loop = await video.evaluate(
+    (el: HTMLVideoElement) =>
+      new Promise<{ from: number; to: number; paused: boolean }>(
+        (resolve, reject) => {
+          let previous = el.currentTime;
+          const timeout = setTimeout(() => {
+            el.removeEventListener("timeupdate", observe);
+            reject(new Error("Recorded feedback section did not loop"));
+          }, 6000);
+          function observe() {
+            const current = el.currentTime;
+            if (previous - current > 0.5) {
+              clearTimeout(timeout);
+              el.removeEventListener("timeupdate", observe);
+              resolve({ from: previous, to: current, paused: el.paused });
+            }
+            previous = current;
+          }
+          el.addEventListener("timeupdate", observe);
+          el.playbackRate = 4;
+        },
+      ),
+  );
+  expect(loop.from).toBeGreaterThan(loop.to + 0.5);
+  expect(loop.to).toBeCloseTo(Math.max(0, evidence[0].t_ms / 1000 - 2), 0);
+  expect(loop.paused).toBe(false);
   await video.evaluate((el: HTMLVideoElement) => {
     el.playbackRate = 1;
   });
@@ -621,4 +647,52 @@ test("pose model failure preserves camera recording controls", async ({
   await expect(
     page.getByRole("button", { name: "Retry landmarks" }),
   ).toBeEnabled();
+});
+
+test("sideways motion and crossed arms reach review while live hints can be muted", async ({
+  page,
+}, info) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  await enable(page);
+  await page
+    .getByRole("button", { name: "Record with gesture feedback" })
+    .click();
+  await startPoseSequence(page, "shift");
+  await expect(page.locator(".cue-message")).toHaveText(
+    "Sideways position change",
+    { timeout: 12000 },
+  );
+  await page.getByRole("button", { name: "Pose debug" }).click();
+  await expect(page.getByLabel("Pose debug readout")).toContainText(
+    "Sideways shift: 0.50",
+  );
+  await page.getByLabel("Show live hints").uncheck();
+  await expect(page.locator(".cue-message")).toHaveText("Live hints hidden");
+  await page.evaluate(() =>
+    (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
+      type: "test-kind",
+      kind: "crossed",
+    }),
+  );
+  await expect(page.locator(".event-feed")).toContainText(
+    "Arms crossed in front of torso",
+    { timeout: 7000 },
+  );
+  await expect(page.locator(".cue-message")).toHaveText("Live hints hidden");
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("pose-debug.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(
+    page.getByLabel("Feedback timeline").getByRole("button"),
+  ).toHaveCount(2);
+  await page.getByRole("link", { name: "Rewatch feedback sections" }).click();
+  await page.getByLabel("Filter by category").selectOption("Gestures");
+  await expect(page.locator(".replay-detail h2")).toHaveText(
+    "Arms crossed in front of torso",
+  );
 });

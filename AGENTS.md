@@ -1,6 +1,6 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Grafische Architektur-Übersicht (Mermaid): `docs/03-architecture.md`.
 
 ## 1. Projekt
 
@@ -44,7 +44,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 **Vorschläge, noch zu bestätigen** (Bestätigung im `docs/02-ai-decision-log.md` festhalten; Vorlage: `templates/ai-decision-log.md`)
 
 - **Transkription:** Stufe A (zuerst): Audio nach dem Stoppen hochladen, Wort-Timestamps zurück. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg → Anbieter mit Füllwort-Option prüfen (z. B. Deepgram, AssemblyAI) oder `faster-whisper`/CrisperWhisper als lokale Alternative. Wort-Timestamps und Füllwort-Unterstützung des gewählten Modells vor der Entscheidung gegen die aktuelle Doku prüfen.
-- **Embeddings:** mehrsprachiges Modell (Inhalte sind deutsch), z. B. Voyage, OpenAI oder lokal bge-m3 / multilingual-e5. Bei wenigen kleinen Dokumenten reicht auch Long-Context ohne Vektoren.
+- **Embeddings:** umgesetzt mit lokalem `jinaai/jina-embeddings-v2-base-de` (Deutsch/Englisch, FastEmbed/ONNX) hinter einem austauschbaren `Embedder`-Interface; Retrieval-Qualität mit echten Dokumenten noch nicht gemessen.
 - **Fact-Check und Frage-Agent:** ein LLM-Anbieter für beides. Für den Web-Fetch-Agent Anbieter-Tool für Suche/Abruf nutzen, kein eigenes Scraping.
 - **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
 - **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
@@ -53,6 +53,8 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 **Offen:** LLM-Anbieter, Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
 
 ## 4. Architektur
+
+**Pflicht bei Architektur-Änderungen:** Die Mermaid-Diagramme in `docs/03-architecture.md` (Systemübersicht, Compose-Deployment, Sprech­analyse-Flow, RAG-Pipeline, Frontend-Routen, Mobile-Screens, Datenmodell, Event-Modell, API-Endpunkte) sind Teil dieser Datei und immer mitzupflegen. Sobald sich Services in `compose.yaml`, Endpunkte/Routen, Pipelines, Datenmodell oder das Event-Schema ändern, die betroffenen Diagramme im selben Change aktualisieren.
 
 ```
 Browser (Next.js, TS)
@@ -134,20 +136,29 @@ docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
   01-product.md                    # Features und offene Punkte
   02-ai-decision-log.md            # tatsächliche Entscheidungen und Prüfergebnisse
+  03-architecture.md               # Architektur als Mermaid-Diagramme; bei Architektur-Änderungen mittesten
+  04-gesture-evaluation.md         # Recherche, Messregeln und Grenzen der Gestenheuristiken
+  05-jury-demo.md                  # Lokale Vorführung und dokumentierte Geräte-Abnahme
 templates/
   ai-decision-log.md               # Vorlage für die AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
 ```
 
 Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
-einen separaten Celery-Worker, Redis, PostgreSQL **ohne pgvector** und
+einen separaten Celery-Worker, Redis, PostgreSQL **mit pgvector** und
 **SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job geprüft; Audio-/ASR-Jobs und
-Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO,
-pgvector und die vollständige Aufnahme-/Clip-/Review-Pipeline aus der
-Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend läuft in einem
+Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO und
+die vollständige Aufnahme-/Clip-/Review-Pipeline aus der Zielarchitektur sind
+noch nicht umgesetzt. Quellen-Upload und Retrieval (RAG) sind umgesetzt
+(`backend/app/sources/`, Frontend-Seite `/sources`): PDF/PPTX/DOCX/TXT/MD →
+Chunks mit Seite/Folie → lokale Embeddings (`jina-embeddings-v2-base-de`) →
+Hybrid-Suche (pgvector + deutsche Volltextsuche). Fact-Check und Frage-Agent
+nutzen `app.sources.retrieval` (`search`, `format_context`, `quote_in_text`);
+beide sind noch nicht implementiert. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
-Darauf laufen nun drei lokale, kalibrierte Gesten-/Haltungsheuristiken mit
+Darauf laufen lokale, kalibrierte Gesten-/Haltungsheuristiken (Hand hoch,
+Hände zusammen, Arme verschränkt, seitliche Neigung/Position) mit
 Live-Hinweis, Review-Markern und Evidenz-Export. `/gestures` zeigt denselben
 Regelablauf mit synthetischen Landmarks; keine Genauigkeitsvalidierung.
 Recherche und Regeln: `docs/04-gesture-evaluation.md`; Jury-Abnahme und

@@ -135,7 +135,7 @@ describe("observable gesture rules", () => {
       expect(state.events.map((e) => e.payload.rule)).toEqual([
         "hand_raised",
         "hands_together",
-        "torso_lean",
+        "body_shift",
       ]);
       expect(state.events.map((e) => e.t_ms)).toEqual([4000, 9000, 14000]);
     },
@@ -148,5 +148,46 @@ describe("observable gesture rules", () => {
     expect(Math.abs(state.baseline!.lean)).toBeGreaterThan(
       POSE_RULES.leanEnterDeg,
     );
+  });
+  it("recognizes the reported whole-body sideways motion without calling it a lean", () => {
+    const engine = ready();
+    expect(feed(engine, "shift", 3100, 3800).events).toEqual([]);
+    const state = feed(engine, "shift", 3900, 6000);
+    expect(state.events.map((e) => e.payload.rule)).toEqual(["body_shift"]);
+    expect(state.measurements?.leanDelta).toBeCloseTo(0);
+    expect(state.measurements?.shiftDelta).toBeCloseTo(0.5);
+    expect(state.events[0].payload).toMatchObject({
+      threshold: 0.35,
+      unit: "shoulder widths",
+      confirmed_at_ms: 3900,
+    });
+  });
+  it("does not mark small lateral jitter or calibrate while the body is moving", () => {
+    const engine = ready();
+    let state!: PoseEvaluation;
+    for (let t = 3100; t <= 7000; t += 100) {
+      const points = syntheticPoints("neutral").map((p) => ({
+        ...p,
+        x: p.x + 0.025 * Math.sin(t),
+      }));
+      state = engine.update(poseSample(points, 640, 360, t), t);
+    }
+    expect(state.events).toEqual([]);
+    const calibration = new PoseEvaluator();
+    feed(calibration, "neutral", 0, 2800);
+    expect(feed(calibration, "shift", 2900, 3100).phase).toBe("calibrating");
+  });
+  it("integrates crossed arms into the same event clock and respects missing wrists and the 20-second cooldown", () => {
+    const engine = ready();
+    expect(feed(engine, "crossed", 3100, 5000).events).toEqual([]);
+    const first = feed(engine, "crossed", 5100, 6000);
+    expect(first.events.map((e) => e.payload.rule)).toEqual(["arms_crossed"]);
+    expect(first.events[0].payload.confirmed_at_ms).toBe(5100);
+    engine.update(null, 6100);
+    expect(feed(engine, "crossed", 6200, 25900).events).toHaveLength(1);
+    expect(feed(engine, "crossed", 26000, 28000).events).toHaveLength(2);
+    expect(
+      feed(ready(), "together", 3100, 6000).events.map((e) => e.payload.rule),
+    ).toEqual(["hands_together"]);
   });
 });

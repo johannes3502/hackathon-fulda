@@ -1,8 +1,8 @@
 # Pose-Datenpunkte und Beobachtungen
 
 Kamera starten, Pose-Landmarks pro Sample erfassen und als JSONL loggen.
-Darauf laufen drei kalibrierte Beobachtungsregeln: Hand über Schulter, Hände
-zusammen, seitliche Torsoänderung. Keine Qualitätsbewertung, kein Face-Mesh,
+Darauf laufen kalibrierte Beobachtungsregeln: Hand über Schulter, Hände
+zusammen, seitliche Torso-Neigung/Position und verschränkte Arme. Keine Qualitätsbewertung, kein Face-Mesh,
 keine Iris/Pupille, keine Finger.
 
 Recherche, Formeln, Konfiguration, Unsicherheit und Evaluationsplan:
@@ -86,6 +86,7 @@ Diese Werte werden aus den geloggten Punkten berechnet, nicht zusätzlich getrac
 | `left_elbow_deg`, `right_elbow_deg` | Schulter → Ellbogen → Handgelenk |
 | `left_arm_open_deg`, `right_arm_open_deg` | Torso-Achse ↔ Oberarm |
 | `left_wrist_height`, `right_wrist_height` | relativ zur Schulterbreite |
+| `left_wrist_cross`, `right_wrist_cross` | Handgelenk entlang der Schulterlinie, ab Körpermitte, in Schulterbreiten; positiv = über die Mitte auf die Gegenseite |
 | `legs_visible` | Knie und Knöchel ausreichend sichtbar |
 
 ## Log-Schema
@@ -194,11 +195,26 @@ sind technische Prototyp-Konfiguration, keine validierte Genauigkeit.
 - Kopf-Pitch: Nase minus Ohrmitte, `atan2(dY,-dZ)`; nur bei nutzbaren Punkten und
   `-dZ > 0`. Das ist eine unkalibrierte Orientierungshilfe, kein anatomisch
   genauer Nickwinkel. Sonst `null`; individuelle Neutralstellung kann abweichen.
+- Wrist-Cross: Projektion (Handgelenk − Schultermitte) auf die Achse rechte →
+  linke Schulter, geteilt durch die Schulterbreite. Vorzeichen so gewählt, dass
+  positiv „auf der Gegenseite“ heißt; unabhängig von Spiegelung und Bildseite.
 - `eyes_forward`: Alle Augenpunkte 1–6 müssen nutzbar sein. Die kleinere/größere
   Augenbreite (innerer–äußerer Punkt in X/Y/Z) muss mindestens 0,65 sein und die
   Tiefendifferenz der Augenmitten höchstens 0,35 ihres 2D-Abstands. Kein Yaw und
   keine Nase als Forward-Kriterium. Nicht nutzbare/degenerierte Augen ergeben
   `false`, was **keine** gesicherte Abwendung bedeutet.
+
+### Arme verschränkt und weitere Beobachtungen
+
+Die Geometrie und der optionale Debug-Readout aus der Team-Implementierung sind
+erhalten: `cues.ts` (`CROSS_ARMS`) und `PoseDebug.tsx`. Die zeitliche Zustandsmaschine
+läuft jetzt gemeinsam mit den anderen Regeln in `PoseEvaluator`. Dadurch gelten
+Kalibrierung, Aufnahmestart, Datenlücken und ein einzelner abschaltbarer Hinweis
+auch für diese Regel. Beobachtungen erscheinen im Review und Evidenz-Export.
+Der frühere separate Chip und seine tolerierte Fortsetzung über verdeckte
+Handgelenke wurden durch die gemeinsame Evidenzprüfung ersetzt.
+
+Alle Formeln und Konfigurationen: [Gesten-Evaluation](../docs/04-gesture-evaluation.md).
 
 Quellen: [MediaPipe Web Guide](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker/web_js),
 [Pose Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker).

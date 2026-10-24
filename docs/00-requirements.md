@@ -159,6 +159,12 @@ erweitert diese Formatideen um sechs konkrete Beispiel-Challenges.
 - Auf Laptop **und** Smartphone testen.
 - Optional: 1-Seiter / 60-Sekunden-Erklärvideo als Jury-Hilfe.
 
+**Projektentscheidung am 24.10.2026:** Der Nutzer bestätigt eine lokale
+Vorführung als ausreichend. Für diesen Stand gilt daher der vorbereitete
+Demo-Laptop auf `localhost`; öffentliches Hosting ist keine Aufgabe dieses
+Changes. Das ändert keine etwaigen Vorgaben der Veranstalter. Ablauf und
+Geräte-Abnahme: `docs/05-jury-demo.md`.
+
 ### 5.3 Technologie & Umsetzung — 20 %
 
 - Fokus: **sinnvoller Technologieeinsatz** und überzeugende technische
@@ -254,7 +260,7 @@ erweitert diese Formatideen um sechs konkrete Beispiel-Challenges.
 
 ### Bis So 09:30
 - [ ] Feature Freeze
-- [ ] Prototyp auf öffentlicher URL erreichbar
+- [ ] Prototyp auf vorbereitetem Demo-Laptop erreichbar (lokaler Umfang bestätigt)
 - [ ] Kein Login / keine Installation nötig
 - [ ] Seed-Daten + Reset
 - [ ] Laptop- und Smartphone-Test

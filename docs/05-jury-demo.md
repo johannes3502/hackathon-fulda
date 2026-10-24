@@ -22,8 +22,10 @@ Gesten-/Sample-Demo reicht alternativ Node.js 22.12+: `npm ci`, `npm run dev`.
    getrennt neben der Taille. „Ready“ abwarten; bei Bedarf neu kalibrieren.
 4. **Record with gesture feedback** → erneut 3 Sekunden neutral. Hand deutlich
    über Schulter heben und etwa 1 Sekunde halten. Zurück. Hände vor dem Torso
-   zusammenführen und etwa 2 Sekunden halten. Zurück. Wenn bequem seitlich lehnen
-   und etwa 2 Sekunden halten. Keine ruckartigen oder unangenehmen Bewegungen.
+   zusammenführen und etwa 2 Sekunden halten. Zurück. Wenn bequem den ganzen Körper
+   bei fester Kamera etwa eine halbe Schulterbreite seitlich versetzen und etwa
+   1 Sekunde halten. Eine Torso-Neigung und verschränkte Arme sind zusätzlich
+   beobachtbar. „Pose debug“ zeigt die Werte bei Problemen. Keine ruckartigen oder unangenehmen Bewegungen.
 5. **Finish & review** → Beobachtung anklicken → Aufnahme an dieser Stelle ansehen.
    Eine sinnvolle Reflexionsfrage stellen: „Hat diese Bewegung deinen Punkt
    unterstützt?“ Optional Rohdaten oder Gesten-Evidenz herunterladen.
@@ -43,6 +45,7 @@ beibehalten oder ändern möchte.“**
 | Schultern/Hüften fehlen | Aufforderung zum Framing. Keine Posebewertung. Weiter zurück, Kamera neu ausrichten. |
 | Hände fehlen | Keine Handbeobachtungen. Bei nutzbarem Torso bleibt die Haltung auswertbar. |
 | Kalibrierung bleibt stehen | Licht, Abstand und ruhige Haltung prüfen. Hände getrennt neben Taille. Langsames Gerät kann am Zeitkriterium scheitern. |
+| Seitwärts-Hinweis erscheint verzögert | Positionsregel wartet bewusst 0,8 s. „Pose debug“ zeigt zusätzlich Frame-/Modellzeit und Abtastrate. Bei hoher Frame-Zeit andere Browser vergleichen; Safari ist bisher nicht als Ursache belegt. |
 | API/Netz fehlt | Lokale Gestenerkennung braucht nach Laden der App/Assets keine Anbieter-API. Synthetischer Rundgang braucht keine Kamera. Kein Service-Worker: erstmaliger Seitenaufruf braucht den App-Server. |
 | Backend-Audio schlägt fehl | Aufnahme und bereits vorhandene lokale Gesten bleiben im Review; Fehlermeldung sichtbar. |
 | Kamera bewegt / Person wechselt | Aufnahme beenden. Neue Aufnahme mit neuer Kalibrierung. |
@@ -56,7 +59,7 @@ Vor-Ort-Abnahme nicht. Keine echten Juryaufnahmen als Testfixtures einchecken.
 | Check | Abnahme | Status |
 | --- | --- | --- |
 | Lokaler Start ohne Login | Demo-Laptop: `http://localhost:3000`, `/gestures` und `/live` öffnen | Lokale Browser-Tests; am Stand nochmals öffnen |
-| Echter Kameraweg auf Demo-Laptop | Drei Bewegungen wiederholt sichtbar erkannt, neutrale Ruhe ohne Event | Offen – vor Ort ausführen |
+| Echter Kameraweg auf Demo-Laptop | Hand hoch, Hände zusammen, seitlicher Versatz; zusätzlich Neigung/Arme verschränkt | Nutzer bestätigt beide Handgesten und seitlichen Versatz. Mindestdauer danach auf 0,8 s reduziert; neue Geschwindigkeit, Neigung und Arme verschränkt noch real prüfen |
 | Hand-/Körperframing | Hinweise bei verdeckten Händen, fehlenden Hüften und Verlassen des Bildes | Offen – vor Ort ausführen |
 | Reale Zeitzuordnung | Marker führt zur tatsächlich gezeigten Bewegung, einschließlich Anfang/Ende der Aufnahme | Offen – vor Ort ausführen |
 | Safari/iPhone (optional) | Berechtigung, Modell, MP4-Aufnahme, Stop, Replay und Download | Nicht qualifiziert; für die lokale Laptop-Demo nicht vorausgesetzt |
@@ -69,6 +72,8 @@ Vor-Ort-Abnahme nicht. Keine echten Juryaufnahmen als Testfixtures einchecken.
 Pro Gerät/Browser, Beleuchtung und Sitz-/Stehposition notieren. Keine Namen
 nötig; freiwillige Teilnahme. Pro Bewegung mehrere Durchläufe, dazwischen
 Neutralstellung und Cooldown. Nicht nur die besten Versuche behalten.
+Der bisherige informelle Nutzerbericht ist oben erfasst; die Tabelle erfordert
+gezählte Versuche und dokumentierte Bedingungen, die noch nicht vorliegen.
 
 | Gerät / Browser / Licht / Position | Beobachtung | Versuche | richtig erkannt | falscher Typ / Fehlalarm | nicht erkannt | Framing nicht beurteilbar | Verzögerung / Zeitversatz | Bemerkung |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -81,7 +86,8 @@ Neutralstellung und Cooldown. Nicht nur die besten Versuche behalten.
 
 Der Kamerapfad erzeugt lokale Gesten-/Haltungsereignisse und spielt das komplette
 Video im Browser ab. Er erstellt noch keine dauerhaft gespeicherten Server-Clips.
-Audioanalyse ist angebunden; automatische ASR-Auswahl im UI, Quellen-Ingest/RAG,
-Web-Fetch und echte Frage-/Antwortanalyse sind noch separat zu integrieren.
+Audioanalyse und Quellen-Ingest/Hybrid-Retrieval sind angebunden; automatische
+ASR-Auswahl im UI, Fact-Check, Web-Fetch und echte Frage-/Antwortanalyse sind noch
+separat zu integrieren.
 Die bestehende Sample-Session zeigt den angestrebten Gesamtfluss mit vorbereiteten
 Daten. Das Team darf sie nicht als Analyse der Live-Aufnahme vorstellen.

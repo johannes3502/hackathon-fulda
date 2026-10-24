@@ -1,11 +1,17 @@
 import { PoseLog, poseSample, type PoseSample } from "./sample";
 import { PoseEvaluator, POSE_RULES, type PoseEvaluation } from "./evaluation";
+export type PoseTiming = {
+  frameMs: number | null;
+  inferenceMs: number | null;
+  samplesPerSecond: number | null;
+};
 export type PoseState = {
   phase: "loading" | "running" | "stopped" | "error";
   count: number;
   message: string;
   latest: PoseSample | null;
   evaluation: PoseEvaluation | null;
+  timing: PoseTiming;
 };
 export class PoseCapture {
   readonly log = new PoseLog();
@@ -20,6 +26,12 @@ export class PoseCapture {
   private origin: number | null = null;
   private evaluation: PoseEvaluation | null = null;
   private frameTimeout?: ReturnType<typeof setTimeout>;
+  private timing: PoseTiming = {
+    frameMs: null,
+    inferenceMs: null,
+    samplesPerSecond: null,
+  };
+  private timestamps: number[] = [];
   constructor(
     private video: HTMLVideoElement,
     private update: (state: PoseState) => void,
@@ -31,6 +43,7 @@ export class PoseCapture {
       count: this.log.count,
       latest: this.latest,
       evaluation: this.evaluation,
+      timing: this.timing,
     });
   }
   start() {
@@ -63,6 +76,23 @@ export class PoseCapture {
           this.pending = false;
           // A delayed preview inference must never affect a new take.
           if (this.origin !== null && data.timestamp < this.origin) return;
+          const elapsed = performance.now() - data.timestamp;
+          this.timestamps = [...this.timestamps, data.timestamp].slice(-20);
+          const duration = this.timestamps.at(-1)! - this.timestamps[0];
+          this.timing = {
+            frameMs:
+              Number.isFinite(elapsed) && elapsed >= 0
+                ? Math.round(elapsed)
+                : null,
+            inferenceMs:
+              Number.isFinite(data.inferenceMs) && data.inferenceMs >= 0
+                ? Math.round(data.inferenceMs)
+                : null,
+            samplesPerSecond:
+              duration > 0
+                ? ((this.timestamps.length - 1) * 1000) / duration
+                : null,
+          };
           const origin = this.origin ?? Number(data.timestamp);
           this.origin = origin;
           const liveSample = poseSample(

@@ -32,6 +32,7 @@ import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { poseFeedback } from "@/features/pose/feedback";
 import { GestureGuide } from "./GestureGuide";
 import { PoseDownload } from "./PoseDownload";
+import { PoseDebug } from "./PoseDebug";
 import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
 
@@ -67,6 +68,7 @@ export function LiveStudio() {
   const [error, setError] = useState<string | null>(null);
   const [largeView, setLargeView] = useState(false);
   const [showCues, setShowCues] = useState(true);
+  const [poseDebug, setPoseDebug] = useState(false);
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   useEffect(() => () => owner.current?.dispose(), []);
@@ -238,6 +240,14 @@ export function LiveStudio() {
             {largeView ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
             {largeView ? "Standard view" : "Large view"}
           </Button>
+          <Button
+            variant="outline"
+            aria-pressed={poseDebug}
+            onClick={() => setPoseDebug(!poseDebug)}
+          >
+            <Eye size={18} />
+            Pose debug
+          </Button>
           {largeView && (
             <strong className="live-view-time">
               {time(progress?.elapsedMs ?? 0)}
@@ -306,6 +316,16 @@ export function LiveStudio() {
                         : "Loading landmarks…"}
                 </span>
               )}
+              {cameraStatus === "active" &&
+                poseDebug &&
+                pose.state?.phase === "running" && (
+                  <PoseDebug
+                    sample={pose.state.latest}
+                    active={evaluation?.cue?.payload.rule === "arms_crossed"}
+                    evaluation={evaluation}
+                    timing={pose.state.timing}
+                  />
+                )}
               {cameraStatus !== "active" && (
                 <div className="stage-placeholder">
                   <span className="stage-camera">

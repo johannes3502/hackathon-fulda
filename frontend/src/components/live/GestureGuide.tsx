@@ -39,14 +39,20 @@ export function GestureGuide({
           about 2 seconds. Then separate them.
         </li>
         <li>
-          <strong>Lean gently sideways.</strong> Hold for about 2 seconds, only
-          if comfortable. Finish and click a moment to replay.
+          <strong>Move sideways.</strong> With the camera fixed, shift your body
+          about half a shoulder width and hold for about a second. A sideways lean is
+          detected separately. Only move if comfortable; then finish and replay.
         </li>
       </ol>
       <p className="field-hint">
         Observations help you reflect; they do not judge a gesture as good or
         bad. Skip movements that are uncomfortable. Moving the camera or
-        changing position requires recalibration.
+        choosing a new neutral position requires recalibration.
+      </p>
+      <p className="field-hint">
+        Also available: cross both arms in front of your torso for 2 seconds
+        with wrists visible. Use Pose debug to inspect missing points or a
+        movement below its trigger.
       </p>
     </section>
   );

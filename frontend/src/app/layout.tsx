@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./live.css";
+import "./sources.css";
 export const metadata: Metadata = {
   title: "Pitch Coach — A clearer story",
   description:

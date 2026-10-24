@@ -2,7 +2,7 @@ import { poseSample, type Landmark } from "./sample";
 
 // Hand-authored geometry, not captured from a person and not a model benchmark.
 export type ExamplePose =
-  "neutral" | "raised" | "together" | "lean" | "missing";
+  "neutral" | "raised" | "together" | "lean" | "shift" | "crossed" | "missing";
 export function syntheticPoints(pose: ExamplePose): Landmark[] {
   if (pose === "missing") return [];
   const points = Array.from({ length: 33 }, () => ({
@@ -40,6 +40,13 @@ export function syntheticPoints(pose: ExamplePose): Landmark[] {
   if (pose === "lean") {
     for (let i = 0; i <= 16; i++) points[i].x += 0.12;
   }
+  if (pose === "shift") {
+    for (const point of points) point.x += 0.12;
+  }
+  if (pose === "crossed") {
+    set(15, 0.59, 0.49);
+    set(16, 0.41, 0.49);
+  }
   return points;
 }
 export function syntheticSample(
@@ -60,7 +67,7 @@ export const WALKTHROUGH = [
     label: "Hands together in front of the torso",
   },
   { until: 14000, pose: "neutral", label: "Return to neutral" },
-  { until: 18000, pose: "lean", label: "A sideways posture change" },
+  { until: 18000, pose: "shift", label: "A sideways position change" },
   {
     until: 20000,
     pose: "missing",

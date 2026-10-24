@@ -54,7 +54,8 @@ the sample controls and validate external input before dispatching events.
 Real local gesture/posture rules now feed live hints, evidence export and review
 markers (`features/pose/evaluation.ts`). The separate `/gestures` walkthrough
 runs these rules on explicitly synthetic landmarks. Eye contact is not inferred.
-Source ingest/fact-check, judge questions and answer evaluation still use sample data. Session persistence, presigned uploads
+Source upload and hybrid retrieval are implemented at `/sources`. Fact-check,
+judge questions and answer evaluation still use sample data. Session persistence, presigned uploads
 and event-clip retrieval are also pending. Keep these boundaries visible when
 connecting new services; no fabricated scores or model results.
 

@@ -1,9 +1,10 @@
 import { HEURISTICS, type PoseSample } from "./sample";
+import { CROSS_ARMS, crossArmsCheck } from "./cues";
 
 // Engineering settings for a visible, reproducible prototype, NOT validated
 // presentation-quality cutoffs. Rationale and acceptance protocol: docs/04-gesture-evaluation.md.
 export const POSE_RULES = Object.freeze({
-  version: "pose-rules-v1",
+  version: "pose-rules-v3",
   calibrationMs: 3000,
   calibrationSamples: 15,
   maxGapMs: 350,
@@ -23,12 +24,20 @@ export const POSE_RULES = Object.freeze({
   togetherExit: 0.5,
   leanEnterDeg: 12,
   leanExitDeg: 8,
+  shiftEnter: 0.35,
+  shiftExit: 0.2,
+  shiftHoldMs: 800,
   gestureHoldMs: 800,
   togetherHoldMs: 1200,
   leanHoldMs: 1500,
   cooldownMs: 5000,
 });
-export type PoseRule = "hand_raised" | "hands_together" | "torso_lean";
+export type PoseRule =
+  | "hand_raised"
+  | "hands_together"
+  | "torso_lean"
+  | "body_shift"
+  | "arms_crossed";
 export type PoseEvent = {
   session_id: string;
   id: string;
@@ -45,6 +54,7 @@ export type PoseEvent = {
     detail: string;
     action: string;
     measurement: number;
+    initial_measurement: number;
     baseline: number;
     threshold: number;
     unit: "shoulder widths" | "degrees";
@@ -56,8 +66,18 @@ type Features = {
   lean: number;
   raised: number | null;
   distance: number | null;
+  centerX: number;
+  shoulderWidth: number;
+  cross: number | null;
 };
-type Baseline = { lean: number; raised: number; distance: number };
+type Baseline = {
+  lean: number;
+  raised: number;
+  distance: number;
+  centerX: number;
+  shoulderWidth: number;
+  cross: number;
+};
 export type PoseEvaluation = {
   phase: "framing" | "calibrating" | "ready";
   message: string;
@@ -66,6 +86,7 @@ export type PoseEvaluation = {
   handsVisible: boolean;
   cue: PoseEvent | null;
   events: PoseEvent[];
+  measurements: { leanDelta: number; shiftDelta: number } | null;
 };
 type Hold = { start: number; last: number; event: PoseEvent | null };
 const median = (values: number[]) => {
@@ -137,7 +158,16 @@ function features(sample: PoseSample | null): Features | null {
         (p.left_wrist![1] - p.right_wrist![1]) * height,
       ) / span
     : null;
-  return { lean: d.torso_lean_deg, raised, distance };
+  const cross = crossArmsCheck(sample);
+  return {
+    lean: d.torso_lean_deg,
+    raised,
+    distance,
+    centerX: (ls[0] + rs[0] + lh[0] + rh[0]) / 4,
+    shoulderWidth: span / width,
+    cross:
+      cross.crossed === null ? null : Math.min(...(cross.cross as number[])),
+  };
 }
 
 export class PoseEvaluator {
@@ -166,6 +196,7 @@ export class PoseEvaluator {
       handsVisible,
       cue,
       events: [...this.events],
+      measurements: null,
     });
     // Duplicated/backwards frames cannot add evidence or advance dwell time.
     if (!Number.isFinite(t) || t < 0 || t <= this.previous)
@@ -176,7 +207,13 @@ export class PoseEvaluator {
     if (gap || !f) {
       for (const [rule, hold] of this.holds) {
         if (hold.event)
-          this.cooldown.set(rule, hold.last + POSE_RULES.cooldownMs);
+          this.cooldown.set(
+            rule,
+            hold.last +
+              (rule === "arms_crossed"
+                ? CROSS_ARMS.cooldownMs
+                : POSE_RULES.cooldownMs),
+          );
       }
       this.holds.clear();
       this.calibration = [];
@@ -207,7 +244,9 @@ export class PoseEvaluator {
       if (
         spread(lean) > POSE_RULES.baselineLeanRangeDeg ||
         spread(raised) > POSE_RULES.baselineHandRange ||
-        spread(distances) > POSE_RULES.baselineHandRange
+        spread(distances) > POSE_RULES.baselineHandRange ||
+        spread(this.calibration.map((s) => s.f.centerX)) / f.shoulderWidth >
+          POSE_RULES.baselineHandRange
       ) {
         this.calibration = [{ t, f }];
         return state(
@@ -230,6 +269,9 @@ export class PoseEvaluator {
         lean: median(lean),
         raised: median(raised),
         distance: median(distances),
+        centerX: median(this.calibration.map((s) => s.f.centerX)),
+        shoulderWidth: median(this.calibration.map((s) => s.f.shoulderWidth)),
+        cross: median(this.calibration.map((s) => s.f.cross ?? 0)),
       };
       this.calibration = [];
     }
@@ -242,6 +284,7 @@ export class PoseEvaluator {
       POSE_RULES.togetherEnter,
       baseline.distance / 2,
     );
+    const crossed = crossArmsCheck(sample).crossed;
     this.rule(
       "hand_raised",
       f.raised,
@@ -260,13 +303,23 @@ export class PoseEvaluator {
       f.distance,
       baseline.distance,
       togetherThreshold,
-      f.distance !== null &&
+      crossed !== true &&
+        f.distance !== null &&
         f.distance <=
           (this.holds.has("hands_together")
             ? togetherThreshold +
               (POSE_RULES.togetherExit - POSE_RULES.togetherEnter)
             : togetherThreshold),
       POSE_RULES.togetherHoldMs,
+      t,
+    );
+    this.rule(
+      "arms_crossed",
+      f.cross,
+      baseline.cross,
+      CROSS_ARMS.minCross,
+      crossed === true,
+      CROSS_ARMS.holdMs,
       t,
     );
     const leanDelta = Math.abs(f.lean - baseline.lean);
@@ -282,6 +335,21 @@ export class PoseEvaluator {
       POSE_RULES.leanHoldMs,
       t,
     );
+    const shiftDelta =
+      Math.abs(f.centerX - baseline.centerX) / baseline.shoulderWidth;
+    this.rule(
+      "body_shift",
+      shiftDelta,
+      0,
+      POSE_RULES.shiftEnter,
+      leanDelta < POSE_RULES.leanExitDeg &&
+        shiftDelta >=
+          (this.holds.has("body_shift")
+            ? POSE_RULES.shiftExit
+            : POSE_RULES.shiftEnter),
+      POSE_RULES.shiftHoldMs,
+      t,
+    );
     // One cue at a time; retain it while that observation is active, then allow the next.
     const active = [...this.holds.values()].flatMap((h) =>
       h.event ? [h.event] : [],
@@ -292,15 +360,18 @@ export class PoseEvaluator {
       if (cue?.id !== this.lastCueId) this.cueUntil = t + POSE_RULES.cueDwellMs;
       this.lastCueId = cue?.id ?? null;
     }
-    return state(
-      "ready",
-      f.raised === null
-        ? "Posture ready. Bring both elbows and wrists into view for gesture feedback."
-        : "Ready. Raise a hand, bring your hands together, or lean gently sideways.",
-      1,
-      f.raised !== null,
-      cue,
-    );
+    return {
+      ...state(
+        "ready",
+        f.raised === null
+          ? "Posture ready. Bring both elbows and wrists into view for gesture feedback."
+          : "Ready. Raise a hand, bring your hands together, or move sideways with the camera fixed.",
+        1,
+        f.raised !== null,
+        cue,
+      ),
+      measurements: { leanDelta, shiftDelta },
+    };
   }
 
   private rule(
@@ -315,7 +386,13 @@ export class PoseEvaluator {
     if (!matches || value === null) {
       const previous = this.holds.get(rule);
       if (previous?.event)
-        this.cooldown.set(rule, previous.last + POSE_RULES.cooldownMs);
+        this.cooldown.set(
+          rule,
+          previous.last +
+            (rule === "arms_crossed"
+              ? CROSS_ARMS.cooldownMs
+              : POSE_RULES.cooldownMs),
+        );
       this.holds.delete(rule);
       return;
     }
@@ -339,9 +416,19 @@ export class PoseEvaluator {
         "Review whether this was intentional. Try opening your hands for the next explanation if comfortable.",
       ],
       torso_lean: [
-        "Sideways posture change",
+        "Sideways lean",
         "Your torso angle changed sideways from your neutral position.",
         "Check the moment in context. Return to your comfortable starting position if you want to compare.",
+      ],
+      body_shift: [
+        "Sideways position change",
+        "Your torso moved sideways in the camera image from its neutral position.",
+        "Was this move intentional? Replay it in context. Camera movement can also cause this observation.",
+      ],
+      arms_crossed: [
+        "Arms crossed in front of torso",
+        "Both wrists crossed the body midline with bent elbows in the camera image.",
+        "Review this held position in context. Try another hand position if comfortable; no emotion or intent is inferred.",
       ],
     }[rule];
     const event: PoseEvent = {
@@ -349,8 +436,9 @@ export class PoseEvaluator {
       id: hold.event?.id ?? `${this.sessionId}-${rule}-${hold.start}`,
       t_ms: Math.round(hold.start),
       duration_ms: Math.round(t - hold.start),
-      type: rule === "torso_lean" ? "posture" : "gesture",
-      severity: rule === "torso_lean" ? "hint" : "info",
+      type:
+        rule === "torso_lean" || rule === "body_shift" ? "posture" : "gesture",
+      severity: "info",
       source: "browser",
       payload: {
         rule,
@@ -360,6 +448,7 @@ export class PoseEvaluator {
         detail: copy[1],
         action: copy[2],
         measurement: value,
+        initial_measurement: hold.event?.payload.initial_measurement ?? value,
         baseline,
         threshold,
         unit: rule === "torso_lean" ? "degrees" : "shoulder widths",

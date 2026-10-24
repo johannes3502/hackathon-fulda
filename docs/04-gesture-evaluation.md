@@ -1,7 +1,7 @@
 # Gesten und Haltung: Was wir beobachten und warum
 
 Stand: 24.10.2026. **Prototyp, keine validierte Beurteilung.**
-Implementierung: `frontend/src/features/pose/evaluation.ts` (`pose-rules-v1`).
+Implementierung: `frontend/src/features/pose/evaluation.ts` (`pose-rules-v3`).
 Kamera: `/live`. Synthetischer, reproduzierbarer Rundgang: `/gestures`.
 
 ## Entscheidung nach Recherche
@@ -13,7 +13,7 @@ keinen Gesamtwert, keine Note und keine Emotions- oder Persönlichkeitsinferenz.
 
 | Option | Was sie liefert | Entscheidung für diesen Prototyp |
 | --- | --- | --- |
-| MediaPipe Pose Landmarker Lite | Körperlandmarks; bereits lokal im Browser eingebunden | Verwenden: Schultern, Hüften, Ellbogen und Handgelenke reichen für die drei groben Beobachtungen. Keine neue Modellkette für diese Aufgabe nötig. |
+| MediaPipe Pose Landmarker Lite | Körperlandmarks; bereits lokal im Browser eingebunden | Verwenden: Schultern, Hüften, Ellbogen und Handgelenke reichen für die groben Beobachtungen. Keine neue Modellkette für diese Aufgabe nötig. |
 | MediaPipe Gesture Recognizer | Vordefinierte Handformen, etwa offene Hand, Faust, Daumen hoch; Handlandmarks | Gute Wahl für explizite Handzeichen. Nicht gewählt: diese Kategorien bewerten keine Vortragsgestik; kleine oder verdeckte Hände benötigen eigene Tests. Ein Daumen-hoch wäre keine positive Vortragsbewertung. |
 | MediaPipe Hand Landmarker | 21 Punkte pro Hand | Sinnvoll, falls Fingergeometrie tatsächlich gebraucht wird. Aktuell kein zusätzlicher Nutzen für Handhöhe, Handabstand oder Torsoachse. |
 | MoveNet Lightning / Thunder | 17 Körperpunkte; zwei Varianten mit unterschiedlichem Latenz-/Qualitätsziel | Technisch plausible Alternative. Kein eigener Vergleich auf unseren Geräten durchgeführt; deshalb kein behaupteter Genauigkeitsgewinner und kein unbegründeter Modellwechsel. |
@@ -55,16 +55,18 @@ Erkennungsqualität und verändern den Roh-Log nicht.
 X/Y werden vor geometrischen Berechnungen in Pixel umgerechnet. Abstände werden
 durch die aktuelle Schulterbreite geteilt. Das reduziert Abhängigkeit von
 Auflösung und Körpergröße im Bild. Es korrigiert weder Perspektive noch starke
-Drehungen. Modell-z wird für diese drei Regeln nicht gebraucht. Das Video ist
+Drehungen. Modell-z wird für diese Regeln nicht gebraucht. Das Video ist
 zur Orientierung gespiegelt; die Daten sind ungespiegelt.
 
-## Die drei Beobachtungen
+## Die Beobachtungen
 
 | Beobachtung | Messung / Vergleich | Warum zeigen wir sie? | Was bedeutet sie ausdrücklich nicht? |
 | --- | --- | --- | --- |
 | **Hand above shoulder** | Größere Handgelenkhöhe relativ zur eigenen Schulter, geteilt durch Schulterbreite; sichtbar über Schulter und gegenüber neutral angehoben | Deutliche, leicht nachstellbare Bewegung. Nutzer kann prüfen, ob sie den gesprochenen Punkt unterstützt. | Keine Bewertung von Offenheit, Engagement, Selbstvertrauen oder Fingerform. |
 | **Hands held together** | Abstand beider Handgelenke im Schulter-Hüft-Band, geteilt durch Schulterbreite; deutlich kleiner als bei neutral getrennten Händen | Zeigt eine gehaltene Handposition zum Rückblick. | Kein Nachweis von Verschränken, Berührung, Nervosität oder „geschlossener Körpersprache“. |
-| **Sideways posture change** | Absoluter Unterschied des Torso-Bildwinkels zur persönlichen Neutralstellung | Sichtbarer Vergleich mit der eigenen Ausgangslage; auch sitzend möglich. | Keine medizinische Haltungsbewertung, kein Vor-/Zurücklehnen, keine Aussage über Sicherheit. |
+| **Sideways lean** | Absoluter Unterschied des Torso-Bildwinkels zur persönlichen Neutralstellung | Sichtbarer Vergleich mit der eigenen Ausgangslage; auch sitzend möglich. | Keine medizinische Haltungsbewertung, kein Vor-/Zurücklehnen, keine Aussage über Sicherheit. |
+| **Sideways position change** | Horizontale Änderung des Mittelpunkts der beiden Schultern und Hüften, geteilt durch die neutrale Schulterbreite | Erfasst auch eine seitliche Versetzung des ganzen Körpers ohne Torso-Neigung; aus dem Nutzer-Test ergänzt. | Kein Nachweis von Unruhe oder schlechter Position; eine Kamerabewegung kann dasselbe Bildsignal erzeugen. |
+| **Arms crossed in front of torso** | Beide Handgelenke über Körpermitte, im Rumpfbereich, Ellbogen gebeugt; Geometrie aus der Team-Implementierung | Macht die vorhandene Team-Regel auch timestamp-genau zurückspulbar. | Keine Aussage über Abwehr, Gefühle oder Persönlichkeit; verdeckte Handgelenke bleiben unbekannt. |
 
 Beine sind für diese Regeln nicht erforderlich. Ein leicht schiefer, aber
 stabiler neutraler Torso ist eine gültige Referenz. Nicht bequeme Bewegungen
@@ -85,12 +87,14 @@ Regelversion, Tests und erneute Prüfung vor Ort.
 | Framing | Schulterbreite ≥ 12 % der Bildbreite; Schulter-Hüft-Höhe ≥ 12 % der Bildhöhe | Winzige/degenerierte Geometrie nicht auswerten. Keine Entfernungsangabe in Metern. |
 | Kalibrierung | 3 s zusammenhängend, mindestens 15 Samples | Eine kurze stabile Referenz statt eines einzelnen Ausreißers. Median für die Baseline. |
 | Neutrale Hände | Höhe ≤ −0,15 Schulterbreiten, Abstand ≥ 0,65 Schulterbreiten; im Torso-Band | Neutrale getrennte Hände als verständliche Referenz. UI erklärt die Pose. |
-| Stabilität der Kalibrierung | Spannweite Torso ≤ 6°; Höhe/Abstand jeweils ≤ 0,3 Schulterbreiten | Während Bewegung keine scheinbar neutrale Baseline übernehmen; Kalibrierung beginnt neu. |
+| Stabilität der Kalibrierung | Spannweite Torso ≤ 6°; Höhe/Abstand/seitliche Position jeweils ≤ 0,3 Schulterbreiten | Während Bewegung keine scheinbar neutrale Baseline übernehmen; Kalibrierung beginnt neu. |
 | Maximaler Sample-Abstand | 350 ms | Lücken nicht als gehaltene Bewegung zählen. Sehr langsame Geräte können so nicht kalibrieren. |
 | Hand hoch | Eintritt max(0,15; neutrale Höhe + 0,5); Austritt 0,1 darunter | Klar über der Schulter; Hysterese reduziert Flackern an der Grenze. 0,8 s halten. |
 | Hände zusammen | Eintritt min(0,35; neutraler Abstand / 2); Austritt 0,15 darüber | Deutlich näher als neutral. 1,2 s halten, nur im Torso-Band. |
 | Seitlicher Torso | Eintritt 12° Veränderung; Austritt 8° | Nur größere Bildwinkeländerungen markieren. 1,5 s halten. |
-| Cooldown | 5 s nach Ende der letzten bestätigten Beobachtung dieses Typs | Eine gehaltene Bewegung bleibt ein Event. Rückkehr/Lücke plus erneute Mindestdauer nötig. |
+| Seitliche Position | Eintritt 0,35 neutrale Schulterbreiten; Austritt 0,2; 0,8 s halten | Erkennt den vom Nutzer getesteten seitlichen Körperversatz. Auf Rückmeldung zur Verzögerung von 1,5 s verkürzt. Bei ≥ 8° Torsoänderung wird die Position nicht zusätzlich markiert; dafür gilt die Neigungsregel. |
+| Arme verschränkt | Beide Wrist-Cross-Werte ≥ 0,1; Höhen in [−1,3; 0,2]; Ellbogen ≤ 120°; 2 s halten | Übernimmt die Team-Geometrie. Im gemeinsamen Evaluator: keine Überbrückung fehlender Frames, 20 s Cooldown. Nicht gleichzeitig als Hände-zusammen markieren. |
+| Cooldown | 5 s (Arme verschränkt: 20 s) nach Ende der letzten bestätigten Beobachtung dieses Typs | Eine gehaltene Bewegung bleibt ein Event. Rückkehr/Lücke plus erneute Mindestdauer nötig. |
 | Kameraframe wird alt | nach 700 ms Overlay/aktuellen Hinweis ausblenden; nach 5 s hängender Inferenz Fehler | Keine eingefrorene Erkennung als aktuellen Zustand zeigen. |
 
 Jede Aufnahme kalibriert neu. Der Button zur Rekalibrierung ist vor der Aufnahme
@@ -111,7 +115,8 @@ neu kalibrieren/aufnehmen.
   aktueller Hinweis wird angezeigt; Hinweise sind abschaltbar, Review bleibt.
 - Das gemeinsame Event-Schema enthält `session_id`, `id`, `t_ms`, `duration_ms`,
   `type`, `severity`, `source=browser`, `payload` mit Regelversion, Messwert,
-  Baseline, Auslöseschwelle und Bestätigungszeit. Keine erfundenen Modell-Scores.
+  Baseline, Auslöseschwelle und Bestätigungszeit. `initial_measurement` hält den
+  Wert bei Bestätigung fest; `measurement` ist der zuletzt beobachtete Wert. Keine erfundenen Modell-Scores.
 - Review: Klick auf einen Marker spielt die lokale Aufnahme mit bis zu 2 s
   Kontext vor/nach der Beobachtung. „How was this observed?“ erklärt die Regel.
 - JSONL enthält Roh-Landmarks; „Download gesture evidence JSON“ enthält die
@@ -135,8 +140,9 @@ Drei getrennte Nachweise, die nicht miteinander verwechselt werden dürfen:
    Dieser Asset-/Laufzeittest beweist keine Erkennung menschlicher Gesten.
 3. **Erkennungsqualität am Veranstaltungsgerät:** Einwilligende Teammitglieder
    führen die Bewegungen vor der echten Kamera aus; die Anleitung und das
-   Ergebnisprotokoll stehen in `docs/05-jury-demo.md`. Dieser Nachweis ist noch
-   offen, bis er tatsächlich ausgeführt und protokolliert wurde.
+   Ergebnisprotokoll stehen in `docs/05-jury-demo.md`. Ein erster Nutzerbericht
+   bestätigt Hand hoch, Hände zusammen und seitliche Position; eine systematische
+   Geräte-/Personenprüfung mit gezählten Versuchen bleibt offen.
 
 Für spätere Datensätze: Clips manuell mit Gestentyp, Beginn/Ende und „nicht
 beurteilbar“ annotieren; Personen und Aufnahmen zwischen Entwicklung und Test
@@ -147,3 +153,25 @@ Prozentzahl berechnen. Ein perfekter synthetischer Test ist keine gemessene
 Genauigkeit auf Menschen. Hauttöne, Kleidung, Licht, Kameras, sitzende/stehende
 Positionen, Bewegungseinschränkungen und verdeckte Hände gehören in die
 Stichprobe; bislang gibt es dafür keine repräsentativen Ergebnisse.
+
+## Rückmeldung aus dem ersten lokalen Kamera-Versuch
+
+Der Nutzer berichtete am 24.10.2026: Hand hoch und Hände zusammen funktionierten;
+seitwärts zunächst nicht. Auf Nachfrage war es ein **Versetzen des ganzen
+Körpers**, keine Neigung relativ zur Hüfte. Das erklärte die Lücke der bisherigen
+Winkelregel. Version 2 ergänzt deshalb eine separate positionsbasierte
+Beobachtung, ohne die Neigungsgrenze pauschal zu senken. Die Anleitung und der
+synthetische Rundgang zeigen nun diese Bewegung. „Pose debug“ zeigt Winkel- und
+Positionsänderung samt Trigger. Dieser einzelne Nutzerbericht ist ein Hinweis
+zur Bedienbarkeit, kein quantifizierter Genauigkeitstest. Der Nutzer bestätigte
+anschließend auch die seitliche Positionsregel, empfand sie aber als verzögert.
+
+Version 3 verkürzt nur deren Mindestdauer von 1,5 auf 0,8 s. Dazu kommen der
+Abtasttakt und die tatsächliche Frame-Verarbeitung. „Pose debug“ zeigt jetzt
+**Frame latency** (Frame-Anforderung bis Worker-Antwort), **model** (Dauer von
+`detect`) und **Sampling** (letzte bis zu 20 Samples). Die Frame-Zeit umfasst
+Bitmap-Erzeugung, Worker-Transport und Inferenz; Kamera-Sensorlatenz und
+Bildschirmdarstellung werden nicht gemessen. Es liegt kein Vergleich Safari
+gegen andere Browser vor, daher keine browserbezogene Ursache behaupten.
+Erneute subjektive Geschwindigkeitsprüfung, Neigung und Kreuzungsregel am echten
+Gerät bleiben offen.

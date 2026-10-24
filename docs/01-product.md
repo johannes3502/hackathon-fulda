@@ -47,13 +47,17 @@ Produktentscheidung.
 - Einzelperson oder mit Feedback durch Lehrkraft?
 
 ### Analyse
-- Welche Metriken pro Feature, welche Schwellenwerte, welche Scores?
+- Gesten: sichtbare Geometrie relativ zur Neutralstellung, Mindestdauer,
+  Hysterese und Cooldown sind als Prototyp-Heuristiken umgesetzt; keine Scores.
+  Systematische Genauigkeits-/Geräteprüfung bleibt offen.
 - Was läuft live, was erst nach der Präsentation?
 - Wie werden Fehlalarme und Unsicherheit angezeigt?
 - Eye Tracking: Webcam-basiert oder zusätzliche Hardware?
 
 ### Fact-Checking
-- Welche Dateiformate können hochgeladen werden?
+- Quellen-Ingest ist für PDF, PPTX, DOCX, TXT und Markdown umgesetzt.
+  Lokale Jina-Embeddings und pgvector/Volltextsuche liefern zitierbare Passagen;
+  der darauf aufbauende Fact-Check bleibt offen.
 - Welche Web-Quellen darf der Agent abrufen?
 - Wie wird eine Quelle als glaubwürdig markiert?
 - Was passiert, wenn keine Quelle gefunden wird?
@@ -79,7 +83,7 @@ Produktentscheidung.
 - Keine echten personenbezogenen Daten in der Demo.
 
 ### Technik
-- Lokaler Stack (24.10.2026): FastAPI, MediaPipe, PostgreSQL,
+- Lokaler Stack (24.10.2026): FastAPI, MediaPipe, PostgreSQL mit pgvector,
   MediaRecorder im Browser und SeaweedFS als S3-Dateispeicher;
   FFmpeg im Backend. Celery führt lange Arbeiten in einem separaten Worker
   aus, Redis dient als Queue und temporärer Ergebnisspeicher. Die
@@ -120,5 +124,4 @@ einbauen**:
 | 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
 | 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |
-
 | 24.10.2026 | Echte lokale Gesten-/Haltungsbeobachtungen, synthetischer Jury-Rundgang und Evidenz-Export | Nutzerauftrag: Gesten recherchieren, nachvollziehbar auswerten und für die Jury vorführbar machen. Keine Blickkontakt-/Qualitätsbewertung. |
