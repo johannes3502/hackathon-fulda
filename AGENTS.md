@@ -24,6 +24,12 @@ Quellenurteile. Formel, Datenabdeckung und fehlende Daten bleiben sichtbar;
 ohne Evidenz kein Score. Keine Validierungs- oder Benotungsbehauptung. Der
 Zeitverlauf ist eine geglättete Linie mit ausdrücklich interpolierten Übergängen.
 
+Review-Verdrahtung (25.10.2026): Beide Web-Review-Ansichten nutzen denselben
+Adapter für die gewählte, lokal gespeicherte Aufnahme. Quellen-Marker kommen
+aus dem aktuellen Fact-Check; nur Urteile mit geprüftem Quellenzitat fließen
+in den Fachwissen-Score ein. `/review-preview` bleibt ein markiertes Beispiel.
+Für Struktur existiert noch keine automatische Messregel; ohne Evidenz kein Score.
+
 ## 2. Ablauf
 
 1. **Vorbereitung:** Nutzer lädt Quellen hoch (PDF, PPTX, Text). Backend zerlegt sie in Chunks mit Quelle und Seite/Folie und legt sie für die Suche ab.

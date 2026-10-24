@@ -1339,6 +1339,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
                 passage:
                   "Die Hochschule hat rund 9.500 Studierende in acht Fachbereichen.",
                 filename: "folien.pdf",
+                quote_verified: "exact",
                 location: { kind: "page", start: 2, end: 2 },
               },
               checked: ["upload"],
@@ -2061,4 +2062,215 @@ test("failed browser storage keeps the current video playable and shows a warnin
         .evaluate((el: HTMLVideoElement) => el.readyState),
     )
     .toBeGreaterThanOrEqual(2);
+});
+
+test("review scores and statistics follow each recorded take across views and reload", async ({
+  page,
+}, info) => {
+  const jobId = "12345678-1234-1234-1234-123456789abc";
+  const factJobId = "87654321-4321-4321-4321-cba987654321";
+  let uploads = 0;
+  const words = [
+    { word: "Demo.", start_ms: 100, end_ms: 200 },
+    { word: "ähm", start_ms: 500, end_ms: 600 },
+  ];
+  await syntheticPose(page);
+  await page.route("**/api/sources?*", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/speech/analyze", (route) => {
+    uploads++;
+    expect(route.request().postDataBuffer()!.length).toBeGreaterThan(1000);
+    return route.fulfill({ status: 202, json: { job_id: jobId } });
+  });
+  await page.route("**/api/speech/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        job_id: jobId,
+        status: "completed",
+        result: {
+          audio: { summary: { pause_count: uploads === 1 ? 1 : 0 } },
+          words: uploads === 1 ? words : [],
+          asr_provider: "synthetic-test",
+          synthetic_demo: true,
+          notices: [],
+          events:
+            uploads === 1
+              ? [
+                  {
+                    t_ms: 200,
+                    duration_ms: 300,
+                    type: "pause",
+                    source: "asr",
+                    severity: "info",
+                    payload: { before: "Demo.", mid_sentence: false },
+                  },
+                  {
+                    t_ms: 500,
+                    duration_ms: 100,
+                    type: "filler",
+                    source: "asr",
+                    severity: "hint",
+                    payload: { word: "ähm" },
+                  },
+                ]
+              : [
+                  {
+                    t_ms: 200,
+                    duration_ms: 400,
+                    type: "pitch",
+                    source: "speech",
+                    severity: "hint",
+                    payload: {},
+                  },
+                ],
+          transcription: {
+            summary: { word_count: 2, filler_count: 1 },
+            events: [],
+          },
+        },
+      },
+    }),
+  );
+  await page.route("**/api/factcheck/settings", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        model: "synthetic-test",
+        llm_host: "synthetic.invalid",
+        web_provider: null,
+      },
+    }),
+  );
+  await page.route("**/api/factcheck", (route) => {
+    expect(route.request().postDataJSON().words).toEqual(words);
+    return route.fulfill({ status: 202, json: { job_id: factJobId } });
+  });
+  await page.route("**/api/factcheck/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        job_id: factJobId,
+        status: "completed",
+        result: {
+          claims: ["supports", "contradicts", "supports", "not_found"].map(
+            (verdict, index) => ({
+              claim: `Synthetic claim ${index}`,
+              transcript: "Demo.",
+              t_ms: 100,
+              duration_ms: 100,
+              verdict,
+              explanation: "Synthetic source comparison.",
+              checked: ["upload"],
+              evidence:
+                verdict === "not_found"
+                  ? null
+                  : {
+                      kind: "upload",
+                      label: "Synthetic test source",
+                      quote: "Demo source passage.",
+                      passage: "Demo source passage.",
+                      quote_verified: index === 2 ? null : "exact",
+                    },
+            }),
+          ),
+          events: [],
+          notices: [],
+          model: "synthetic-test",
+          web_provider: null,
+          sources_checked: true,
+          config: {
+            max_claims: 6,
+            top_k: 5,
+            web_results: 4,
+            min_quote_chars: 12,
+          },
+        },
+      },
+    }),
+  );
+
+  await backend(page, true, async () => {
+    await page.getByText("Title and duration", { exact: true }).click();
+    await page.getByLabel("Recording title").fill("First recorded take");
+  });
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  const firstReview = page.url();
+  const scores = page.getByRole("region", {
+    name: "Bewertung der vier Kriterien",
+  });
+  const values = scores.locator(".review-score-value");
+  await expect(values).toHaveText(["–", "–", "75/100", "–"]);
+  await expect(scores.locator(".review-score-origin")).toContainText(
+    "First recorded take",
+  );
+  await expect(scores).toContainText("0,4 s bewertet");
+  await page
+    .getByText("Recording details and exports", { exact: true })
+    .click();
+  const metric = page
+    .locator(".backend-metrics > div")
+    .filter({ hasText: "Transcript: word count" });
+  await expect(metric.locator("dd")).toHaveText("2");
+
+  await page.getByText("Transcript and source checks", { exact: true }).click();
+  await page.getByRole("button", { name: "Check facts", exact: true }).click();
+  const expected = ["–", "50/100", "75/100", "–"];
+  await expect(values).toHaveText(expected);
+  await expect(scores).toContainText("1 von 2 Aussagen gestützt");
+  await expect(scores).toContainText("2 Aussagen offen");
+  await expect(page.locator(".fact-verdict")).toHaveText([
+    "Supported by source",
+    "Source says otherwise",
+    "Could not be checked",
+    "Not found in sources",
+  ]);
+  await expect(
+    page.getByText("Sessions are saved in this browser", { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Detailed timeline", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/analysis$/);
+  await expect(values).toHaveText(expected);
+  await expect(page.locator(".review418-moment")).toHaveCount(6);
+  await expect(page.locator("video")).toHaveAttribute("src", /^blob:/);
+  await page.reload();
+  await expect(values).toHaveText(expected);
+  await expect(scores.locator(".review-score-origin")).toContainText(
+    "First recorded take",
+  );
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("recorded-review-scores.png"),
+    fullPage: true,
+  });
+
+  await backend(page, false, async () => {
+    await page.getByText("Title and duration", { exact: true }).click();
+    await page.getByLabel("Recording title").fill("Second recorded take");
+  });
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  const secondReview = page.url();
+  expect(secondReview).not.toBe(firstReview);
+  expect(uploads).toBe(2);
+  await expect(values).toHaveText(["–", "–", "0/100", "–"]);
+  await expect(scores.locator(".review-score-origin")).toContainText(
+    "Second recorded take",
+  );
+  await expect(
+    page.getByText("Sessions are saved in this browser", { exact: false }),
+  ).toBeVisible();
+  await page.goto(firstReview);
+  await expect(values).toHaveText(expected);
+  await page.goto("/");
+  const statistics = page.getByRole("definition");
+  await expect(statistics.nth(0)).toHaveText("2");
+  await expect(statistics.nth(2)).toHaveText("7");
+  await expect(statistics.nth(3)).toHaveText("1");
+  await page.goto("/sources");
+  await expect(
+    page
+      .getByRole("navigation", { name: "Presentation workflow" })
+      .getByRole("link", { name: /Review/ }),
+  ).toHaveAttribute("href", new URL(secondReview).pathname);
 });

@@ -9,9 +9,19 @@ Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
 Ergänzender Nutzerauftrag: Vier 0–100-Prototyp-Scores stehen über dem Video.
 `evidence-share-v1` bewertet positive / (positive + kritische) Zeitanteile,
 mit zeitlicher Vereinigung überlappender Hinweise derselben Art. Für Fachwissen
-hat der Anteil gestützter an entscheidbaren Quellenurteilen Vorrang. Offene
-Aussagen, neutrale Beobachtungen und unbekannte Zeit werden ausgeschlossen.
+hat der Anteil gestützter an entscheidbaren Quellenurteilen mit geprüftem
+Quellenzitat Vorrang. Offene Aussagen, neutrale Beobachtungen und unbekannte
+Zeit werden ausgeschlossen.
 Ohne Evidenz steht „–“. Datenabdeckung und Formel sind direkt im UI sichtbar.
+Das Hauptreview und die detaillierte Analyse verwenden denselben
+`recordingReviewData`-Adapter für die gespeicherte Aufnahme (Video, Dauer,
+Kamera-/Sprachhinweise und aktueller Quellencheck). Quellen-Anmerkungen werden
+aus dem aktuellen Check abgeleitet, damit alte Marker nach einem erneuten Check
+keine abweichenden Scores ergeben. `evidenceVerdict` hält Urteile ohne geprüftes
+Zitat auch im Score offen. Die Score-Karten benennen den Titel der Aufnahme;
+der synthetische Pfad `/review-preview` bleibt ausdrücklich ein Beispiel.
+Für Struktur gibt es derzeit keine automatische Messregel; ohne entsprechende
+Evidenz bleibt dieses Kriterium daher offen.
 Der Graph ist eine durchgehende, ungefüllte Linie mit geraden, zackigen Segmenten. Zwischenwerte
 sind als interpoliert gekennzeichnet, der Wiedergabepunkt folgt dem Video.
 Darunter teilt eine Wiedergabeleiste dieselbe Zeitachse und die Grün-/Rot-/Neutralbereiche
@@ -36,8 +46,9 @@ den nativen Videosteuerungen synchronisiert; Tastatursprünge bleiben möglich.
 4. **Practice questions**: sprechen oder tippen, eine Frage pro Schritt.
    Fehlt ein Transkript, kann **Transcribe this take** die Aufnahme nach explizitem
    Klick zur lokalen Whisper-Analyse hochladen. Das Originalvideo bleibt im Tab.
-5. Video vor dem Neuladen herunterladen. Browser-Aufnahmen und Gesprächstext
-   werden nicht über einen Reload hinaus gespeichert.
+5. Abgeschlossene Aufnahmen, Analyse und Gesprächstext bleiben in IndexedDB
+   dieses Browsers gespeichert und werden nach Reload wiederhergestellt.
+   **Recording details and exports** bietet Download und lokales Löschen.
 
 Getippte Fragen und ihr Quellenvergleich nutzen das konfigurierte Sprachmodell,
 standardmäßig Gemini (Google). Dabei verlassen Transkript, passende

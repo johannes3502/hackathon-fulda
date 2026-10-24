@@ -271,7 +271,8 @@ test("review annotations survive a failed video and missing live recording", asy
   await page.goto("/live/missing/analysis");
   await expect(
     page.getByRole("heading", {
-      name: "This recording isn’t in this workspace.",
+      name: "This recording isn’t available in this browser.",
     }),
   ).toBeVisible();
+  await expect(page.locator("[data-score-version]")).toHaveCount(0);
 });

@@ -14,6 +14,18 @@ export const VERDICT_LABELS: Record<Verdict, string> = {
   unchecked: "Could not be checked",
 };
 
+/** A source verdict is assessable only when the backend verified its quote. */
+export function evidenceVerdict(
+  claim: Pick<ClaimResult, "verdict" | "evidence">,
+): Verdict {
+  const verified = claim.evidence?.quote_verified;
+  return (claim.verdict === "supports" || claim.verdict === "contradicts") &&
+    verified !== "exact" &&
+    verified !== "fuzzy"
+    ? "unchecked"
+    : claim.verdict;
+}
+
 export async function factCheckSettings(endpoint: string, signal: AbortSignal) {
   const value = await callBackend(endpoint, "/factcheck/settings", signal);
   if (!isObject(value) || typeof value.available !== "boolean")
@@ -86,10 +98,7 @@ export function factFeedback(
   durationMs: number,
 ): LiveFeedback[] {
   return result.claims.map((claim, index) => {
-    const verdict =
-      claim.verdict === "supports" && !claim.evidence?.quote_verified
-        ? "unchecked"
-        : claim.verdict;
+    const verdict = evidenceVerdict(claim);
     const startMs = Math.min(Math.max(0, claim.t_ms), durationMs);
     const evidence = claim.evidence
       ? ` ${claim.evidence.label}: “${claim.evidence.quote}”`

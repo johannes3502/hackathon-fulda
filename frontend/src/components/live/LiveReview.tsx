@@ -13,7 +13,7 @@ import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import type { LiveFeedback } from "@/features/live/contracts";
-import { needsPractice, reviewMoments } from "@/features/live/review";
+import { needsPractice, recordingFeedback } from "@/features/live/review";
 import { PRESENTATION_MODES } from "@/features/questions/presentation";
 import { clipRange } from "@/features/live/protocol";
 import { cueAppearance } from "@/features/live/cue-appearance";
@@ -29,7 +29,7 @@ import { TranscriptAnalysis } from "./TranscriptAnalysis";
 import { VideoPlayback } from "./VideoPlayback";
 import { ReviewScores } from "./ReviewScores";
 import { reviewScores } from "@/features/live/review-scores";
-import { feedbackToMoment } from "../analysis/review-data";
+import { recordingReviewData } from "../analysis/review-data";
 import "./review-accessibility.css";
 
 export function LiveReview({ sessionId }: { sessionId: string }) {
@@ -42,7 +42,8 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
   const [view, setView] = useState<"moments" | "questions">("moments");
   const [all, setAll] = useState(true);
   if (!recording) return <MissingRecording />;
-  const moments = reviewMoments(recording.feedback);
+  const moments = recordingFeedback(recording);
+  const reviewData = recordingReviewData(recording);
   const practice = moments.filter(needsPractice);
   const strengths = moments.filter((item) => item.kind === "positive");
   const visible = all || !practice.length ? moments : practice;
@@ -107,15 +108,16 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
           <>
             <ReviewScores
               scores={reviewScores(
-                moments.map((item) => feedbackToMoment(item)),
-                recording.durationMs,
-                recording.factCheck?.claims,
+                reviewData.moments,
+                reviewData.durationMs,
+                reviewData.claims,
               )}
               demo={recording.transcript?.synthetic ?? false}
+              recordingTitle={reviewData.title}
             />
             <div className="review-stage-grid">
               <VideoPlayback
-                recording={recording}
+                recording={{ ...recording, feedback: moments }}
                 selected={selected}
                 onSelect={jump}
               />

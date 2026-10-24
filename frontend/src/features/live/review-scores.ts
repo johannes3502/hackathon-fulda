@@ -1,4 +1,4 @@
-import type { ClaimResult } from "../factcheck/api";
+import { evidenceVerdict, type ClaimResult } from "../factcheck/api";
 
 export const REVIEW_SCORE_VERSION = "evidence-share-v1";
 export const SCORE_LABELS = {
@@ -43,7 +43,7 @@ function unionLength(intervals: Interval[]) {
 export function reviewScores(
   moments: ScoreMoment[],
   durationMs: number,
-  claims?: Pick<ClaimResult, "verdict">[],
+  claims?: Pick<ClaimResult, "verdict" | "evidence">[],
 ) {
   const duration = Number.isFinite(durationMs) ? Math.max(0, durationMs) : 0;
   return Object.fromEntries(
@@ -81,12 +81,13 @@ export function reviewScores(
         unassessed: 0,
       };
       if (key === "knowledge" && claims !== undefined) {
+        const verdicts = claims.map(evidenceVerdict);
         result.source = "claims";
-        result.supported = claims.filter(
-          (claim) => claim.verdict === "supports",
+        result.supported = verdicts.filter(
+          (verdict) => verdict === "supports",
         ).length;
-        result.contradicted = claims.filter(
-          (claim) => claim.verdict === "contradicts",
+        result.contradicted = verdicts.filter(
+          (verdict) => verdict === "contradicts",
         ).length;
         result.unassessed =
           claims.length - result.supported - result.contradicted;

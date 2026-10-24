@@ -17,6 +17,12 @@
   font-size: 0.875rem;
   color: var(--muted);
 }
+.review-score-origin {
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
 .review-score-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

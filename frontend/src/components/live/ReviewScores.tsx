@@ -13,11 +13,13 @@ export function ReviewScores({
   selected,
   onSelect,
   demo = false,
+  recordingTitle,
 }: {
   scores: Record<ScoreCriterion, ReviewScore>;
   selected?: ScoreCriterion | null;
   onSelect?: (criterion: ScoreCriterion) => void;
   demo?: boolean;
+  recordingTitle?: string;
 }) {
   return (
     <section
@@ -30,6 +32,13 @@ export function ReviewScores({
         <h2>Deine vier Kriterien</h2>
         <span>{demo ? "Demo · " : ""}Prototyp-Score · 0–100</span>
       </div>
+      {recordingTitle && (
+        <p className="review-score-origin">
+          Daten aus dieser Aufnahme: <strong>{recordingTitle}</strong>. Kamera-
+          und Sprachhinweise sowie vorhandene Quellenchecks bilden die
+          Grundlage. Fehlende Messungen bleiben offen.
+        </p>
+      )}
       <div className="review-score-grid">
         {(Object.entries(SCORE_LABELS) as [ScoreCriterion, string][]).map(
           ([key, label]) => {
@@ -93,9 +102,9 @@ export function ReviewScores({
         </p>
         <p>
           Fachwissen: Wenn ein Quellencheck vorliegt, zählt der Anteil
-          gestützter Aussagen an allen gestützten oder widersprochenen Aussagen.
-          „Nicht gefunden“ und ungeprüfte Aussagen bleiben offen. Ohne
-          Quellencheck gelten die bewerteten Zeitanteile.
+          gestützter Aussagen an allen gestützten oder widersprochenen Aussagen
+          mit geprüftem Quellenzitat. „Nicht gefunden“ und ungeprüfte Aussagen
+          bleiben offen. Ohne Quellencheck gelten die bewerteten Zeitanteile.
         </p>
         <p>
           Der Score bewertet die erfasste Evidenz dieses Takes. Er ist eine

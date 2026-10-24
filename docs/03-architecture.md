@@ -476,12 +476,15 @@ flowchart TD
     DRAWER --> RP
     DRAWER --> WALK
     DRAWER --> DEMOPAGE
-    RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ohne Scores und Performance-Kurve"]
+    RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ausdrücklich markierte Beispiel-Scores"]
     SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
     LIVE["/live - LiveStudio<br/>Vollbild-Layout ohne Menü, Pose-Overlay,<br/>Immer Live + Backend-Analyse,<br/>Options: Vortragstyp, Material und Transkript,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
-    STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
+    STORE["Root-Layout: LiveSessionProvider + IndexedDB<br/>Video, Analyse und Fragen je Aufnahme<br/>Wiederherstellung nach Reload"] -.-> LIVE
+    STORE --> EVIDENCE["recordingReviewData + recordingFeedback<br/>Video, Dauer und Events der gewählten Aufnahme<br/>Quellen-Marker aus aktuellem Fact-Check<br/>Fragen zählen nicht als Präsentationsevidenz"]
+    EVIDENCE --> LREV
+    EVIDENCE --> LA
     DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
     LIVE --> SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]
@@ -503,7 +506,7 @@ flowchart TD
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
     RP --> RA["ReviewAnalysis + PerformanceGraph / FeedbackGraph<br/>qualitativer Event-Saldo, positive Hinweise oben<br/>neutrale Mittellinie, Anpassungshinweise unten<br/>video.currentTime, Zeitmarken, Abschnitt-Loop"]
-    LREV --> SCORES["ReviewScores über dem Video<br/>evidence-share-v1: 4 Kriterien, 0–100<br/>Zeitanteile / Quellenurteile, Abdeckung und fehlende Daten"]
+    LREV --> SCORES["ReviewScores über dem Video<br/>evidence-share-v1: 4 Kriterien, 0–100<br/>Zeitanteile / Quellenurteile mit geprüftem Zitat<br/>Aufnahmetitel, Abdeckung und fehlende Daten"]
     RA --> SCORES
     LREV --> FGRAPH["VideoPlayback + FeedbackGraph unter dem Video<br/>Zackiger Liniengraph, Zwischenwerte linear interpoliert<br/>Gute Momente oben; farbige Wiedergabeleiste darunter<br/>Cursor + abgespielter Fortschritt an video.currentTime<br/>Play/Pause / Zeitregler / Zeitmarken ↔ lokales Video"]
     LA --> RA

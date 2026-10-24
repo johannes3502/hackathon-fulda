@@ -141,6 +141,7 @@ export function ReviewAnalysis({
             scores={scores}
             selected={criterion}
             demo={data.demo}
+            recordingTitle={data.demo ? undefined : data.title}
             onSelect={(key) => setCriterion(criterion === key ? null : key)}
           />
           <div className="review418-context">

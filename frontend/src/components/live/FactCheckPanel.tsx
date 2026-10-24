@@ -7,6 +7,7 @@ import type { LiveFeedback, LiveRecording } from "@/features/live/contracts";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import {
   factCheckSettings,
+  evidenceVerdict,
   factFeedback,
   runFactCheck,
   VERDICT_LABELS,
@@ -214,10 +215,13 @@ export function FactCheckPanel({
         <>
           <ol className="fact-claims">
             {result.claims.map((claim, index) => (
-              <li key={index} className={`fact-claim ${claim.verdict}`}>
+              <li
+                key={index}
+                className={`fact-claim ${evidenceVerdict(claim)}`}
+              >
                 <div className="fact-claim-head">
-                  <span className={`fact-verdict ${claim.verdict}`}>
-                    {VERDICT_LABELS[claim.verdict]}
+                  <span className={`fact-verdict ${evidenceVerdict(claim)}`}>
+                    {VERDICT_LABELS[evidenceVerdict(claim)]}
                   </span>
                   <button
                     type="button"

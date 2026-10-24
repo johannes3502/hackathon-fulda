@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { reviewScores, type ScoreMoment } from "./review-scores";
 
+const evidence = {
+  kind: "upload" as const,
+  label: "Synthetic source",
+  quote: "A verified source passage.",
+  passage: "A verified source passage.",
+  quote_verified: "exact" as const,
+};
+
 const moment = (
   kind: ScoreMoment["kind"],
   tMs: number,
@@ -60,9 +68,12 @@ describe("evidence-share review scores", () => {
   });
   it("uses source verdicts for knowledge and excludes not-found / unchecked claims", () => {
     const knowledge = reviewScores([], 10000, [
-      { verdict: "supports" },
-      { verdict: "supports" },
-      { verdict: "contradicts" },
+      { verdict: "supports", evidence },
+      {
+        verdict: "supports",
+        evidence: { ...evidence, quote_verified: "fuzzy" },
+      },
+      { verdict: "contradicts", evidence },
       { verdict: "not_found" },
       { verdict: "unchecked" },
     ]).knowledge;
@@ -77,6 +88,25 @@ describe("evidence-share review scores", () => {
       reviewScores([], 10000, [{ verdict: "not_found" }]).knowledge.value,
     ).toBeNull();
     expect(reviewScores([], 10000, []).knowledge.value).toBeNull();
+  });
+  it("leaves verdicts without a verified source quote unassessed", () => {
+    const claims = [
+      { verdict: "supports" as const },
+      {
+        verdict: "contradicts" as const,
+        evidence: { ...evidence, quote_verified: null },
+      },
+    ];
+    expect(reviewScores([], 10000, claims).knowledge).toMatchObject({
+      value: null,
+      supported: 0,
+      contradicted: 0,
+      unassessed: 2,
+    });
+    expect(
+      reviewScores([], 10000, [...claims, { verdict: "supports", evidence }])
+        .knowledge,
+    ).toMatchObject({ value: 100, supported: 1, unassessed: 2 });
   });
   it("clamps evidence to the take and respects explicit classification without changing the annotation", () => {
     const flow = reviewScores(
