@@ -1,339 +1,166 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-> **Einstiegspunkt für Menschen und Agents.**
-> Lies dieses File zuerst. Es sagt dir, was das Ziel ist, was hart ist, was du
-> als Nächstes tun musst und welche Dokumente du wann lesen sollst.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Archiv (`archive/`) ist nicht Scope.
 
----
+## 1. Projekt
 
-## 0. Mission & Status
+**Live-Präsentationstrainer** (8. Hackathon Fulda, 24.–25.10.2026, Thema Future Education): analysiert Auftritt und Sprache, macht Feedback timestamp-genau zurückspulbar und fragt danach gezielt nach. Web-App für Laptop und Smartphone, öffentliche URL, kein Login.
 
-**Mission:** Beim 8. Hackathon Fulda (24.–25.10.2026) mit einem
-funktionsfähigen, evidenzbasierten und menschzentrierten Future-Education-
-Prototyp gewinnen.
+| # | Feature | Inhalt |
+|---|---|---|
+| 1 | Posture / Gesture / Eye Tracking | Pose-, Gesten- und Blick-Landmarks aus der Kamera; Regeln darauf erzeugen Events (z. B. „Haltung auffällig“) |
+| 2 | Transkription + Fact-Check | Transkript mit Wort-Timestamps; Abgleich der Aussagen per RAG mit vorab hochgeladenen Quellen (PDF, PPTX, …); Web-Fetch-Agent als Zweitquelle |
+| 3 | Sprechmerkmale | Tempo, Pausen, Zögern, Füllwörter, Lautstärke (zu leise/laut), Tonhöhenvariation (monoton); live Hinweise während des Vortrags |
+| 4 | Timestamp-Review | Events auf einer Timeline; Klick springt zur Stelle und spielt den Clip des Events ab |
+| 5 | Frage-Simulator | Agent stellt nach der Präsentation Fragen, abgeleitet aus Transkript, Quellen und Fact-Check-Funden |
 
-**Status (24.10.2026, 10:00):**
-- Die offizielle Challenge liegt als PDF vor
-  (`Challenge_HackathonFulda2026_de.pdf`).
-- Sechs Beispiel-Challenges; ausdrücklich Orientierung, keine Pflicht-Challenge.
-  Eigene Ideen sind erlaubt.
-- **Viva passt primär zu Challenge #1 „Prüfungen im Zeitalter von KI“ und
-  sekundär zu #6 „KI als kritischer Lernbegleiter“.**
-- **Eigene Challenge ist ausdrücklich erlaubt:** Die sechs Challenges sind nur
-  Orientierung. Viva ist unsere eigene Challenge; #1/#6 sind unser Fit, kein
-  Pflichtrahmen.
-- Team, Rollen und Stack jetzt bestätigen; **10:30 Scope lock**.
+**Leitplanken:** nur diese fünf Features; keine erfundenen Scores, Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeits-/Notenbewertung; nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
 
-**Ein Satz:** *Viva ist der Übungsraum für faire, aussagekräftige Prüfungen im
-KI-Zeitalter: Die KI fragt nach und widerspricht, der Mensch entscheidet.*
+## 2. Ablauf
 
----
+1. **Vorbereitung:** Nutzer lädt Quellen hoch (PDF, PPTX, Text). Backend zerlegt sie in Chunks mit Quelle und Seite/Folie und legt sie für die Suche ab.
+2. **Aufnahme:** Kamera und Mikro laufen. Im Browser erzeugt MediaPipe live Pose-/Blick-Landmarks, daraus entstehen Events; das Mikro liefert den Pegel.
+3. **Upload:** Nach dem Stoppen wird die komplette Aufnahme hochgeladen.
+4. **Analyse (Backend):** Transkription mit Wort-Timestamps, Sprechmerkmale, Fact-Check. Pro Event wird ein kurzer Clip geschnitten, die Aufnahme danach gelöscht.
+5. **Review:** Timeline über alle Events; Klick spielt den Clip, ggf. mit Skelett-Overlay.
+6. **Frage-Simulator:** Der Agent stellt gezielte Rückfragen, vor allem zu Widersprüchen und Lücken aus dem Fact-Check, und vergleicht die Antworten mit den Quellen.
 
-## 1. Harte Fakten
+## 3. Tech-Stack
 
-| Punkt | Fakt |
+**Entschieden (Zielarchitektur; aktueller Umsetzungsstand in Abschnitt 6)**
+
+| Schicht | Technik |
 |---|---|
-| Event | 8. Hackathon Fulda, 24.–25.10.2026 |
-| Ort | Hochschule Fulda, Halle 8 |
-| Thema | Future Education – Lernen, Lehren und Prüfen neu denken |
-| Beispiel-Challenges | 6: Prüfungen im KI-Zeitalter; smarte Steuerung; Social Learning; KI-Bewerbungscoach; Orientierung Arbeitswelt; KI als kritischer Lernbegleiter |
-| Unser Fit | **#1 primär**, **#6 sekundär**; keine Pflicht-Challenge, eigene Ideen erlaubt |
-| Team | mind. 8 Mitglieder (laut Mail; vor Ort bestätigen) |
-| Registrierung | https://hackathon.kaleidoscode.de/register-team (ab Sa morgen) |
-| Challenge | `Challenge_HackathonFulda2026_de.pdf` (24.10.2026); Original: https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK |
-| Bewertung | 40 % Pitch (3 Min + 2 Min AI Reflection), 40 % Produktreview, 20 % Technik |
-| Prototyp | lauffähig, eigenständig testbar, Web auf Laptop/Smartphone |
-| WLAN | SSID `Hackathon`, Passwort `Hackathon2026` |
+| Frontend | Next.js (App Router) + TypeScript; Kamera, MediaPipe und `MediaRecorder` laufen ausschließlich client-seitig |
+| Backend | Python 3.12 + FastAPI |
+| Hintergrundjobs | Celery-Worker; Redis als Broker und temporäres Result-Backend (Docker Compose) |
+| Datenbank | Postgres mit `pgvector` (Docker Compose): Sessions, Events, Transkript, Quellen-Chunks + Embeddings |
+| Objektspeicher | MinIO, S3-kompatibel (Docker Compose): Uploads, Event-Clips, Snapshots; Browser lädt per Presigned URL direkt hoch |
+| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker, FaceLandmarker (Iris, Kopfausrichtung), HandLandmarker |
+| Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
+| Medien-Verarbeitung | `ffmpeg` im Backend: Clips schneiden, WebM/MP4 remuxen (seekbar machen) |
+| Transkription | Gehostete ASR-API hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}`), damit der Anbieter austauschbar bleibt |
 
-**Harte Deadlines:**
+**Vorschläge, noch zu bestätigen** (Bestätigung im `docs/02-ai-decision-log.md` festhalten; Vorlage: `templates/ai-decision-log.md`)
 
-| Zeit | Was |
-|---|---|
-| Sa 10:30 | **Idee & Scope locked** — danach bauen, nicht strategieren |
-| Sa 11:00 | Coding-Start |
-| Sa 17:30 | Coachings (1–2 Personen) |
-| Sa 19:30 | Pitch-Coaching |
-| So 09:30 | **Feature Freeze** |
-| So 10:30 | **Jury-Walkthrough** — Prototyp lauffähig, 2–3 Min Erklärung |
-| So 10:45 | **Submission** (Puffer; Coding endet 11:00) |
-| So 12:15 | **Pitch** (3 + 2 Minuten) |
+- **Transkription:** Stufe A (zuerst): Audio nach dem Stoppen hochladen, Wort-Timestamps zurück. Stufe B (Stretch): Live-Transkript über Streaming-ASR oder 5–10 s lange, eigenständige Audio-Segmente aus `AudioWorklet`-PCM (nicht aus `MediaRecorder`-Chunks, die sind einzeln nicht dekodierbar). Whisper lässt Füllwörter oft weg → Anbieter mit Füllwort-Option prüfen (z. B. Deepgram, AssemblyAI) oder `faster-whisper`/CrisperWhisper als lokale Alternative. Wort-Timestamps und Füllwort-Unterstützung des gewählten Modells vor der Entscheidung gegen die aktuelle Doku prüfen.
+- **Embeddings:** mehrsprachiges Modell (Inhalte sind deutsch), z. B. Voyage, OpenAI oder lokal bge-m3 / multilingual-e5. Bei wenigen kleinen Dokumenten reicht auch Long-Context ohne Vektoren.
+- **Fact-Check und Frage-Agent:** ein LLM-Anbieter für beides. Für den Web-Fetch-Agent Anbieter-Tool für Suche/Abruf nutzen, kein eigenes Scraping.
+- **Stimme (live, im Browser):** Lautstärke per RMS, Tonhöhe per F0-Schätzung (YIN/McLeod) im `AudioWorklet`, Tempo als Silbenrate aus der Energie-Hüllkurve. Alles relativ zu einer Kalibrierung (ca. 3 s normales Sprechen), F0 in Halbtönen zum Kalibrierungs-Median. Monotonie = geringe Tonhöhenvariation im gleitenden Fenster, keine Aussage über Emotion. `getUserMedia` mit `autoGainControl`, `noiseSuppression`, `echoCancellation` = false. Exakte WPM, Pausen und Füllwörter kommen nach dem Upload aus den Wort-Timestamps.
+- **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
+- **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
----
+**Offen:** ASR- und LLM-Anbieter, Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
 
-## 2. Leseordnung (context-efficient)
-
-Lies **nur**, was du für deine Aufgabe brauchst. Reihenfolge:
-
-1. **`docs/00-requirements.md`** — alle Anforderungen, Regeln, Checklisten.
-   Pflicht für alle.
-2. **`docs/01-challenge.md`** — Interpretation, Sieger-These,
-   Samstagmorgen-Protokoll, Pivot-Matrix.
-3. **`docs/03-project-ideas.md`** — 8 Ideen, Scoring, Empfehlung, Pivots.
-4. **`docs/04-build-plan-viva.md`** — wenn Viva gebaut wird: Scope,
-   Architektur, Datenmodell, Pipeline, 24h-Plan, Rollen, Tests.
-5. **`docs/06-prompt-pack.md`** — Prompts, JSON-Schemata, Quote-Verifier,
-   Red-Team-Tests, Model Card. Wenn du die KI-Pipeline baust.
-6. **`docs/05-pitch-playbook.md`** — 3+2-Minuten-Skript, Q&A, Produktreview,
-   One-Pager.
-7. **`docs/02-deep-research.md`** — Evidenz-Synthese. Selektiv lesen, wenn du
-   eine Behauptung belegen oder eine Designentscheidung begründen musst.
-8. **`research/raw/*.md`** — Rohresearch. Nur für spezifische Fragen; nicht
-   komplett lesen.
-
-**Für Agents:** Wenn du eine Aufgabe bearbeitest, lies das kleinste passende
-Dokument. Schreibe neue Research-Notizen nach `research/raw/`. Ändere
-`docs/00-requirements.md` nur, wenn du eine bestätigte Quelle hast, und
-datiere die Änderung.
-
----
-
-## 3. Repo-Map
+## 4. Architektur
 
 ```
-AGENTS.md                      # dieser Einstiegspunkt
-Challenge_HackathonFulda2026_de.pdf  # offizielle Challenge (24.10.2026)
+Browser (Next.js, TS)
+ ├─ Kamera → MediaPipe (Pose/Face/Hand) → Regeln → Events + Landmarks      [live, lokal]
+ ├─ Mikro  → AudioWorklet → Pegel, F0, Silbenrate → Regeln → Events + Live-Hinweis [live, lokal]
+ └─ MediaRecorder → komplette Aufnahme ──(Presigned URL)──► MinIO
+                                                     │
+ Quellen-Upload (PDF/PPTX) ──────────────────────────┤
+                                                     ▼
+                                          FastAPI (Python 3.12)
+                                                     │
+                                          Redis → Celery-Worker
+     ┌──────────────┬─────────────────┬──────────────┴───┬─────────────────┐
+     ▼              ▼                 ▼                  ▼                 ▼
+ Ingest/RAG    Transkription    Sprechanalyse        Fact-Check        Frage-Agent
+ (Chunks +     (Transcriber →   (Tempo, Pausen,     (Aussagen ↔       (Fragen aus
+ Embeddings)   Wort-Timestamps)  Füllwörter)        Quellen-Chunks)    Fact-Check-Funden)
+     │                                                   ▲                 │
+     └───────────── Retrieval (pgvector) ────────────────┴─────────────────┘
+                                   │
+                  ffmpeg: Clip + Snapshot pro Event, Original löschen
+                                   ▼
+        Postgres (Sessions, Events, Transkript, Chunks)   MinIO (Clips, Snapshots, Uploads)
+                                   ▼
+                    Review-UI: Timeline über gemeinsame Zeitachse
+```
+
+### Event-Schema (Vertrag zwischen Frontend und Backend)
+
+Jede Analyse schreibt in dasselbe Schema; die Timeline liest nur dieses.
+
+```
+Event {
+  session_id, id,
+  t_ms          // relativ zum Aufnahmestart
+  duration_ms,
+  type          // posture | gesture | gaze | filler | pause | pace | volume | pitch | fact | question
+  severity      // info | hint | warning
+  source        // browser | asr | speech | factcheck | agent
+  clip_key?, snapshot_key?   // Objektspeicher
+  payload       // typabhängig: Landmarks, Wort, Quelle + Zitat, Frage …
+}
+```
+
+### Regeln
+
+- **Gemeinsame Zeitachse:** Alle Events tragen `t_ms` relativ zum Aufnahmestart. Der Landmark-Takt wird an `MediaRecorder.onstart` verankert (`performance.now()`), das Review nutzt nur `video.currentTime`.
+- **Live-Feedback:** Browser-Regeln (Pose und Stimme) zeigen während der Aufnahme einen dezenten Hinweis (z. B. „Tempo hoch“, „Stimme monoton“, „zu leise“), ohne Score und ohne Note. Damit er nicht ablenkt: Mindestdauer der Abweichung, Cooldown pro Hinweis-Typ, höchstens ein Hinweis gleichzeitig, abschaltbar. Jeder Hinweis erzeugt zugleich ein Event für die Timeline. Schwellenwerte sind Konfiguration relativ zur Baseline und als „Heuristik“ gekennzeichnet.
+- **Pose-Events:** Regeln auf Landmark-Winkeln, kalibriert gegen eine Baseline (erste Sekunden neutrale Haltung), mit Mindestdauer gegen Flackern. Schwellenwerte sind Konfiguration und im UI als „Heuristik“ gekennzeichnet. Kamera-Framing: Oberkörper muss sichtbar sein, sonst Hinweis statt Auswertung.
+- **Clips statt Vollvideo:** Das Backend schneidet pro Event ein Fenster (ca. 5 s vor/nach, mit Re-Encode für präzise Schnitte) plus Snapshot-Frame und löscht die Originalaufnahme. Aufnahme vorher remuxen, weil `MediaRecorder`-WebM nicht seekbar ist.
+- **Fact-Check:** (1) LLM extrahiert prüfbare Aussagen mit Timestamp aus dem Transkript, (2) Top-k-Chunks pro Aussage aus pgvector, (3) LLM urteilt mit wörtlichem Zitat, (4) Code prüft per String-Match, dass das Zitat im Chunk steht. Drei Ergebnisse: *stützt*, *widerspricht*, *in den Quellen nicht gefunden*. Letzteres ist nicht „falsch“. Web-Fetch kommt erst danach als Zweitquelle.
+- **Frage-Agent:** Eingabe sind Transkript, Quellen-Chunks und die Fact-Check-Funde. Er fragt gezielt nach Widersprüchen und Lücken und vergleicht Antworten mit den Quellen. Ausgabe ohne Punkte oder Noten.
+- **Fallback:** Fällt Modell, API oder Kamera aus, spielt die App eine vorberechnete Beispiel-Session deterministisch ab. Sie ist zugleich der Standard-Einstieg für den Produktreview (Wert in unter 3 Minuten), Live-Aufnahme ist der zweite Pfad (30–60 s reichen).
+- **Datenschutz:** Demo-Daten synthetisch. Live-Aufnahmen der Jury sind echte personenbezogene Daten: Einwilligungshinweis, Originalaufnahme nach der Verarbeitung löschen, Drittanbieter-APIs benennen (relevant für die KI-Reflection).
+- **Daten und Secrets:** Ziel sind Postgres mit pgvector und MinIO; der vorhandene Compose-Stack ist in Abschnitt 6 beschrieben. Secrets nur in `.env`, nicht committen.
+- **Hintergrundjobs:** Lange Backend-Arbeiten (z. B. Transkription, Ingest, Clips) als Celery-Tasks ausführen. Async-API-Routen publizieren über `app.jobs.enqueue_task` und geben eine Job-ID zurück; im Request nicht auf das Ergebnis warten. Nur IDs/Object-Keys in Redis, Medien in S3. Tasks müssen bei erneuter Zustellung sicher wiederholbar sein.
+- **Layout (Ziel):** `frontend/` (Next.js), `backend/` (FastAPI); die vorhandene Compose-Datei heißt `compose.yaml`.
+
+## 5. Priorität
+
+1. Aufnahme → Upload → Transkript → Events → Timeline mit Clip-Sprung (Rückgrat, Features 2a und 4).
+2. Pose-Events (2–3 Regeln) und Sprechmerkmale aus Wort-Timestamps.
+3. Quellen-Upload, Ingest und RAG-Fact-Check.
+4. Frage-Agent auf den Fact-Check-Funden.
+5. Stretch: Live-Transkript, Web-Fetch.
+
+## 6. Repo und aktueller Stand
+
+```
+AGENTS.md                          # Einstiegspunkt und Zielarchitektur
+compose.yaml                       # Backend + Celery + Redis + PostgreSQL + S3
+.env.example                       # lokale Konfiguration ohne echte Secrets
+backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
+.run/                              # geteilte IntelliJ-Run-Konfigurationen
+.vscode/                           # geteilte VS-Code-Tasks für Docker Compose
+Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
 docs/
-  00-requirements.md           # Anforderungen, Regeln, Deadlines, Checklisten
-  01-challenge.md              # Challenge-Interpretation + Samstag-Protokoll
-  02-deep-research.md          # Evidenz-Synthese mit Quellen
-  03-project-ideas.md          # 8 Ideen, Scoring, Empfehlung, Pivots
-  04-build-plan-viva.md        # 24h-Build-Plan für Viva
-  05-pitch-playbook.md         # Pitch, AI Reflection, Q&A, Produktreview
-  06-prompt-pack.md            # Prompts, Schemata, Quote-Verifier, Red-Team
-research/
-  raw/
-    ai-tutors.md               # KI-Tutoren, LLM-Tutoring, Guardrails
-    learning-science.md       # Lernmechanismen, Future Skills, DE-Kontext
-    games-simulations.md       # Serious Games, Simulationen, XR, Debriefing
-    assessment-ethics-regulation.md  # Assessment, AI Literacy, EU AI Act, DSGVO
-    trends-hackathon.md        # EdTech-Trends, Fulda-Historie, Hackathon-Strategie
+  00-requirements.md               # Hackathon-Regeln und Bewertung
+  01-product.md                    # Features und offene Punkte
+  02-ai-decision-log.md            # tatsächliche Entscheidungen und Prüfergebnisse
 templates/
-  ai-decision-log.md           # Pflicht: KI-Fehler/Entscheidungen für die Reflection
-  demo-test-script.md          # 90-Sekunden-Jury-Test + Testmatrix
-  team-roles.md                # 8 Rollen, Gates, RACI, Standups
-  one-pager.md                 # Jury-Handout
+  ai-decision-log.md               # Vorlage für die AI Reflection
+  team-roles.md                    # Rollen, Gates, RACI
 ```
 
----
+Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
+einen separaten Celery-Worker, Redis, PostgreSQL **ohne pgvector** und
+**SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job
+geprüft; Produkt-Tasks und Job-API-Endpunkte sind noch nicht implementiert. MinIO,
+pgvector, das Next.js-Frontend und die Analyse-/Aufnahme-Pipeline aus der
+Zielarchitektur sind noch nicht umgesetzt. Umgesetzt sind zwei getrennte
+Analyse-Pipelines ohne Persistenz, beide mit `t_ms` ab Aufnahmestart im
+gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als
+Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription
+(`backend/app/transcription/`, noch ohne ASR-Anbieter). Die Umstellung des Speichers
+ist eine separate Implementierungsaufgabe.
 
-## 4. Empfehlung: Viva
+Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
+sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
+Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`
+abgeglichen werden; dort ist noch das bisherige Grundgerüst dokumentiert.
 
-**Challenge-Fit:** Viva ist primär eine Lösung für **Challenge #1 „Prüfungen
-im Zeitalter von KI“** und sekundär für **#6 „KI als kritischer Lernbegleiter
-in der Hochschullehre“**. #1 fordert faire, aussagekräftige und möglichst
-täuschungssichere Prüfungen; #6 fordert eine KI, die widerspricht, nachfragt
-und Argumentationslücken aufzeigt. Viva macht beides — ohne KI-Detection.
+## 7. Git-Workflow
 
-**Problem:** KI hat schriftliche Arbeiten als Verständnisnachweis
-destabilisiert; Detektoren sind unzuverlässig; mündliche Prüfungen skalieren
-nicht. Die Challenge #6 ergänzt: KI bestätigt oft bestehende Annahmen, statt
-sie kritisch zu prüfen.
-
-**Lösung:** Viva extrahiert zentrale Behauptungen aus einer Arbeit, stellt
-evidenzgebundene Nachfragen, fordert mindestens einmal eine Gegenposition und
-gibt eine formative Evidenzkarte. Die Lehrkraft sieht Lücken und entscheidet,
-wer ein menschliches Viva braucht. **Viva erkennt keine KI und verspricht keine
-Täuschungssicherheit; es verschiebt den Nachweis auf Erklärungskompetenz.**
-
-**Warum es gewinnen kann:**
-- **Challenge-Fit:** trifft #1 und #6 wörtlich, statt nur allgemein „Future
-  Education“ zu bedienen.
-- **40 % Produktreview:** Der Juror erlebt in 90 Sekunden, ob er seinen eigenen
-  Text erklären kann. Kein Login, sofort verständlich.
-- **40 % Pitch:** Starke „Why now“-Story (AI + Assessment-Integrität),
-  überraschende Lösung (KI fragt, statt zu antworten), glaubwürdige
-  AI Reflection.
-- **20 % Technik:** Claim-Extraktion, Quote-Verifier, Rubrik, Human Review,
-  optional Speech — sinnvoller Technologieeinsatz statt Chat-Wrapper.
-
-**Pitch in drei Sätzen:**
-1. „KI hat die Hausarbeit als Verständnisnachweis destabilisiert — Detektoren
-   helfen nicht, mündliche Prüfungen skalieren nicht.“
-2. „Viva macht das Gespräch über Verständnis übbar: Die KI fragt
-   evidenzgebunden nach, widerspricht und zeigt Argumentationslücken; der Mensch
-   entscheidet.“
-3. „Kein Zitat, keine Behauptung — und keine Note.“
-
-**Fallbacks, falls die mündliche Einweisung oder das Team pivotiert:**
-- **Socratic Lock:** bester Fit zu #6, wenn die Jury stärker Tutor/Guardrails
-  sehen will.
-- **AI Literacy Lab** (Hallucination Hunt): niedrigstes technisches Risiko,
-  guter Fit zu #6/#3, sofort spielbar.
-- **Klassenzimmer-Simulator:** eigene Idee/#2; bestes Fit zu „interaktive
-  Simulation“, falls die Challenge dorthin zeigt.
-- **SkillPass** (#2/#5) und **Azubi Talk** (#4), falls die Challenge klar in
-  Richtung Studien-/Berufsorientierung oder Bewerbung geht.
-
-Entscheidung am Samstag um **10:30**. Danach wird gebaut.
-
----
-
-## 5. Non-Negotiables
-
-1. **Ein vertikaler Slice.** Eine Nutzerreise, ein Demo-Pfad, eine Rubrik.
-2. **Öffentliche URL + QR-Code.** Kein Login, keine Installation.
-3. **90-Sekunden-Wert.** Der Prototyp muss ohne Erklärung funktionieren.
-4. **Laptop + Smartphone getestet.**
-5. **Seed-Daten + Reset.**
-6. **Deterministischer Fallback**, wenn LLM/API ausfällt.
-7. **Jede KI-Behauptung mit verifiziertem Zitat** oder „nicht genug Evidenz“.
-8. **Human-in-the-loop** bei allem, was wie Bewertung aussieht.
-9. **Keine echten personenbezogenen Daten**, kein Audio-Storage, keine
-   Detektion/Proctoring/Emotion AI.
-10. **AI Decision Log** ab Samstag 11:00 führen — mindestens 5 Einträge.
-11. **3:00 + 2:00 geprobt.** Kein Overrun.
-12. **Submission vor 11:00 Sonntag.**
-13. **Keine Detection, keine Täuschungssicherheit versprechen.** Viva macht
-    Erklärungskompetenz sichtbar; der Mensch entscheidet.
-14. **Eigene Challenge ist erlaubt.** #1/#6 sind unser Fit, kein Pflichtrahmen.
-
----
-
-## 6. Samstagmorgen-Protokoll
-
-### 09:00–09:30 — Ankommen
-- Registrierung, Plattform-Zugang, WLAN/LAN, API-Erreichbarkeit testen.
-- Challenge-PDF gegen die mündliche Einweisung prüfen.
-
-### 09:30–10:00 — Challenge abgleichen
-- Sechs Beispiel-Challenges: Stimmen sie mit der PDF überein?
-- Gibt es zusätzliche Pflicht-Szenarien, Daten oder Ausschlüsse?
-- Bewertung/Rubrik gegen die Mail prüfen.
-- Offene Fragen notieren und die Orga fragen.
-
-### 10:00–10:20 — Mapping
-- **Primär:** Challenge #1 „Prüfungen im Zeitalter von KI“.
-- **Sekundär:** Challenge #6 „KI als kritischer Lernbegleiter“.
-- Pivots: Socratic Lock, AI Literacy Lab, Klassenzimmer-Simulator.
-- Welche Story/Folie ändert sich, welche Technik bleibt?
-
-### 10:20–10:30 — Entscheidung
-- **Eine Idee. Ein Nutzer. Eine Kernschleife.**
-- Rollen bestätigen; Scope auf ein Essay, eine Rubrik, einen Pfad.
-- **10:30: Lock.**
-
-### 10:30–11:00 — Build-Setup
-- Repo, Deploy, API-Key, DB, Seed-Daten.
-- Erste Tasks; AI Decision Log starten.
-
-**Wichtig:** Die Challenge fordert „möglichst täuschungssicher“. Viva
-verspricht **keine** Detection und **keine** Täuschungssicherheit. Es verschiebt
-den Nachweis von der Texturheberschaft auf die Erklärungskompetenz. Diesen
-Unterschied im Pitch explizit machen.
-
-**Wenn die mündliche Einweisung Viva nicht hergibt:** Pivot-Matrix in
-`docs/01-challenge.md` nutzen. Framing ändern, Technik behalten.
-
----
-
-## 7. Build-Workflow (sobald Code existiert)
-
-- **Stack:** Next.js + Tailwind; API Routes oder FastAPI; Supabase/Postgres
-  oder localStorage; Vercel.
-- **Deploy früh:** „Hello World“ am Samstag vor 12:30 öffentlich.
-- **Testen:** `npm run lint`, `npm run build`, `npm test` (Commands werden
-  ergänzt, sobald das Repo steht).
-- **Mobile:** 375 px und 1366 px testen; kein Horizontal-Scroll.
-- **API:** Timeout 25 s, 2 Retries, Cache für Demo, Fallback-Provider.
-- **Speech:** Web Speech API optional; Text ist Default; kein Audio-Storage.
-- **Daten:** synthetisch; keine echten Namen/Matrikelnummern/E-Mails.
-- **Logging:** Session-Events + Audit-Log; keine sensiblen Inhalte loggen.
-
-**Definition of Done:** siehe `docs/04-build-plan-viva.md`, Abschnitt 15.
-
----
-
-## 8. AI Reflection & Pitch
-
-- **AI Decision Log** ab Samstag 11:00 füllen
-  (`templates/ai-decision-log.md`).
-- Mindestens **5 Einträge**: Aufgabe, KI-Output, was falsch/riskant war,
-  menschliche Korrektur, Evidenz.
-- Am Sonntag **2 Beschleunigungen** und **2 Fehler/Korrekturen** auswählen.
-- **2-Minuten-Struktur:** Rahmen → Beschleunigung → menschliche Entscheidungen
-  → Fehler/Korrekturen → Prinzip.
-- **Nicht erfinden.** Die Jury merkt es.
-- **Pitch proben:** 3:00 + 2:00 mit Timer; 20 % kürzen; Fallback-Video.
-
-Details: `docs/05-pitch-playbook.md`.
-
----
-
-## 9. Offene Punkte (am Samstag klären)
-
-1. Gibt es zusätzliche Pflicht-Szenarien, Daten oder Ausschlüsse? Die PDF nennt
-   die sechs Challenges ausdrücklich als Orientierung.
-2. Exakte 40/40/20-Anwendung und Tie-Breaker? Gibt es ein Scoring-Sheet?
-3. Submission-Cutoff und Upload-Format?
-4. Pitch-Deck erforderlich? Format/Seitenverhältnis?
-5. Dürfen externe APIs genutzt werden? Netzwerk-Restriktionen?
-6. Ist „mindestens 8“ hart oder Empfehlung?
-7. Gibt es einen „Best Code“-Preis? (Mail sagt Nein; vor Ort bestätigen.)
-8. Wo steht die Jury beim Walkthrough? Strom/Display?
-9. Datenschutzvorgaben für Demo-Daten?
-10. Gibt es zusätzliche Preise/Kategorien?
-
----
-
-## 10. Nächste Aktionen (jetzt)
-
-### Jetzt (Sa 10:00–10:30)
-- [x] Challenge-PDF gelesen; #1/#6 als stärksten Fit identifiziert.
-- [ ] Team bestätigen; 8 Rollen besetzen (`templates/team-roles.md`).
-- [ ] Eigene Challenge/Scope bestätigen; **10:30 Lock**.
-- [ ] Stack entscheiden; Repo/Deploy/API testen.
-- [ ] Seed-Essay 1 + Rubrik entwerfen.
-- [ ] AI Decision Log anlegen.
-
-### Samstag ab 11:00
-- [ ] Build starten.
-- [ ] Deploy „Hello World“ vor 12:30.
-- [ ] AI Decision Log ab 11:00 führen.
-
-### Sonntag
-- [ ] 09:30 Feature Freeze.
-- [ ] 10:30 Walkthrough.
-- [ ] 10:45 Submission.
-- [ ] 12:15 Pitch.
-
----
-
-## 11. Regeln für Agents & Subagents
-
-- **Kontext sparen:** Lies das kleinste passende Dokument; nicht die gesamte
-  Research.
-- **Research:** Neue Notizen nach `research/raw/<thema>.md`; Quellen mit URL und
-  Typ (`[P]`, `[WP]`, `[PP]`, `[POL]`, `[V]`).
-- **Keine Erfindungen:** Wenn eine Zahl/ein Zitat nicht belegt ist, markiere sie
-  als unsicher oder lasse sie weg.
-- **Docs ändern:** Nur mit Quelle; Datum und Grund notieren.
-- **Keine Overclaims:** „In unserem Pilot …“ statt „validiert“; „designed for
-  human oversight“ statt „AI Act compliant“.
-- **Code:** Keine Secrets committen; `.env` nutzen; synthetische Daten.
-- **Subagent-Rückgabe:** Max. 300 Wörter, 5–8 Quellen, klare Unsicherheiten.
-  Volle Notizen in Dateien, nicht in die Antwort.
-- **Eine Idee:** Nicht mehrere Konzepte gleichzeitig bauen. Pivot nur am
-  Samstag vor 10:30.
-
----
-
-## 12. Quellen & Updates
-
-- **Source of Truth:** `docs/00-requirements.md` (Organisator-Mails) und die
-  offizielle Challenge-PDF (`Challenge_HackathonFulda2026_de.pdf`, 24.10.2026).
-- **Challenge-PDF:** sechs Beispiel-Challenges, ausdrücklich als Orientierung;
-  eigene Ideen erlaubt. Original:
-  https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK
-- **Website:** https://hackathon-fulda.de
-- **„eatec“** aus dem Auftrag wird als **EdTech / Education Technology**
-  interpretiert.
-- **Stand:** 24.10.2026. Änderungen datieren und begründen.
-
----
-
-**Wenn du nur einen Satz mitnimmst:**
-> **Baue Viva: Die KI fragt nach, statt zu antworten. Kein Zitat, keine
-> Behauptung. Der Mensch entscheidet.**
+Nach abgeschlossenen Änderungen die relevanten Prüfungen ausführen, die
+Änderungen committen und zum zugehörigen Remote-Branch pushen. Das ist die
+ausdrückliche Arbeitspräferenz des Nutzers. Neue Remote-Änderungen integrieren
+und dabei auftretende Merge-Konflikte lösen; bestehende Teamarbeit erhalten.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Compose: up",
+      "type": "process",
+      "command": "docker",
+      "args": ["compose", "up", "--build", "-d", "--wait"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "group": {"kind": "build", "isDefault": true},
+      "problemMatcher": []
+    },
+    {
+      "label": "Compose: stop",
+      "type": "process",
+      "command": "docker",
+      "args": ["compose", "stop"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "Compose: backend logs",
+      "type": "process",
+      "command": "docker",
+      "args": ["compose", "logs", "--follow", "backend"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    }
+  ]
+}

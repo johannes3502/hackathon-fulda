@@ -56,15 +56,13 @@ Pflicht-Challenge; ob es zusätzliche Pflicht-Szenarien oder Daten gibt, vor Ort
 klären.
 
 **Unsere eigene Challenge:** Wir müssen keine der sechs Vorschläge eins zu eins
-bauen. Viva ist unsere eigene Challenge — sie passt zu #1 und #6, ist aber
-nicht darauf beschränkt. Entscheidend ist, dass die Lösung unter „Future
-Education“ einen klaren Praxis-Nutzen hat und als Prototyp funktioniert.
+bauen. Unser Produkt ist ein **Live-Präsentationstrainer**; die sechs
+Beispiel-Challenges sind Orientierung. Entscheidend ist, dass die Lösung unter
+„Future Education“ einen klaren Praxis-Nutzen hat und als Prototyp funktioniert.
 
-**Unser Fit:** Viva ist primär eine Lösung für **Challenge #1** und sekundär
-für **Challenge #6**. Viva erkennt keine KI und verspricht keine
-Täuschungssicherheit; es verschiebt den Nachweis von der Texturheberschaft auf
-die Erklärungskompetenz. Die Challenge #6 beschreibt mit „widerspricht,
-fragt nach und zeigt Argumentationslücken“ genau die Viva-Follow-ups.
+**Unser Fit:** Der Live-Präsentationstrainer ist eine eigene Challenge. Er
+trainiert Auftritt und mündliche Erklärung. Fixe Features und offene Punkte:
+`docs/01-product.md`.
 
 **Frühere Mail-Formate:** Die Organisator-Mails nannten zusätzlich KI-Tutor,
 interaktive Lernsimulation, Serious Game und „völlig neuer Ansatz“. Die PDF
@@ -249,7 +247,7 @@ erweitert diese Formatideen um sechs konkrete Beispiel-Challenges.
 ### Vor dem Start
 - [ ] Team registriert (Plattform ab Sa morgen)
 - [x] Challenge-PDF gelesen; sechs Beispiel-Challenges notiert
-- [ ] Mapping #1/#6 und Scope entschieden
+- [ ] Scope (Live-Präsentationstrainer) und offene Punkte entschieden
 - [ ] Rollen festgelegt
 - [ ] Repo, Hosting, API-Keys, Fallback getestet
 - [ ] AI Decision Log angelegt
@@ -290,9 +288,8 @@ folgt: Die Lösung muss in 90 Sekunden verständlich sein, einen echten
 Praxis-Nutzen zeigen und technisch zuverlässig laufen — nicht möglichst groß
 sein.
 
-Die sechs Beispiel-Challenges sind Orientierung, keine Pflicht. **Viva ist
-unsere eigene Challenge**; #1 und #6 sind der stärkste Fit, aber nicht der
-einzige erlaubte Rahmen.
+Die sechs Beispiel-Challenges sind Orientierung, keine Pflicht. **Unser
+Live-Präsentationstrainer ist unsere eigene Challenge.**
 
 Die Bewertung ist ungewöhnlich produktlastig (40 % praktisches Testen) und
 stellt die KI-Reflection gleichberechtigt neben den Pitch (2 von 5 Minuten).

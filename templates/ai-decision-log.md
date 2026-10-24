@@ -14,12 +14,12 @@ Story.
 
 | # | Zeit | Aufgabe | Tool/Modell/Prompt | KI-Output (kurz) | Was war falsch/riskant? | Menschliche Entscheidung/Korrektur | Evidenz |
 |---|---|---|---|---|---|---|---|
-| 1 | Sa 11:20 | Quote-Verifier | GPT-5/Cursor | erfand ein Zitat aus dem Essay | Zitat nicht im Text; hätte Jury getäuscht | String-Match-Verifier; kein Zitat → „insufficient evidence“ | 3 Testfälle, Screenshot |
-| 2 | Sa 12:10 | Fragen-Generierung | LLM, Prompt v1 | „Was ist Schlaf?“ | zu generisch, keine Verständnisfrage | Bloom-Level + Claim-Zitat im Prompt; 12 von 40 Fragen verworfen | 10 Fragen vorher/nachher |
-| 3 | Sa 14:30 | Feedback | LLM | lobte eine paraphrasierende Antwort | Eloquenz statt Verständnis | Rubrik auf Verständnis/Evidenz; jede Kritik braucht Antwort-Zitat | 5 Beispiele |
-| 4 | Sa 16:00 | Code | Cursor/Copilot | erfundene Bibliothek | Build-Fehler | Tests ausgeführt; Bibliothek ersetzt; Lockfile geprüft | CI-Log |
-| 5 | Sa 18:00 | Speech | Web Speech API | Fachbegriff falsch transkribiert | peinlich im Demo | Glossar + Text-Fallback; Voice optional | 2 Transkripte |
-| 6 | Sa 17:00 | Gegenargument | LLM, Prompt v1 | bestätigte eine unbegründete Annahme | sycophancy; Challenge #6 verfehlt | Counter-Argument-Prompt + Rubrik-Anker für Argumentationslücken | 3 Testfälle |
+| 1 | Sa 11:20 | Code | Cursor/Copilot | erfundene Bibliothek | Build-Fehler | Tests ausgeführt; Bibliothek ersetzt | CI-Log |
+| 2 |  |  |  |  |  |  |  |
+| 3 |  |  |  |  |  |  |  |
+| 4 |  |  |  |  |  |  |  |
+| 5 |  |  |  |  |  |  |  |
+| 6 |  |  |  |  |  |  |  |
 | 7 |  |  |  |  |  |  |  |
 | 8 |  |  |  |  |  |  |  |
 
