@@ -8,6 +8,19 @@ export type QuestionKind = Question["kind"];
 export type QuestionResult = components["schemas"]["QuestionResult"];
 export type AnswerReview = components["schemas"]["AnswerReview"];
 export type QuestionAnswer = { answer: string; review: AnswerReview };
+export type Persona = QuestionResult["persona"];
+
+export const PERSONA_LABELS: Record<Persona, { name: string; detail: string }> =
+  {
+    student: {
+      name: "Curious student",
+      detail: "Asks naive, direct questions about terms, reasons and examples.",
+    },
+    tutor: {
+      name: "Professor / tutor",
+      detail: "Probes precisely and critically, asks for reasons and sources.",
+    },
+  };
 
 export const KIND_LABELS: Record<QuestionKind, string> = {
   contradiction: "Source says otherwise",
@@ -53,7 +66,12 @@ function validReview(value: unknown): value is AnswerReview {
 /** Generate follow-up questions from transcript, fact-check findings and sources. */
 export function generateQuestions(
   endpoint: string,
-  input: { words: Word[]; collectionId: string | null; claims: ClaimResult[] },
+  input: {
+    words: Word[];
+    collectionId: string | null;
+    claims: ClaimResult[];
+    persona: Persona;
+  },
   signal: AbortSignal,
   pollMs = 1500,
 ): Promise<QuestionResult> {
@@ -66,6 +84,7 @@ export function generateQuestions(
         words: input.words,
         collection_id: input.collectionId,
         claims: input.claims,
+        persona: input.persona,
       },
       label: "question simulator",
       valid: validResult,
@@ -78,7 +97,12 @@ export function generateQuestions(
 /** Compare a typed answer with the question's evidence and the uploaded sources. */
 export function reviewAnswer(
   endpoint: string,
-  input: { question: Question; answer: string; collectionId: string | null },
+  input: {
+    question: Question;
+    answer: string;
+    collectionId: string | null;
+    persona: Persona;
+  },
   signal: AbortSignal,
   pollMs = 1000,
 ): Promise<AnswerReview> {
@@ -91,8 +115,49 @@ export function reviewAnswer(
         question: input.question,
         answer: input.answer,
         collection_id: input.collectionId,
+        persona: input.persona,
       },
       label: "answer review",
+      valid: validReview,
+    },
+    signal,
+    pollMs,
+  );
+}
+
+/** Upload a spoken answer; the backend transcribes it, then compares it like a typed one. */
+export function reviewVoiceAnswer(
+  endpoint: string,
+  input: {
+    question: Question;
+    recording: Blob;
+    collectionId: string | null;
+    persona: Persona;
+  },
+  signal: AbortSignal,
+  pollMs = 1000,
+): Promise<AnswerReview> {
+  const body = new FormData();
+  body.append(
+    "recording",
+    input.recording,
+    input.recording.type.includes("mp4") ? "answer.mp4" : "answer.webm",
+  );
+  body.append(
+    "request",
+    JSON.stringify({
+      question: input.question,
+      collection_id: input.collectionId,
+      persona: input.persona,
+    }),
+  );
+  return runBackendJob(
+    endpoint,
+    {
+      path: "/questions/answers/voice",
+      statusPath: "/questions/answers",
+      body,
+      label: "spoken answer",
       valid: validReview,
     },
     signal,

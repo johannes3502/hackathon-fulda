@@ -50,7 +50,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 - **Hosting:** TLS ist Pflicht (`getUserMedia`). Ein Deployment auf einer VM mit Compose und Caddy, oder Frontend und Backend getrennt. Venue-Netz und API-Zugriff früh testen.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
-**Offen:** konkreter LLM-Anbieter und Modell (Schnittstelle: OpenAI-kompatibel), Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Spracheingabe im Frage-Simulator (umgesetzt: nur Text, ohne Bewertung), Produktname.
+**Offen:** konkreter LLM-Anbieter und Modell (Schnittstelle: OpenAI-kompatibel), Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Stille-Erkennung für das Antwortende im Voice-Agent (umgesetzt: Button „Done“), Produktname.
 
 ## 4. Architektur
 
@@ -162,7 +162,11 @@ Fact-Check-Funden (Widerspruch, nicht belegt), Lücken gegenüber den Quellen un
 unklaren Stellen; `t_ms` und Evidenz kommen aus Verweisen, nicht vom Modell.
 Getippte Antworten werden mit den Quellen verglichen (Zitat-Prüfung, optionale
 Nachfrage), ohne Punkte oder Noten; Fragen mit gesprochener Stelle sind
-`question`-Events. Im Live-Studio lässt sich die
+`question`-Events. Voice-Agent: Rolle `student` (neugieriger Erstsemester) oder
+`tutor` (Professor/Tutor) wählbar; der Browser liest Fragen und Reaktionen per
+`speechSynthesis` vor, gesprochene Antworten gehen über
+`POST /questions/answers/voice` an Deepgram und werden danach wie getippte
+Antworten gegen die Quellen geprüft. Im Live-Studio lässt sich die
 Transkription (Deepgram) vor der Aufnahme zuschalten; die Wörter sind Eingabe
 für den Fact-Check. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.

@@ -1,33 +1,40 @@
 from uuid import UUID, uuid4
 
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+import os
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel, ValidationError
 from starlette.concurrency import run_in_threadpool
 
+from app.connections import s3_client
 from app.factcheck.llm import configured_llm
 from app.jobs import QueueUnavailable, enqueue_task
-from app.questions.models import AnswerJob, AnswerRequest, QuestionJob, QuestionRequest
+from app.questions.models import AnswerJob, AnswerRequest, QuestionJob, QuestionRequest, VoiceAnswerRequest
 from app.speech import storage
 from app.speech.job_models import AcceptedJob
-from app.tasks import ANSWER_PREFIX, QUESTION_PREFIX, generate_questions, review_answer
+from app.tasks import ANSWER_PREFIX, QUESTION_PREFIX, generate_questions, review_answer, review_voice_answer
+from app.transcription.transcriber import configured_transcriber
 
 router = APIRouter(prefix="/questions", tags=["questions"])
 
 
-def _store(job_id: str, request: BaseModel, prefix: str, job: BaseModel):
+def _store(job_id: str, request: BaseModel, prefix: str, job: BaseModel, recording=None):
+    if recording is not None:
+        s3_client().upload_fileobj(recording, os.environ["S3_BUCKET"], storage.key(job_id, "recording", prefix))
     storage.write_json(job_id, "request.json", request.model_dump(mode="json"), prefix)
     storage.write_json(job_id, "status.json", job.model_dump(), prefix)
 
 
-async def _accept(request: BaseModel, prefix: str, job_model, task, status_path: str) -> AcceptedJob:
+async def _accept(request: BaseModel, prefix: str, job_model, task, status_path: str,
+                  recording=None) -> AcceptedJob:
     try:
         configured_llm()
     except ValueError as error:
         raise HTTPException(503, f"Question simulator is not configured: {error}") from error
     job_id = str(uuid4())
     try:
-        await run_in_threadpool(_store, job_id, request, prefix, job_model(job_id=job_id, status="queued"))
+        await run_in_threadpool(_store, job_id, request, prefix, job_model(job_id=job_id, status="queued"), recording)
         await enqueue_task(task, job_id)
     except (QueueUnavailable, BotoCoreError, ClientError) as error:
         raise HTTPException(503, "Question storage or queue unavailable") from error
@@ -68,6 +75,30 @@ async def start_answer_review(request: AnswerRequest) -> AcceptedJob:
     question; no points or grades.
     """
     return await _accept(request, ANSWER_PREFIX, AnswerJob, review_answer, "/questions/answers")
+
+
+@router.post("/answers/voice", status_code=202)
+async def start_voice_answer_review(
+    recording: UploadFile = File(description="Spoken answer (WebM, MP4, WAV, ...)"),
+    request: str = Form(description="VoiceAnswerRequest JSON: question, collection_id, persona"),
+) -> AcceptedJob:
+    """Transcribe a spoken answer with the configured ASR, then compare it with the sources.
+
+    Audio goes to the ASR provider (default: Deepgram EU), the transcript to
+    the configured language model. Audio and request are deleted after
+    processing. The result has the transcript in `answer` and the persona's
+    reply to read aloud; poll `/questions/answers/{job_id}`.
+    """
+    try:
+        parsed = VoiceAnswerRequest.model_validate_json(request)
+    except ValidationError as error:
+        raise HTTPException(422, error.errors(include_url=False, include_context=False)) from error
+    try:
+        configured_transcriber()
+    except (ValueError, KeyError) as error:
+        raise HTTPException(503, "ASR is not configured; spoken answers need provider credentials") from error
+    return await _accept(parsed, ANSWER_PREFIX, AnswerJob, review_voice_answer, "/questions/answers",
+                         recording.file)
 
 
 @router.get("/answers/{job_id}")

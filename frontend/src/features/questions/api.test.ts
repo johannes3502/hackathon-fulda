@@ -3,10 +3,12 @@ import {
   generateQuestions,
   questionFeedback,
   reviewAnswer,
+  reviewVoiceAnswer,
   withFollowUp,
   type Question,
   type QuestionResult,
 } from "./api";
+import { nextQuestion } from "./voice";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -34,6 +36,7 @@ const gap: Question = {
 const result: QuestionResult = {
   questions: [moon, gap],
   events: [],
+  persona: "student",
   model: "test-model",
   sources_used: true,
   config: {
@@ -65,7 +68,7 @@ it("posts transcript and findings, then polls the question job", async () => {
   vi.stubGlobal("fetch", fetcher);
   const generated = await generateQuestions(
     "/api",
-    { words, collectionId: null, claims: [] },
+    { words, collectionId: null, claims: [], persona: "student" },
     new AbortController().signal,
     0,
   );
@@ -75,6 +78,7 @@ it("posts transcript and findings, then polls the question job", async () => {
     words,
     collection_id: null,
     claims: [],
+    persona: "student",
   });
   expect(fetcher.mock.calls[2][0]).toBe(`/api/questions/jobs/${jobId}`);
 });
@@ -91,12 +95,20 @@ it("sends the answer with its question and rejects invalid reviews", async () =>
   vi.stubGlobal("fetch", fetcher);
   const reviewed = await reviewAnswer(
     "/api",
-    { question: moon, answer: "Aus Gestein.", collectionId: null },
+    {
+      question: moon,
+      answer: "Aus Gestein.",
+      collectionId: null,
+      persona: "tutor",
+    },
     new AbortController().signal,
     0,
   );
   expect(reviewed.follow_up?.id).toBe("q1.f");
-  expect(JSON.parse(fetcher.mock.calls[0][1].body).answer).toBe("Aus Gestein.");
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({
+    answer: "Aus Gestein.",
+    persona: "tutor",
+  });
   expect(fetcher.mock.calls[2][0]).toBe(`/api/questions/answers/${jobId}`);
 
   vi.stubGlobal(
@@ -106,11 +118,57 @@ it("sends the answer with its question and rejects invalid reviews", async () =>
   await expect(
     reviewAnswer(
       "/api",
-      { question: moon, answer: "x", collectionId: null },
+      { question: moon, answer: "x", collectionId: null, persona: "tutor" },
       new AbortController().signal,
       0,
     ),
   ).rejects.toThrow("invalid answer review");
+});
+
+it("uploads a spoken answer as multipart and returns its transcript", async () => {
+  const review = {
+    verdict: "not_found",
+    explanation: "",
+    checked: ["upload"],
+    model: "test-model",
+    reply: "Okay, danke!",
+    answer: "Aus Gestein.",
+  };
+  const fetcher = jobFetcher("/questions/answers", review);
+  vi.stubGlobal("fetch", fetcher);
+  const reviewed = await reviewVoiceAnswer(
+    "/api",
+    {
+      question: moon,
+      recording: new Blob(["synthetic"], { type: "audio/webm" }),
+      collectionId: null,
+      persona: "student",
+    },
+    new AbortController().signal,
+    0,
+  );
+  expect(reviewed.answer).toBe("Aus Gestein.");
+  const [path, init] = fetcher.mock.calls[0];
+  expect(path).toBe("/api/questions/answers/voice");
+  expect(init.headers).toBeUndefined();
+  const body = init.body as FormData;
+  expect((body.get("recording") as File).name).toBe("answer.webm");
+  expect(JSON.parse(body.get("request") as string)).toEqual({
+    question: moon,
+    collection_id: null,
+    persona: "student",
+  });
+  expect(fetcher.mock.calls[2][0]).toBe(`/api/questions/answers/${jobId}`);
+});
+
+it("asks unanswered questions in list order", () => {
+  const followUp = { ...moon, id: "q1.f", kind: "follow_up" as const };
+  const questions = withFollowUp([moon, gap], "q1", followUp);
+  expect(nextQuestion(questions, new Set())?.id).toBe("q1");
+  expect(nextQuestion(questions, new Set(["q1"]))?.id).toBe("q1.f");
+  expect(
+    nextQuestion(questions, new Set(["q1", "q1.f", "q2"])),
+  ).toBeUndefined();
 });
 
 it("places follow-ups after their question and only timed questions on the timeline", () => {

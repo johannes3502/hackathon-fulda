@@ -28,9 +28,9 @@ flowchart TB
         TR["Transcription-Router<br/>POST /transcription/analyze-words"]
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
         FC["Factcheck-Router<br/>POST /factcheck<br/>GET /factcheck/jobs/id, /settings"]
-        QR["Questions-Router<br/>POST /questions, /questions/answers<br/>GET /questions/jobs/id, /questions/answers/id"]
+        QR["Questions-Router<br/>POST /questions, /questions/answers,<br/>/questions/answers/voice<br/>GET /questions/jobs/id, /questions/answers/id"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -39,7 +39,7 @@ flowchart TB
         INGEST["RAG-Ingest<br/>Extrakt, Chunk, Embed"]
         EMB["Lokale Embeddings<br/>jina-embeddings-v2-base-de<br/>FastEmbed/ONNX"]
         FACT["Fact-Check<br/>Aussagen extrahieren, RAG zuerst,<br/>Web als Zweitquelle, Zitat-Check"]
-        QUEST["Frage-Simulator<br/>Fragen aus Funden + Quellen,<br/>Antwort-Abgleich mit Zitat-Check"]
+        QUEST["Frage-Simulator / Voice-Agent<br/>Rolle: Student oder Professor/Tutor,<br/>Fragen aus Funden + Quellen,<br/>gesprochene Antwort -> ASR,<br/>Antwort-Abgleich mit Zitat-Check"]
     end
 
     subgraph Infra["Infrastruktur (Docker Compose)"]
@@ -229,7 +229,13 @@ sequenceDiagram
     FE->>FE: fact-Momente in der Timeline, Klick spielt die Stelle ab
 ```
 
-## 5b. Datenfluss: Frage-Simulator
+## 5b. Datenfluss: Frage-Simulator und Voice-Agent
+
+Die Rolle (`persona`: `student` = neugieriger Erstsemester, `tutor` =
+Professor/Tutor) ändert nur Ton und Fragestil; Quellen, Fact-Check-Funde und
+Zitat-Prüfung sind in beiden Rollen gleich. Der Browser liest Fragen und
+Reaktionen per `speechSynthesis` vor; nur die gesprochene Antwort geht an
+das Backend.
 
 ```mermaid
 sequenceDiagram
@@ -240,9 +246,10 @@ sequenceDiagram
     participant W as Celery Worker
     participant PG as Postgres + pgvector
     participant L as LLM (OpenAI-kompatibel)
+    participant A as ASR (Deepgram EU)
 
-    U->>FE: Start question round
-    FE->>BE: POST /questions (Wörter, Fact-Check-Funde, collection_id)
+    U->>FE: Rolle wählen, Start question round
+    FE->>BE: POST /questions (Wörter, Fact-Check-Funde, collection_id, persona)
     BE->>S3: question-jobs/id/request.json
     BE-->>FE: 202 {job_id, status_url}
     W->>PG: Hybrid-Suche mit dem Transkript (Auszüge für Lücken)
@@ -258,6 +265,20 @@ sequenceDiagram
     W->>S3: status.json, request.json (Antworttext) löschen
     FE->>BE: GET /questions/answers/{job_id} (Polling)
     FE->>FE: Nachfrage unter der Frage einfügen, keine Punkte oder Noten
+    U->>FE: Talk with the student / professor
+    loop je offene Frage (Nachfragen direkt danach)
+        FE->>U: speechSynthesis liest die Frage vor
+        U->>FE: spricht Antwort (MediaRecorder, Audio), "Done"
+        FE->>BE: POST /questions/answers/voice (Audio + Frage, persona)
+        BE->>S3: answer-jobs/id/recording + request.json
+        W->>A: 16-kHz-WAV, Wort-Timestamps zurück
+        W->>PG: Hybrid-Suche (Frage + Transkript der Antwort)
+        W->>L: Urteil + Zitat + Reaktion in der Rolle + Nachfrage
+        W->>W: Reaktion nur bei verifiziertem Zitat, sonst neutraler Satz
+        W->>S3: status.json, Audio und request.json löschen
+        FE->>BE: GET /questions/answers/{job_id} (Polling)
+        FE->>U: speechSynthesis liest die Reaktion vor
+    end
 ```
 
 ## 6. Frontend-Navigation (Web)
@@ -281,7 +302,7 @@ flowchart TD
 
     LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Statistiken,<br/>Transcript-Import, Fact-Check-Panel,<br/>Frage-Simulator, Pose-Download"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>gleiche collection_id wie /sources"]
-    LREV -->|"POST /questions,<br/>POST /questions/answers"| QAPI["Frage-Jobs<br/>Eingabe: Wörter + Fact-Check-Funde"]
+    LREV -->|"POST /questions,<br/>POST /questions/answers,<br/>POST /questions/answers/voice"| QAPI["Frage-Jobs + Voice-Agent<br/>Eingabe: Wörter + Fact-Check-Funde,<br/>Rolle Student / Professor"]
     LREV --> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
     RP --> RA["ReviewAnalysis + PerformanceGraph<br/>gemeinsame video.currentTime-Zeitachse<br/>Anmerkungen, Quellen, Abschnitt-Loop"]
@@ -356,7 +377,7 @@ Zusätzlich (außerhalb Postgres):
 | SeaweedFS `sources/{id}/original` | Original-Uploads |
 | SeaweedFS `speech-jobs/{job_id}/` | Job-Konfig, Status, Analyse-Ergebnis (Original wird nach Abschluss gelöscht) |
 | SeaweedFS `factcheck-jobs/{job_id}/` | Status und Fact-Check-Ergebnis; `request.json` (Transkript) wird nach Abschluss gelöscht |
-| SeaweedFS `question-jobs/{job_id}/`, `answer-jobs/{job_id}/` | Status mit Fragen bzw. Antwort-Abgleich; `request.json` (Transkript, Antworttext) wird nach Abschluss gelöscht |
+| SeaweedFS `question-jobs/{job_id}/`, `answer-jobs/{job_id}/` | Status mit Fragen bzw. Antwort-Abgleich (bei Sprache mit Transkript der Antwort); `request.json` (Transkript, Antworttext) und `recording` (gesprochene Antwort) werden nach Abschluss gelöscht |
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), auch vom Fact-Check genutzt |
@@ -410,9 +431,10 @@ flowchart LR
         Q2["GET /questions/jobs/{job_id}"]
         Q3["POST /questions/answers"]
         Q4["GET /questions/answers/{job_id}"]
+        Q5["POST /questions/answers/voice"]
     end
 
-    WEBF["Web-Frontend"] --> H2 & S1 & S2 & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4
+    WEBF["Web-Frontend"] --> H2 & S1 & S2 & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5
     MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
 ```
 

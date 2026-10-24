@@ -219,3 +219,33 @@ Spracheingabe bleibt offen.
   (Verweisprüfung, Reihenfolge, Events, Antwort-Abgleich, API, Task-Wiederholung),
   Frontend-Unit-Tests für Client und Timeline-Momente. Qualität der Fragen mit
   einem echten Modell ist nicht gemessen.
+
+## Voice-Agent mit Rollen (24.10.2026)
+
+Entscheidung (Nutzerauftrag „Voice Agent nach dem Vortrag, Modi dummer
+Schüler und Professor/Tutor, Vorlesungsunterlagen als Quellen“): Der
+Frage-Simulator bekommt eine Rolle (`persona`) und ein Sprachgespräch. Die
+frühere Entscheidung „nur Text“ ist damit für diesen Pfad aufgehoben.
+
+- Spracheingabe über die vorhandene Deepgram-Anbindung (EU-Endpunkt) statt
+  Browser-Spracherkennung: kein zusätzlicher Drittanbieter, funktioniert auch
+  in Firefox/Safari. Audio und Antworttext werden nach dem Job gelöscht.
+- Sprachausgabe über die Web Speech API (`speechSynthesis`) im Browser: kein
+  API-Schlüssel, keine Latenz durch einen weiteren Dienst. Stimmqualität und
+  Stimmenauswahl hängen vom Betriebssystem ab; je nach Browser kann die
+  Synthese selbst einen Cloud-Dienst des Browser-Herstellers nutzen.
+- „Dummer Schüler“ ist als neugieriger Erstsemester umgesetzt (naive,
+  direkte Fragen, keine herabsetzende Darstellung). Beide Rollen sehen
+  dieselben Fact-Check-Funde und Quellenauszüge; nur Prompt-Rolle, Anrede
+  und Tonhöhe/Tempo der Stimme unterscheiden sich.
+- Die gesprochene Reaktion des Agents (`reply`) wird verworfen und durch
+  einen neutralen Satz ersetzt, wenn das Urteil kein wörtlich verifiziertes
+  Zitat hat; so spricht der Agent keine ungeprüften Inhalte aus.
+- Antwortende per Button „Done“, keine Stille-Erkennung (kein ungeprüfter
+  Schwellenwert).
+- Geprüft: `tests/test_questions.py` (Rollen-Prompts, gleiche Eingabe in
+  beiden Rollen, Reaktion nur mit Zitat, Transkription → Abgleich,
+  Stille → Wiederholung, Voice-API, Task löscht Audio), Frontend-Unit-Tests
+  (Multipart-Upload, Gesprächsreihenfolge). Nicht geprüft: echtes LLM,
+  echte Deepgram-Antwort, Mikrofon/Sprachausgabe auf echten Geräten
+  (insbesondere iOS Safari).

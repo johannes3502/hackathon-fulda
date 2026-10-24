@@ -29,7 +29,7 @@ export async function callBackend(
 }
 
 /**
- * POST `body` to `path`, then poll `${statusPath}/{job_id}` until the job
+ * POST `body` (JSON, or multipart if it is `FormData`) to `path`, then poll `${statusPath}/{job_id}` until the job
  * finishes (at most 11 minutes, the worker's hard limit).
  */
 export async function runBackendJob<T>(
@@ -44,11 +44,19 @@ export async function runBackendJob<T>(
   signal: AbortSignal,
   pollMs = 1500,
 ): Promise<T> {
-  const accepted = await callBackend(endpoint, job.path, signal, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(job.body),
-  });
+  // FormData sets its own multipart boundary.
+  const accepted = await callBackend(
+    endpoint,
+    job.path,
+    signal,
+    job.body instanceof FormData
+      ? { method: "POST", body: job.body }
+      : {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(job.body),
+        },
+  );
   if (
     !isObject(accepted) ||
     typeof accepted.job_id !== "string" ||
