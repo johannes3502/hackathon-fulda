@@ -38,6 +38,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sources */
+        get: operations["list_sources_sources_get"];
+        put?: never;
+        /**
+         * Upload Source
+         * @description Store in S3 and enqueue extraction, chunking and embedding.
+         *
+         *     Poll status_url until status is `ready` or `failed`. Scanned PDFs without
+         *     a text layer are not supported (no OCR).
+         */
+        post: operations["upload_source_sources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Sources
+         * @description Top-k passages of ready sources, hybrid vector + keyword ranking.
+         */
+        post: operations["search_sources_sources_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sources/{source_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Source */
+        get: operations["get_source_sources__source_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Source
+         * @description Delete the file, its chunks and vectors.
+         */
+        delete: operations["delete_source_sources__source_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/speech/analyze": {
         parameters: {
             query?: never;
@@ -106,6 +171,12 @@ export interface components {
         AcceptedJob: {
             /** Job Id */
             job_id: string;
+            /** Status Url */
+            status_url: string;
+        };
+        /** AcceptedSource */
+        AcceptedSource: {
+            source: components["schemas"]["Source"];
             /** Status Url */
             status_url: string;
         };
@@ -197,6 +268,20 @@ export interface components {
              */
             transcribe: boolean;
         };
+        /** Body_upload_source_sources_post */
+        Body_upload_source_sources_post: {
+            /**
+             * Collection Id
+             * Format: uuid
+             * @description Client-generated ID grouping the sources of one presentation
+             */
+            collection_id: string;
+            /**
+             * File
+             * @description PDF, PPTX, DOCX, TXT or MD; synthetic content only
+             */
+            file: string;
+        };
         /** Event */
         Event: {
             /** Duration Ms */
@@ -228,6 +313,21 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * Location
+         * @description 1-based; `start == end` unless merged paragraphs/line blocks.
+         */
+        Location: {
+            /** End */
+            end: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "page" | "slide" | "paragraph" | "line";
+            /** Start */
+            start: number;
+        };
         /** RecordingAnalysis */
         RecordingAnalysis: {
             /** Asr Provider */
@@ -245,6 +345,81 @@ export interface components {
             transcription: components["schemas"]["WordAnalysis"] | null;
             /** Words */
             words: components["schemas"]["Word"][];
+        };
+        /** SearchRequest */
+        SearchRequest: {
+            /**
+             * Collection Id
+             * Format: uuid
+             */
+            collection_id: string;
+            /**
+             * K
+             * @default 5
+             */
+            k: number;
+            /** Query */
+            query: string;
+        };
+        /** Source */
+        Source: {
+            /**
+             * Chunk Count
+             * @default 0
+             */
+            chunk_count: number;
+            /**
+             * Collection Id
+             * Format: uuid
+             */
+            collection_id: string;
+            /** Content Type */
+            content_type: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Embedding Model */
+            embedding_model?: string | null;
+            /** Error */
+            error?: string | null;
+            /** Filename */
+            filename: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "processing" | "ready" | "failed";
+        };
+        /** SourceHit */
+        SourceHit: {
+            /** Chunk Id */
+            chunk_id: number;
+            /** Filename */
+            filename: string;
+            location: components["schemas"]["Location"];
+            /** Matched By */
+            matched_by: ("vector" | "keyword")[];
+            /**
+             * Similarity
+             * @description Cosine similarity to the query embedding; null if matched by keywords only
+             */
+            similarity?: number | null;
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+            /** Text */
+            text: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -382,6 +557,163 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    list_sources_sources_get: {
+        parameters: {
+            query: {
+                collection_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Source"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_source_sources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_source_sources_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedSource"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_sources_sources_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceHit"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_sources__source_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Source"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_source_sources__source_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -59,6 +59,10 @@ The API defaults to `http://localhost:8000`. To override it, copy
 `frontend/.env.example` to `frontend/.env.local`. A separate API origin needs
 matching backend CORS configuration and HTTPS when the frontend uses HTTPS.
 
+## Sources
+
+Open `/sources` or choose **Add your sources** on setup. Upload PDF, PPTX, DOCX, TXT or MD files (synthetic content, max 25 MB). The backend extracts text per page or slide and indexes it; the page polls until each file is **Ready**. **What will the coach find?** runs the same search that fact-check and the question round will use. The browser keeps one collection ID in `localStorage`; clearing site data starts a new, empty collection.
+
 ## Checks
 
 With Compose running:

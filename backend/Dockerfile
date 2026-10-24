@@ -15,6 +15,11 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+# Pinned embedding model before copying source, so code edits keep this layer.
+# Keep name and revision in sync with app/sources/embeddings.py.
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('jinaai/jina-embeddings-v2-base-de', revision='3f9eede875721714945b6a99a3198299243cf2be', local_dir='/app/models/embedding', allow_patterns=['onnx/model.onnx', '*.json'])" \
+    && rm -rf /app/models/embedding/.cache
+
 COPY --chown=app:app app ./app
 COPY --chown=app:app scripts ./scripts
 RUN python -m scripts.install_silero /app/models
