@@ -41,8 +41,9 @@ Der Adapter akzeptiert nur lokale Hostnamen und keinen Cloud-Modelltag.
 1. Unter `/sources` eine synthetische PDF/PPTX/TXT-Quelle hochladen und **Ready**
    abwarten. Es wird die Quellen-Collection dieses Browsers verwendet.
 2. Unter `/live` direkt **oberhalb der Kamera** bei **Speech analysis**
-   **On · local speech analysis** wählen (auch in **Large view** sichtbar).
-   **Create a transcript with local Whisper** eingeschaltet lassen.
+   **Live + full backend analysis** wählen. Unter **Options → Recording options**
+   **Create a transcript** eingeschaltet lassen und für rein lokale Transkription
+   **Stream transcription with Deepgram (EU)** ausschalten.
 3. Kamera und Mikro erlauben. Für die ersten drei Sekunden neutral stehen und
    normal sprechen: Pose und Stimme brauchen ihre jeweilige Baseline.
 4. Während der Aufnahme liefert **On · local speech analysis** jetzt alle fünf

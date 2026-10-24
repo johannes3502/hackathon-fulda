@@ -11,6 +11,18 @@ test("shared loading and stats dependencies do not break page loading", async ({
     const response = await page.goto(path);
     expect(response?.status(), path).toBe(200);
     await expect(page.locator("body")).not.toContainText("Module not found");
+    await expect(page.locator("body")).not.toContainText(
+      "Error evaluating Node.js code",
+    );
+    if (path === "/live") {
+      await expect(
+        page.getByRole("button", { name: "Enable camera", exact: true }),
+      ).toBeVisible();
+      await expect(page.locator(".live-camera-stage")).toHaveCSS(
+        "background-color",
+        "rgb(28, 28, 31)",
+      );
+    }
   }
   expect(errors).toEqual([]);
 });

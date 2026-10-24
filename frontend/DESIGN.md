@@ -9,13 +9,14 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
 
 ## Shared system
 
-- Use the platform system font: San Francisco on Apple devices, platform fallbacks
-  elsewhere. No downloaded fonts. Body text is 1rem; page titles are 2rem on desktop.
-  Small supporting text is at least 0.75rem. Text scales with browser preferences.
+- Use locally hosted Open Sans Variable (`@fontsource-variable/open-sans`) with
+  platform fallbacks, and accent `#3803bf` (`--primary` / `--primary-fill`).
+  Body text is 1rem; page titles are 2rem on desktop. Small supporting text is
+  at least 0.75rem. Text scales with browser preferences.
 - Use the semantic tokens in `src/app/globals.css` for backgrounds, surfaces,
   foreground, secondary text, borders, and state colors. Light appearance uses
   neutral gray and white; dark appearance follows the system preference.
-- Retain the 418 violet for primary actions and selections. Use the lighter text
+- Retain the 418 `#3803bf` violet for primary actions and selections. Use the lighter text
   accent separately from filled buttons in dark appearance. Warning and error
   colors always accompany a label or symbol.
 - Shared content width: 1280px including gutters. Use 32px desktop gutters and
@@ -25,19 +26,24 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   use 1rem text. Keyboard focus, the skip link, and dialog focus restoration remain
   visible. Reduced motion disables animation; increased contrast strengthens
   separators and secondary text.
-- AppShell owns Studio, Sources, Sample demo, help, and the footer. The active
-  destination is identified visually and with `aria-current`. Screen-specific
-  tabs belong inside the workspace.
+- `/` and `/stats-preview` open the stats start dashboard with the `StatsCard` as
+  the prominent starting card, accompanied by interactive monthly progress,
+  criteria comparison and training activity charts (clearly labelled as synthetic
+  demo data) and direct actions into `/live`, `/review-preview`, `/sources` and
+  `/demo`. `AppShell` provides both the header navigation (`Main navigation`) and a
+  slide-over navigation drawer (`Menü`) outside the full-size live studio. The active destination
+  is identified visually and with `aria-current`.
 
 ## Screens
 
-- **Studio:** normal view is the default, with visible navigation, speech choice,
-  timer, and camera stage. Before feedback exists, the stage uses the available
-  width. Large view is optional and preserves the active camera and recording;
-  Escape returns to normal view. Large view fills the available height with the
-  camera on the left and an equally wide feedback panel on the right, with shared
-  controls above. Below 1001px they stack. Recording options and diagnostics are disclosures.
-  Live cues use large text and contextual SVG icons. Red means an adjustment to
+- **Studio:** the full-size camera and feedback layout is the only view. The
+  camera fills the available width before feedback exists; during preview and
+  recording it sits beside an equally wide feedback panel. Below 1001px they
+  stack. Shared controls, speech choice and recording timer sit
+  above the camera. Options links to setup, recording options and diagnostics
+  below the studio. The live toolbar has no navigation menu.
+  Live cues use large text, contextual SVG icons, a clear panel tint and a lighter
+  tint across the live workspace. Red means an adjustment to
   consider; green means explicit positive feedback or labelled tracking readiness.
   Ordinary gestures, pauses, calibration and hidden hints remain neutral. Color
   always has a text label; tracking readiness is not a performance assessment.
@@ -45,6 +51,10 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   playback sits beside one selected observation and a compact list of replay
   sections. Annotations follow video.currentTime; ordinary gestures are not
   labelled bad performance. On phones, playback precedes the feedback.
+  Timestamp jump buttons show the time and feedback title, wrapping without
+  overlapping even when observations cover the same time range. Timestamp labels
+  use the live feedback colors: red for adjustments, green for positive feedback,
+  neutral for observations. The violet selection outline remains separate.
   Transcript, source checks, metrics and exports live in disclosures.
   Questions show one exchange at a time, with voice or typed answers. The
   presentation mode and material collection are fixed when a take starts.

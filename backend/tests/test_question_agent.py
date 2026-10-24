@@ -23,6 +23,8 @@ def test_modes_change_both_questions_and_answer_feedback(mode):
     result = generate_questions(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode), model)
     assert result.presentation_mode == mode
     assert PRESENTATION_STYLES[mode] in model.prompts[0][0]
+    if mode != "thesis":
+        assert "Professur" not in model.prompts[0][0]
     answer_model = Model({"verdict": "not_found"})
     review_answer(AnswerRequest(question=question(), answer="Synthetic answer", presentation_mode=mode), answer_model)
     assert PRESENTATION_STYLES[mode] in answer_model.prompts[0][0]

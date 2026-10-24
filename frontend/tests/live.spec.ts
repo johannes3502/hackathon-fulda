@@ -115,7 +115,7 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 async function enable(page: Page) {
-  await page.goto("/");
+  await page.goto("/live");
   await page.getByLabel("Speech analysis").selectOption("local");
   await page.getByRole("button", { name: "Enable camera" }).click();
   await expect(
@@ -132,7 +132,7 @@ test("local microphone feedback emits live volume/pause markers and preserves th
     if (request.method() === "POST" && request.url().includes("/speech/"))
       uploads++;
   });
-  await page.goto("/");
+  await page.goto("/live");
   await expect(page.getByLabel("Speech analysis")).toHaveValue("live");
   await page
     .getByRole("button", { name: "Enable camera", exact: true })
@@ -212,7 +212,7 @@ test("normal preview displays all finger points without enabling the lab, includ
   ).toHaveAttribute("aria-pressed", "false");
 });
 
-test("speech analysis is visible above the camera and in large view", async ({
+test("speech analysis is visible above the full-size camera", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
@@ -224,7 +224,6 @@ test("speech analysis is visible above the camera and in large view", async ({
   const speech = page.getByLabel("Speech analysis", { exact: true });
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(speech).toBeInViewport();
-  await page.getByRole("button", { name: "Large view", exact: true }).click();
   await expect(speech).toBeInViewport();
   await speech.selectOption("backend");
   await expect(
@@ -249,7 +248,7 @@ test("speech analysis is visible above the camera and in large view", async ({
   });
 });
 
-test("large view scales feedback and preserves an active recording", async ({
+test("full-size view is the default and options preserve an active recording", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
@@ -257,25 +256,20 @@ test("large view scales feedback and preserves an active recording", async ({
   await enable(page);
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
-  const originalHeight = (await video.boundingBox())!.height;
   await page
     .getByRole("button", { name: "Start recording", exact: true })
     .click();
   const cue = page.locator(".cue-message");
-  const originalFontSize = await cue.evaluate((el) =>
-    parseFloat(getComputedStyle(el).fontSize),
-  );
-  await page.getByRole("button", { name: "Large view", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Standard view" }),
-  ).toHaveAttribute("aria-pressed", "true");
+    page.getByRole("button", { name: /^(Large|Standard) view$/ }),
+  ).toHaveCount(0);
   expect(
     await cue.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
-  ).toBeGreaterThan(originalFontSize * 1.5);
+  ).toBeGreaterThanOrEqual(info.project.name === "desktop" ? 52 : 40);
   if (info.project.name === "desktop") {
     const camera = (await page.locator(".live-camera-stage").boundingBox())!;
     const feedback = (await page.locator(".cue-panel").boundingBox())!;
-    expect(camera.height).toBeGreaterThan(originalHeight);
+    expect(camera.height).toBeGreaterThan(480);
     expect(feedback.x).toBeGreaterThanOrEqual(camera.x + camera.width);
     expect(feedback.y).toBeCloseTo(camera.y, 0);
     expect(feedback.height).toBeCloseTo(camera.height, 0);
@@ -313,12 +307,26 @@ test("large view scales feedback and preserves an active recording", async ({
     ).toBeInViewport();
     await expect(cue).toBeInViewport();
   }
-  await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("button", { name: "Large view", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
-  await page.getByRole("button", { name: "Large view", exact: true }).click();
-  await page.getByRole("button", { name: "Standard view" }).click();
+    page.getByRole("button", { name: "Menü", exact: true }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.getByRole("link", { name: "Options", exact: true }).click();
+  await page.getByText("Analysis features", { exact: true }).click();
+  await expect(page.getByLabel("Track fingers")).toBeVisible();
+  await expect(page.getByLabel("Track fingers")).toBeDisabled();
+  await page
+    .getByText("Gesture guide and calibration", { exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Recalibrate neutral position" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Recalibrate neutral position" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: /^(Large|Standard) view$/ }),
+  ).toHaveCount(0);
   expect(
     await video.evaluate((el, original) => el === original, originalVideo),
   ).toBe(true);
@@ -343,6 +351,68 @@ test("large view scales feedback and preserves an active recording", async ({
     )
     .toBeGreaterThanOrEqual(2);
 });
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`live feedback visibly tints green and red in ${colorScheme} appearance`, async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ colorScheme });
+    await syntheticCamera(page);
+    await syntheticPose(page);
+    await enable(page);
+    await page.getByRole("button", { name: "Start recording" }).click();
+    const workspace = page.locator(".live-workspace");
+    const panel = page.locator(".cue-panel");
+    const pixels = (selector: string) =>
+      page.locator(selector).evaluate((element) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext("2d")!;
+        context.fillStyle = getComputedStyle(element).backgroundColor;
+        context.fillRect(0, 0, 1, 1);
+        return [...context.getImageData(0, 0, 1, 1).data];
+      });
+    await expect(workspace).toHaveAttribute("data-feedback", "positive", {
+      timeout: 10000,
+    });
+    const green = await pixels(".cue-panel");
+    expect(green[1] - green[0]).toBeGreaterThanOrEqual(10);
+    const greenWorkspace = await pixels(".live-workspace");
+    expect(greenWorkspace[1]).toBeGreaterThan(greenWorkspace[0]);
+    await panel.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath(`green-feedback-${colorScheme}.png`),
+    });
+
+    await startPoseSequence(page, "crossed");
+    await expect(workspace).toHaveAttribute("data-feedback", "attention", {
+      timeout: 12000,
+    });
+    await expect(page.locator(".live-cue-label")).toHaveText("Try adjusting");
+    const red = await pixels(".cue-panel");
+    expect(red[0] - red[1]).toBeGreaterThanOrEqual(10);
+    const redWorkspace = await pixels(".live-workspace");
+    expect(redWorkspace[0]).toBeGreaterThan(redWorkspace[1]);
+    await panel.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath(`red-feedback-${colorScheme}.png`),
+    });
+
+    await page.evaluate(() =>
+      (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
+        type: "test-kind",
+        kind: "neutral",
+      }),
+    );
+    await expect(workspace).toHaveAttribute("data-feedback", "positive");
+    await expect(page.locator(".live-cue-label")).toHaveText("Tracking ready");
+    await page.getByLabel("Show live hints").uncheck();
+    await expect(workspace).toHaveAttribute("data-feedback", "neutral");
+    expect((await pixels(".live-workspace"))[3]).toBe(0);
+    await page.getByRole("button", { name: "Finish & review" }).click();
+    await expect(page).toHaveURL(/\/review$/);
+  });
+}
+
 test("raw camera recording, stats, filtered video sections, download and refresh recovery", async ({
   page,
 }, info) => {
@@ -597,7 +667,8 @@ test("feature options lock per take, filter speech markers and survive review na
 
 test("REST analysis uploads recorded audio/video and merges word feedback into review", async ({
   page,
-}) => {
+}, info) => {
+  await page.emulateMedia({ colorScheme: "dark" });
   let uploads = 0;
   await page.route("**/api/speech/analyze", async (route) => {
     uploads++;
@@ -662,13 +733,13 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
   expect(uploads).toBe(1);
-  await expect(page.getByText("Audio: pause count")).toBeVisible();
   await page
     .getByText("Recording details and exports", { exact: true })
     .locator("..")
     .evaluate((el) => {
       (el as HTMLDetailsElement).open = true;
     });
+  await expect(page.getByText("Audio: pause count")).toBeVisible();
   await page
     .getByText("Replace transcript timestamps", { exact: true })
     .click();
@@ -683,6 +754,37 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
     page.getByText("Transcript analysis added to this take."),
   ).toBeVisible();
   await expect(page.getByText("Transcript: filler count")).toBeVisible();
+  // Both events begin at 100 ms: duration bars used to obscure each other.
+  const timeline = page.getByRole("group", { name: "Feedback timeline" });
+  const jumps = timeline.getByRole("button");
+  await expect(jumps).toHaveCount(2);
+  const bounds = [];
+  for (const jump of await jumps.all()) {
+    await expect(jump.locator(".timeline-time")).toHaveText("0:01");
+    await expect(jump.locator(".timeline-time")).toBeVisible();
+    const title = await jump.locator(".timeline-title").innerText();
+    await jump.focus();
+    await page.keyboard.press("Enter");
+    await expect(jump).toHaveAttribute("aria-pressed", "true");
+    await expect(jump).toHaveAttribute("data-feedback", "attention");
+    await expect(jump.locator(".timeline-time")).toHaveCSS(
+      "color",
+      "rgb(255, 171, 180)",
+    );
+    await expect(page.locator(".review-observation h3")).toHaveText(title);
+    bounds.push((await jump.boundingBox())!);
+  }
+  const [first, second] = bounds;
+  expect(first.height).toBeGreaterThanOrEqual(44);
+  expect(second.height).toBeGreaterThanOrEqual(44);
+  expect(
+    second.x >= first.x + first.width || second.y >= first.y + first.height,
+  ).toBe(true);
+  await noOverflow(page);
+  await timeline.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: info.outputPath("readable-timestamp-jumps.png"),
+  });
 });
 
 test("analysis failure preserves playable recording", async ({ page }) => {
@@ -767,6 +869,9 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
   });
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
+  await page
+    .getByText("Recording details and exports", { exact: true })
+    .click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("link", { name: "Download pose JSONL" }).click();
   const download = await downloadPromise;
@@ -796,7 +901,7 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
   });
 });
 
-test("automatic landmarks align with the mirrored video in both sizes and clear when lost", async ({
+test("automatic landmarks align with the full-size mirrored video and clear when lost", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
@@ -834,41 +939,33 @@ test("automatic landmarks align with the mirrored video in both sizes and clear 
   await expect(overlay.locator("circle")).toHaveCount(16);
   await expect(overlay.locator('[data-landmark="left_elbow"]')).toHaveCount(0);
   await expect(overlay.locator('[data-landmark="left_knee"]')).toHaveCount(0);
-  for (const large of [false, true]) {
-    if (large)
-      await page
-        .getByRole("button", { name: "Large view", exact: true })
-        .click();
-    const expected = await page
-      .getByLabel("Your local camera feed")
-      .evaluate((video: HTMLVideoElement) => {
-        const rect = video.getBoundingClientRect();
-        const scale =
-          getComputedStyle(video).objectFit === "contain"
-            ? Math.min(
-                rect.width / video.videoWidth,
-                rect.height / video.videoHeight,
-              )
-            : Math.max(
-                rect.width / video.videoWidth,
-                rect.height / video.videoHeight,
-              );
-        return {
-          x: rect.x + rect.width / 2 + 0.1 * video.videoWidth * scale,
-          y: rect.y + rect.height / 2 - 0.3 * video.videoHeight * scale,
-        };
-      });
-    const nose = (await overlay
-      .locator('[data-landmark="nose"]')
-      .boundingBox())!;
-    expect(nose.x + nose.width / 2).toBeCloseTo(expected.x, 0);
-    expect(nose.y + nose.height / 2).toBeCloseTo(expected.y, 0);
-    await noOverflow(page);
-    await page.screenshot({
-      path: info.outputPath(`landmarks-${large ? "large" : "standard"}.png`),
-      fullPage: true,
+  const expected = await page
+    .getByLabel("Your local camera feed")
+    .evaluate((video: HTMLVideoElement) => {
+      const rect = video.getBoundingClientRect();
+      const scale =
+        getComputedStyle(video).objectFit === "contain"
+          ? Math.min(
+              rect.width / video.videoWidth,
+              rect.height / video.videoHeight,
+            )
+          : Math.max(
+              rect.width / video.videoWidth,
+              rect.height / video.videoHeight,
+            );
+      return {
+        x: rect.x + rect.width / 2 + 0.1 * video.videoWidth * scale,
+        y: rect.y + rect.height / 2 - 0.3 * video.videoHeight * scale,
+      };
     });
-  }
+  const nose = (await overlay.locator('[data-landmark="nose"]').boundingBox())!;
+  expect(nose.x + nose.width / 2).toBeCloseTo(expected.x, 0);
+  expect(nose.y + nose.height / 2).toBeCloseTo(expected.y, 0);
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("landmarks-full-size.png"),
+    fullPage: true,
+  });
   await page.evaluate(() =>
     (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
       type: "visible",
@@ -940,6 +1037,7 @@ test("sideways motion and crossed arms reach review while live hints can be mute
       kind: "crossed",
     }),
   );
+  await page.getByText("Session observations", { exact: true }).first().click();
   await expect(page.locator(".event-feed")).toContainText(
     "Arms crossed in front of torso",
     { timeout: 7000 },
@@ -1313,7 +1411,7 @@ test("signal feedback appears during recording without captions and failure pres
       }
     });
   });
-  await page.goto("/");
+  await page.goto("/live");
   await page.getByLabel("Speech analysis").selectOption("backend");
   await page
     .getByRole("button", { name: "Enable camera", exact: true })
@@ -1355,7 +1453,7 @@ test("unavailable backend never starts recording and offers a working local retr
   await page.route("**/api/health/ready", (route) =>
     route.fulfill({ status: 500 }),
   );
-  await page.goto("/");
+  await page.goto("/live");
   await page.getByLabel("Speech analysis").selectOption("backend");
   await page
     .getByRole("button", { name: "Enable camera", exact: true })
@@ -1484,6 +1582,7 @@ test("Deepgram streaming waits for the last word and reuses the final transcript
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
   expect(uploaded).toBe(true);
+  await page.getByText("Transcript and source checks", { exact: true }).click();
   await expect(page.locator(".recorded-transcript")).toContainText("deepgram");
   await expect(
     page

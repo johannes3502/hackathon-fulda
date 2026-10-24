@@ -43,6 +43,7 @@ class Evidence(BaseModel):
     source_id: UUID | None = None
     location: Location | None = None
     url: str | None = None
+    quote_verified: Literal["exact", "fuzzy"] | None = None
 
 
 class ClaimResult(BaseModel):

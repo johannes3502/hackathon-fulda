@@ -11,7 +11,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | 1 | Posture / Gesture / Eye Tracking | Pose- und Gesten-Landmarks aus der Kamera; Kopforientierung als Proxy (kein Gaze); Regeln darauf erzeugen Events (z. B. „Haltung auffällig“) |
 | 2 | Transkription + Fact-Check | Transkript mit Wort-Timestamps; Abgleich der Aussagen per RAG mit vorab hochgeladenen Quellen (PDF, PPTX, …); Web-Fetch-Agent als Zweitquelle |
 | 3 | Sprechmerkmale | Tempo, Pausen, Zögern, Füllwörter, Lautstärke (zu leise/laut), Tonhöhenvariation (monoton); live Hinweise während des Vortrags |
-| 4 | Timestamp-Review | Events auf einer Timeline; Klick springt zur Stelle und spielt den Clip des Events ab |
+| 4 | Timestamp-Review | Events auf einer Timeline; `peakMs` springt zur Stelle in der lokalen Aufnahme; keine serverseitigen Clips |
 | 5 | Frage-Simulator | Agent stellt nach der Präsentation Fragen, abgeleitet aus Transkript, Quellen und Fact-Check-Funden |
 
 **Leitplanken:** nur diese fünf Features; keine erfundenen Scores, Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeits-/Notenbewertung; nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
@@ -20,9 +20,9 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 1. **Vorbereitung:** Nutzer lädt Quellen hoch (PDF, PPTX, Text). Backend zerlegt sie in Chunks mit Quelle und Seite/Folie und legt sie für die Suche ab.
 2. **Aufnahme:** Kamera und Mikro laufen. Im Browser erzeugt MediaPipe live Pose-Landmarks und einen Kopforientierungs-Proxy, daraus entstehen Events; das Mikro liefert den Pegel.
-3. **Upload:** Nach dem Stoppen wird die komplette Aufnahme hochgeladen.
-4. **Analyse (Backend):** Transkription mit Wort-Timestamps, Sprechmerkmale, Fact-Check. Pro Event wird ein kurzer Clip geschnitten, die Aufnahme danach gelöscht.
-5. **Review:** Timeline über alle Events; Klick spielt den Clip, ggf. mit Skelett-Overlay.
+3. **Übergabe:** Session/Take-Metadaten und abgeleitete Pose-Events gehen ans Backend. Audio oder Aufnahme für ASR/Sprechanalyse nur optional und temporär hochladen.
+4. **Analyse (Backend):** Transkription mit Wort-Timestamps, Sprechmerkmale, Fact-Check. Timestamp-Daten und Review bleiben in Postgres; der Upload wird auch bei Analysefehlern gelöscht.
+5. **Review:** Timeline über alle finalen Events; `peakMs` ist das Sprungziel im lokalen Video. Browser-Speicherung und Wiedergabe gehören dem Frontend.
 6. **Frage-Simulator:** Der Agent stellt gezielte Rückfragen, vor allem zu Widersprüchen und Lücken aus dem Fact-Check, und vergleicht die Antworten mit den Quellen.
 
 ## 3. Tech-Stack
@@ -35,10 +35,10 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | Backend | Python 3.12 + FastAPI |
 | Hintergrundjobs | Celery-Worker; Redis als Broker und temporäres Result-Backend (Docker Compose) |
 | Datenbank | Postgres mit `pgvector` (Docker Compose): Sessions, Events, Transkript, Quellen-Chunks + Embeddings |
-| Objektspeicher | MinIO, S3-kompatibel (Docker Compose): Uploads, Event-Clips, Snapshots; Browser lädt per Presigned URL direkt hoch |
+| Objektspeicher | SeaweedFS, S3-kompatibel (Docker Compose): Quellen und temporäre Analyse-Uploads; keine Review-Videos, Clips oder Snapshots |
 | Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker und optionaler HandLandmarker für Fingertracking; Pocket nur Dev; FaceLandmarker (Iris) nicht MVP |
 | Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
-| Medien-Verarbeitung | `ffmpeg` im Backend: Clips schneiden, WebM/MP4 remuxen (seekbar machen) |
+| Medien-Verarbeitung | `ffprobe` für Stream-Startzeiten/Dauer, `ffmpeg` nur für Audio-Dekodierung und ASR |
 | Transkription | Lokales Whisper (`faster-whisper`) hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}` + Text), Deepgram EU als wählbarer Live-Stream mit Wiederverwendung der finalen Wörter; Anbieter bleibt austauschbar |
 
 **Vorschläge, noch zu bestätigen** (Bestätigung im `docs/02-ai-decision-log.md` festhalten; Vorlage: `templates/ai-decision-log.md`)
@@ -60,8 +60,8 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 Browser (Next.js, TS)
  ├─ Kamera → MediaPipe Pose + Hand (Fingertracking, Pocket nur Dev) → Regeln → Events + Landmarks [live, lokal]
  ├─ Mikro  → AudioWorklet → Pegel, F0, Silbenrate → Regeln → Events + Live-Hinweis [live, lokal]
- └─ MediaRecorder → komplette Aufnahme ──(Presigned URL)──► MinIO
-                                                     │
+ └─ MediaRecorder → lokale Aufnahme (Client-Vertrag)
+         └─ optionaler Audio-/Aufnahme-Upload ───────┐
  Quellen-Upload (PDF/PPTX) ──────────────────────────┤
                                                      ▼
                                           FastAPI (Python 3.12)
@@ -75,26 +75,31 @@ Browser (Next.js, TS)
      │                                                   ▲                 │
      └───────────── Retrieval (pgvector) ────────────────┴─────────────────┘
                                    │
-                  ffmpeg: Clip + Snapshot pro Event, Original löschen
+                  Audio-Probe + Timestamp-Offset, Original löschen
                                    ▼
-        Postgres (Sessions, Events, Transkript, Chunks)   MinIO (Clips, Snapshots, Uploads)
+        Postgres (Sessions, Takes, Events, Reviews, Jobs, Wörter, Chunks)
+        SeaweedFS (Quellen, nur temporäre Audio-/Aufnahme-Uploads)
                                    ▼
                     Review-UI: Timeline über gemeinsame Zeitachse
 ```
 
 ### Event-Schema (Vertrag zwischen Frontend und Backend)
 
-Jede Analyse schreibt in dasselbe Schema; die Timeline liest nur dieses.
+Der persistente Review-Vertrag steht in `backend/app/review/models.py` und
+`docs/06-backend-review-api.md` (JSON in camelCase). Bestehende Analyse-Routen
+behalten ihr kleineres `app/events.py`-Format; der Take-Worker adaptiert es.
 
 ```
 Event {
-  session_id, id,
+  take_id, id, dedupe_key,
   t_ms          // relativ zum Aufnahmestart
+  peak_ms       // Sprungziel; ohne Peak-Sample explizit Event-Anfang
   duration_ms,
-  type          // posture | gesture | gaze | filler | pause | pace | volume | pitch | fact | question
+  type          // posture | head | hands | framing | data-quality | gesture | filler | pause | pace | volume | pitch | fact | question
   severity      // info | hint | warning
   source        // browser | asr | speech | factcheck | agent
-  clip_key?, snapshot_key?   // Objektspeicher
+  stage         // live | final
+  rule_version?
   payload       // typabhängig: Landmarks, Wort, Quelle + Zitat, Frage …
 }
 ```
@@ -104,18 +109,19 @@ Event {
 - **Gemeinsame Zeitachse:** Alle Events tragen `t_ms` relativ zum Aufnahmestart. Der Landmark-Takt wird an `MediaRecorder.onstart` verankert (`performance.now()`), das Review nutzt nur `video.currentTime`.
 - **Live-Feedback:** Browser-Regeln (Pose und Stimme) zeigen während der Aufnahme einen dezenten Hinweis (z. B. „Tempo hoch“, „Stimme monoton“, „zu leise“), ohne Score und ohne Note. Damit er nicht ablenkt: Mindestdauer der Abweichung, Cooldown pro Hinweis-Typ, höchstens ein Hinweis gleichzeitig, abschaltbar. Jeder Hinweis erzeugt zugleich ein Event für die Timeline. Schwellenwerte sind Konfiguration relativ zur Baseline und als „Heuristik“ gekennzeichnet.
 - **Pose-Events:** Regeln auf Landmark-Winkeln, kalibriert gegen eine Baseline (erste Sekunden neutrale Haltung), mit Mindestdauer gegen Flackern. Schwellenwerte sind Konfiguration und im UI als „Heuristik“ gekennzeichnet. Kamera-Framing: Oberkörper muss sichtbar sein, sonst Hinweis statt Auswertung.
-- **Clips statt Vollvideo:** Das Backend schneidet pro Event ein Fenster (ca. 5 s vor/nach, mit Re-Encode für präzise Schnitte) plus Snapshot-Frame und löscht die Originalaufnahme. Aufnahme vorher remuxen, weil `MediaRecorder`-WebM nicht seekbar ist.
+- **Lokale Wiedergabe:** Kein Clip-/Snapshot-/Video-Endpunkt im Backend. Die Aufnahme bleibt im Client; Audio/Container nur temporär für Analyse. Take-Events liefern Start, Peak und Dauer. Coverage nur aus gemeldeten Messintervallen, fehlende Zeit bleibt unbekannt.
+- **Persistente Review:** `POST /sessions`, `/sessions/{id}/takes`, `/takes/{id}/events`, optional `/audio`, dann `/review`; `GET /timeline`, `/review`, `/jobs/{id}`. Neue POSTs brauchen `Idempotency-Key`. Template-Review ist Standard; LLM nur über geprüfte Evidence Cards und Platzhalter. `DELETE /sessions/{id}` kaskadiert Metadaten und entfernt temporäres Audio. P1/P2-Anbindung über Take-`/factcheck`, `/questions`, `/questions/answers`; Details in `docs/06-backend-review-api.md`.
 - **Fact-Check:** (1) LLM extrahiert prüfbare Aussagen mit Timestamp aus dem Transkript, (2) Top-k-Chunks pro Aussage aus pgvector, (3) LLM urteilt mit wörtlichem Zitat, (4) Code prüft per String-Match, dass das Zitat im Chunk steht. Drei Ergebnisse: *stützt*, *widerspricht*, *in den Quellen nicht gefunden*. Letzteres ist nicht „falsch“. Web-Fetch kommt erst danach als Zweitquelle.
 - **Frage-Agent:** Eingabe sind Transkript, Quellen-Chunks und die Fact-Check-Funde. Er fragt gezielt nach Widersprüchen und Lücken und vergleicht Antworten mit den Quellen. Ausgabe ohne Punkte oder Noten.
 - **Fallback:** Fällt Modell, API oder Kamera aus, spielt die App eine vorberechnete Beispiel-Session deterministisch ab. Sie ist zugleich der Standard-Einstieg für den Produktreview (Wert in unter 3 Minuten), Live-Aufnahme ist der zweite Pfad (30–60 s reichen).
 - **Datenschutz:** Demo-Daten synthetisch. Live-Aufnahmen der Jury sind echte personenbezogene Daten: Einwilligungshinweis, Originalaufnahme nach der Verarbeitung löschen, Drittanbieter-APIs benennen (relevant für die KI-Reflection).
-- **Daten und Secrets:** Ziel sind Postgres mit pgvector und MinIO; der vorhandene Compose-Stack ist in Abschnitt 6 beschrieben. Secrets nur in `.env`, nicht committen.
-- **Hintergrundjobs:** Lange Backend-Arbeiten (z. B. Transkription, Ingest, Clips) als Celery-Tasks ausführen. Async-API-Routen publizieren über `app.jobs.enqueue_task` und geben eine Job-ID zurück; im Request nicht auf das Ergebnis warten. Nur IDs/Object-Keys in Redis, Medien in S3. Tasks müssen bei erneuter Zustellung sicher wiederholbar sein.
+- **Daten und Secrets:** Postgres mit pgvector und SeaweedFS; der vorhandene Compose-Stack ist in Abschnitt 6 beschrieben. Secrets nur in `.env`, nicht committen.
+- **Hintergrundjobs:** Lange Backend-Arbeiten (z. B. Transkription, Ingest, Review) als Celery-Tasks ausführen. Async-API-Routen publizieren über `app.jobs.enqueue_task` und geben eine Job-ID zurück; im Request nicht auf das Ergebnis warten. Nur IDs/Object-Keys in Redis, Medien temporär in S3. Tasks müssen bei erneuter Zustellung sicher wiederholbar sein.
 - **Layout (Ziel):** `frontend/` (Next.js), `backend/` (FastAPI); die vorhandene Compose-Datei heißt `compose.yaml`.
 
 ## 5. Priorität
 
-1. Aufnahme → Upload → Transkript → Events → Timeline mit Clip-Sprung (Rückgrat, Features 2a und 4).
+1. Aufnahme → optionale Audioanalyse → Transkript → Events → Timeline mit lokalem Timestamp-Sprung (Rückgrat, Features 2a und 4).
 2. Pose-Events (2–3 Regeln) und Sprechmerkmale aus Wort-Timestamps.
 3. Quellen-Upload, Ingest und RAG-Fact-Check.
 4. Frage-Agent auf den Fact-Check-Funden.
@@ -148,9 +154,12 @@ templates/
 Das lokale Grundgerüst startet aktuell FastAPI mit FFmpeg,
 einen separaten Celery-Worker, Redis, PostgreSQL **mit pgvector** und
 **SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job geprüft; Audio-/ASR-Jobs und
-Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). MinIO und
-die vollständige Aufnahme-/Clip-/Review-Pipeline aus der Zielarchitektur sind
-noch nicht umgesetzt. Quellen-Upload und Retrieval (RAG) sind umgesetzt
+Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). Die additive
+Take-Review-API (`backend/app/review/`) speichert Sessions, Takes, Events, Reviews,
+Jobs und Wort-/Sprechdaten in Postgres. Sie bietet Template-/LLM-Review,
+Coverage, Fact-Check-/Frage-Anbindung und explizite Löschung ohne Server-Clips.
+Browser-Integration dieser neuen API ist ein separater Frontend-Change.
+Quellen-Upload und Retrieval (RAG) sind umgesetzt
 (`backend/app/sources/`, Frontend-Seite `/sources`): PDF/PPTX/DOCX/TXT/MD →
 Chunks mit Seite/Folie → lokale Embeddings (`jina-embeddings-v2-base-de`) →
 Hybrid-Suche (pgvector + deutsche Volltextsuche). Der Fact-Check ist umgesetzt
@@ -213,8 +222,9 @@ Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription
 (`backend/app/transcription/`, standardmäßig lokales faster-whisper; Deepgram
 Nova-3 über EU-Endpunkt optional; deutsche Füllworterhaltung ungeprüft).
 Das Ergebnis enthält zusätzlich den zusammengesetzten Transkripttext. Silero VAD v6.2 (ONNX, lokal) erkennt
-Sprachaktivität; RMS und YIN bleiben erhalten, Standard-Kalibrierung 3 s. Die Umstellung des Speichers
-ist eine separate Implementierungsaufgabe.
+Sprachaktivität; RMS und YIN bleiben erhalten, Standard-Kalibrierung 3 s.
+Die bisherigen `/speech`-/`factcheck`-/`questions`-Routen bleiben kompatibel;
+der neue Take-Pfad persistiert Ergebnisse in Postgres und temporäres Audio in S3.
 
 Live-Sprechfeedback ist im Web-Backend-Modus umgesetzt: `WS /speech/feedback`
 analysiert Mikrofon-PCM alle 5 s mit denselben Signalregeln und 3-s-Baseline.
