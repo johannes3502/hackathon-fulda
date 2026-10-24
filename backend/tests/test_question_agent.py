@@ -42,7 +42,7 @@ def test_context_uses_only_the_requested_collection_and_includes_source_location
     assert "Folie 3" in result.prompt
     assert "source_passages" in result.prompt and "transcript" in result.prompt
     assert "untrusted reference material" in result.prompt
-    assert PRESENTATION_STYLES["nonprofit"] in result.prompt
+    assert "teacher asking a student" in result.prompt
 
 
 def test_missing_or_processing_sources_are_not_presented_as_ready(monkeypatch):
@@ -53,15 +53,30 @@ def test_missing_or_processing_sources_are_not_presented_as_ready(monkeypatch):
         agent.prepare_context(QuestionRequest(words=TRANSCRIPT, collection_id=uuid4()))
 
 
-def test_professor_receives_the_spoken_content_and_probes_breadth_without_a_greeting():
-    result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode="thesis"))
+@pytest.mark.parametrize("mode", PRESENTATION_STYLES)
+def test_teacher_receives_the_spoken_content_and_starts_without_an_introduction(mode):
+    result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode))
     context = json.loads(result.prompt.splitlines()[-1])
     assert context["transcript"] == " ".join(word.word for word in TRANSCRIPT)
     assert "Do not greet" in result.prompt
+    assert "teacher asking a student" in result.prompt
+    assert "Open with only 'I have a few questions.'" in result.prompt
+    assert "immediately followed by the first specific question" in result.prompt
+    assert "Do not add an introduction, recap or explanation" in result.prompt
+    assert all(style not in result.prompt for style in PRESENTATION_STYLES.values())
     assert "actual claim, example or explanation" in result.prompt
     assert "breadth of understanding" in result.prompt
     assert "new application or counterexample" in result.prompt
     assert "do not turn the conversation into unrelated trivia" in result.prompt
+
+
+def test_teacher_moves_on_after_limited_follow_ups_even_if_the_answer_is_wrong():
+    prompt = agent.prepare_context(QuestionRequest(words=TRANSCRIPT)).prompt
+    assert "ask one brief follow-up, and at most a second follow-up" in prompt
+    assert "After at most two follow-ups" in prompt
+    assert "continue to the next main question even if the answer is still wrong" in prompt
+    assert "Move on sooner if the student does not know or asks to skip" in prompt
+    assert "Never repeat a question until they get it right" in prompt
 
 
 def test_agent_api_queues_context_without_needing_the_local_llm(monkeypatch):

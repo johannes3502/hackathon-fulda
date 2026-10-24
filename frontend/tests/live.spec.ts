@@ -1794,7 +1794,9 @@ test("ElevenLabs receives the presentation and starts a contextual question inst
       const message = JSON.parse(raw);
       if (message.type === "conversation_initiation_client_data") {
         override = message.conversation_config_override.agent.prompt.prompt;
-        expect(message.conversation_config_override.agent.first_message).toBe("");
+        expect(message.conversation_config_override.agent.first_message).toBe(
+          "",
+        );
         socket.send(
           JSON.stringify({
             type: "conversation_initiation_metadata",
@@ -1810,12 +1812,16 @@ test("ElevenLabs receives the presentation and starts a contextual question inst
         expect(override).toBe("Synthetic thesis context with source notes");
         expect(message.text).toContain("first question");
         expect(message.text).toContain("presentation");
+        expect(message.text).toContain("As their teacher");
+        expect(message.text).toContain("say only 'I have a few questions.'");
+        expect(message.text).toContain("Do not add any other introduction");
         kickoffs++;
         socket.send(
           JSON.stringify({
             type: "agent_response",
             agent_response_event: {
-              agent_response: "Why did you choose this research method?",
+              agent_response:
+                "I have a few questions. Why did you choose this research method?",
             },
           }),
         );
@@ -1848,7 +1854,7 @@ test("ElevenLabs receives the presentation and starts a contextual question inst
     .getByRole("button", { name: "Practice questions" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Meet your university professor." }),
+    page.getByRole("heading", { name: "Meet your teacher." }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Start voice questions" }).click();
   await expect(
@@ -1857,7 +1863,7 @@ test("ElevenLabs receives the presentation and starts a contextual question inst
   expect(override).toBe("Synthetic thesis context with source notes");
   await expect(
     page.getByRole("heading", {
-      name: "Why did you choose this research method?",
+      name: "I have a few questions. Why did you choose this research method?",
     }),
   ).toBeVisible();
   expect(kickoffs).toBe(1);

@@ -229,10 +229,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             <div className="review-continue">
               <div>
                 <h2>Now defend your ideas.</h2>
-                <p>
-                  Your {mode.listener.toLowerCase()} will ask about what you
-                  presented.
-                </p>
+                <p>Your teacher will ask about what you presented.</p>
               </div>
               <Button onClick={() => setView("questions")}>
                 Practice questions <ArrowRight size={17} />

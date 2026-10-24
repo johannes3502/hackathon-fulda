@@ -10,7 +10,6 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 
 from app.questions.models import QuestionRequest
-from app.questions.styles import PRESENTATION_STYLES
 from app.sources import db, retrieval
 
 
@@ -63,13 +62,25 @@ def prepare_context(request: QuestionRequest) -> AgentContext:
         "tentative_findings": [{"claim": c.claim, "status": c.verdict} for c in request.claims],
     }
     prompt = "\n".join([
-        "You are an AI rehearsal partner, not an actual examiner. " + PRESENTATION_STYLES[request.presentation_mode],
+        "Act as a fair teacher asking a student about their completed presentation. "
+        "This is an AI rehearsal, not an actual examination. Check understanding of the ideas, "
+        "reasoning, supporting examples and source use. Test breadth of understanding by connecting "
+        "what the student actually said to underlying concepts and a new application or counterexample. "
+        "Anchor every question in the presentation or supplied material; "
+        "do not turn the conversation into unrelated trivia. Do not act as an investor or conduct a pitch interview.",
         "Use the language of the presentation, even if the session-start instruction is in another language. "
         "The presentation has already finished and its transcript is provided below. "
         "Do not greet, introduce yourself, or ask what the presentation was about. "
-        "Start directly with one specific question that refers to an actual claim, example or explanation in it. "
+        "Open with only 'I have a few questions.' in the presentation's language, "
+        "immediately followed by the first specific question about an actual claim, example or explanation in it. "
+        "Do not add an introduction, recap or explanation of the exercise. "
         "Ask one question at a time and wait for the answer. Listen, probe evasive or unsupported answers, "
-        "and adapt follow-ups to the answer. After three main questions, give two concrete practice suggestions "
+        "and adapt follow-ups to the answer. If an answer is incorrect, incomplete or unsupported, "
+        "ask one brief follow-up, and at most a second follow-up on that main question. "
+        "After at most two follow-ups, briefly explain any source-supported correction or acknowledge "
+        "the uncertainty, then continue to the next main question even if the answer is still wrong. "
+        "Move on sooner if the student does not know or asks to skip. Never repeat a question until they get it right. "
+        "After three main questions, give two concrete practice suggestions "
         "and offer to finish. Do not lecture or list all questions at once.",
         "Compare factual answers only against the source_passages. Name the file and page/slide when citing. "
         "If a statement is absent from the material, say it is not established there; that does not make it false. "

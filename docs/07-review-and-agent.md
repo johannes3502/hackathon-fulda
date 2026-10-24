@@ -70,10 +70,18 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
   generiert der Agent seine erste Frage aus dem bereits übergebenen Transkript,
   statt die feste Begrüßung vorzulesen. Der Startauftrag erscheint beim Anbieter
   als programmatische Nutzernachricht; er ist keine gesprochene Antwort.
-  Der Gesprächsprompt verlangt Fragen in der Sprache des Transkripts und
-  untersagt Begrüßung, Vorstellung und die Frage nach dem Vortragsthema.
-  Im Thesis-Modus prüft die Professur auch Zusammenhänge, Transfer auf neue
-  Beispiele und Gegenbeispiele, jeweils am Vortrag oder Material verankert.
+  Der Sprachagent ist in allen Präsentationsmodi eine Lehrkraft, die ihren
+  Schüler zum abgeschlossenen Vortrag befragt, kein Investor. Er beginnt nur
+  mit „Ich habe ein paar Fragen.“ in der Sprache des Transkripts und stellt
+  direkt die erste konkrete Frage; ohne Begrüßung, Vorstellung oder Rückblick.
+  Er prüft Verständnis, Zusammenhänge, Beispiele und Transfer anhand des
+  Vortrags oder Materials. Bei falschen, unvollständigen oder unbelegten
+  Antworten sind eine, höchstens zwei Nachfragen pro Hauptfrage vorgesehen;
+  danach kurz quellenbelegt korrigieren oder Unsicherheit benennen und zur
+  nächsten Hauptfrage wechseln, auch wenn die Antwort weiter falsch ist.
+  Bei „weiß ich nicht“ oder Wunsch zu überspringen wechselt er früher weiter.
+  Diese Grenzen sind Prompt-Vorgaben, keine programmatisch erzwungene
+  Gesprächssteuerung. Die Rollen der getippten Fragerunde bleiben modusabhängig.
 - In der lokalen `.env` setzen:
 
 ```dotenv

@@ -365,8 +365,9 @@ sequenceDiagram
 Der Web-Review hat zwei Ansichten: **Review moments** (begrenzte Wiedergabe-
 Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
 Vor der Aufnahme werden `presentationMode` (startup/thesis/school/nonprofit)
-und `sourceCollectionId` im Take eingefroren. Der Modus steuert fachliche
-Schwerpunkte in beiden Fragepfaden, keine Scores oder Noten.
+und `sourceCollectionId` im Take eingefroren. Im getippten Fragepfad steuert der
+Modus Rolle und fachliche Schwerpunkte. Der Sprachagent ist immer eine
+Lehrkraft, die Verständnis des Vortrags prüft, ohne Scores oder Noten.
 
 ```mermaid
 sequenceDiagram
@@ -398,11 +399,12 @@ sequenceDiagram
         BE-->>FE: Signed URL, Cache-Control no-store
         FE->>E: SDK-WebSocket mit Kontext und Modus im Prompt-Override, first_message leer
         E-->>FE: Verbindung bestätigt
-        FE->>E: Programmatische user_message fordert erste Frage aus Transkript an
+        FE->>E: user_message fordert kurzen Fragensatz und erste Frage aus Transkript an
         loop Eine Frage nach der anderen
             E->>FE: Frage / Reaktion, Audio + Text
             U->>FE: Gesprochene Antwort
             FE->>E: Mikrofon-Audio
+            Note over E: Prompt: höchstens zwei Nachfragen, danach nächste Hauptfrage
         end
         U->>FE: End conversation oder Ansicht verlassen
         FE->>E: Verbindung schließen, Mikrofon freigeben

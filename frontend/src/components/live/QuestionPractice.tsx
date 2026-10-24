@@ -156,7 +156,7 @@ export function QuestionPractice({
       session.current = current;
       // The saved greeting bypasses the LLM; request a generated opening after context is installed.
       current.sendUserMessage(
-        "The presentation is complete. Ask your first question about a specific point in the supplied presentation transcript, in its language. Start directly with the question.",
+        "The student's presentation is complete. As their teacher, say only 'I have a few questions.' in the presentation's language, then immediately ask your first question about a specific point in the supplied presentation transcript. Do not add any other introduction.",
       );
     } catch (failure) {
       if (!pending.signal.aborted) {
@@ -216,8 +216,16 @@ export function QuestionPractice({
     >
       <div className="question-practice-heading">
         <div>
-          <h2>Meet your {mode.listener.toLowerCase()}.</h2>
-          <p>{mode.focus} One question at a time.</p>
+          <h2>
+            Meet your{" "}
+            {method === "voice" ? "teacher" : mode.listener.toLowerCase()}.
+          </h2>
+          <p>
+            {method === "voice"
+              ? "Understanding, reasoning and examples from your presentation."
+              : mode.focus}{" "}
+            One question at a time.
+          </p>
         </div>
         <span className="badge">{mode.label}</span>
       </div>
@@ -273,7 +281,7 @@ export function QuestionPractice({
                     : phase === "connecting"
                       ? "Connecting your microphone…"
                       : phase === "speaking"
-                        ? `Your ${mode.listener.toLowerCase()} is speaking`
+                        ? "Your teacher is speaking"
                         : phase === "listening"
                           ? muted
                             ? "Microphone muted"
@@ -350,7 +358,7 @@ export function QuestionPractice({
                     {messages.map((item, index) => (
                       <li key={index}>
                         <strong>
-                          {item.role === "user" ? "You" : mode.listener}
+                          {item.role === "user" ? "You" : "Teacher"}
                         </strong>
                         <p>{item.text}</p>
                       </li>
