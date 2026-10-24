@@ -18,6 +18,9 @@ flowchart TB
         MR["MediaRecorder / Vision Camera<br/>Video + Audio"]
     end
 
+    WEB -->|"LiveSessionProvider: abgeschlossene Takes und Review-Updates"| IDB["Browser IndexedDB<br/>Video, Pose-Log, Transkript, Feedback,<br/>Fragen, Antworten, Gespräch"]
+    IDB -->|"Nach Reload: Blob-URLs neu erzeugen"| WEB
+
     subgraph API["api/ - Geteilter API-Vertrag"]
         OAS["openapi.json + schema.d.ts<br/>generiert aus FastAPI"]
     end
@@ -56,6 +59,7 @@ flowchart TB
     LLM["LLM: Gemini (Cloud)<br/>3.1 Flash Lite / 3.8 Flash<br/>JSON-Modus, austauschbarer Adapter"]
     ELEVEN["ElevenLabs Agent, optional<br/>Live-Audio + Gespräch; serverseitiger Schlüssel"]
     WEBS["Websuche (Zweitquelle)<br/>Wikipedia-API oder Tavily"]
+    ELEVEN -->|"search_web bei unzureichenden Upload-Auszügen<br/>Secret im ElevenLabs-Konto"| TAVILY["Tavily Search API<br/>Titel, URLs, Auszüge"]
 
     WEB -- "Kamera/Mikro" --> MP_W
     WEB -- "Aufnahme" --> MR
@@ -145,7 +149,7 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph Host["docker compose (localhost only)"]
-        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000"]
+        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000<br/>Health: Homepage, Studio, Review, Backend"]
         BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, --reload"]
         WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Concurrency 2"]
         PG[("postgres<br/>pgvector :5432<br/>Volume: postgres_data")]
@@ -366,8 +370,12 @@ sequenceDiagram
 Der Web-Review hat zwei Ansichten: **Review moments** (begrenzte Wiedergabe-
 Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
 Vor der Aufnahme werden `presentationMode` (startup/thesis/school/nonprofit)
-und `sourceCollectionId` im Take eingefroren. Der Modus steuert fachliche
-Schwerpunkte in beiden Fragepfaden, keine Scores oder Noten.
+und `sourceCollectionId` im Take eingefroren. Im getippten Fragepfad steuert der
+Modus Rolle und fachliche Schwerpunkte. Der Sprachagent ist immer eine
+Lehrkraft, die Verständnis des Vortrags prüft, ohne Scores oder Noten. Nach der
+vollständig beantworteten getippten Runde zeigt der Client zusätzlich eine
+Auswertung mit transparentem Heuristik-Score aus gemessenen Events; siehe
+`docs/07-review-and-agent.md`.
 
 ```mermaid
 sequenceDiagram
@@ -378,6 +386,7 @@ sequenceDiagram
     participant W as Celery Worker
     participant PG as Postgres + pgvector
     participant E as ElevenLabs Agent
+    participant T as Tavily (Websuche)
     participant L as Gemini (JSON-Modus)
 
     U->>FE: Practice questions
@@ -397,16 +406,31 @@ sequenceDiagram
         FE->>BE: POST /questions/agent/session
         BE->>E: Signed URL anfordern (API-Key bleibt serverseitig)
         BE-->>FE: Signed URL, Cache-Control no-store
-        FE->>E: SDK-WebSocket mit Kontext und Modus im Prompt-Override, first_message leer
+        Note over E: Gespeicherte First message fragt nach Bereitschaft
+        FE->>E: SDK-WebSocket mit Kontext im Prompt-Override und festem first_message
         E-->>FE: Verbindung bestätigt
-        FE->>E: Programmatische user_message fordert erste Frage aus Transkript an
+        E->>FE: Ich habe noch ein paar Fragen. Bist du bereit? (Audio + Text)
+        U->>FE: Bereitschaft bestätigen
+        FE->>E: Mikrofon-Audio; erst danach erste Frage zum Vortrag
         loop Eine Frage nach der anderen
             E->>FE: Frage / Reaktion, Audio + Text
             U->>FE: Gesprochene Antwort
             FE->>E: Mikrofon-Audio
+            opt Upload-Auszüge fehlen oder klären Sachfrage nicht
+                E->>T: search_web: gezielte öffentliche Sachfrage
+                T-->>E: Bis zu drei Treffer mit Titel, URL und Auszug
+                Note over E: Webquelle nennen; bei Fehler/fehlendem Beleg Urteil offenlassen
+            end
+            Note over E: Prompt: höchstens zwei Nachfragen, danach nächste Hauptfrage
         end
-        U->>FE: End conversation oder Ansicht verlassen
-        FE->>E: Verbindung schließen, Mikrofon freigeben
+        alt End conversation oder reguläres Agent-Ende
+            U->>FE: Gespräch beenden
+            FE->>E: Verbindung schließen, Mikrofon freigeben
+            FE->>FE: PerformanceEvaluation anzeigen; Fokus auf Statistik-Überschrift
+            Note over FE: Gleiche vorhandene Messdaten wie bei getippter Runde;<br/>keine neuen Urteile über gesprochene Antworten
+        else Ansicht verlassen / Verbindung abbrechen
+            FE->>E: Verbindung schließen, keine Auswertung öffnen
+        end
     else Practice by typing
         FE->>BE: Optional automatisch POST /factcheck + Status-Polling
         FE->>BE: POST /questions (Wörter, Funde, Collection, Modus)
@@ -419,6 +443,8 @@ sequenceDiagram
         W->>L: Quellenvergleich + Nachfrage
         W->>W: Zitat im Quelltext prüfen
         FE->>FE: Nächste Frage / Nachfrage anzeigen
+        U->>FE: Letzte Frage beantworten
+        FE->>FE: Auswertung: Client-Heuristik-Score<br/>(Inhalt 0,5 / Stimme 0,25 / Gestik 0,25)<br/>kein Backend-Aufruf
     end
 ```
 
@@ -433,7 +459,7 @@ kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
 
 ```mermaid
 flowchart TD
-    DRAWER["AppShell: modaler Drawer + Header außerhalb des Live-Studio<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>Drawer: /, /live, /sources, /review-preview, /gestures, /demo<br/>Header-Nav zusätzlich: /admin; geplant: /progress"]
+    DRAWER["AppShell: modaler Drawer + Header außerhalb des Live-Studio<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>Drawer: /, /live, /progress, /sources, /review-preview, /gestures, /demo<br/>Header-Nav zusätzlich: /admin"]
     THEME["Root-Layout: gespeicherte Darstellung vor First Paint<br/>localStorage, CSS-Tokens, OS-Fallback"] -.-> DRAWER
     JOURNEY["Gemeinsamer Ablauf: Prepare / Record / Review<br/>aktuelle oder letzte Aufnahme, sonst markiertes Beispiel"] --> SRC
     JOURNEY --> LIVE
@@ -441,7 +467,7 @@ flowchart TD
     LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>PNG-Logo, CSS-Animation, Reduced-Motion"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
     SP["/ und /stats-preview<br/>Einleitung + Neue Präsentation / Quellen vorbereiten<br/>darunter Aufnahmeübersicht im Browser-Arbeitsbereich"] --> SC["StatsDashboard<br/>Anzahl, Dauer, Hinweise und Transkripte<br/>aus aufgenommenen Takes, sonst Leerzustand"]
-    SP -->|"Neue Präsentation"| LIVE
+    SP -->|"Neue Präsentation"| SRC
     SP -->|"Quellen vorbereiten"| SRC
     SP -->|"Letzte Aufnahme, falls vorhanden"| LREV
     DRAWER --> SP
@@ -450,12 +476,15 @@ flowchart TD
     DRAWER --> RP
     DRAWER --> WALK
     DRAWER --> DEMOPAGE
-    RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ohne Scores und Performance-Kurve"]
+    RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ausdrücklich markierte Beispiel-Scores"]
     SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
     LIVE["/live - LiveStudio<br/>Vollbild-Layout ohne Menü, Pose-Overlay,<br/>Immer Live + Backend-Analyse,<br/>Options: Vortragstyp, Material und Transkript,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
-    STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
+    STORE["Root-Layout: LiveSessionProvider + IndexedDB<br/>Video, Analyse und Fragen je Aufnahme<br/>Wiederherstellung nach Reload"] -.-> LIVE
+    STORE --> EVIDENCE["recordingReviewData + recordingFeedback<br/>Video, Dauer und Events der gewählten Aufnahme<br/>Quellen-Marker aus aktuellem Fact-Check<br/>Fragen zählen nicht als Präsentationsevidenz"]
+    EVIDENCE --> LREV
+    EVIDENCE --> LA
     DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
     LIVE --> SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]
@@ -463,8 +492,8 @@ flowchart TD
     LIVE --> WALK["/gestures: synthetischer 22-s-Rundgang<br/>gleiche Regeln, keine Genauigkeitsvalidierung"]
     WALK --> LIVE
     ADMIN["/admin (Navbar, ohne Login)<br/>AdminPanel: Pose-Haltezeit,<br/>Hinweis-Mindestdauer + Lücke,<br/>Pose feedback: On/Review/Off je Regel,<br/>Analysis features: Modell/Modus/Feedback"] -->|"localStorage, ab nächster<br/>Kalibrierung/Aufnahme"| LIVE
-    PROGRESSFE["/progress (geplant)<br/>Small Multiples, Rohpunkte, Lücken,<br/>Qualitätsmarker, Ziele<br/>kein Gesamtscore/Radar"] -. "progress.v1" .-> PAPI["GET/PUT /profiles/id/progress|goals"]
-    DRAWER -. "geplant" .-> PROGRESSFE
+    PROGRESSFE["/progress + /progress/demo<br/>Profil/Consent, Small Multiples, Rohpunkte, Lücken,<br/>Qualitätsmarker, Ziele, Export/Löschung<br/>kein Gesamtscore/Radar"] -. "progress.v1" .-> PAPI["GET/PUT /profiles/id/progress|goals"]
+    DRAWER --> PROGRESSFE
 
     PRAC --> STATE{"Phasen"}
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]
@@ -473,11 +502,15 @@ flowchart TD
     LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video, Stärken und nächste Übungsschritte<br/>Feste Erklärungen aus Messdaten ohne LLM<br/>Transkript, Quellencheck und Exporte als Details"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>sourceCollectionId des aufgenommenen Takes"]
     LREV -->|"POST /questions/agent + /agent/session<br/>oder /questions + /answers"| QAPI["ElevenLabs-Dialog oder getippte Fragen<br/>Startup, Thesis, Schule, Nonprofit<br/>eine Frage pro Schritt"]
+    QAPI -->|"Sprachdialog beenden oder<br/>getippte Runde beantworten"| FINALSTATS["PerformanceEvaluation: Your take at a glance<br/>bestehende Messdaten, Heuristik und Grenzen"]
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
     RP --> RA["ReviewAnalysis + PerformanceGraph / FeedbackGraph<br/>qualitativer Event-Saldo, positive Hinweise oben<br/>neutrale Mittellinie, Anpassungshinweise unten<br/>video.currentTime, Zeitmarken, Abschnitt-Loop"]
-    LREV --> FGRAPH["VideoPlayback + FeedbackGraph unter dem Video<br/>Event-Intervalle statt erfundener Scores<br/>Klick / Zeitregler / Tastatur-Zeitmarken → lokales Video"]
+    LREV --> SCORES["ReviewScores über dem Video<br/>evidence-share-v1: 4 Kriterien, 0–100<br/>Zeitanteile / Quellenurteile mit geprüftem Zitat<br/>Aufnahmetitel, Abdeckung und fehlende Daten"]
+    RA --> SCORES
+    LREV --> FGRAPH["VideoPlayback + FeedbackGraph unter dem Video<br/>Zackiger Liniengraph, Zwischenwerte linear interpoliert<br/>Gute Momente oben; farbige Wiedergabeleiste darunter<br/>Cursor + abgespielter Fortschritt an video.currentTime<br/>Play/Pause / Zeitregler / Zeitmarken ↔ lokales Video"]
     LA --> RA
+    RA --> FGRAPH
 
     SRC -->|"collection_id aus localStorage"| UPLOAD["POST /sources<br/>POST /sources/search"]
 
@@ -739,7 +772,7 @@ Zusätzlich (außerhalb Postgres):
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), optional Profil-ID/Token (`pp_…`) und zufälliger `deviceKey`; Token ist XSS-exponiert |
-| Browser-Speicher (Live-Workspace) | FeatureFlags, presentationMode und sourceCollectionId pro Take, ElevenLabs-Gespräch, Wörter, Pose-Events mit runtime, Fact-Check-Ergebnis, Fragen und Antworten; nur bis zum Neuladen |
+| Browser IndexedDB `presentation-recordings`, Store `recordings` | Abgeschlossene Live-Takes inklusive Video-/Pose-Log-Blobs, Config mit FeatureFlags/presentationMode/sourceCollectionId, ElevenLabs-Gespräch, Wörter, Pose-Events, Fact-Check, Fragen und Antworten; pro Take gespeichert, nach Reload wiederhergestellt. Objekt-URLs nur im Arbeitsspeicher. Löschen im Review entfernt den lokalen Take, keine Backend-Daten/Quellen. |
 
 ## 9. Event-Modell: gemeinsame Timeline
 

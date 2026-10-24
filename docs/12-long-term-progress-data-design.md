@@ -1,11 +1,12 @@
 # Long-Term-Fortschritt — Data Design, Speicherung und Auswertung
 
-Status: **In Arbeit — Johannes (24.10.2026).** Backend implementiert;
-Frontend-UI und Profil-Anbindung werden auf dem Branch
-`feat/long-term-progress-ui` umgesetzt. Der Code liegt in
+Status: **Backend und Web-UI umgesetzt (24.10.2026).** Der Code liegt in
 `backend/app/progress/`, die additiven Spalten/Tabellen werden beim Start
 idempotent angelegt. Die 10 neuen Backend-Tests laufen zusammen mit der
-bestehenden Suite (290 passed, 1 skipped). Dieses Dokument beschreibt weiterhin
+bestehenden Suite (290 passed, 1 skipped). Die Web-Oberfläche `/progress`
+(Consent, Demo, Filter, Ziele, Export und Löschung) ist umgesetzt; die
+Verknüpfung neuer Live-Aufnahmen mit einem Profil ist noch offen. Dieses
+Dokument beschreibt weiterhin
 die Zielarchitektur und die Gründe; Abweichungen zum ersten Entwurf sind in §2.3
 ausdrücklich festgehalten. Der Frontend-Vertrag steht separat in
 [`13-long-term-progress-frontend-contract.md`](13-long-term-progress-frontend-contract.md).

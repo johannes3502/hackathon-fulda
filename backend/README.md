@@ -772,7 +772,10 @@ recreation. Those fixtures were removed too.
 
 The web review supports a source-grounded ElevenLabs conversation and typed
 questions with four presentation contexts. Configure `ELEVENLABS_API_KEY` and
-`ELEVENLABS_AGENT_ID` server-side; enable the agent's System prompt override.
+`ELEVENLABS_AGENT_ID` server-side; set the agent's saved First message to
+"Ich habe noch ein paar Fragen. Bist du bereit?" and enable both System prompt
+and First message overrides. The agent waits for readiness before asking about
+the presentation.
 `GET /questions/agent/settings` reports configuration presence. Context preparation
 is queued through `POST /questions/agent`, polled at `/questions/agent/jobs/{id}`.
 `POST /questions/agent/session` issues an uncached signed WebSocket URL. It does

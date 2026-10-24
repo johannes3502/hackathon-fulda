@@ -1,0 +1,127 @@
+.review-scores {
+  min-width: 0;
+  margin: 0 0 24px;
+}
+.review-scores-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-bottom: 14px;
+}
+.review-scores-heading h2 {
+  font-size: 1.25rem;
+}
+.review-scores-heading > span {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.review-score-origin {
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.review-score-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.review-score-card,
+.review-score-card.review418-criterion {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+.review-score-card.active {
+  border-color: var(--primary);
+  background: var(--soft-accent);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+.review-score-card.review418-criterion:hover {
+  border-color: var(--primary);
+}
+.review-score-card .review-score-label {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.review-score-card .review-score-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 2.75rem;
+  line-height: 1.1;
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary);
+}
+.review-score-value small {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 6px;
+  letter-spacing: 0;
+}
+.review-score-bar {
+  display: block;
+  width: 100%;
+  height: 5px;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.review-score-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+.review-score-evidence,
+.review-score-unknown {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.review-score-method {
+  margin-top: 12px;
+  color: var(--muted);
+}
+.review-score-method summary {
+  width: fit-content;
+  min-height: 44px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.review-score-method p {
+  max-width: 100ch;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  margin: 12px 0;
+}
+@media (max-width: 850px) {
+  .review-score-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 400px) {
+  .review-score-card,
+  .review-score-card.review418-criterion {
+    padding: 16px 12px;
+  }
+  .review-score-card .review-score-value {
+    font-size: 2.25rem;
+  }
+}

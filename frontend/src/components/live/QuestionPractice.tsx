@@ -15,6 +15,7 @@ import {
 import { PRESENTATION_MODES } from "@/features/questions/presentation";
 import { collectionId } from "@/features/sources/api";
 import { QuestionSimulator } from "./QuestionSimulator";
+import { PerformanceEvaluation } from "./PerformanceEvaluation";
 
 export function QuestionPractice({
   recording,
@@ -30,6 +31,7 @@ export function QuestionPractice({
     "idle" | "preparing" | "connecting" | "listening" | "speaking"
   >("idle");
   const [muted, setMuted] = useState(false);
+  const [finished, setFinished] = useState(false);
   const [error, setError] = useState("");
   const [notices, setNotices] = useState<string[]>([]);
   const [transcribing, setTranscribing] = useState(false);
@@ -71,7 +73,13 @@ export function QuestionPractice({
     [],
   );
 
-  async function stop() {
+  useEffect(() => {
+    document
+      .getElementById(finished ? "performance-evaluation-title" : "question-practice-title")
+      ?.focus();
+  }, [finished]);
+
+  async function stop(showStats = false) {
     controller.current?.abort();
     const current = session.current;
     session.current = null;
@@ -79,6 +87,7 @@ export function QuestionPractice({
     setMuted(false);
     try {
       await current?.endSession();
+      if (showStats) setFinished(true);
     } catch {
       setError("The connection ended unexpectedly. You can start again.");
     }
@@ -107,7 +116,10 @@ export function QuestionPractice({
         connectionType: "websocket",
         textOnly: false,
         overrides: {
-          agent: { prompt: { prompt: context.prompt }, firstMessage: "" },
+          agent: {
+            prompt: { prompt: context.prompt },
+            firstMessage: "Ich habe noch ein paar Fragen. Bist du bereit?",
+          },
         },
         onConversationCreated: (created) => {
           if (pending.signal.aborted) void created.endSession();
@@ -132,12 +144,13 @@ export function QuestionPractice({
               ],
             }));
         },
-        onDisconnect: () => {
+        onDisconnect: ({ reason }) => {
           if (!pending.signal.aborted) {
             pending.abort();
             session.current = null;
             setPhase("idle");
             setMuted(false);
+            if (reason === "agent") setFinished(true);
           }
         },
         onError: () => {
@@ -154,10 +167,6 @@ export function QuestionPractice({
         return;
       }
       session.current = current;
-      // The saved greeting bypasses the LLM; request a generated opening after context is installed.
-      current.sendUserMessage(
-        "The presentation is complete. Ask your first question about a specific point in the supplied presentation transcript, in its language. Start directly with the question.",
-      );
     } catch (failure) {
       if (!pending.signal.aborted) {
         setError(
@@ -209,6 +218,16 @@ export function QuestionPractice({
     }
   }
 
+  if (finished)
+    return (
+      <div className="question-practice">
+        <PerformanceEvaluation input={recording} />
+        <Button variant="outline" onClick={() => setFinished(false)}>
+          Back to questions
+        </Button>
+      </div>
+    );
+
   return (
     <section
       className="panel question-practice"
@@ -216,8 +235,16 @@ export function QuestionPractice({
     >
       <div className="question-practice-heading">
         <div>
-          <h2>Meet your {mode.listener.toLowerCase()}.</h2>
-          <p>{mode.focus} One question at a time.</p>
+          <h2 id="question-practice-title" tabIndex={-1}>
+            Meet your{" "}
+            {method === "voice" ? "teacher" : mode.listener.toLowerCase()}.
+          </h2>
+          <p>
+            {method === "voice"
+              ? "Understanding, reasoning and examples from your presentation."
+              : mode.focus}{" "}
+            One question at a time.
+          </p>
         </div>
         <span className="badge">{mode.label}</span>
       </div>
@@ -273,7 +300,7 @@ export function QuestionPractice({
                     : phase === "connecting"
                       ? "Connecting your microphone…"
                       : phase === "speaking"
-                        ? `Your ${mode.listener.toLowerCase()} is speaking`
+                        ? "Your teacher is speaking"
                         : phase === "listening"
                           ? muted
                             ? "Microphone muted"
@@ -291,7 +318,10 @@ export function QuestionPractice({
                 )}
                 {active ? (
                   <div className="question-actions">
-                    <Button variant="outline" onClick={() => void stop()}>
+                    <Button
+                      variant="outline"
+                      onClick={() => void stop(connected)}
+                    >
                       <Square size={16} />{" "}
                       {connected ? "End conversation" : "Cancel"}
                     </Button>
@@ -334,7 +364,9 @@ export function QuestionPractice({
               )}
               <p className="field-hint">
                 Starting shares your transcript, matching material and live
-                microphone audio with ElevenLabs. Spoken feedback is an AI
+                microphone audio with ElevenLabs. When materials are insufficient,
+                the agent sends focused search queries to Tavily to check public
+                web sources. Spoken feedback is an AI
                 suggestion; use source checks to verify factual claims. You can
                 end the conversation at any time.
               </p>
@@ -350,7 +382,7 @@ export function QuestionPractice({
                     {messages.map((item, index) => (
                       <li key={index}>
                         <strong>
-                          {item.role === "user" ? "You" : mode.listener}
+                          {item.role === "user" ? "You" : "Teacher"}
                         </strong>
                         <p>{item.text}</p>
                       </li>

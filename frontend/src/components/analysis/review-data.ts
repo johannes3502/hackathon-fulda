@@ -1,6 +1,8 @@
-import type { LiveFeedback } from "@/features/live/contracts";
-import type { ClaimResult } from "@/features/factcheck/api";
+import type { LiveFeedback, LiveRecording } from "@/features/live/contracts";
+import { evidenceVerdict, type ClaimResult } from "@/features/factcheck/api";
 import { STAT_LABELS } from "@/components/stats/stats";
+import { cueAppearance } from "@/features/live/cue-appearance";
+import { recordingFeedback } from "@/features/live/review";
 
 export type Criterion = keyof typeof STAT_LABELS;
 export type ReviewMoment = {
@@ -9,6 +11,7 @@ export type ReviewMoment = {
   durationMs: number;
   criterion: Criterion | null;
   kind: "positive" | "attention" | "note";
+  assessment?: "positive" | "attention" | "neutral";
   title: string;
   detail: string;
   action: string;
@@ -25,6 +28,7 @@ export type ReviewData = {
   notice?: string;
   performance: PerformancePoint[];
   moments: ReviewMoment[];
+  claims?: ClaimResult[];
 };
 
 export function timestamp(ms: number) {
@@ -61,6 +65,7 @@ export function feedbackToMoment(
   item: LiveFeedback,
   claim?: ClaimResult,
 ): ReviewMoment {
+  const verdict = claim ? evidenceVerdict(claim) : undefined;
   const categories: Record<string, Criterion> = {
     gestures: "gesture",
     gesture: "gesture",
@@ -87,6 +92,17 @@ export function feedbackToMoment(
       item.kind === "suggestion" || item.kind === "observation"
         ? "note"
         : item.kind,
+    assessment: verdict
+      ? verdict === "supports"
+        ? "positive"
+        : verdict === "contradicts"
+          ? "attention"
+          : "neutral"
+      : item.kind === "positive"
+        ? "positive"
+        : cueAppearance(item, "ready").tone === "attention"
+          ? "attention"
+          : "neutral",
     title: item.title,
     detail: claim?.explanation || item.detail,
     action: item.action,
@@ -101,6 +117,26 @@ export function feedbackToMoment(
               : undefined,
         }
       : undefined,
+  };
+}
+
+/** Both review views read this take, including source checks added after capture. */
+export function recordingReviewData(recording: LiveRecording): ReviewData {
+  return {
+    title: recording.config.title,
+    durationMs: recording.durationMs,
+    videoUrl: recording.videoUrl,
+    demo: false,
+    notice: recording.notice ?? undefined,
+    performance: [],
+    claims: recording.factCheck?.claims,
+    moments: recordingFeedback(recording).map((item) => {
+      const factIndex = /^fact-(\d+)$/.exec(item.id);
+      const claim = factIndex
+        ? recording.factCheck?.claims[Number(factIndex[1])]
+        : undefined;
+      return feedbackToMoment(item, claim);
+    }),
   };
 }
 

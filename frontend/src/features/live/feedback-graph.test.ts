@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { LiveFeedback } from "./contracts";
-import { feedbackGraph } from "./feedback-graph";
+import {
+  feedbackGraph,
+  feedbackLinePath,
+  lineSamples,
+  lineValueAt,
+  playbackGradient,
+} from "./feedback-graph";
 
 const event = (
   id: string,
@@ -19,6 +25,46 @@ const event = (
 });
 
 describe("feedback graph", () => {
+  it("draws sharp straight segments through unique evidence knots without overshoot", () => {
+    const knots = lineSamples([
+      { tMs: 0, balance: 0 },
+      { tMs: 1000, balance: 0 },
+      { tMs: 1000, balance: -1 },
+      { tMs: 2000, balance: 1 },
+    ]);
+    expect(knots).toHaveLength(3);
+    const path = feedbackLinePath(knots, 2000, 1);
+    expect(path).toBe("M0,120 L500,32 L1000,208");
+    expect(path.match(/M/g)).toHaveLength(1);
+    expect(path).not.toContain("C");
+    expect(lineValueAt(knots, 1000)).toBe(-1);
+    expect(lineValueAt(knots, 1500)).toBe(0);
+    expect(lineValueAt(knots, 1250)).toBe(-0.5);
+    expect(lineValueAt(knots, -1)).toBe(0);
+    expect(lineValueAt(knots, 3000)).toBe(1);
+    for (let t = 0; t <= 2000; t += 10)
+      expect(Math.abs(lineValueAt(knots, t))).toBeLessThanOrEqual(1);
+    expect(feedbackLinePath([], 0, 0)).toBe("");
+  });
+  it("colors playback like the graph, splitting at exact neutral crossings", () => {
+    expect(
+      playbackGradient(
+        [
+          { tMs: 0, balance: 0 },
+          { tMs: 1000, balance: 0 },
+          { tMs: 2000, balance: -1 },
+          { tMs: 4000, balance: 3 },
+          { tMs: 5000, balance: 0 },
+        ],
+        5000,
+      ),
+    ).toBe(
+      "linear-gradient(to right, var(--muted) 0% 20%, var(--success) 20% 40%, var(--success) 40% 50%, var(--error) 50% 80%, var(--error) 80% 100%)",
+    );
+    expect(playbackGradient([], 1000)).toBe("var(--muted)");
+    expect(playbackGradient([], 0)).toBe("var(--muted)");
+    expect(playbackGradient([], NaN)).toBe("var(--muted)");
+  });
   it("keeps praise and adjustments separate without grading ordinary gestures", () => {
     const graph = feedbackGraph(
       [

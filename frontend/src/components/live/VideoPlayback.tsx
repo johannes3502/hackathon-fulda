@@ -20,6 +20,7 @@ export function VideoPlayback({
   const rangeRef = useRef<{ start: number; end: number } | null>(null);
   const pendingSeek = useRef<number | null>(null);
   const [position, setPosition] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const annotation = playbackAnnotation(recording.feedback, position, selected);
@@ -84,6 +85,8 @@ export function VideoPlayback({
           playsInline
           preload="metadata"
           aria-label="Recorded pitch video"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
           onLoadedMetadata={() => {
             if (pendingSeek.current !== null) seekTo(pendingSeek.current);
           }}
@@ -96,6 +99,7 @@ export function VideoPlayback({
             )
           }
           onEnded={(event) => {
+            setPlaying(false);
             // Encoded media can end before the capture clock reaches the selected range's end.
             const range = rangeRef.current;
             if (range && loop) {
@@ -148,6 +152,22 @@ export function VideoPlayback({
           selectedId={selected?.id}
           onSelect={onSelect}
           onSeek={seekTo}
+          playing={playing}
+          onTogglePlayback={() => {
+            const player = videoRef.current;
+            if (!player) return;
+            if (!player.paused) player.pause();
+            else {
+              setError(null);
+              void player
+                .play()
+                .catch(() =>
+                  setError(
+                    "The video could not play. Try the native playback controls.",
+                  ),
+                );
+            }
+          }}
         />
         <p className="field-hint">
           {selected

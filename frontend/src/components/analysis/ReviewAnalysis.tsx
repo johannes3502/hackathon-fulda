@@ -13,6 +13,8 @@ import {
 import { AppShell } from "@/components/shared/AppShell";
 import { STAT_LABELS } from "@/components/stats/stats";
 import { PerformanceGraph } from "./PerformanceGraph";
+import { ReviewScores } from "@/components/live/ReviewScores";
+import { reviewScores } from "@/features/live/review-scores";
 import {
   boundedTime,
   timestamp,
@@ -44,6 +46,7 @@ export function ReviewAnalysis({
   const pendingSeek = useRef<number | null>(null);
   const segment = useRef<{ start: number; end: number } | null>(null);
   const [positionMs, setPositionMs] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>(
     data.moments[0]?.id,
   );
@@ -57,6 +60,7 @@ export function ReviewAnalysis({
   );
   const selected = moments.find((item) => item.id === selectedId);
   const selectedIndex = visible.findIndex((item) => item.id === selectedId);
+  const scores = reviewScores(moments, data.durationMs, data.claims);
 
   useEffect(() => {
     // Preloaded media can finish or fail before hydration attaches its handlers.
@@ -133,38 +137,19 @@ export function ReviewAnalysis({
               </span>
             </div>
           </div>
-          <div
-            className="review418-criteria"
-            aria-label="Kriterien und Filter für Momente"
-          >
-            {Object.entries(STAT_LABELS).map(([key, label]) => {
-              const count = moments.filter(
-                (moment) => moment.criterion === key,
-              ).length;
-              return (
-                <button
-                  type="button"
-                  key={key}
-                  className={`review418-criterion ${criterion === key ? "active" : ""}`}
-                  aria-pressed={criterion === key}
-                  onClick={() =>
-                    setCriterion(criterion === key ? null : (key as Criterion))
-                  }
-                >
-                  <span>{label}</span>
-                  <strong>
-                    {count} <small>Momente</small>
-                  </strong>
-                </button>
-              );
-            })}
-          </div>
+          <ReviewScores
+            scores={scores}
+            selected={criterion}
+            demo={data.demo}
+            recordingTitle={data.demo ? undefined : data.title}
+            onSelect={(key) => setCriterion(criterion === key ? null : key)}
+          />
           <div className="review418-context">
             <span>
               {data.notice ??
                 (data.demo
                   ? "Demo: Video und Anmerkungen sind synthetisch. Die Zeitachse zeigt die Beispiel-Momente."
-                  : "Zeitmarken stammen aus den vorhandenen Events. Die Anzahl der Hinweise ist keine Bewertung.")}
+                  : "Scores beziehen sich auf bewertete Evidenz. Zeitmarken führen zu den vorhandenen Events.")}
             </span>
             <button
               type="button"
@@ -199,6 +184,8 @@ export function ReviewAnalysis({
                   playsInline
                   preload="metadata"
                   aria-label="Präsentationsvideo"
+                  onPlay={() => setPlaying(true)}
+                  onPause={() => setPlaying(false)}
                   onLoadedMetadata={() => {
                     setMediaReady(true);
                     if (pendingSeek.current !== null) {
@@ -223,6 +210,7 @@ export function ReviewAnalysis({
                     }
                   }}
                   onEnded={(event) => {
+                    setPlaying(false);
                     if (loop && segment.current) {
                       event.currentTarget.currentTime = segment.current.start;
                       void event.currentTarget
@@ -250,6 +238,23 @@ export function ReviewAnalysis({
                 selectedId={selectedId}
                 onSeek={seek}
                 onSelect={select}
+                playing={playing}
+                playbackDisabled={!mediaReady}
+                onTogglePlayback={() => {
+                  const player = video.current;
+                  if (!player) return;
+                  if (!player.paused) player.pause();
+                  else {
+                    setError(null);
+                    void player
+                      .play()
+                      .catch(() =>
+                        setError(
+                          "Bitte starte das Video über die Wiedergabesteuerung.",
+                        ),
+                      );
+                  }
+                }}
               />
               <div className="review418-under-chart">
                 <span>Ein Klick auf den Verlauf springt zur Videostelle.</span>

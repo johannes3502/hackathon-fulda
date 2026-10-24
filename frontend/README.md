@@ -4,18 +4,31 @@ Start the full stack using the [root README](../README.md), then open
 <http://localhost:3000>. Changes in `frontend/src/` reload automatically;
 rebuild after changing dependencies or configuration.
 
+If Turbopack reports a newly merged module as missing although it exists inside
+the container, restart only the frontend with `docker compose restart frontend`
+(`docker --context colima compose restart frontend` when using Colima). The
+file watcher can miss new files across the host mount. This cleared the stale
+`lab-events` and review-component errors without changing source files or data.
+The frontend healthcheck also compiles `/live` and `/live/healthcheck/review`,
+so a working homepage cannot conceal a broken studio or review. The review probe
+opens the missing-recording state; it does not create a take or access a recording.
+
 ## Use
 
 - **Recording dashboard** (`/`, also `/stats-preview`): counts, durations and
   observations from takes actually captured in the current browser workspace.
   Before the first recording it shows an empty state. There are no fixed demo
-  statistics, quality scores or simulated monthly progress. Video remains in memory.
+  statistics, quality scores or simulated monthly progress. Completed takes,
+  their videos and analysis are saved in this browser's IndexedDB.
 
 - **418 review analysis** (`/review-preview`): a clearly labelled synthetic
-  90-second video with timestamped example notes and sources, without synthetic
-  scores or a performance curve. The matching `/live/[sessionId]/analysis` view
-  uses the actual recording and feedback events. Click a marker or the timeline
-  to seek; the slider supports keyboard seeking. Selected sections play with
+  90-second video with timestamped example notes, sources and prototype scores.
+  The matching `/live/[sessionId]/analysis` view and the main review use one
+  adapter for the selected recording's video, duration, feedback and latest
+  source checks. Knowledge scores require a verified source quote; missing
+  measurements stay empty (including structure, which has no automatic rule).
+  Click a marker or the timeline to seek; the slider supports keyboard seeking.
+  Selected sections play with
   ±2 seconds of context and optional looping. Criterion buttons filter moments.
   Fact-check results supply transcript quotes and source excerpts.
 
@@ -54,9 +67,9 @@ rebuild after changing dependencies or configuration.
   Automatic words are clickable for replay. Replacing the transcript clears
   stale fact findings, questions and answers from the browser review.
 
-Recordings stay in browser memory for replay; download before refreshing or
-leaving the workspace. Backend mode uploads the complete take after stopping
-and retains analysis results in S3; original uploads are deleted after terminal
+Completed recordings and their results stay in this browser across reloads;
+download important videos as a backup. Backend mode uploads the complete take
+after stopping and retains analysis results in S3; original uploads are deleted after terminal
 processing. See [storage behavior and limits](../backend/README.md).
 Failed analysis preserves the local recording. Sample findings are simulated.
 

@@ -1680,6 +1680,93 @@ body:has(.live-workspace-large) .app-footer {
   gap: 16px;
   margin: 20px 0;
 }
+.performance-evaluation {
+  margin-top: 8px;
+  padding: 20px 24px;
+}
+.performance-overall {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 16px 0 20px;
+}
+.performance-score {
+  font-size: 2.75rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.performance-score small {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 6px;
+}
+.performance-label {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.performance-categories {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.performance-category {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.performance-category-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.performance-category-score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.performance-category-score small {
+  font-weight: 500;
+  color: var(--muted);
+}
+.performance-category p {
+  margin: 6px 0 0;
+}
+.performance-evidence {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.performance-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin: 4px 0 16px;
+}
+.performance-lists h3 {
+  font-size: 0.875rem;
+  margin: 0 0 8px;
+}
+.performance-lists ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.875rem;
+}
+.performance-lists li + li {
+  margin-top: 6px;
+}
+.performance-lists p {
+  margin: 0;
+}
 .conversation-transcript {
   list-style: none;
   padding: 0;
@@ -1732,6 +1819,15 @@ body:has(.live-workspace-large) .app-footer {
     font-size: 1.5rem;
   }
   .question-navigation {
+    flex-wrap: wrap;
+  }
+  .performance-evaluation {
+    padding: 16px;
+  }
+  .performance-lists {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .performance-category-head {
     flex-wrap: wrap;
   }
 }

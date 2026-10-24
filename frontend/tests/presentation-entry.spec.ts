@@ -17,7 +17,7 @@ test("presentation introduction leads into preparation and recording", async ({
   await expect(intro).toBeVisible();
   await expect(
     intro.getByRole("link", { name: "Neue Präsentation" }),
-  ).toHaveAttribute("href", "/live");
+  ).toHaveAttribute("href", "/sources");
   await expect(page.locator("h1")).toHaveCount(1);
   await expect(
     page.getByRole("heading", {
@@ -28,7 +28,12 @@ test("presentation introduction leads into preparation and recording", async ({
     path: info.outputPath("home-light.png"),
     fullPage: true,
   });
-  await intro.getByRole("link", { name: "Quellen vorbereiten" }).click();
+  await intro.getByRole("link", { name: "Neue Präsentation" }).click();
+  await expect(page).toHaveURL(/\/sources$/);
+  await expect(
+    page.getByRole("heading", { name: "Your sources", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('input[type="file"]')).toBeEnabled();
   const journey = page.getByRole("navigation", {
     name: "Presentation workflow",
   });

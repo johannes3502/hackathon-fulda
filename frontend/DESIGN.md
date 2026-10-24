@@ -30,9 +30,10 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   visible. Reduced motion disables animation; increased contrast strengthens
   separators and secondary text.
 - `/` and `/stats-preview` begin with a presentation introduction: primary action
-  “Neue Präsentation” opens the existing `/live` studio, secondary action prepares
-  sources. Three steps explain preparation, recording and review. A recent take
-  links back into its review while it is available in browser memory.
+  “Neue Präsentation” opens `/sources` to add presentation material; the secondary
+  action also prepares sources. Three steps explain preparation, recording and
+  review. A recent take links back into its review; completed takes persist locally
+  in IndexedDB.
   Below, `StatsDashboard` shows counts, durations and observations from actual
   recordings in the current workspace, with an empty state before the first take.
   No synthetic percentages, monthly histories or performance scores appear.
@@ -57,16 +58,31 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   consider; green means explicit positive feedback or labelled tracking readiness.
   Ordinary gestures, pauses, calibration and hidden hints remain neutral. Color
   always has a text label; tracking readiness is not a performance assessment.
-- **Review:** two primary views, Review moments and Practice questions. Large
-  playback includes a Stockfish-inspired qualitative graph immediately below
+- **Review:** two primary views, Review moments and Practice questions.
+  Four `ReviewScores` cards above playback show 0–100 prototype ratings on the
+  user's explicit request (`evidence-share-v1`). Formula: positive assessed
+  time / (positive + critical assessed time) × 100; same-kind overlaps count once.
+  Neutral observations and unknown time are excluded; assessed seconds and
+  coverage remain visible. Knowledge prefers supported / (supported + contradicted)
+  source claims; not-found and unchecked claims are open and excluded. Missing
+  evidence stays unavailable, never zero or a perfect score. Filtering moments
+  does not recalculate the take's score. Methodology is a disclosure.
+
+  Playback includes a Stockfish-inspired qualitative graph immediately below
   the video: timestamps on the horizontal axis, a dashed neutral midpoint,
   explicit positive feedback above and adjustments below. The line is the net
   count of simultaneous directional events, scaled to the take's maximum absolute
-  count; height is not measured presentation quality. Ordinary observations stay
+  count. A continuous angular line through unique time knots shows changes
+  without smoothing or invented fluctuations. Intermediate values are labelled as interpolated;
+  the area is not filled. A moving point follows this interpolation during
+  playback. Height is not measured presentation quality. Ordinary observations stay
   neutral; gaps contain no directional evidence, not proof of good performance.
   The same `FeedbackGraph` serves live playback and the analysis example. A click
   selects the nearest event, the labelled slider seeks exact times, and the
-  disclosure offers full timestamp buttons with at least 48px targets for dense
+  colored playback strip shares the graph's time scale and green/red/neutral
+  intervals, split exactly at zero crossings. Played time is highlighted; future
+  time is muted. Play/pause, native video controls and keyboard seeking stay
+  synchronized through media events. The disclosure offers full timestamp buttons with at least 48px targets for dense
   or simultaneous events. The playhead follows `video.currentTime`.
   Review controls are at least 48px high, supporting text at least 0.9375rem,
   body copy 1–1.0625rem, with larger headings and comfortable line spacing.
@@ -88,8 +104,8 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   desktop and stack them on phones. Show supported formats, upload state, errors,
   and when search becomes available. Continue to recording is the main action.
 - **Sample:** retain explicit synthetic-data labels for the walkthrough and
-  example annotations. Review criteria count timestamped moments; synthetic
-  quality scores remain absent; the qualitative event graph uses only the
+  example annotations. Review scores use the disclosed rubric on the synthetic
+  example evidence; the qualitative event graph uses only the
   supplied example annotations.
 - **Loading:** small wordmark and announced status, with a reduced-motion-safe
   indicator. Loading must not download a font or initialize WebGL.
@@ -100,8 +116,10 @@ The interface must not imply that missing observations mean good performance.
 Pose and voice calibration, tracking status, and errors stay visible. Model, mode,
 finger tracking, and speech features lock during a take; Pose Lab is diagnostic.
 Camera and skeleton use the same crop and mirror projection. Live review shows
-observed events and source-backed findings, without a performance score.
-Local media stays in browser memory, with download and retention guidance.
+observed events, source-backed findings and explicit evidence-share prototype
+scores with visible coverage and missing-data states.
+Completed local media and review data persist in IndexedDB, with visible saving
+and error states, download guidance and confirmed deletion in the review.
 Backend transcription names Deepgram EU when streaming is enabled and explains
 the local Whisper fallback. A completed stream supplies the review transcript.
 

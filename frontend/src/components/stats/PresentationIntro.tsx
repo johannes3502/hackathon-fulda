@@ -28,7 +28,7 @@ export function PresentationIntro() {
           Review die Momente, an denen du weiterarbeiten möchtest.
         </p>
         <div className="presentation-intro-actions">
-          <Link href="/live" className="button button-primary">
+          <Link href="/sources" className="button button-primary">
             <Video size={18} /> Neue Präsentation <ArrowRight size={17} />
           </Link>
           <Link href="/sources" className="button button-outline">

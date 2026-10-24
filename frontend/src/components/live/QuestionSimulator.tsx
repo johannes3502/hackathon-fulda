@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { LiveFeedback, LiveRecording } from "@/features/live/contracts";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
+import { PerformanceEvaluation } from "./PerformanceEvaluation";
 import {
   factCheckSettings,
   factFeedback,
@@ -70,6 +71,10 @@ export function QuestionSimulator({
   const result = recording.questions;
   const question = result?.questions[index];
   const persona = result?.persona ?? "tutor";
+  const fullyAnswered =
+    !!result &&
+    result.questions.length > 0 &&
+    result.questions.every((q) => recording.answers?.[q.id]);
 
   function withQuestions(
     current: LiveRecording,
@@ -259,13 +264,26 @@ export function QuestionSimulator({
               >
                 Next question <ArrowRight size={16} />
               </Button>
-            ) : (
+            ) : fullyAnswered ? null : (
               <span className="field-hint">
                 End of this round. Take one improvement into your next
                 rehearsal.
               </span>
             )}
           </div>
+          {fullyAnswered && (
+            <PerformanceEvaluation
+              input={{
+                durationMs: recording.durationMs,
+                factCheck: recording.factCheck,
+                questions: result,
+                answers: recording.answers,
+                words: recording.words,
+                feedback: recording.feedback,
+                poseEvents: recording.poseEvents,
+              }}
+            />
+          )}
           <details className="review-details">
             <summary>Sources and round details</summary>
             <ul className="fact-notices">

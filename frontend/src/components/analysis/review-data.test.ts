@@ -1,13 +1,40 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import type { ClaimResult } from "@/features/factcheck/api";
+import type { LiveRecording } from "@/features/live/contracts";
+import { reviewScores } from "@/features/live/review-scores";
 import {
   boundedTime,
   DEMO_REVIEW,
   feedbackToMoment,
   performanceAt,
+  recordingReviewData,
   timestamp,
 } from "./review-data";
+
+const recordedTake = (
+  overrides: Partial<LiveRecording> = {},
+): LiveRecording => ({
+  id: "recorded-take",
+  config: {
+    title: "Recorded presentation",
+    targetMs: 10000,
+    mode: "backend",
+    endpoint: "/api",
+  },
+  durationMs: 10000,
+  createdAt: "2026-10-25T00:00:00Z",
+  video: new Blob(["synthetic recording"]),
+  videoUrl: "blob:recorded-take",
+  mimeType: "video/webm",
+  feedback: [],
+  metrics: [],
+  chunksSent: 1,
+  bytesSent: 19,
+  completion: "complete",
+  notice: null,
+  ...overrides,
+});
 
 describe("review timeline", () => {
   it("carries checked factual evidence into the annotation without treating not-found as false", () => {
@@ -54,6 +81,119 @@ describe("review timeline", () => {
     expect(boundedTime(NaN, 90000)).toBe(0);
     expect(timestamp(83000)).toBe("1:23");
     expect(timestamp(90000)).toBe("1:30");
+  });
+  it("derives the review from the selected take and refreshes stale source moments", () => {
+    const feedback = {
+      id: "speech-0",
+      category: "pause",
+      kind: "positive" as const,
+      startMs: 1000,
+      endMs: 4000,
+      title: "Sentence boundary",
+      detail: "Recorded pause",
+      action: "Replay",
+    };
+    const claim: ClaimResult = {
+      claim: "Synthetic claim",
+      transcript: "The pilot has twelve participants.",
+      t_ms: 5000,
+      duration_ms: 1000,
+      verdict: "contradicts",
+      explanation: "The source names ten participants.",
+      checked: ["upload"],
+      evidence: {
+        kind: "upload",
+        label: "Demo source, page 2",
+        quote: "Ten participants.",
+        passage: "Ten participants.",
+        quote_verified: "exact",
+      },
+    };
+    const take = recordedTake({
+      feedback: [
+        feedback,
+        {
+          ...feedback,
+          id: "speech-1",
+          category: "filler",
+          kind: "suggestion",
+          startMs: 4000,
+          endMs: 5000,
+        },
+        { ...feedback, id: "fact-0", category: "fact" },
+        { ...feedback, id: "question-0", category: "question" },
+      ],
+      factCheck: {
+        claims: [claim],
+        events: [],
+        notices: [],
+        model: "synthetic",
+        web_provider: null,
+        sources_checked: true,
+        config: {
+          max_claims: 6,
+          top_k: 5,
+          web_results: 4,
+          min_quote_chars: 12,
+        },
+      },
+    });
+    const data = recordingReviewData(take);
+    expect(data).toMatchObject({
+      title: take.config.title,
+      durationMs: 10000,
+      videoUrl: take.videoUrl,
+      demo: false,
+    });
+    expect(data.moments.map((item) => item.id)).toEqual([
+      "speech-0",
+      "speech-1",
+      "fact-0",
+    ]);
+    expect(data.moments[2]).toMatchObject({
+      tMs: 5000,
+      durationMs: 1000,
+      assessment: "attention",
+      quote: claim.transcript,
+      source: { title: claim.evidence!.label, quote: claim.evidence!.quote },
+    });
+    const scores = reviewScores(data.moments, data.durationMs, data.claims);
+    expect(scores.flow).toMatchObject({
+      value: 75,
+      assessedMs: 4000,
+      coverage: 0.4,
+    });
+    expect(scores.knowledge).toMatchObject({ value: 0, contradicted: 1 });
+    expect(scores.gesture.value).toBeNull();
+    expect(scores.structure.value).toBeNull();
+    // Source checks added or rerun after recording change the current evidence.
+    const updated = recordingReviewData({
+      ...take,
+      factCheck: {
+        ...take.factCheck!,
+        claims: [{ ...claim, verdict: "supports" }],
+      },
+    });
+    expect(
+      reviewScores(updated.moments, updated.durationMs, updated.claims)
+        .knowledge.value,
+    ).toBe(100);
+    expect(updated.moments[2].assessment).toBe("positive");
+    expect(take.feedback[2].startMs).toBe(1000);
+    expect(take.factCheck!.claims[0].verdict).toBe("contradicts");
+  });
+  it("keeps an unmeasured take empty instead of using the synthetic preview", () => {
+    const data = recordingReviewData(
+      recordedTake({ notice: "Analysis failed." }),
+    );
+    expect(data.notice).toBe("Analysis failed.");
+    expect(data.moments).toEqual([]);
+    expect(data.performance).toEqual([]);
+    expect(
+      Object.values(
+        reviewScores(data.moments, data.durationMs, data.claims),
+      ).every((score) => score.value === null),
+    ).toBe(true);
   });
   it("interpolates provided values without fabricating a score for empty data", () => {
     const points = [

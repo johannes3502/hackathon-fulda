@@ -19,6 +19,7 @@ const result: FactCheckResult = {
         label: "folien.pdf, Seite 2",
         quote: "rund 9.500 Studierende",
         passage: "Die Hochschule hat rund 9.500 Studierende.",
+        quote_verified: "exact",
         filename: "folien.pdf",
         location: { kind: "page", start: 2, end: 2 },
       },
@@ -130,15 +131,30 @@ it("only praises a supported claim with verified source evidence", () => {
     ...result.claims[0],
     verdict: "supports" as const,
     explanation: "",
+    evidence: { ...result.claims[0].evidence!, quote_verified: null },
   };
-  const review = (evidence = claim.evidence) =>
-    factFeedback({ ...result, claims: [{ ...claim, evidence }] }, 10_000)[0];
+  const review = (
+    evidence: FactCheckResult["claims"][number]["evidence"] = claim.evidence,
+  ) => factFeedback({ ...result, claims: [{ ...claim, evidence }] }, 10_000)[0];
   expect(review().kind).toBe("observation");
   expect(review(null).title).toContain("Could not be checked");
   const supported = review({ ...claim.evidence!, quote_verified: "exact" });
   expect(supported.kind).toBe("positive");
   expect(supported.detail).toContain("this specific statement");
   expect(supported.action).toContain("name the source");
+});
+
+it("does not turn an unverified contradiction into a content error", () => {
+  const [item] = factFeedback(
+    {
+      ...result,
+      claims: [{ ...result.claims[0], evidence: null }],
+    },
+    10000,
+  );
+  expect(item.kind).toBe("observation");
+  expect(item.title).toContain("Could not be checked");
+  expect(item.detail).toContain("does not establish a content error");
 });
 
 it("treats a failed source check as a technical observation with a retry step", () => {

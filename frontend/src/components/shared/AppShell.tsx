@@ -66,6 +66,12 @@ export const NAV_ITEMS = [
     icon: Video,
   },
   {
+    href: "/progress",
+    label: "Fortschritt",
+    description: "Messreihen über Aufnahmen, Lücken und Ziele",
+    icon: LineChart,
+  },
+  {
     href: "/sources",
     label: "Quellen",
     description: "PDF, PPTX & Notizen für den Fact-Check verwalten",
@@ -138,20 +144,16 @@ export function AppShell({
         </div>
         <nav aria-label="Main navigation" className="app-nav">
           <Link
-            href="/"
-            aria-current={
-              pathname === "/" || pathname === "/stats-preview"
-                ? "page"
-                : undefined
-            }
-          >
-            Overview
-          </Link>
-          <Link
             href="/live"
             aria-current={pathname.startsWith("/live") ? "page" : undefined}
           >
             Studio
+          </Link>
+          <Link
+            href="/progress"
+            aria-current={pathname.startsWith("/progress") ? "page" : undefined}
+          >
+            Progress
           </Link>
           <Link
             href="/sources"
@@ -221,9 +223,10 @@ export function AppShell({
                   walkthrough is separately labelled and needs no camera.
                 </p>
                 <p>
-                  Recordings live in browser memory only. Download before
-                  refreshing or leaving the live workspace. Backend retention is
-                  controlled by your backend.
+                  Completed sessions are saved in this browser for later review.
+                  Delete them in Recording details and exports. Clearing browser
+                  data removes them; download important videos as a backup.
+                  Backend retention is controlled by your backend.
                 </p>
               </>
             ) : (

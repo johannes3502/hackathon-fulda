@@ -50,6 +50,16 @@ neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.m
 
 ## 3. Offen — muss das Team entscheiden
 
+Ergänzender Nutzerauftrag (24.10.2026): Vier 0–100-Scores über dem Review-Video
+statt Moment-Anzahlen. `evidence-share-v1` nutzt bewertete positive bzw. kritische
+Zeitanteile (Überlappungen derselben Art vereinigt); Fachwissen nutzt bevorzugt
+gestützte / (gestützte + widersprochene) Aussagen. Nicht gefunden, ungeprüft,
+neutrale Beobachtungen und unbeobachtete Zeit erzeugen keine Benotung. Kein
+Score ohne bewertbare Evidenz; Zeitabdeckung und Formel stehen im UI.
+Die Graph-Darstellung ist jetzt eine durchgehende kubische Linie ohne
+Säulenflächen, mit beweglichem Wiedergabepunkt. Zwischenwerte sind als
+Interpolation gekennzeichnet, nicht als zusätzliche Messungen.
+
 Review-Graph (24.10.2026, Nutzerauftrag): Timestamp-Momente als qualitativer
 Verlauf unter dem Video. Nach Nutzerkorrektur positive Momente oberhalb,
 Anpassungshinweise unterhalb der neutralen Mittellinie. Die Ausschläge bilden
@@ -105,6 +115,12 @@ und besser lesbarer Schrift.
   „Done“), Sprache außer Deutsch, Anzahl der Fragen.
 
 ### Daten und Datenschutz
+- Live-Sessions werden lokal in IndexedDB gespeichert: Video, Transkript,
+  Feedback, Quellenurteile und Fragen-/Gesprächsverlauf. Studio und Dashboard
+  zeigen frühere Takes nach dem Neuladen. Löschen im Review entfernt den lokalen
+  Take; Quellen und Backend-Daten bleiben separat. Speicherfehler werden angezeigt,
+  der Take bleibt dann im aktuellen Tab verfügbar. Kein Geräte-/Browser-Sync;
+  gelöschte Browserdaten und vom Browser verdrängte Daten sind nicht wiederherstellbar.
 - Neuer Backend-Vertrag: `docs/06-backend-review-api.md`. Video bleibt im
   Client; keine serverseitigen Clips, Snapshots oder Wiedergabe-URLs. Die
   additive Session-/Take-API persistiert Timestamp-Events, Wörter, Metriken
@@ -232,6 +248,18 @@ Nutzer hat ElevenLabs für den Sprachdialog beauftragt und konfiguriert den
 Agenten selbst nach der Implementierung. Getippte Fragen nutzen das
 konfigurierte Gemini-Modell (Cloud). Einrichtung: `docs/07-review-and-agent.md`.
 
+### Auswertung nach der Fragerunde (24.10.2026)
+
+Nutzerauftrag: Nach den Agenten-Fragen eine Auswertung des Vortrags. Sobald
+jede Frage der getippten Runde beantwortet ist, zeigt der Web-Review unten eine
+Zusammenfassung mit Score 0–100 und drei Kategorien: **Inhalt** (Fakten und
+Wissen, Gewicht 0,5 — Anteil quellengestützter Aussagen und Antwort-Urteile),
+**Stimme** (0,25) und **Gestik** (0,25 — Abzug je Marker pro Minute). Dazu
+evidenzbasierte Stärken, Übungsvorschläge und ein aufklappbarer
+Methoden-/Grenzen-Hinweis. Der Score ist eine transparente Client-Heuristik aus
+bereits gemessenen Events (`evidence-count-heuristic.v1`), keine Note und keine
+Personenbewertung; Details: `docs/07-review-and-agent.md`.
+
 ## Deep Research (24.10.2026)
 
 Die Produktentscheidungen sind in `docs/11-deep-research-validation.md`
@@ -241,5 +269,6 @@ gefunden“ ist nicht „falsch“. Der geplante TTS-Voice-Agent soll im Gesprä
 aufgabenbezogenes Feedback, die vollständige Evidenz steht im Review. Harte
 Grenzen des Plans: 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop. Umgesetzt
 ist bisher das Maximum von fünf Anfangsfragen im getippten Pfad; ein
-Sitzungstimer oder ein globales Follow-up-Limit ist noch nicht implementiert. Es gibt
-weiterhin keine Noten, Scores oder Personenbewertung.
+Sitzungstimer oder ein globales Follow-up-Limit ist noch nicht implementiert.
+Scores gibt es nur in der transparenten Auswertung nach der getippten
+Fragerunde (siehe oben); weiterhin keine Personenbewertung.

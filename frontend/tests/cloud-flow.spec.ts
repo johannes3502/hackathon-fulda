@@ -20,9 +20,9 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
   let audioChunks = 0;
   let outputFormat = "";
   let promptSent = false;
-  let savedGreetingDisabled = false;
+  let openingOverridden = false;
   let kickoffSent = false;
-  let firstQuestion = "";
+  let opening = "";
   let recognizedAnswer = false;
   let repliedToAnswer = false;
   let socketClosed = false;
@@ -42,8 +42,9 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
     socket.on("framesent", ({ payload }) => {
       const message = JSON.parse(String(payload));
       if (message.type === "conversation_initiation_client_data") {
-        savedGreetingDisabled =
-          message.conversation_config_override?.agent?.first_message === "";
+        openingOverridden =
+          message.conversation_config_override?.agent?.first_message ===
+          "Ich habe noch ein paar Fragen. Bist du bereit?";
         const prompt =
           message.conversation_config_override?.agent?.prompt?.prompt;
         promptSent =
@@ -56,8 +57,8 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
     socket.on("framereceived", ({ payload }) => {
       const message = JSON.parse(String(payload));
       if (message.type === "audio") audioChunks++;
-      if (message.type === "agent_response" && !firstQuestion)
-        firstQuestion = message.agent_response_event?.agent_response ?? "";
+      if (message.type === "agent_response" && !opening)
+        opening = message.agent_response_event?.agent_response ?? "";
       if (message.type === "agent_response" && recognizedAnswer)
         repliedToAnswer = true;
       if (message.type === "user_transcript")
@@ -204,13 +205,10 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
       .poll(() => audioChunks, { timeout: 30_000 })
       .toBeGreaterThan(0);
     expect(promptSent).toBe(true);
-    expect(savedGreetingDisabled).toBe(true);
-    expect(kickoffSent).toBe(true);
-    await expect.poll(() => firstQuestion).not.toBe("");
-    expect(firstQuestion).toContain("?");
-    expect(firstQuestion).toMatch(/Prototyp|Präsentation|Quell|Vortrag|Üb/i);
-    expect(firstQuestion).not.toMatch(
-      /worum (?:ging|geht) es|wie kann ich.*helfen|Lernbegleiter/i,
+    expect(openingOverridden).toBe(true);
+    expect(kickoffSent).toBe(false);
+    await expect.poll(() => opening).toBe(
+      "Ich habe noch ein paar Fragen. Bist du bereit?",
     );
     expect(outputFormat).toBe("pcm_48000");
     await page.evaluate(() =>
@@ -228,6 +226,9 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
       .getByRole("button", { name: "End conversation", exact: true })
       .click();
     await expect.poll(() => socketClosed).toBe(true);
+    await expect(
+      page.getByRole("heading", { name: "Your take at a glance" }),
+    ).toBeVisible();
   } finally {
     await page
       .getByRole("button", { name: "End conversation", exact: true })
