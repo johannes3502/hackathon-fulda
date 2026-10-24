@@ -17,7 +17,7 @@ export function useCameraPreview() {
     release();
     setStatus("idle");
   };
-  const enable = async () => {
+  const enable = async (audio = false) => {
     release();
     const request = generation.current;
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -28,7 +28,13 @@ export function useCameraPreview() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
-        audio: false,
+        audio: audio
+          ? {
+              autoGainControl: false,
+              noiseSuppression: false,
+              echoCancellation: false,
+            }
+          : false,
       });
       if (request !== generation.current) {
         stream.getTracks().forEach((t) => t.stop());

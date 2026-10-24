@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Clock3,
   Eye,
+  Mic,
   MicOff,
   Radio,
   ShieldCheck,
@@ -22,7 +23,7 @@ import { useCameraPreview } from "@/hooks/useCameraPreview";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { LiveRecorder } from "@/features/live/recorder";
 import { createVideoTransport } from "@/features/live/transport";
-import { validateEndpoint } from "@/features/live/protocol";
+import { apiEndpoint, request } from "@/features/live/analysis";
 import type { LiveConfig, LiveProgress } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { LiveBadge } from "./shared";
@@ -51,13 +52,36 @@ export function LiveStudio() {
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("demo");
   const [endpoint, setEndpoint] = useState(
-    process.env.NEXT_PUBLIC_COACH_WS_URL ?? "",
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
   );
   const [progress, setProgress] = useState<LiveProgress | null>(null);
+  const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   useEffect(() => () => owner.current?.dispose(), []);
+  useEffect(() => {
+    if (mode !== "backend") return;
+    const controller = new AbortController();
+    let destination: string;
+    try {
+      destination = apiEndpoint(
+        endpoint,
+        window.location.protocol === "https:",
+      );
+    } catch {
+      return;
+    }
+    request(destination, "/health/ready", controller.signal)
+      .then(() => setHealth("Backend services ready."))
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setHealth(
+            "Backend readiness check failed. Audio analysis may still work without storage services.",
+          );
+      });
+    return () => controller.abort();
+  }, [mode, endpoint]);
   const start = async () => {
     if (busy.current) return;
     setError(null);
@@ -69,7 +93,7 @@ export function LiveStudio() {
     let destination = endpoint;
     try {
       if (mode === "backend")
-        destination = validateEndpoint(
+        destination = apiEndpoint(
           endpoint,
           window.location.protocol === "https:",
         );
@@ -167,7 +191,15 @@ export function LiveStudio() {
                         : "Preview only"}
                 </span>
                 <span className="stage-demo">
-                  <MicOff size={14} /> No audio
+                  {mode === "demo" ? (
+                    <>
+                      <MicOff size={14} /> No audio
+                    </>
+                  ) : (
+                    <>
+                      <Mic size={14} /> Microphone audio
+                    </>
+                  )}
                 </span>
               </div>
               <video
@@ -204,7 +236,7 @@ export function LiveStudio() {
                   {mode === "demo"
                     ? "Demo markers · no detection"
                     : progress?.phase === "recording"
-                      ? "Video streaming to backend"
+                      ? "Audio analysis after stopping"
                       : "Backend mode"}
                 </span>
               </div>
@@ -216,7 +248,9 @@ export function LiveStudio() {
                     variant="outline"
                     disabled={cameraStatus === "pending"}
                     onClick={() =>
-                      cameraStatus === "active" ? stopCamera() : void enable()
+                      cameraStatus === "active"
+                        ? stopCamera()
+                        : void enable(mode === "backend")
                     }
                   >
                     {cameraStatus === "active" ? (
@@ -237,7 +271,7 @@ export function LiveStudio() {
                     <Radio size={17} />
                     {mode === "demo"
                       ? "Record with demo feedback"
-                      : "Start streaming & recording"}
+                      : "Record & analyze audio"}
                   </Button>
                 </>
               ) : progress.phase === "connecting" ? (
@@ -261,7 +295,7 @@ export function LiveStudio() {
                 ? (progress.notice ??
                   (mode === "demo"
                     ? "Demo feedback is scripted. Your camera video is not being analyzed or uploaded."
-                    : `Sending video to ${endpoint}. Feedback comes from that backend.`))
+                    : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis.`))
                 : cameraCopy[cameraStatus]}
             </p>
             <section className="panel live-settings">
@@ -295,28 +329,36 @@ export function LiveStudio() {
                   <NativeSelect
                     id="live-source"
                     value={mode}
-                    onChange={(e) =>
-                      setMode(e.target.value as LiveConfig["mode"])
-                    }
+                    onChange={(e) => {
+                      stopCamera();
+                      setMode(e.target.value as LiveConfig["mode"]);
+                    }}
                   >
                     <option value="demo">Local demo · scripted markers</option>
                     <option value="backend">
-                      Backend · live video detection
+                      Backend · audio analysis after recording
                     </option>
                   </NativeSelect>
                 </div>
                 {mode === "backend" && (
                   <div className="field">
-                    <label htmlFor="live-endpoint">Backend WebSocket URL</label>
+                    <label htmlFor="live-endpoint">Backend API URL</label>
                     <Input
                       id="live-endpoint"
                       value={endpoint}
-                      placeholder="ws://localhost:8000/live"
+                      placeholder="http://localhost:8000"
                       onChange={(e) => setEndpoint(e.target.value)}
                     />
+                    {health && (
+                      <p className="field-hint" role="status">
+                        {health}
+                      </p>
+                    )}
                     <p className="field-hint">
-                      Your video will be transmitted to this destination when
-                      you start. Use your team’s trusted endpoint.
+                      By starting, you agree to send your complete video and
+                      microphone audio to this destination after stopping. This
+                      endpoint processes it temporarily without persistent
+                      storage. No ASR or LLM provider is used.
                     </p>
                   </div>
                 )}
@@ -331,7 +373,8 @@ export function LiveStudio() {
             <section className="cue-panel">
               <div className="panel-title-row">
                 <h2>
-                  <Eye size={18} /> Live feedback
+                  <Eye size={18} />{" "}
+                  {mode === "demo" ? "Live feedback" : "Audio feedback"}
                 </h2>
                 <span>{mode === "demo" ? "Scripted" : "From backend"}</span>
               </div>
@@ -343,7 +386,7 @@ export function LiveStudio() {
                   {latest?.action ??
                     (mode === "demo"
                       ? "Start a recording to try example feedback markers and video replay."
-                      : "Feedback will appear when the backend detects an observation.")}
+                      : "Audio heuristics appear after you finish. Visual detection and automatic transcription are not connected yet.")}
                 </p>
               </div>
               {latest && (
@@ -400,8 +443,10 @@ export function LiveStudio() {
             )}
             <div className="stream-summary">
               <span>
-                {progress?.chunksSent ?? 0} video chunks{" "}
-                {mode === "demo" ? "handled locally" : "sent"}
+                {progress?.chunksSent ?? 0} recording parts{" "}
+                {mode === "demo"
+                  ? "handled locally"
+                  : "uploaded after stopping"}
               </span>
               <span>
                 {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB

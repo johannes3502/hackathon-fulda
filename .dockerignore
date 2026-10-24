@@ -6,7 +6,7 @@
 !api/
 !api/**
 **/node_modules
-**/.next
+**/.next*
 **/.env
 **/.env.*
 !**/.env.example

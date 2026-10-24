@@ -146,7 +146,8 @@ geprüft; Produkt-Tasks und Job-API-Endpunkte sind noch nicht implementiert. Min
 pgvector und die vollständige Analyse-/Aufnahme-Pipeline aus der
 Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
-Der Live-Video-WebSocket benötigt weiterhin eine Backend-Implementierung.
+Die Audio-Analyse nach Aufnahmestopp ist über die bestehenden HTTP-Endpunkte
+angebunden; die automatische Transkription benötigt weiterhin einen ASR-Anbieter.
 Umgesetzt sind zwei getrennte
 Analyse-Pipelines ohne Persistenz, beide mit `t_ms` ab Aufnahmestart im
 gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als

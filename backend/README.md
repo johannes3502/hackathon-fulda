@@ -9,7 +9,8 @@ docker compose exec backend python -m scripts.smoke
 ```
 
 Keep an existing `.env` instead of overwriting it. API docs:
-<http://localhost:8000/docs>. Edit `backend/app/` for automatic API reload;
+<http://localhost:8000/docs>; frontend: <http://localhost:3000>.
+Edit `backend/app/` for automatic API reload;
 restart the worker after task changes with `docker compose restart worker`.
 Changes to dependencies, scripts or the Dockerfile require a rebuild.
 
@@ -64,6 +65,7 @@ smoke command above to check the running containers.
 
 | Component | Role | Local address |
 |---|---|---|
+| Next.js frontend | Browser UI; `/api/...` forwards to FastAPI inside Compose | `http://localhost:3000` |
 | FastAPI + Uvicorn | API; connection helpers and health endpoints | `http://localhost:8000` |
 | Celery worker | Background jobs in separate Python processes | Internal; no host port |
 | Redis | Celery broker (DB 0) and temporary task results (DB 1) | Internal `redis:6379`; no host port |

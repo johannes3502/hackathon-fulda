@@ -18,6 +18,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 10 | Sprachanalyse-Pipeline (Feature 3, Backend) | Claude Code: `app/speech/` mit `Transcriber`-Interface, FFmpeg-Audioextraktion, Pausen-, Füllwort-, Wiederholungs- und Tempo-Events, `POST /speech/analyze` | Kein ASR-Anbieter gewählt, daher nur `JsonTranscriber` (vorberechnete Wörter); Schwellenwerte sind ungeprüfte Heuristik-Startwerte; Tempo nur relativ zum Session-Median, nicht absolut | Nutzerauftrag; Anbieter, Füllwortliste und Schwellenwerte bleiben Teamentscheidung | `backend/tests/test_speech.py`: 12 Tests mit synthetischen Daten bestanden (Python 3.12, lokal) |
 | 11 | Sprachanalyse auf das Audiosignal umstellen, Transkription trennen | Claude Code: `app/speech/` analysiert nur das Signal (Pegel, F0 per YIN, Sprachaktivität, Silbenspitzen als Zeitreihe; Events pause/volume/pitch/pace); wortbasierter Code nach `app/transcription/` (Events mit `source="asr"`); gemeinsames `Event`-Schema in `app/events.py` | Signalbasierte Silbenrate und Monotonie sind Näherungen; nur mit synthetischen Tönen geprüft, nicht mit echter Sprache. Testerwartung für Lautstärke korrigiert: Referenz ist der Median der ganzen Aufnahme inkl. leisem Abschnitt (≈ −10 dB statt theoretisch −15,6 dB) | Nutzerauftrag (Signal-Zeitreihe, Transkription als eigene Pipeline, alles mit Timestamp) | `backend/tests/`: 22 Tests bestanden (Python 3.12, lokal); 60 s synthetisches Audio in ≈ 0,7 s analysiert |
 | 12 | API-Vertrag für TypeScript generieren | Codex: OpenAPI-Export aus FastAPI, TypeScript-Typen und Aktualitätscheck ergänzt; Merge mit Celery/Redis zusammengeführt | Generierte Typen prüfen nur zur Compile-Zeit; freie Event-Payloads und JSON im Multipart-String bleiben untypisiert. Kein laufender Server für den Export nötig | Ausdrücklicher Nutzerauftrag für TypeScript-Generierung und Integration nach main | `api/`, `package.json`, zentrale `README.md`; Generierung, Aktualitätscheck und TypeScript-Kompilierung bestanden; 22 Backend-Tests nach der Konfliktlösung bestanden (Python 3.14, temporäre Testumgebung) |
+| 13 | Frontend gemeinsam mit dem Backend starten | Eigener Next.js-Container, API-Proxy und gemeinsamer Compose-Start für beide IDEs; neue HTTP-Integration aus main übernommen | Browser können den Docker-Hostnamen `backend` nicht auflösen; `/api` wird auf derselben Origin an FastAPI weitergeleitet. Merge-Konflikt in `next.config.ts` gelöst, konfigurierbares Test-Build-Verzeichnis erhalten | Nutzerkorrektur: Frontend ebenfalls im Container statt lokalem npm-Run | `frontend/Dockerfile`, `compose.yaml`, `frontend/next.config.ts`; Prüfprotokoll unten |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -87,3 +88,21 @@ Infrastrukturauftrags. Der lokale Stack bleibt gestartet.
   gestartet zu werden.
 - Nur synthetische Testdaten; keine Transkription, externen Anbieter oder
   Aufnahme-/Job-Endpunkte implementiert. Der lokale Stack bleibt gestartet.
+
+## Frontend in Compose (24.10.2026)
+
+- `docker compose up --build -d --wait`: alle sechs Dienste gesund, nativ auf
+  ARM64. Node.js und npm-Abhängigkeiten liegen im Frontend-Image, Next.js-Cache
+  in einem Docker-Volume; lokale SDKs sind für den Start nicht erforderlich.
+- Frontend-Seiten erreichbar. `/api/health/ready` erreicht FastAPI;
+  synthetische Wort-Timestamps und eine stille WAV-Datei lassen sich über den
+  Frontend-Proxy analysieren. Backend-Fehlercodes 404/422 bleiben erhalten.
+- Temporäre Testseite unter `frontend/src/` angelegt, geändert und über HTTP
+  geprüft: beide Änderungen ohne Rebuild sichtbar. Testseite danach entfernt.
+- Im Frontend-Container: Typecheck, Lint und 26 Unit-Tests bestanden,
+  einschließlich relativer `/api`-URL mit HTTPS und abweichendem Browser-Port.
+- Backend-Smoke-Test mit PostgreSQL, S3 und Celery bestanden.
+- IntelliJ enthält wieder nur die gemeinsame Docker-Compose-Konfiguration;
+  VS Code startet ebenfalls alle Dienste und bietet Frontend-Logs als Task.
+- Keine echte Kamera-/Mikrofonaufnahme, kein Smartphone- oder Deployment-Test
+  in diesem Durchlauf. Der lokale Stack bleibt gestartet.

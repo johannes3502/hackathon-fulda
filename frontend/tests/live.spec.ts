@@ -28,6 +28,16 @@ async function syntheticCamera(page: Page) {
       paint();
       const timer = setInterval(paint, 100);
       const stream = canvas.captureStream(10);
+      if (constraints?.audio) {
+        const audio = new AudioContext();
+        const oscillator = audio.createOscillator();
+        const destination = audio.createMediaStreamDestination();
+        oscillator.connect(destination);
+        oscillator.start();
+        const track = destination.stream.getAudioTracks()[0];
+        track.addEventListener("ended", () => void audio.close());
+        stream.addTrack(track);
+      }
       for (const track of stream.getTracks()) {
         const stop = track.stop.bind(track);
         track.stop = () => {
@@ -147,124 +157,97 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   expect(errors).toEqual([]);
 });
 
-test("backend receives contiguous binary video and supplies live feedback and statistics", async ({
+async function backend(page: Page) {
+  await syntheticCamera(page);
+  await page.route("http://localhost:8000/health/**", (route) =>
+    route.fulfill({ json: { status: "ok" } }),
+  );
+  await page.goto("/live");
+  await page.getByLabel("Feedback source").selectOption("backend");
+  await page.getByRole("button", { name: "Enable camera preview" }).click();
+  await page.getByRole("button", { name: "Record & analyze audio" }).click();
+  await expect(
+    page.getByRole("button", { name: "Finish & review" }),
+  ).toBeVisible();
+  await page.waitForTimeout(1200);
+}
+
+test("REST analysis uploads recorded audio/video and merges word feedback into review", async ({
   page,
 }) => {
-  await syntheticCamera(page);
-  let sessionId = "";
-  let seq = 0;
-  let bytes = 0;
-  let pendingSize = 0;
-  let endMs = 0;
-  await page.routeWebSocket("ws://localhost:8000/live", (socket) => {
-    socket.onMessage((raw) => {
-      if (typeof raw !== "string") {
-        expect(raw.byteLength).toBe(pendingSize);
-        bytes += raw.byteLength;
-        if (endMs >= 1000) {
-          socket.send(
-            JSON.stringify({
-              type: "feedback",
-              sessionId,
-              feedback: {
-                id: "backend-1",
-                category: "Framing",
-                kind: "positive",
-                startMs: 0,
-                endMs,
-                title: "Visible in frame",
-                detail: "A test backend observation.",
-                action: "Keep this framing.",
-              },
-            }),
-          );
-          socket.send(
-            JSON.stringify({
-              type: "metrics",
-              sessionId,
-              atMs: endMs,
-              metrics: [
-                {
-                  id: "visibility",
-                  label: "Frame visibility",
-                  value: 96,
-                  unit: "%",
-                },
-              ],
-            }),
-          );
-        }
-        return;
-      }
-      const message = JSON.parse(raw);
-      if (message.type === "session.start") {
-        sessionId = message.sessionId;
-        expect(message.audio).toBe(false);
-        socket.send(JSON.stringify({ type: "session.ready", sessionId }));
-      }
-      if (message.type === "video.chunk") {
-        expect(message.seq).toBe(++seq);
-        expect(message.startMs).toBe(endMs);
-        pendingSize = message.byteLength;
-        endMs = message.endMs;
-      }
-      if (message.type === "session.stop")
-        socket.send(JSON.stringify({ type: "session.complete", sessionId }));
+  let uploads = 0;
+  await page.route("http://localhost:8000/speech/analyze", async (route) => {
+    uploads++;
+    expect(route.request().headers()["content-type"]).toContain(
+      "multipart/form-data",
+    );
+    expect(route.request().postDataBuffer()!.length).toBeGreaterThan(1000);
+    await route.fulfill({
+      json: {
+        summary: { pause_count: 1 },
+        events: [
+          {
+            t_ms: 100,
+            duration_ms: 400,
+            type: "pause",
+            severity: "info",
+            payload: {},
+          },
+        ],
+      },
     });
   });
-  await enable(page);
-  await page.getByLabel("Feedback source").selectOption("backend");
-  await page
-    .getByLabel("Backend WebSocket URL")
-    .fill("ws://localhost:8000/live");
-  await page
-    .getByRole("button", { name: "Start streaming & recording" })
-    .click();
-  await expect(page.getByText("Visible in frame").first()).toBeVisible();
-  await expect(page.getByText("Frame visibility")).toBeVisible();
+  await page.route(
+    "http://localhost:8000/transcription/analyze-words",
+    async (route) => {
+      expect(route.request().postDataJSON()).toEqual({
+        words: [{ word: "um", start_ms: 100, end_ms: 300 }],
+      });
+      await route.fulfill({
+        json: {
+          summary: { filler_count: 1 },
+          events: [
+            {
+              t_ms: 100,
+              duration_ms: 200,
+              type: "filler",
+              severity: "hint",
+              payload: { word: "um" },
+            },
+          ],
+        },
+      });
+    },
+  );
+  await backend(page);
+  expect(uploads).toBe(0);
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
-  await expect(page.getByText("Frame visibility")).toBeVisible();
-  expect(bytes).toBeGreaterThan(1000);
-  expect(seq).toBeGreaterThan(1);
-  await expect(page.getByText("Demo feedback, real recording.")).toHaveCount(0);
+  expect(uploads).toBe(1);
+  await expect(page.getByText("Audio: pause count")).toBeVisible();
+  await page
+    .getByLabel("Word timestamps (JSON)")
+    .setInputFiles({
+      name: "words.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify([{ word: "um", start_ms: 100, end_ms: 300 }]),
+      ),
+    });
+  await expect(
+    page.getByText("Transcript analysis added to this take."),
+  ).toBeVisible();
+  await expect(page.getByText("Transcript: filler count")).toBeVisible();
 });
 
-test("backend disconnect preserves playable partial recording", async ({
-  page,
-}) => {
-  await syntheticCamera(page);
-  await page.routeWebSocket("ws://localhost:8000/live", (socket) => {
-    socket.onMessage((raw) => {
-      if (typeof raw !== "string") {
-        socket.close({ code: 1011, reason: "Test interruption" });
-        return;
-      }
-      const message = JSON.parse(raw);
-      if (message.type === "session.start")
-        socket.send(
-          JSON.stringify({
-            type: "session.ready",
-            sessionId: message.sessionId,
-          }),
-        );
-    });
-  });
-  await enable(page);
-  await page.getByLabel("Feedback source").selectOption("backend");
-  await page
-    .getByLabel("Backend WebSocket URL")
-    .fill("ws://localhost:8000/live");
-  await page
-    .getByRole("button", { name: "Start streaming & recording" })
-    .click();
+test("analysis failure preserves playable recording", async ({ page }) => {
+  await page.route("http://localhost:8000/speech/analyze", (route) =>
+    route.fulfill({ status: 503 }),
+  );
+  await backend(page);
+  await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
-  await expect(
-    page.getByText("Interrupted recording", { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("The backend connection closed.", { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText("HTTP 503", { exact: false })).toBeVisible();
   await expect
     .poll(() =>
       page
@@ -272,35 +255,4 @@ test("backend disconnect preserves playable partial recording", async ({
         .evaluate((el: HTMLVideoElement) => el.readyState),
     )
     .toBeGreaterThanOrEqual(2);
-});
-
-test("invalid destination and cancelled handshake do not leave a camera running", async ({
-  page,
-}) => {
-  await syntheticCamera(page);
-  await page.routeWebSocket("ws://localhost:8000/live", () => {});
-  await enable(page);
-  await page.getByLabel("Feedback source").selectOption("backend");
-  await page.getByLabel("Backend WebSocket URL").fill("https://localhost");
-  await page
-    .getByRole("button", { name: "Start streaming & recording" })
-    .click();
-  await expect(page.locator(".status-error[role=alert]")).toContainText(
-    "ws:// or wss://",
-  );
-  await page
-    .getByLabel("Backend WebSocket URL")
-    .fill("ws://localhost:8000/live");
-  await page
-    .getByRole("button", { name: "Start streaming & recording" })
-    .click();
-  await page.getByRole("button", { name: "Cancel connection" }).click();
-  await expect(
-    page.getByRole("button", { name: "Enable camera preview" }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
-    ),
-  ).toBe(1);
 });
