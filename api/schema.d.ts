@@ -49,9 +49,29 @@ export interface paths {
         put?: never;
         /**
          * Analyze
-         * @description Time series and events from the audio signal only. Stores nothing.
+         * @description Store in S3 and enqueue analysis. Poll status_url for the result.
+         *
+         *     German filler preservation is unverified. Originals are deleted after
+         *     terminal processing. Demo recordings must be synthetic.
          */
         post: operations["analyze_speech_analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/speech/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job Status */
+        get: operations["job_status_speech_jobs__job_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -82,6 +102,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptedJob */
+        AcceptedJob: {
+            /** Job Id */
+            job_id: string;
+            /** Status Url */
+            status_url: string;
+        };
+        /** AnalysisJob */
+        AnalysisJob: {
+            /** Error */
+            error?: string | null;
+            /** Job Id */
+            job_id: string;
+            result?: components["schemas"]["RecordingAnalysis"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+        };
         /** AnalyzeRequest */
         AnalyzeRequest: {
             config?: components["schemas"]["WordConfig"];
@@ -142,14 +182,20 @@ export interface components {
         Body_analyze_speech_analyze_post: {
             /**
              * Config
-             * @description Optional AudioConfig as JSON
+             * @description AudioConfig JSON; first 3000 ms are calibration
              */
             config?: string | null;
             /**
              * Recording
-             * @description Audio or video recording (WebM, MP4, WAV, ...)
+             * @description Synthetic audio/video recording (WebM, MP4, WAV, ...)
              */
             recording: string;
+            /**
+             * Transcribe
+             * @description Send audio to configured ASR (default: Deepgram EU). false = local signal analysis only
+             * @default true
+             */
+            transcribe: boolean;
         };
         /** Event */
         Event: {
@@ -181,6 +227,24 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** RecordingAnalysis */
+        RecordingAnalysis: {
+            /** Asr Provider */
+            asr_provider: string | null;
+            audio: components["schemas"]["AudioAnalysis"];
+            /** Events */
+            events: components["schemas"]["Event"][];
+            /** Notices */
+            notices?: string[];
+            /**
+             * Synthetic Demo
+             * @default false
+             */
+            synthetic_demo: boolean;
+            transcription: components["schemas"]["WordAnalysis"] | null;
+            /** Words */
+            words: components["schemas"]["Word"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -336,12 +400,43 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_status_speech_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AudioAnalysis"];
+                    "application/json": components["schemas"]["AnalysisJob"];
                 };
             };
             /** @description Validation Error */

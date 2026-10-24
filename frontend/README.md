@@ -87,3 +87,11 @@ All points, heuristics, null handling and limits are documented in
 `npm ci` installs the pinned runtime; `npm run dev` and `npm run build` prepare its
 static assets automatically. Deploy `public/pose` with the frontend. The official
 Lite model version 1 is included; provenance is in `public/pose/README.md`.
+
+## Queued audio analysis
+
+The camera backend mode uses the asynchronous audio API: POST `/speech/analyze`
+with `transcribe=false`, then GET `/speech/jobs/{job_id}` until completed or
+failed. It polls for at most eleven minutes and cancels on exit. This UI uses
+local Silero/RMS/YIN analysis; no paid ASR request is made. Speak normally during
+the first three seconds for calibration. Word JSON import remains separate.

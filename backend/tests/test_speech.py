@@ -10,9 +10,16 @@ from fastapi.testclient import TestClient
 
 from app.events import Event, merge_timeline
 from app.main import app
-from app.speech import AudioConfig, analyze_samples
+from app.speech import AudioConfig, analyze_samples as _analyze_samples
 
 SR = 16000
+
+
+def analyze_samples(samples, config=None):
+    # Synthetic tones exercise DSP, not speech detection. Explicit legacy
+    # baseline keeps these tests independent of the new calibration default.
+    config = config or AudioConfig(baseline_ms=None)
+    return _analyze_samples(samples, config.model_copy(update={"activity_detector": "energy"}))
 
 
 def tone(seconds: float, f0: float = 150.0, amplitude: float = 0.3, syllables_hz: float = 4.0,
@@ -95,6 +102,18 @@ def test_silence_only():
     assert result.summary.active_ms == 0 and result.summary.median_f0_hz is None
 
 
+def test_silent_calibration_does_not_produce_nan():
+    import json
+
+    samples = np.concatenate([silence(4.0), tone(4.0)])
+    result = analyze_samples(samples, AudioConfig(baseline_ms=3000))
+    assert result.summary.f0_range_st is None
+    assert of_type(result, "volume") == []
+    assert of_type(result, "pace") == []
+    # Results must be persistable with strict JSON even when speech starts late.
+    json.dumps(result.model_dump(), allow_nan=False)
+
+
 def test_merge_timeline_across_pipelines():
     a = Event(t_ms=500, duration_ms=0, type="pause", severity="info", source="speech", payload={})
     b = Event(t_ms=100, duration_ms=0, type="filler", severity="hint", source="asr", payload={})
@@ -112,17 +131,19 @@ def wav_bytes(samples: np.ndarray) -> bytes:
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="FFmpeg not installed")
-def test_api_analyze_upload():
-    client = TestClient(app)
+def test_upload_decoder():
+    from app.speech.analysis import analyze_upload
+
     samples = np.concatenate([tone(3.0), silence(2.5), tone(3.0)])
+    result = analyze_upload(io.BytesIO(wav_bytes(samples)), AudioConfig(activity_detector="energy", pause_min_ms=1500))
+    assert result.summary.pause_count == 1
+
+
+def test_api_invalid_config():
+    client = TestClient(app)
     response = client.post(
         "/speech/analyze",
-        files={"recording": ("synthetic.wav", wav_bytes(samples), "audio/wav")},
-        data={"config": '{"pause_min_ms": 1500}'},
+        files={"recording": ("synthetic.wav", b"", "audio/wav")},
+        data={"config": '{"f0_min_hz": 500}', "transcribe": "false"},
     )
-    assert response.status_code == 200
-    body = response.json()
-    assert [e["type"] for e in body["events"] if e["type"] == "pause"] == ["pause"]
-    assert body["heuristics"]["pause_min_ms"] == 1500
-    bad = client.post("/speech/analyze", files={"recording": ("x.wav", b"not audio", "audio/wav")})
-    assert bad.status_code == 422
+    assert response.status_code == 422

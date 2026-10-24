@@ -17,6 +17,7 @@ RUN pip install -r requirements.txt
 
 COPY --chown=app:app app ./app
 COPY --chown=app:app scripts ./scripts
+RUN python -m scripts.install_silero /app/models
 
 USER app
 EXPOSE 8000

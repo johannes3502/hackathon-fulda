@@ -183,17 +183,35 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
     );
     expect(route.request().postDataBuffer()!.length).toBeGreaterThan(1000);
     await route.fulfill({
+      status: 202,
       json: {
-        summary: { pause_count: 1 },
-        events: [
-          {
-            t_ms: 100,
-            duration_ms: 400,
-            type: "pause",
-            severity: "info",
-            payload: {},
-          },
-        ],
+        job_id: "12345678-1234-1234-1234-123456789abc",
+        status_url: "/speech/jobs/12345678-1234-1234-1234-123456789abc",
+      },
+    });
+  });
+  let polls = 0;
+  await page.route("http://localhost:8000/speech/jobs/*", async (route) => {
+    polls++;
+    await route.fulfill({
+      json: {
+        job_id: "12345678-1234-1234-1234-123456789abc",
+        status: polls === 1 ? "running" : "completed",
+        result:
+          polls === 1
+            ? null
+            : {
+                audio: { summary: { pause_count: 1 } },
+                events: [
+                  {
+                    t_ms: 100,
+                    duration_ms: 400,
+                    type: "pause",
+                    severity: "info",
+                    payload: {},
+                  },
+                ],
+              },
       },
     });
   });
