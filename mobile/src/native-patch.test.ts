@@ -3,6 +3,13 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { expect, it } from "vitest";
+import { ESLint } from "eslint";
+
+it("lints the CommonJS install script including its optional-dependency early return", async () => {
+  const results = await new ESLint().lintFiles(["scripts/patch-native.cjs"]);
+  expect(results.flatMap((result) => result.messages)).toEqual([]);
+});
+
 it("applies the pinned native bridge patch idempotently and preserves timestamps on both platforms", () => {
   execFileSync(process.execPath, ["scripts/patch-native.cjs"]);
   execFileSync(process.execPath, ["scripts/patch-native.cjs"]);

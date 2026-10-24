@@ -61,6 +61,9 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
 
 - Einen privaten Conversational Agent anlegen. In **Security** die Authentifizierung
   und den Override für **System prompt** aktivieren.
+- Der API-Schlüssel braucht unter **ElevenAgents** die Berechtigung **Write**
+  (`convai_write`). **Read** kann den Agenten laden, aber keine Signed URL
+  ausstellen; dieser Aufruf scheitert dann mit HTTP 401 `missing_permissions`.
 - Die erste Nachricht des Agenten kurz und offen halten, z. B. „Lassen Sie uns
   Ihre zentrale Aussage besprechen. Welche Belege stützen sie?“ Sprache und
   Stimme passend zur Vorführung konfigurieren. Der Gesprächsprompt fordert
@@ -70,6 +73,16 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
 ```dotenv
 ELEVENLABS_API_KEY=...
 ELEVENLABS_AGENT_ID=agent_...
+```
+
+Der Variablenname ist `ELEVENLABS_API_KEY`, nicht `ELEVENLABS_KEY`.
+Für Gemini müssen auch Endpunkt und Modell gesetzt sein; vorhandene, aber
+leere `.env`-Einträge überschreiben die Compose-Standardwerte:
+
+```dotenv
+LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+LLM_MODEL=gemini-3.1-flash-lite
+LLM_API_KEY=...
 ```
 
 ```sh
@@ -110,8 +123,35 @@ im ElevenLabs-Konto angelegt oder verändert.
 
 Synthetische Tests prüfen Prompt-Schwerpunkte aller vier Modi, Quellenbindung,
 Job-Wiederzustellung, serverseitige Authentifizierung, Fehlermeldungen sowie
-Wiedergabe und Dialog-UI. Ein echter ElevenLabs-Anruf, reale Audioqualität,
-Geräteverhalten und pädagogische Qualität bleiben nach der Konfiguration zu prüfen.
+Wiedergabe und Dialog-UI. Der optionale Browser-Test nutzt echte lokale Dienste,
+Gemini und ElevenLabs; nur Kamera und Mikrofon werden durch synthetisches Video
+und die deutsche Sprach-Fixture ersetzt:
+
+```sh
+RUN_CLOUD_SMOKE=1 npm run test:e2e --workspace frontend -- cloud-flow.spec.ts --project desktop
+```
+
+Er prüft Material-Upload, Aufnahme, Whisper-Transkription, Quellencheck,
+getippte Fragen und Antwortvergleich sowie eine authentifizierte ElevenLabs-
+Verbindung mit Quellen im Prompt-Override, 48-kHz-Audio und einem gesprochenen
+Antwortwechsel. Er verursacht Anbieter-Nutzung und setzt den Agenten auf
+`pcm_48000` voraus. Ohne `RUN_CLOUD_SMOKE=1` wird er übersprungen.
+Traces und Videos sind deaktiviert, damit keine Signed URLs in ihnen landen.
+Die hochgeladene Testquelle wird gelöscht; synthetische Job-IDs stehen im
+Test-Anhang für gezieltes Cleanup der weiterhin gespeicherten Job-Ergebnisse.
+Anbieter-Gespräche unterliegen weiterhin der Konto-Aufbewahrung.
+
+Am 24.10.2026 lief dieser Cloud-Test erfolgreich durch (35,4 s): Gemini
+`gemini-3.1-flash-lite` für Quellencheck und Text-Fragerunde; der ElevenLabs-
+Agent mit Ben, `eleven_v4_turbo`, `pcm_48000` und seinem separat konfigurierten
+Dialogmodell `deepseek-v41-flash`. Signed URL, Prompt-Override und ein
+gesprochener Antwortwechsel wurden tatsächlich geprüft. Zusätzlich bestanden
+281 Backend-Tests, die App-Unit-Tests, 47 reguläre Desktop-Browser-Tests,
+Lint, Typecheck, Production-Build und die echten Coaching-/Review-Smokes.
+Die Dauer ist ein einzelner synthetischer Testlauf, keine Latenzzusage.
+
+Reale Audioqualität über Mac-Lautsprecher, Geräteverhalten und pädagogische
+Qualität sind durch synthetische Audioübertragung nicht abgenommen.
 
 Offizielle Referenzen: [JavaScript SDK](https://elevenlabs.io/docs/eleven-agents/libraries/java-script),
 [Signed URLs](https://elevenlabs.io/docs/api-reference/conversations/get-signed-url),

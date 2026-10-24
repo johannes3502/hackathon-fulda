@@ -20,7 +20,10 @@ export default defineConfig([
   },
   {
     files: ["**/*.cjs"],
-    languageOptions: { globals: { __dirname: "readonly" } },
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: { __dirname: "readonly" },
+    },
   },
   { ignores: ["ios/**", "android/**", "dist/**"] },
 ]);
