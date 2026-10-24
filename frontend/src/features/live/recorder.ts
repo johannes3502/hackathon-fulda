@@ -144,7 +144,7 @@ export class LiveRecorder {
         try {
           if (this.disposed || this.failed) return;
           await this.transport.send(event.data, meta);
-          if (this.config.mode === "demo") {
+          if (this.config.mode === "local") {
             this.progress.chunksSent++;
             this.progress.bytesSent += event.data.size;
           }

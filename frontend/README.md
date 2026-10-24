@@ -8,8 +8,12 @@ rebuild after changing dependencies or configuration.
 
 - **Try sample demo:** deterministic rehearsal, sample transcript, judge questions
   and review. Works without camera, microphone or backend credentials.
-- **Open camera studio** (`/live`): enable the camera, then **Record with demo
-  feedback** for real silent video with clearly labeled scripted markers.
+- **See gestures in 22 seconds** (`/gestures`): synthetic skeleton walkthrough
+  using the real observation rules; no camera or API needed.
+- **Open camera studio** (`/live`): enable the camera, then **Record with gesture
+  feedback**. Hold a neutral position for 3 seconds, then follow the movement guide.
+  Real local observations appear live and become replay markers. No scripted
+  findings are attached to your recording.
 - **Backend · audio analysis after recording:** enable camera and microphone,
   then **Record & analyze audio**. Speak normally for the first three seconds
   of calibration. After stopping, local Silero/RMS/YIN analysis runs in Celery;
@@ -34,8 +38,9 @@ is preview-only and is not burned into recordings.
 Turn the camera off to **Download pose JSONL**. Starting a take resets the preview
 log and anchors it to video start; the take's log is also available in review.
 Download preview data before starting a take to keep it. The log is limited to
-3,000 samples; landmarks keep updating after that limit. Samples stay local and
-do not replace scripted feedback.
+3,000 samples; landmarks keep updating after that limit. Samples stay local. Calibrated, sustained gesture/posture observations use the
+same recording clock and can be exported as evidence JSON from review.
+[How and why we evaluate](../docs/04-gesture-evaluation.md) · [Jury runbook](../docs/05-jury-demo.md).
 
 [Data points and heuristics](DATA_POINTS.md) · [Model provenance](public/pose/README.md).
 `npm run dev` and `npm run build` prepare the runtime assets automatically;

@@ -2,8 +2,11 @@
 
 **Status:** Thema fix (24.10.2026).
 **Grundlage:** Erste Feature-Beschreibungen des Teams. Es gibt noch kein
-Fein-Konzept, keine Scores und keine Schwellenwerte. Das lokale technische
-Grundgerüst ist inzwischen festgelegt (Abschnitt 3, Technik).
+vollständiges Fein-Konzept. Gesten-/Haltungsbeobachtungen sind inzwischen
+als explizite Prototyp-Heuristiken umgesetzt (keine Scores):
+[Recherche und Auswertung](04-gesture-evaluation.md),
+[Jury-Ablauf und offene Abnahme](05-jury-demo.md). Das lokale technische
+Grundgerüst ist festgelegt (Abschnitt 3, Technik).
 
 > **Regel:** Keine zusätzlichen Features erfinden. Alles, was unten nicht steht,
 > ist offen und muss entschieden werden.
@@ -84,7 +87,8 @@ Produktentscheidung.
   Deutsche Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und Speicherverhalten:
   `backend/README.md`.
 - Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
-- Hosting und Anbieter für Fact-Check/Frage-Agent bleiben offen.
+- Nutzerentscheidung: lokale Vorführung reicht; öffentliches Hosting ist
+  derzeit nicht nötig. Anbieter für Fact-Check/Frage-Agent bleiben offen.
 - Latenz, Ausfall-Fallback, Kosten.
 - Browser- und Geräte-Support (Laptop und Smartphone).
 
@@ -116,3 +120,5 @@ einbauen**:
 | 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
 | 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |
+
+| 24.10.2026 | Echte lokale Gesten-/Haltungsbeobachtungen, synthetischer Jury-Rundgang und Evidenz-Export | Nutzerauftrag: Gesten recherchieren, nachvollziehbar auswerten und für die Jury vorführbar machen. Keine Blickkontakt-/Qualitätsbewertung. |

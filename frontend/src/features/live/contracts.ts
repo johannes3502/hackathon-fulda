@@ -1,5 +1,8 @@
-export type FeedbackKind = "positive" | "suggestion" | "attention";
+import type { PoseEvent } from "../pose/evaluation";
+export type FeedbackKind =
+  "positive" | "suggestion" | "attention" | "observation";
 export type LiveFeedback = {
+  evidence?: PoseEvent;
   id: string;
   category: string;
   kind: FeedbackKind;
@@ -18,7 +21,7 @@ export type LiveMetric = {
 export type LiveConfig = {
   title: string;
   targetMs: number;
-  mode: "demo" | "backend";
+  mode: "local" | "backend";
   endpoint: string;
 };
 export type VideoChunkMeta = {
@@ -43,6 +46,7 @@ export type LiveProgress = {
   notice: string | null;
 };
 export type LiveRecording = {
+  poseEvents?: PoseEvent[];
   poseLog?: Blob;
   id: string;
   config: LiveConfig;

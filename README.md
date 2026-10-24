@@ -15,3 +15,6 @@ All six services start together; no local Node.js or Python installation needed.
 
 Details: [Frontend](frontend/README.md) · [Backend](backend/README.md) ·
 [API types](api/README.md).
+
+**Jury:** [22-second gesture example](http://localhost:3000/gestures) ·
+[Demo guide](docs/05-jury-demo.md) · [What we measure and why](docs/04-gesture-evaluation.md).

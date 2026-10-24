@@ -1,9 +1,11 @@
 import { PoseLog, poseSample, type PoseSample } from "./sample";
+import { PoseEvaluator, POSE_RULES, type PoseEvaluation } from "./evaluation";
 export type PoseState = {
   phase: "loading" | "running" | "stopped" | "error";
   count: number;
   message: string;
   latest: PoseSample | null;
+  evaluation: PoseEvaluation | null;
 };
 export class PoseCapture {
   readonly log = new PoseLog();
@@ -14,12 +16,22 @@ export class PoseCapture {
   private lastFrame = -Infinity;
   private timeout?: ReturnType<typeof setTimeout>;
   private latest: PoseSample | null = null;
+  private evaluator = new PoseEvaluator();
+  private origin: number | null = null;
+  private evaluation: PoseEvaluation | null = null;
+  private frameTimeout?: ReturnType<typeof setTimeout>;
   constructor(
     private video: HTMLVideoElement,
     private update: (state: PoseState) => void,
   ) {}
   private publish(phase: PoseState["phase"], message: string) {
-    this.update({ phase, message, count: this.log.count, latest: this.latest });
+    this.update({
+      phase,
+      message,
+      count: this.log.count,
+      latest: this.latest,
+      evaluation: this.evaluation,
+    });
   }
   start() {
     this.publish("loading", "Loading the local pose model…");
@@ -47,10 +59,21 @@ export class PoseCapture {
             "Pose detection failed. You can download any samples already captured and retry.",
           );
         } else if (data.type === "sample") {
+          clearTimeout(this.frameTimeout);
           this.pending = false;
+          // A delayed preview inference must never affect a new take.
+          if (this.origin !== null && data.timestamp < this.origin) return;
+          const origin = this.origin ?? Number(data.timestamp);
+          this.origin = origin;
+          const liveSample = poseSample(
+            data.points,
+            data.width,
+            data.height,
+            data.timestamp - origin,
+          );
           // A frame captured before the recording anchor must not enter its log.
           const sample = this.log.full
-            ? poseSample(data.points, data.width, data.height, 0)
+            ? liveSample
             : this.log.add(
                 data.points,
                 data.width,
@@ -58,6 +81,10 @@ export class PoseCapture {
                 data.timestamp,
               );
           this.latest = sample;
+          this.evaluation = this.evaluator.update(
+            liveSample,
+            data.timestamp - origin,
+          );
           this.publish(
             "running",
             this.log.full
@@ -78,6 +105,18 @@ export class PoseCapture {
     if (!worker) return;
     this.frame = requestAnimationFrame(this.tick);
     const timestamp = performance.now();
+    if (
+      this.latest &&
+      timestamp - this.lastFrame > POSE_RULES.staleFrameMs &&
+      this.origin !== null
+    ) {
+      this.latest = null;
+      this.evaluation = this.evaluator.update(null, timestamp - this.origin);
+      this.publish(
+        "running",
+        "Waiting for a fresh camera frame. Evaluation paused.",
+      );
+    }
     if (
       this.video.ended ||
       !(this.video.srcObject as MediaStream | null)
@@ -111,6 +150,12 @@ export class PoseCapture {
     )
       return;
     this.pending = true;
+    this.frameTimeout = setTimeout(() => {
+      if (this.worker === worker)
+        this.fail(
+          "Pose detection stalled. Retry landmarks or open the synthetic walkthrough.",
+        );
+    }, POSE_RULES.inferenceTimeoutMs);
     this.lastFrame = timestamp;
     this.lastVideoTime = this.video.currentTime;
     void createImageBitmap(this.video)
@@ -133,12 +178,27 @@ export class PoseCapture {
           this.fail("Could not read a camera frame for pose capture.");
       });
   };
-  beginRecording(timestamp: number) {
+  beginRecording(timestamp: number, sessionId = "recording") {
     this.log.reset(timestamp);
+    this.origin = timestamp;
+    this.evaluator = new PoseEvaluator(sessionId);
+    this.evaluation = null;
     this.latest = null;
+  }
+  recalibrate() {
+    this.evaluator = new PoseEvaluator();
+    this.evaluation = null;
+    this.publish("running", "Calibration reset. Hold your neutral position.");
+  }
+  get events() {
+    return this.evaluation?.events ?? [];
   }
   private fail(message: string) {
     this.dispose();
+    this.latest = null;
+    this.evaluation = this.evaluation
+      ? { ...this.evaluation, phase: "framing", cue: null, message }
+      : null;
     this.publish("error", message);
   }
   stop(message = "Pose capture stopped. Your samples are ready to download.") {
@@ -147,6 +207,7 @@ export class PoseCapture {
   }
   dispose() {
     clearTimeout(this.timeout);
+    clearTimeout(this.frameTimeout);
     cancelAnimationFrame(this.frame);
     this.worker?.terminate();
     this.worker = null;

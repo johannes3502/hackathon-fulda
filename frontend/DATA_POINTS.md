@@ -1,7 +1,13 @@
-# Pose-Datenpunkte — MVP
+# Pose-Datenpunkte und Beobachtungen
 
-Ziel: Kamera starten, Pose-Landmarks pro Sample erfassen und als JSONL loggen.  
-Keine Bewertung, kein Backend, kein Face-Mesh, keine Iris/Pupille, keine Finger.
+Kamera starten, Pose-Landmarks pro Sample erfassen und als JSONL loggen.
+Darauf laufen drei kalibrierte Beobachtungsregeln: Hand über Schulter, Hände
+zusammen, seitliche Torsoänderung. Keine Qualitätsbewertung, kein Face-Mesh,
+keine Iris/Pupille, keine Finger.
+
+Recherche, Formeln, Konfiguration, Unsicherheit und Evaluationsplan:
+[Gesten-Evaluation](../docs/04-gesture-evaluation.md).
+[Jury-Anleitung](../docs/05-jury-demo.md).
 
 ## Modell
 
@@ -119,7 +125,7 @@ Regeln:
 - Nur Samples loggen, wenn `pose_present` true ist.
 - Nicht sichtbare Beine als `null` loggen, nicht interpolieren.
 - Keine Glättung im Roh-Log; Glättung erst bei der Auswertung.
-- `t_ms` relativ zum ersten Pose-Sample; bei Aufnahme später an `MediaRecorder.onstart` ausrichten.
+- `t_ms` in der Vorschau relativ zum ersten Pose-Sample; bei Aufnahme an `MediaRecorder.onstart` ausgerichtet.
 
 ## Nicht im MVP
 
@@ -154,7 +160,8 @@ Aufnahme-Logs ausgegeben.
   installierten JS-/WASM-Dateien nach `public/pose/runtime` (generiert, gitignored).
   Im Browser sind keine CDN-/Modell-Downloads von Drittanbietern nötig.
 - `IMAGE`-Modus pro Frame vermeidet das zeitliche Smoothing des VIDEO-Graphen.
-  Keine zusätzliche Glättung, keine Pose-Bewertung und keine Pose-Feedback-Events.
+  Keine zusätzliche Glättung im Roh-Log. Die separate Auswertung erzeugt
+  nachvollziehbare Beobachtungen mit Mindestdauer; keine Pose-Qualitätsnote.
 - Jeder Log-Eintrag enthält alle 21 Schlüssel aus der Indexliste. Tupel sind
   `[x,y,z,visibility,presence]`; fehlende Konfidenzwerte sind `null`, nicht erfunden.
   Ungültige Koordinaten sind `null`. Für Beine gelten zusätzlich die Sichtbarkeitsregeln.

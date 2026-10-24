@@ -176,3 +176,27 @@ TypeScript, ESLint, Produktionsbuild und API-Aktualitätscheck bestanden.
 - Danach erneut Typecheck, ESLint und 34 Frontend-Tests bestanden; Pose-Worker,
   JS-/WASM-Runtime und Modell über HTTP erreichbar, Modell-Prüfsumme stimmt
   mit dem eingecheckten Asset überein.
+
+## Gesten und Jury-Pfad (24.10.2026)
+
+Auftrag: Gestenerkennung recherchieren, implementieren, leicht demonstrierbar
+machen und das Wie/Warum der Auswertung dokumentieren.
+
+- Geprüfte Primärquellen und Alternativen: `docs/04-gesture-evaluation.md`.
+  Codex entschied für die vorhandene Pose-Landmark-Kette statt eines zusätzlichen
+  Fingerklassifikators, da grobe Bewegungen die gewählten Beobachtungen tragen.
+- Korrektur: Die bisherigen zeitgesteuerten Marker auf echten Kameraaufnahmen
+  wurden entfernt. Der lokale Modus erzeugt nur aus tatsächlich gelieferten
+  Landmarks abgeleitete Beobachtungen. Synthetische Demonstration bleibt ein
+  eigener, sichtbarer Pfad, ohne Kamera und ohne behauptete Modellgenauigkeit.
+- Technische Parameter sind als `pose-rules-v1` offengelegt. Keine wissenschaftlich
+  validierten Grenzwerte, keine Scores; Prüfung am echten Demo-Gerät bleibt offen.
+- Unsicherheit: Fehlende Pose pausiert Auswertung; fehlende Hände sperren nur
+  Gesten. Kalibrierung, Mindestdauer, Hysterese und Cooldown verhindern definierte
+  Arten von Flackern. Eye Contact wird aus diesen Punkten nicht abgeleitet.
+- Zeitbezug: Rohdaten und Events beginnen bei `MediaRecorder.onstart` neu.
+  Review nutzt die lokale Aufnahme und zeigt die Regel-Evidenz am Event.
+- Menschliche Entscheidungen noch nötig: Prüfung auf Veranstaltungsgerät,
+  belastbare Evaluationsdaten, Quellen-/Frage-Anbieter. Nutzer hat lokale
+  Vorführung bestätigt; öffentliches Hosting ist keine Abnahmevoraussetzung. Details und
+  ehrliche Demo-Abgrenzung: `docs/05-jury-demo.md`.

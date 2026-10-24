@@ -29,6 +29,8 @@ import { apiEndpoint, request } from "@/features/live/analysis";
 import type { LiveConfig, LiveProgress } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
+import { poseFeedback } from "@/features/pose/feedback";
+import { GestureGuide } from "./GestureGuide";
 import { PoseDownload } from "./PoseDownload";
 import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
@@ -56,7 +58,7 @@ export function LiveStudio() {
   const pose = usePoseCapture(videoRef, cameraStatus === "active");
   const [title, setTitle] = useState("My pitch rehearsal");
   const [targetMs, setTargetMs] = useState(180000);
-  const [mode, setMode] = useState<LiveConfig["mode"]>("demo");
+  const [mode, setMode] = useState<LiveConfig["mode"]>("local");
   const [endpoint, setEndpoint] = useState(
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
   );
@@ -64,6 +66,7 @@ export function LiveStudio() {
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [largeView, setLargeView] = useState(false);
+  const [showCues, setShowCues] = useState(true);
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   useEffect(() => () => owner.current?.dispose(), []);
@@ -137,10 +140,28 @@ export function LiveStudio() {
         setProgress(next);
       },
       (recording) => {
-        save({ ...recording, poseLog: pose.recordingBlob() });
+        const poseEvents = pose
+          .recordingEvents()
+          .filter((event) => event.t_ms < recording.durationMs)
+          .map((event) => ({
+            ...event,
+            duration_ms: Math.min(
+              event.duration_ms,
+              recording.durationMs - event.t_ms,
+            ),
+          }));
+        save({
+          ...recording,
+          poseLog: pose.recordingBlob(),
+          poseEvents,
+          feedback: [
+            ...recording.feedback,
+            ...poseEvents.map(poseFeedback),
+          ].sort((a, b) => a.startMs - b.startMs),
+        });
         router.push(`/live/${recording.id}/review`);
       },
-      pose.beginRecording,
+      (timestamp) => pose.beginRecording(timestamp, recorder.id),
     );
     owner.current = recorder;
     try {
@@ -162,7 +183,20 @@ export function LiveStudio() {
     stopCamera();
     setProgress(null);
   };
-  const latest = progress?.feedback.at(-1);
+  const evaluation =
+    cameraStatus === "active" && pose.state?.phase === "running"
+      ? pose.state.evaluation
+      : null;
+  const feedback = progress
+    ? [
+        ...progress.feedback,
+        ...(pose.state?.evaluation?.events ?? []).map(poseFeedback),
+      ].sort((a, b) => a.startMs - b.startMs)
+    : [];
+  const latest =
+    showCues && pose.state?.phase === "running" && evaluation?.cue
+      ? poseFeedback(evaluation.cue)
+      : null;
   return (
     <AppShell experience="live">
       <div
@@ -228,7 +262,7 @@ export function LiveStudio() {
                         : "Preview only"}
                 </span>
                 <span className="stage-demo">
-                  {mode === "demo" ? (
+                  {mode === "local" ? (
                     <>
                       <MicOff size={14} /> No audio
                     </>
@@ -291,8 +325,8 @@ export function LiveStudio() {
                     : "Camera stays local until Start"}
                 </span>
                 <span>
-                  {mode === "demo"
-                    ? "Scripted feedback · local landmarks"
+                  {mode === "local"
+                    ? "Local gesture observations"
                     : progress?.phase === "recording"
                       ? "Audio analysis after stopping"
                       : "Backend mode"}
@@ -327,8 +361,8 @@ export function LiveStudio() {
                     onClick={() => void start()}
                   >
                     <Radio size={17} />
-                    {mode === "demo"
-                      ? "Record with demo feedback"
+                    {mode === "local"
+                      ? "Record with gesture feedback"
                       : "Record & analyze audio"}
                   </Button>
                 </>
@@ -351,11 +385,28 @@ export function LiveStudio() {
             <p className="camera-message" role="status">
               {progress
                 ? (progress.notice ??
-                  (mode === "demo"
-                    ? "Demo feedback is scripted. No video is uploaded. Pose landmarks and logging stay local."
+                  (mode === "local"
+                    ? "Video and gesture observations stay in this browser. Start each take with 3 seconds in a neutral position."
                     : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis.`))
                 : cameraCopy[cameraStatus]}
             </p>
+            <GestureGuide evaluation={evaluation ?? null} />
+            <div className="live-control-bar">
+              <Button
+                variant="outline"
+                disabled={
+                  cameraStatus !== "active" ||
+                  pose.state?.phase !== "running" ||
+                  !!progress
+                }
+                onClick={pose.recalibrate}
+              >
+                Recalibrate neutral position
+              </Button>
+              <Button asChild variant="ghost">
+                <Link href="/gestures">Try synthetic walkthrough</Link>
+              </Button>
+            </div>
             <section
               className="panel live-settings"
               aria-label="Local pose capture"
@@ -366,8 +417,8 @@ export function LiveStudio() {
                 data is uploaded or used to score your presentation.
               </p>
               <p className="field-hint">
-                Head angles and frontal-eye visibility are uncalibrated
-                heuristics, not gaze tracking. Missing measurements stay empty.
+                Gesture and posture observations are prototype heuristics. Eye
+                contact, emotion and presentation quality are not measured.
               </p>
               <div className="live-control-bar">
                 {pose.state?.phase === "error" && (
@@ -433,7 +484,9 @@ export function LiveStudio() {
                       setMode(e.target.value as LiveConfig["mode"]);
                     }}
                   >
-                    <option value="demo">Local demo · scripted markers</option>
+                    <option value="local">
+                      Local · gesture and posture observations
+                    </option>
                     <option value="backend">
                       Backend · audio analysis after recording
                     </option>
@@ -473,20 +526,27 @@ export function LiveStudio() {
             <section className="cue-panel">
               <div className="panel-title-row">
                 <h2>
-                  <Eye size={18} />{" "}
-                  {mode === "demo" ? "Live feedback" : "Audio feedback"}
+                  <Eye size={18} /> Live gesture feedback
                 </h2>
-                <span>{mode === "demo" ? "Scripted" : "From backend"}</span>
+                <span>Heuristic</span>
               </div>
               <div aria-live="polite" aria-atomic="true">
                 <p className="cue-message">
-                  {latest?.title ?? "One useful moment at a time."}
+                  {!showCues
+                    ? "Live hints hidden"
+                    : (latest?.title ??
+                      (pose.state?.phase === "error"
+                        ? "Landmarks unavailable"
+                        : evaluation?.phase === "ready"
+                          ? "Ready for your next gesture"
+                          : "Find your neutral position"))}
                 </p>
                 <p className="live-cue-detail">
-                  {latest?.action ??
-                    (mode === "demo"
-                      ? "Start a recording to try example feedback markers and video replay."
-                      : "Audio heuristics appear after you finish. Pose logging is separate from feedback. Automatic transcription is not connected yet.")}
+                  {!showCues
+                    ? "Observations still appear in your review."
+                    : (latest?.action ??
+                      evaluation?.message ??
+                      "Enable your camera, then keep shoulders, hips and hands visible. Recording is optional for preview.")}
                 </p>
               </div>
               {latest && (
@@ -495,15 +555,23 @@ export function LiveStudio() {
                   {time(latest.endMs)}
                 </span>
               )}
+              <label className="loop-control">
+                <input
+                  type="checkbox"
+                  checked={showCues}
+                  onChange={(e) => setShowCues(e.target.checked)}
+                />{" "}
+                Show live hints
+              </label>
             </section>
             <section className="panel live-events">
               <div className="panel-title-row">
                 <h2>Session observations</h2>
-                <span className="badge">{progress?.feedback.length ?? 0}</span>
+                <span className="badge">{feedback.length}</span>
               </div>
-              {progress?.feedback.length ? (
+              {feedback.length ? (
                 <div className="event-feed">
-                  {progress.feedback.toReversed().map((item) => (
+                  {feedback.toReversed().map((item) => (
                     <div key={item.id}>
                       <span className={`feedback-kind ${item.kind}`}>
                         {item.category} · {time(item.startMs)}
@@ -518,9 +586,8 @@ export function LiveStudio() {
                   <CheckCircle2 size={24} />
                   <p>No observations yet.</p>
                   <span>
-                    {mode === "demo"
-                      ? "Three scripted markers arrive in the first 10 seconds."
-                      : "No feedback does not imply a perfect performance."}
+                    Start a take to save observations for replay. No
+                    observations does not imply a perfect performance.
                   </span>
                 </div>
               )}
@@ -544,7 +611,7 @@ export function LiveStudio() {
             <div className="stream-summary">
               <span>
                 {progress?.chunksSent ?? 0} recording parts{" "}
-                {mode === "demo"
+                {mode === "local"
                   ? "handled locally"
                   : "uploaded after stopping"}
               </span>

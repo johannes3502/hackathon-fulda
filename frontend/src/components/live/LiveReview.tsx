@@ -18,6 +18,8 @@ import { FeedbackMoment, LiveNav, MissingRecording } from "./shared";
 import { PoseDownload } from "./PoseDownload";
 import { TranscriptAnalysis } from "./TranscriptAnalysis";
 import { VideoPlayback } from "./VideoPlayback";
+import { PoseEvidence } from "./PoseEvidence";
+import { PoseEventDownload } from "./PoseEventDownload";
 
 export function LiveReview({ sessionId }: { sessionId: string }) {
   const { recordings } = useLiveSessions();
@@ -63,13 +65,10 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             {recording.notice}
           </p>
         )}
-        {recording.config.mode === "demo" && (
-          <p className="live-demo-notice">
-            <strong>Demo feedback, real recording.</strong> These markers are
-            scripted examples, not detections or an assessment of how you
-            performed.
-          </p>
-        )}
+        <p className="live-demo-notice">
+          Camera observations are prototype heuristics. Replay them in context;
+          their frequency does not measure presentation quality.
+        </p>
         <div className="recording-stats">
           <div>
             <Clock3 size={19} />
@@ -79,25 +78,14 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
           <div>
             <MessageSquare size={19} />
             <strong>{recording.feedback.length}</strong>
-            <span>
-              {recording.config.mode === "demo"
-                ? "Demo markers"
-                : "Feedback moments"}
-            </span>
+            <span>Feedback moments</span>
           </div>
           <div>
             <CheckCircle2 size={19} />
             <strong>
-              {
-                recording.feedback.filter((item) => item.kind === "positive")
-                  .length
-              }
+              {recording.feedback.filter((item) => !!item.evidence).length}
             </strong>
-            <span>
-              {recording.config.mode === "demo"
-                ? "Positive examples"
-                : "Positive observations"}
-            </span>
+            <span>Camera observations</span>
           </div>
           <div>
             <Video size={19} />
@@ -116,6 +104,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
               onSelect={(item) => setSelected({ ...item })}
             />
             <PoseDownload blob={recording.poseLog} />
+            <PoseEventDownload events={recording.poseEvents} />
             <div className="recording-retention">
               <Download size={16} />
               <p>
@@ -136,6 +125,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 <p>{selected.detail}</p>
                 <strong>Try this</strong>
                 <p>{selected.action}</p>
+                <PoseEvidence event={selected.evidence} />
               </section>
             )}
           </div>
@@ -187,11 +177,11 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
               )}
               <p className="field-hint">
                 {recording.chunksSent} recording uploads/parts{" "}
-                {recording.config.mode === "demo"
-                  ? "processed by the local demo"
+                {recording.config.mode === "local"
+                  ? "kept in this browser"
                   : "sent to the backend"}
                 . {(recording.bytesSent / 1024 / 1024).toFixed(1)} MB{" "}
-                {recording.config.mode === "demo" ? "kept local" : "sent"}.
+                {recording.config.mode === "local" ? "kept local" : "sent"}.
               </p>
             </section>
             <section className="next-review-step">

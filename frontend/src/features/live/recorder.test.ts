@@ -21,7 +21,7 @@ class Recorder {
 }
 function setup(
   transport: VideoTransport,
-  mode: LiveConfig["mode"] = "demo",
+  mode: LiveConfig["mode"] = "local",
   onStart?: (timestamp: number) => void,
 ) {
   vi.useFakeTimers();
@@ -140,7 +140,7 @@ it("anchors pose capture on the actual recorder start, after connection complete
     finish: async () => {},
     close: () => {},
   };
-  const { recorder } = setup(transport, "demo", onStart);
+  const { recorder } = setup(transport, "local", onStart);
   const starting = recorder.start();
   await vi.advanceTimersByTimeAsync(5000);
   expect(onStart).not.toHaveBeenCalled();

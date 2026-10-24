@@ -76,8 +76,8 @@ export function AppShell({
               <ol className="help-list">
                 <li>Enable your camera for a local preview.</li>
                 <li>
-                  Choose demo feedback or your backend connection, then start
-                  recording.
+                  Hold a neutral position for 3 seconds. Follow the gesture
+                  guide, then start a recording to save your observations.
                 </li>
                 <li>
                   Review your video and the feedback received during that
@@ -88,9 +88,12 @@ export function AppShell({
                 </li>
               </ol>
               <p>
-                No microphone is captured. Backend mode sends encoded video
-                chunks to the destination shown in the studio. Demo mode keeps
-                video local and supplies scripted markers, not real detections.
+                Local mode keeps video and gesture observations in this browser,
+                without microphone audio. Optional backend mode records audio
+                too and uploads the complete take after stopping for audio
+                analysis. Camera observations are prototype heuristics, not
+                quality scores. The synthetic walkthrough is separately labelled
+                and needs no camera.
               </p>
               <p>
                 Recordings live in browser memory only. Download before

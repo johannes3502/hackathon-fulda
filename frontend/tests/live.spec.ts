@@ -50,6 +50,48 @@ async function syntheticCamera(page: Page) {
     };
   });
 }
+// Controlled landmarks exercise the real evaluator, recording and UI, not model accuracy.
+async function syntheticPose(page: Page) {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        if (String(url).includes("/pose/worker.js"))
+          (window as unknown as { poseWorker: Worker }).poseWorker = this;
+      }
+    };
+  });
+  await page.route("**/pose/worker.js", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: `let origin = null;
+      onmessage = ({data}) => {
+        if (data.type === 'init') postMessage({type:'ready'});
+        if (data.type === 'test-start') origin = data.timestamp;
+        if (data.type === 'frame') {
+          const points = Array.from({length:33}, () => ({x:.5,y:.2,z:0,visibility:.99,presence:.99}));
+          const set = (i,x,y) => Object.assign(points[i],{x,y});
+          set(11,.38,.38); set(12,.62,.38); set(13,.34,.55); set(14,.66,.55);
+          set(15,.34,.72); set(16,.66,.72); set(23,.41,.82); set(24,.59,.82);
+          if (origin !== null && data.timestamp - origin >= 4000) { set(14,.73,.35); set(16,.72,.12); }
+          for(let i=25;i<33;i++) points[i].visibility=.1;
+          postMessage({type:'sample',timestamp:data.timestamp,width:data.frame.width,height:data.frame.height,points});
+          data.frame.close();
+        }
+      };`,
+    }),
+  );
+}
+async function startPoseSequence(page: Page) {
+  await expect(page.getByRole("button", { name: "Finish & review" })).toBeVisible();
+  await page.evaluate(() =>
+    (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
+      type: "test-start",
+      timestamp: performance.now(),
+    }),
+  );
+}
 async function noOverflow(page: Page) {
   expect(
     await page.evaluate(
@@ -68,6 +110,7 @@ test("large view scales feedback and preserves an active recording", async ({
   page,
 }, info) => {
   await syntheticCamera(page);
+  await syntheticPose(page);
   await enable(page);
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
@@ -88,8 +131,11 @@ test("large view scales feedback and preserves an active recording", async ({
       originalWidth * 1.5,
     );
   }
-  await page.getByRole("button", { name: "Record with demo feedback" }).click();
-  await expect(cue).toHaveText("Review this gesture moment", {
+  await page
+    .getByRole("button", { name: "Record with gesture feedback" })
+    .click();
+  await startPoseSequence(page);
+  await expect(cue).toHaveText("Hand above shoulder", {
     timeout: 12000,
   });
   await noOverflow(page);
@@ -139,11 +185,15 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await syntheticCamera(page);
+  await syntheticPose(page);
   await enable(page);
-  await page.getByRole("button", { name: "Record with demo feedback" }).click();
-  await expect(
-    page.getByText("Review this gesture moment").first(),
-  ).toBeVisible({ timeout: 12000 });
+  await page
+    .getByRole("button", { name: "Record with gesture feedback" })
+    .click();
+  await startPoseSequence(page);
+  await expect(page.getByText("Hand above shoulder").first()).toBeVisible({
+    timeout: 12000,
+  });
   await noOverflow(page);
   await page.screenshot({
     path: `test-results/live-studio-${info.project.name}.png`,
@@ -181,11 +231,30 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("link", { name: "Download video" }).click();
   expect((await downloadPromise).suggestedFilename()).toMatch(/\.webm$/);
+  const evidenceDownload = page.waitForEvent("download");
+  await page
+    .getByRole("link", { name: "Download gesture evidence JSON" })
+    .click();
+  const evidenceStream = await (await evidenceDownload).createReadStream();
+  const evidenceChunks: Buffer[] = [];
+  for await (const chunk of evidenceStream!) evidenceChunks.push(chunk);
+  const evidence = JSON.parse(Buffer.concat(evidenceChunks).toString());
+  expect(evidence).toHaveLength(1);
+  expect(evidence[0].session_id).toBe(page.url().split("/").at(-2));
+  expect(evidence[0].payload).toMatchObject({
+    rule: "hand_raised",
+    heuristic: true,
+    rule_version: "pose-rules-v1",
+  });
+  expect(evidence[0].t_ms).toBeGreaterThanOrEqual(4000);
+  expect(
+    evidence[0].payload.confirmed_at_ms - evidence[0].t_ms,
+  ).toBeGreaterThanOrEqual(800);
   await page.getByRole("link", { name: "Rewatch feedback sections" }).click();
   await page.getByLabel("Filter by category").selectOption("Gestures");
   await expect(page.locator(".moment-browser-list button")).toHaveCount(1);
   await expect(page.locator(".replay-detail h2")).toHaveText(
-    "Review this gesture moment",
+    "Hand above shoulder",
   );
   await expect
     .poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime))
@@ -397,7 +466,9 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
   await page
     .getByLabel("Your local camera feed")
     .evaluate((v: HTMLVideoElement) => v.pause());
-  await page.getByRole("button", { name: "Record with demo feedback" }).click();
+  await page
+    .getByRole("button", { name: "Record with gesture feedback" })
+    .click();
   await expect(page.getByLabel("Local pose capture")).toContainText(
     /[1-9]\d* pose samples/,
   );
@@ -545,7 +616,7 @@ test("pose model failure preserves camera recording controls", async ({
     page.getByText("Pose detection failed.", { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Record with demo feedback" }),
+    page.getByRole("button", { name: "Record with gesture feedback" }),
   ).toBeEnabled();
   await expect(
     page.getByRole("button", { name: "Retry landmarks" }),

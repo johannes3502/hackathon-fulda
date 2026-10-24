@@ -101,6 +101,11 @@ export function SessionSetupForm() {
           </p>
           <div className="live-entry">
             <Button asChild variant="outline">
+              <Link href="/gestures">
+                See gestures in 22 seconds <ArrowRight size={17} />
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/live">
                 Open camera studio <ArrowRight size={17} />
               </Link>

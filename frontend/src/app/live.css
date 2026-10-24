@@ -680,3 +680,103 @@ body:has(.live-workspace-large) .app-footer,
     overflow-wrap: anywhere;
   }
 }
+
+/* Gesture feedback keeps the observation and its explanation together. */
+.gesture-guide {
+  padding: 22px;
+  margin-top: 18px;
+}
+.gesture-guide > p,
+.gesture-guide li {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.gesture-guide ol {
+  padding-left: 22px;
+  margin: 14px 0;
+}
+.gesture-guide li {
+  padding: 5px 0;
+}
+.gesture-guide li strong {
+  color: var(--foreground);
+}
+.gesture-guide progress {
+  width: 100%;
+  accent-color: var(--primary);
+  margin-top: 12px;
+}
+.gesture-guide .panel-title-row {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pose-evidence {
+  font-size: 13px;
+  line-height: 1.6;
+  margin-top: 14px;
+  color: var(--muted);
+}
+.pose-evidence summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 600;
+}
+.pose-evidence p {
+  margin: 10px 0;
+}
+.gesture-example {
+  min-height: 320px;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  color: white;
+}
+.gesture-example .live-pose-overlay {
+  transform: none;
+}
+.gesture-example-event {
+  margin: 20px 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.gesture-example-event p {
+  margin-top: 8px;
+}
+.gesture-walkthrough .live-review-grid > * {
+  min-width: 0;
+}
+.feedback-kind.observation {
+  color: #275d92;
+  background: #edf4fb;
+}
+.timeline-marker.observation {
+  background: #4b8cc5;
+}
+.live-workspace-large .gesture-guide,
+.live-workspace-large .gesture-guide + .live-control-bar {
+  display: none;
+}
+.live-workspace-large .cue-panel .loop-control {
+  font-size: 14px;
+}
+@media (max-width: 760px) {
+  .gesture-example {
+    min-height: 240px;
+  }
+  .gesture-guide {
+    padding: 18px;
+  }
+  .gesture-walkthrough .live-review-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .gesture-walkthrough .workspace-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .gesture-walkthrough .workspace-back {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

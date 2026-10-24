@@ -147,7 +147,13 @@ pgvector und die vollständige Aufnahme-/Clip-/Review-Pipeline aus der
 Zielarchitektur sind noch nicht umgesetzt. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
-Bewertungs-/Feedback-Regeln darauf sind noch offen (`frontend/DATA_POINTS.md`).
+Darauf laufen nun drei lokale, kalibrierte Gesten-/Haltungsheuristiken mit
+Live-Hinweis, Review-Markern und Evidenz-Export. `/gestures` zeigt denselben
+Regelablauf mit synthetischen Landmarks; keine Genauigkeitsvalidierung.
+Recherche und Regeln: `docs/04-gesture-evaluation.md`; Jury-Abnahme und
+noch offene Geräte-Gates: `docs/05-jury-demo.md`. Nutzerentscheidung:
+lokale Vorführung reicht; kein öffentliches Deployment erforderlich.
+Eye Contact wird nicht aus Pose-/Iris-Punkten behauptet.
 Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
 jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
