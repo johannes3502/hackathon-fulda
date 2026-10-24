@@ -34,8 +34,8 @@ Gesten-/Sample-Demo reicht alternativ Node.js 22.12+: `npm ci`, `npm run dev`.
 
 ## Echte lokale Sprache und Fragen (optional, etwa 2 weitere Minuten)
 
-Ollama vorab starten, Modell laden und Smoke ausführen:
-[lokale KI einrichten](06-local-coaching.md). Unter `/sources` eine TXT-Datei
+Gemini-Key in `.env` setzen, Backend/Worker neu starten und den Smoke ausführen:
+[Einrichtung und Grenzen](06-local-coaching.md). Unter `/sources` eine TXT-Datei
 mit erfundenem Inhalt hochladen: „Synthetische Beispieldaten: Das Lernlabor hat
 zwanzig Plätze. Es öffnet um neun Uhr.“ Auf **Ready** warten.
 
@@ -62,7 +62,7 @@ beibehalten oder ändern möchte.“**
 | Seitwärts-Hinweis erscheint verzögert | Positionsregel wartet bewusst 0,8 s. „Pose debug“ zeigt zusätzlich Frame-/Modellzeit und Abtastrate. Bei hoher Frame-Zeit andere Browser vergleichen; Safari ist bisher nicht als Ursache belegt. |
 | API/Netz fehlt | Lokale Gestenerkennung braucht nach Laden der App/Assets keine Anbieter-API. Synthetischer Rundgang braucht keine Kamera. Kein Service-Worker: erstmaliger Seitenaufruf braucht den App-Server. |
 | Backend-Audio schlägt fehl | Aufnahme und bereits vorhandene lokale Gesten bleiben im Review; Fehlermeldung sichtbar. |
-| Quellenmodell fehlt / Quellen nicht bereit | Ollama und Modellstatus prüfen, Quelle fertig laden lassen, **Refresh status**. Kein Cloud-Fallback. |
+| Quellenmodell fehlt / Quellen nicht bereit | Gemini-Key und Modellstatus prüfen, Quelle fertig laden lassen, **Refresh status**. Kein stiller Fallback. |
 | Zitat kann nicht geprüft werden | Kein Urteil anzeigen; Passage selbst prüfen. Eine Zahl von Modellurteilen ist keine Genauigkeit. |
 | Kamera bewegt / Person wechselt | Aufnahme beenden. Neue Aufnahme mit neuer Kalibrierung. |
 | Seite wird neu geladen | Lokales Video ist weg. Vorher downloaden; neuen Versuch starten. |
@@ -104,7 +104,7 @@ gezählte Versuche und dokumentierte Bedingungen, die noch nicht vorliegen.
 Der Kamerapfad erzeugt lokale Gesten-/Haltungsereignisse und spielt das komplette
 Video im Browser ab. Er erstellt noch keine dauerhaft gespeicherten Server-Clips.
 Audioanalyse, lokale Whisper-Transkription, Quellen-Ingest/Hybrid-Retrieval,
-Ollama-Quellenvergleich und Text-Frage-/Antwortanalyse sind im Web angebunden.
+Gemini-Quellenvergleich und Text-Frage-/Antwortanalyse sind im Web angebunden.
 Optionale Live-Captions liefern während der Aufnahme eine Textvorschau;
 die vollständige Transkription nach dem Stoppen bleibt die Review-Zeitbasis.
 Web-Fetch, Blickkontakt-Auswertung und dauerhafte Server-Clips sind nicht Teil
@@ -147,3 +147,18 @@ T12, Pocket und Kopforientierung erzeugen keine Produktions-Events.
 Vor Ort weiter offen: echtes GPU-Verhalten, Heavy-Durchsatz unter Kamera-/Audio-
 Last, Verzögerung durch VIDEO-Glättung und Erkennungsqualität. Automatisierte
 Tests mit synthetischen Bildern belegen Start und Datenfluss, keine Genauigkeit.
+
+## Deep Research (24.10.2026)
+
+- **Gemini statt Ollama:** Der Quellenvergleich braucht jetzt einen
+  `GEMINI_API_KEY` in `.env`; es gibt keinen stillen lokalen Fallback. Der
+  schwache Testpfad (`gemini-3.1-flash-lite`) lief mit 3,4 / 2,1 / 1,7 s; der
+  finale Writer braucht `gemini-3.8-flash`, sonst greift sichtbar die
+  Template-Review.
+- **Datenschutz:** Gemini ist Cloud ohne EU-Region-Pinning. Für die Jury nur
+  synthetische Inhalte verwenden; keine echten Personenaufnahmen an das LLM
+  senden.
+- **Fragegrenzen:** 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop; die
+  Begründung und Zitate stehen in `docs/11-deep-research-validation.md`.
+- **Was die Demo nicht verspricht:** keine Genauigkeits-, Latenz- oder
+  Lernwirksamkeitsgarantie; keine Noten oder Personenbewertung.

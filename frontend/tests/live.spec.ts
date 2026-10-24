@@ -570,7 +570,9 @@ async function backend(
     route.fulfill({ json: { status: "ok" } }),
   );
   await page.goto("/live");
-  await page.getByText("Recording options", { exact: true }).click();
+  // Scope to the visible main; Next can briefly retain hidden streamed markup.
+  const studio = page.getByRole("main");
+  await studio.getByText("Recording options", { exact: true }).click();
   await expect(
     page.getByText("analysis results remain stored", { exact: false }),
   ).toBeVisible();

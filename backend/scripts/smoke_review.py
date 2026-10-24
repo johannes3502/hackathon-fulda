@@ -15,8 +15,9 @@ import httpx
 
 
 def audio_bytes():
+    # Leave more than pause_min_ms of silence after the overlapping frame edges.
     samples = array("h", (round(5000 * math.sin(2 * math.pi * 180 * index / 16000))
-                          if index < 32000 or index >= 64000 else 0 for index in range(128000)))
+                          if index < 32000 or index >= 72000 else 0 for index in range(128000)))
     data = BytesIO()
     with wave.open(data, "wb") as output:
         output.setnchannels(1)
@@ -50,7 +51,8 @@ def main():
         try:
             client.get("/health/ready").raise_for_status()
             created = post("/sessions", {"title": "Synthetischer Backend-Smoke", "consent": {
-                "granted": True, "at": datetime.now(timezone.utc).isoformat(), "version": "smoke.v1", "scope": "local-analysis"}})
+                "granted": True, "at": datetime.now(timezone.utc).isoformat(), "version": "smoke.v1",
+                "scope": "local-and-cloud-analysis" if args.llm else "local-analysis"}})
             session_id = created.json()["session"]["sessionId"]
             take = post(f"/sessions/{session_id}/takes", {"durationMs": 8000, "mimeType": "audio/wav",
                 "timebase": {"onstartPerfMs": 0, "firstVideoPtsMs": 0, "audioStartMs": 0, "avOffsetMs": 0},

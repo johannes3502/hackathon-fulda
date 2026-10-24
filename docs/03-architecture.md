@@ -51,7 +51,7 @@ flowchart TB
     end
 
     EXT["ASR lokal: faster-whisper small<br/>CPU/int8, Deutsch<br/>Deepgram nur explizit optional"]
-    LLM["LLM lokal: Ollama auf dem Host<br/>Qwen3.5 4B Q4_K_M<br/>JSON-Schema, kein Cloud-Fallback"]
+    LLM["LLM: Gemini (Cloud)<br/>3.1 Flash Lite / 3.8 Flash<br/>JSON-Modus, austauschbarer Adapter"]
     ELEVEN["ElevenLabs Agent, optional<br/>Live-Audio + Gespräch; serverseitiger Schlüssel"]
     WEBS["Websuche (Zweitquelle)<br/>Wikipedia-API oder Tavily"]
 
@@ -153,7 +153,7 @@ flowchart LR
     WK --> PG
     WK --> ST
     WK --> RD
-    WK -. "OLLAMA_URL<br/>(Host: host.docker.internal)" .-> LLM(["Ollama lokal; kompatibler Adapter optional"])
+    WK -. "LLM_BASE_URL / LLM_MODEL<br/>(Gemini, OpenAI-kompatibel)" .-> LLM(["Gemini; austauschbarer Adapter"])
     BE -. "ELEVENLABS_API_KEY + ELEVENLABS_AGENT_ID" .-> EL(["ElevenLabs; Voice optional"])
     User -. "Signed WebSocket" .-> EL
     WK -. "WEB_SEARCH_PROVIDER" .-> WS(["Wikipedia / Tavily"])
@@ -177,7 +177,7 @@ sequenceDiagram
     BE-->>FE: Bereit, oder Abbruch vor Aufnahme mit Retry-Hinweis
     FE->>FE: FeatureFlags im Take festhalten (Lite/Heavy, VIDEO/IMAGE)
     FE->>FE: Pose-Worker GPU-first/CPU-Fallback, Fingertracking separat bis 5 Hz
-    Note over FE,BE: Jede Web-Aufnahme mit Mikrofon, Live-Feedback und vollständigem Upload; kein Modus-Schalter
+    Note over FE,BE: Jede Web-Aufnahme mit Mikrofon, Live-Feedback und vollständigem Upload, kein Modus-Schalter
 
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>BE: WS /speech/feedback: start, PCM nach ready
@@ -317,12 +317,13 @@ sequenceDiagram
     participant S3 as SeaweedFS (S3)
     participant W as Celery Worker (fact_check)
     participant PG as Postgres + pgvector
-    participant L as Ollama lokal (JSON-Schema)
+    participant L as Gemini (JSON-Modus)
     participant WS as Wikipedia / Tavily
 
     FE->>BE: GET /factcheck/settings (Modell, LLM-Host, Web-Anbieter)
     U->>FE: Check facts (Wörter aus ASR oder Import, collection_id, use_web)
     FE->>BE: POST /factcheck
+    BE->>BE: URL, Schlüssel und Optionen prüfen (sonst 503 vor Speicherung)
     BE->>S3: factcheck-jobs/id/request.json
     BE-->>FE: 202 {job_id, status_url}
     W->>S3: Request laden
@@ -362,7 +363,7 @@ sequenceDiagram
     participant W as Celery Worker
     participant PG as Postgres + pgvector
     participant E as ElevenLabs Agent
-    participant L as Lokales LLM
+    participant L as Gemini (JSON-Modus)
 
     U->>FE: Practice questions
     opt Kein Transkript vorhanden
@@ -687,3 +688,17 @@ flowchart LR
 ```
 
 Der Vertrag wird über `npm run api:generate` aus dem FastAPI-Code generiert (`api/openapi.json` -> `api/schema.d.ts`) und ist damit immer synchron zum Backend.
+
+## Deep Research (24.10.2026)
+
+Die geplante inkrementelle LLM-/TTS-Pipeline ist in
+`docs/11-deep-research-validation.md` gegen Forschung und offizielle
+API-Dokumentation geprüft. Ihre Umsetzung ist noch offen. Drei Vorgaben:
+Live-Analyse soll **ereignisgetrieben auf finalisierten ASR-Segmenten** laufen
+(nicht auf einem festen 20–30-s-Takt), der finale Fact-Check ist
+**quellengebunden, aber nicht autoritativ** (keine Live-Urteile,
+„nicht gefunden“ ≠ „falsch“), und das Gespräch soll **harte Grenzen** haben
+(3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop). Im Code ist bisher nur
+das Maximum von fünf Anfangsfragen im getippten Pfad umgesetzt, kein
+Sitzungstimer oder globales Follow-up-Limit. Gemini ist Cloud ohne
+EU-Region-Pinning; nur synthetische Demo-Daten oder Vertex AI mit EU-Region.

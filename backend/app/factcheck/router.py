@@ -4,8 +4,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, HTTPException
 from starlette.concurrency import run_in_threadpool
 
-from app.factcheck.llm import configured_llm, llm_settings
-from app.factcheck.local import LocalOllamaChat
+from app.factcheck.llm import configured_llm, llm_available, llm_settings
 from app.factcheck.models import FactCheckJob, FactCheckRequest, FactCheckSettings
 from app.factcheck.web import configured_web_searcher, web_provider
 from app.jobs import QueueUnavailable, enqueue_task
@@ -21,7 +20,7 @@ def settings() -> FactCheckSettings:
     """Whether the fact-check is configured and which third parties receive text."""
     llm = llm_settings()
     provider = web_provider()
-    available = llm is not None and (llm.get("provider") != "ollama" or LocalOllamaChat().available())
+    available = llm_available(llm)
     return FactCheckSettings(available=available, model=llm["model"] if llm else None,
                              llm_host=llm["host"] if llm else None,
                              web_provider=None if provider == "none" else provider)
