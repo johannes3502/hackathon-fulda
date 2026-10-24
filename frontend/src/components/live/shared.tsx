@@ -61,6 +61,9 @@ export function LiveNav({
         >
           Feedback moments
         </Link>
+        <Link href={`/live/${sessionId}/analysis`}>
+          Analyse &amp; Zeitverlauf
+        </Link>
       </nav>
     </>
   );

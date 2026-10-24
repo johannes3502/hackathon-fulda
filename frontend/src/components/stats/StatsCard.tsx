@@ -149,6 +149,11 @@ export function StatsCard({
             Demo · synthetische Werte
           </span>
         )}
+        {demo && (
+          <Link className="stats418-review-link" href="/review-preview">
+            Analyse-Beispiel ansehen ↗
+          </Link>
+        )}
       </footer>
     </article>
   );

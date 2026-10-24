@@ -173,6 +173,20 @@
   border-radius: 50%;
   background: #42ff8c;
 }
+.stats418-review-link {
+  display: block;
+  width: fit-content;
+  margin: 14px auto 0;
+  padding: 7px 0;
+  color: #344e3e;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.stats418-review-link:focus-visible {
+  outline: 2px solid #142019;
+  outline-offset: 4px;
+}
 .stats418-preview {
   min-height: 100svh;
   background: #fff;
