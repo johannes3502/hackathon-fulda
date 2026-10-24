@@ -69,9 +69,9 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
         )}
         {recording.config.mode === "local" && (
           <p className="live-demo-notice">
-            <strong>Demo feedback, real recording.</strong> These markers are
-            scripted examples, not detections or an assessment of how you
-            performed.
+            <strong>Local recording and observations.</strong> Markers come from
+            camera and enabled microphone heuristics. They are not a score or a
+            validated assessment of your presentation.
           </p>
         )}
         <div className="recording-stats">

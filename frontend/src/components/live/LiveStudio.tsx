@@ -24,22 +24,33 @@ import { useCameraPreview } from "@/hooks/useCameraPreview";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { LiveCaptions } from "@/features/live/captions";
 import { speechCue } from "@/features/live/speech-feedback";
+import { feedbackEnabled } from "@/features/live/feature-flags";
+import { upsertFeedback } from "@/features/live/protocol";
+import {
+  LiveSpeech,
+  mergeSpeechFeedback,
+  type SpeechState,
+} from "@/features/live/speech";
 import { LiveRecorder } from "@/features/live/recorder";
 import { createVideoTransport } from "@/features/live/transport";
 import { apiEndpoint, request } from "@/features/live/analysis";
 import type {
   LiveConfig,
-  LiveFeedback,
   LiveProgress,
+  LiveFeedback,
 } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { poseFeedback } from "@/features/pose/feedback";
 import { GestureGuide } from "./GestureGuide";
 import { PoseDownload } from "./PoseDownload";
+import { PoseDevMode, type PoseView } from "./PoseDevMode";
+import { poseFeedback as labFeedback } from "@/features/pose/testPoses";
 import { PoseDebug } from "./PoseDebug";
 import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
+import { FeatureOptions } from "./FeatureOptions";
+import { backendLabel, fallbackLabel } from "@/features/pose/backend";
 
 const cameraCopy = {
   idle: "Enable your camera to check your framing. Then start recording when you’re ready.",
@@ -54,7 +65,7 @@ const cameraCopy = {
 };
 export function LiveStudio() {
   const router = useRouter();
-  const { save, recordings } = useLiveSessions();
+  const { save, recordings, featureFlags, setFeatureFlags } = useLiveSessions();
   const {
     status: cameraStatus,
     videoRef,
@@ -62,20 +73,36 @@ export function LiveStudio() {
     stop: stopCamera,
     getStream,
   } = useCameraPreview();
-  const pose = usePoseCapture(videoRef, cameraStatus === "active");
+  const pose = usePoseCapture(
+    videoRef,
+    cameraStatus === "active",
+    featureFlags,
+  );
   const [title, setTitle] = useState("My pitch rehearsal");
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("local");
+  const microphone = mode === "backend" || featureFlags.liveSpeechFeedback;
+  const speechChoice =
+    mode === "backend"
+      ? "backend"
+      : featureFlags.liveSpeechFeedback
+        ? "live"
+        : "local";
+  const [speech, setSpeech] = useState<SpeechState | null>(null);
+  const voice = useRef<LiveSpeech | null>(null);
+  const serverSpeech = useRef<LiveCaptions | null>(null);
+  const serverEvents = useRef<LiveFeedback[]>([]);
+  const [serverFeedback, setServerFeedback] = useState<LiveFeedback[]>([]);
+  const [serverStatus, setServerStatus] = useState("");
+  const [serverCue, setServerCue] = useState<{
+    event: LiveFeedback;
+    untilMs: number;
+  } | null>(null);
+  const voiceStream = cameraStatus === "active" ? getStream() : null;
   const [transcribe, setTranscribe] = useState(true);
   const [liveCaptions, setLiveCaptions] = useState(false);
   const [caption, setCaption] = useState({ text: "", status: "" });
   const captions = useRef<LiveCaptions | null>(null);
-  const speech = useRef<LiveCaptions | null>(null);
-  const [speechStatus, setSpeechStatus] = useState("");
-  const [voiceCue, setVoiceCue] = useState<{
-    event: LiveFeedback;
-    untilMs: number;
-  } | null>(null);
   const [endpoint, setEndpoint] = useState(
     process.env.NEXT_PUBLIC_API_URL ?? "/api",
   );
@@ -85,16 +112,41 @@ export function LiveStudio() {
   const [largeView, setLargeView] = useState(false);
   const [showCues, setShowCues] = useState(true);
   const [poseDebug, setPoseDebug] = useState(false);
+  const poseLab = featureFlags.devMode;
+  const setPoseLab = (devMode: boolean) =>
+    setFeatureFlags({ ...featureFlags, devMode });
+  const [poseView, setPoseView] = useState<PoseView>("coach");
+  const poseAlert =
+    poseLab &&
+    pose.state?.phase === "running" &&
+    labFeedback(pose.state.tests).state === "alert";
   const owner = useRef<LiveRecorder | null>(null);
   const busy = useRef(false);
   useEffect(
     () => () => {
       owner.current?.dispose();
       captions.current?.stop();
-      speech.current?.stop();
+      voice.current?.stop();
+      serverSpeech.current?.stop();
     },
     [],
   );
+  useEffect(() => {
+    if (
+      mode === "backend" ||
+      !voiceStream ||
+      !featureFlags.liveSpeechFeedback ||
+      !featureFlags.speechFeedback
+    )
+      return;
+    const capture = new LiveSpeech(featureFlags, setSpeech);
+    voice.current = capture;
+    void capture.start(voiceStream);
+    return () => {
+      capture.stop();
+      if (voice.current === capture) voice.current = null;
+    };
+  }, [voiceStream, featureFlags, mode]);
   useEffect(() => {
     if (!largeView) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -156,6 +208,7 @@ export function LiveStudio() {
       mode,
       endpoint: destination,
       transcribe: mode === "backend" && transcribe,
+      featureFlags: { ...featureFlags },
     };
     const recorder = new LiveRecorder(
       stream,
@@ -165,7 +218,8 @@ export function LiveStudio() {
         if (next.phase === "finishing") {
           pose.stop();
           captions.current?.stop();
-          speech.current?.stop();
+          voice.current?.stop();
+          serverSpeech.current?.stop();
         }
         setProgress(next);
       },
@@ -185,7 +239,15 @@ export function LiveStudio() {
           poseLog: pose.recordingBlob(),
           poseEvents,
           feedback: [
-            ...recording.feedback,
+            ...mergeSpeechFeedback(recording.feedback, [
+              ...(voice.current?.events ?? []),
+              ...serverEvents.current,
+            ])
+              .filter((item) => item.startMs < recording.durationMs)
+              .map((item) => ({
+                ...item,
+                endMs: Math.min(item.endMs, recording.durationMs),
+              })),
             ...poseEvents.map(poseFeedback),
           ].sort((a, b) => a.startMs - b.startMs),
         });
@@ -193,21 +255,37 @@ export function LiveStudio() {
       },
       (timestamp) => {
         pose.beginRecording(timestamp, recorder.id);
-        setVoiceCue(null);
-        if (mode === "backend") {
+        voice.current?.beginRecording(timestamp, recorder.id);
+        serverEvents.current = [];
+        setServerFeedback([]);
+        setServerCue(null);
+        if (
+          mode === "backend" &&
+          featureFlags.speechFeedback &&
+          featureFlags.liveSpeechFeedback
+        ) {
           const shown = new Map<string, number>();
-          speech.current = new LiveCaptions(
+          serverSpeech.current = new LiveCaptions(
             (_, status) => {
-              setSpeechStatus(status);
-              if (status.includes("unavailable")) setVoiceCue(null);
+              setServerStatus(status);
+              if (status.includes("unavailable")) setServerCue(null);
             },
             (events) => {
+              const enabled = events.filter((event) =>
+                feedbackEnabled(event.category, featureFlags),
+              );
+              for (const event of enabled)
+                serverEvents.current = upsertFeedback(serverEvents.current, {
+                  ...event,
+                  id: `${recorder.id}-server-speech-${event.category}-${Math.round(event.startMs)}`,
+                });
+              setServerFeedback(serverEvents.current);
               const now = performance.now() - timestamp;
-              const event = speechCue(events, now, shown);
-              setVoiceCue(event ? { event, untilMs: now + 5000 } : null);
+              const event = speechCue(enabled, now, shown);
+              setServerCue(event ? { event, untilMs: now + 5000 } : null);
             },
           );
-          void speech.current.start(stream, destination, timestamp);
+          void serverSpeech.current.start(stream, destination, timestamp);
         }
         if (mode === "backend" && transcribe && liveCaptions) {
           captions.current = new LiveCaptions((text, status) =>
@@ -223,7 +301,7 @@ export function LiveStudio() {
     } catch (e) {
       if (owner.current !== recorder) return;
       recorder.dispose();
-      speech.current?.stop();
+      serverSpeech.current?.stop();
       captions.current?.stop();
       owner.current = null;
       busy.current = false;
@@ -235,7 +313,8 @@ export function LiveStudio() {
   const cancel = () => {
     owner.current?.dispose();
     captions.current?.stop();
-    speech.current?.stop();
+    voice.current?.stop();
+    serverSpeech.current?.stop();
     owner.current = null;
     busy.current = false;
     stopCamera();
@@ -245,21 +324,42 @@ export function LiveStudio() {
     cameraStatus === "active" && pose.state?.phase === "running"
       ? pose.state.evaluation
       : null;
-  const feedback = progress
-    ? [
-        ...progress.feedback,
-        ...(pose.state?.evaluation?.events ?? []).map(poseFeedback),
-      ].sort((a, b) => a.startMs - b.startMs)
-    : [];
-  const latest = !showCues
-    ? null
-    : progress?.phase === "recording" &&
-        voiceCue &&
-        progress.elapsedMs < voiceCue.untilMs
-      ? voiceCue.event
-      : pose.state?.phase === "running" && evaluation?.cue
-        ? poseFeedback(evaluation.cue)
-        : null;
+  const feedback =
+    progress && progress.phase !== "connecting"
+      ? [
+          ...mergeSpeechFeedback(
+            progress.feedback,
+            !featureFlags.liveSpeechFeedback || !featureFlags.speechFeedback
+              ? []
+              : mode === "backend"
+                ? serverFeedback
+                : (speech?.events ?? []),
+          ),
+          ...(pose.state?.evaluation?.events ?? []).map(poseFeedback),
+        ].sort((a, b) => a.startMs - b.startMs)
+      : [];
+  const poseCue =
+    showCues && pose.state?.phase === "running" && evaluation?.cue
+      ? poseFeedback(evaluation.cue)
+      : null;
+  const speechEnabled =
+    microphone &&
+    featureFlags.liveSpeechFeedback &&
+    featureFlags.speechFeedback;
+  const voiceCue =
+    !showCues || !speechEnabled || cameraStatus !== "active"
+      ? null
+      : mode === "backend"
+        ? progress?.phase === "recording" &&
+          serverCue &&
+          progress.elapsedMs < serverCue.untilMs
+          ? serverCue.event
+          : null
+        : speech?.cue;
+  const latest =
+    voiceCue && (!poseCue || voiceCue.startMs >= poseCue.startMs)
+      ? voiceCue
+      : poseCue;
   return (
     <AppShell experience="live">
       <div
@@ -276,7 +376,9 @@ export function LiveStudio() {
               <Clock3 size={18} />
               <strong>{time(progress?.elapsedMs ?? 0)}</strong>
               <span>
-                {progress ? "recording time" : `${targetMs / 60000}-minute limit`}
+                {progress
+                  ? "recording time"
+                  : `${targetMs / 60000}-minute limit`}
               </span>
             </div>
           </div>
@@ -294,17 +396,33 @@ export function LiveStudio() {
                   <label htmlFor="live-source">Speech analysis</label>
                   <NativeSelect
                     id="live-source"
-                    value={mode}
+                    value={speechChoice}
                     onChange={(e) => {
                       stopCamera();
-                      setMode(e.target.value as LiveConfig["mode"]);
+                      setMode(
+                        e.target.value === "backend" ? "backend" : "local",
+                      );
+                      setFeatureFlags({
+                        ...featureFlags,
+                        liveSpeechFeedback: e.target.value !== "local",
+                      });
                     }}
                   >
                     <option value="local">Off · gestures only</option>
-                    <option value="backend">On · local speech analysis</option>
+                    <option value="live">Live · in browser</option>
+                    <option value="backend">
+                      Live + full backend analysis
+                    </option>
                   </NativeSelect>
                 </div>
               </fieldset>
+              <p className="field-hint live-audio-hint">
+                {mode === "backend"
+                  ? "Microphone audio is sent to your server for live feedback. The full take is uploaded after stopping."
+                  : microphone
+                    ? "Camera and microphone stay in this browser. Voice hints work without a backend."
+                    : "Camera only. Choose Live · in browser to enable microphone feedback."}
+              </p>
               {!progress ? (
                 cameraStatus === "active" && (
                   <>
@@ -353,7 +471,7 @@ export function LiveStudio() {
               </div>
             </div>
             <section
-              className="media-stage live-camera-stage"
+              className={`media-stage live-camera-stage${poseAlert ? " pose-alert" : ""}`}
               aria-label="Live camera preview"
             >
               <div className="stage-top">
@@ -368,7 +486,7 @@ export function LiveStudio() {
                         : "Preview only"}
                 </span>
                 <span className="stage-demo">
-                  {mode === "local" ? (
+                  {!microphone ? (
                     <>
                       <MicOff size={14} /> No audio
                     </>
@@ -393,10 +511,13 @@ export function LiveStudio() {
               />
               {cameraStatus === "active" &&
                 pose.state?.phase === "running" &&
-                pose.state.latest && (
+                (pose.state.latest || pose.state.hands.length > 0) && (
                   <PoseOverlay
                     sample={pose.state.latest}
+                    image={pose.state.image}
                     largeView={largeView}
+                    hands={pose.state.hands}
+                    showHands={featureFlags.handTracking}
                   />
                 )}
               {cameraStatus === "active" && (
@@ -405,7 +526,7 @@ export function LiveStudio() {
                     ? "Landmarks unavailable"
                     : pose.state?.phase === "running"
                       ? pose.state.latest
-                        ? "Pose landmarks · local"
+                        ? `Pose landmarks · ${featureFlags.handTracking ? `${pose.state.hands.length} hands` : "fingers off"} · local`
                         : "No pose in frame"
                       : pose.state?.phase === "stopped"
                         ? "Landmarks stopped"
@@ -422,6 +543,18 @@ export function LiveStudio() {
                     timing={pose.state.timing}
                   />
                 )}
+              {cameraStatus === "active" &&
+                poseLab &&
+                pose.state?.phase === "running" && (
+                  <PoseDevMode
+                    results={pose.state.tests}
+                    handModel={pose.state.handModel}
+                    handError={pose.state.handError}
+                    hands={pose.state.hands.length}
+                    backend={pose.state.backend}
+                    view={poseView}
+                  />
+                )}
               {cameraStatus !== "active" && (
                 <div className="stage-placeholder">
                   <span className="stage-camera">
@@ -436,7 +569,7 @@ export function LiveStudio() {
                   {!progress && (
                     <Button
                       disabled={cameraStatus === "pending"}
-                      onClick={() => void enable(mode === "backend")}
+                      onClick={() => void enable(microphone)}
                     >
                       <Camera size={18} />
                       {cameraStatus === "pending"
@@ -465,7 +598,9 @@ export function LiveStudio() {
                 </span>
                 <span>
                   {mode === "local"
-                    ? "Local gesture observations"
+                    ? microphone
+                      ? "Local gestures + live voice feedback"
+                      : "Local gesture observations"
                     : progress?.phase === "recording"
                       ? liveCaptions && transcribe
                         ? "Live speech feedback + captions"
@@ -479,14 +614,14 @@ export function LiveStudio() {
                 ? (progress.notice ??
                   (mode === "local"
                     ? "Video and gesture observations stay in this browser. Start each take with 3 seconds in a neutral position."
-                    : `${speechStatus} Speak normally for the first 3 seconds. Full analysis follows after stopping.`))
+                    : `${serverStatus} Speak normally for the first 3 seconds. Full analysis follows after stopping.`))
                 : cameraCopy[cameraStatus]}
               {mode === "backend" && !progress && (
                 <span className="recording-consent">
                   By starting, you agree to send your video and microphone audio
                   to <strong>{endpoint}</strong> after stopping. Microphone
-                  audio is also sent during recording for live volume, pitch,
-                  pace and pause feedback.
+                  audio is also sent during recording for live speech feedback
+                  when enabled.
                   {transcribe &&
                     liveCaptions &&
                     " Live captions also send microphone audio to this server during recording."}
@@ -570,6 +705,12 @@ export function LiveStudio() {
                 )}
               </fieldset>
             </details>
+            <FeatureOptions
+              flags={featureFlags}
+              change={setFeatureFlags}
+              disabled={!!progress}
+              speechEnabled={microphone}
+            />
             <details className="live-settings gesture-settings">
               <summary>Gesture guide and calibration</summary>
               <GestureGuide evaluation={evaluation ?? null} />
@@ -591,10 +732,45 @@ export function LiveStudio() {
               aria-label="Local pose capture"
             >
               <summary>Camera diagnostics</summary>
+              <p role="status">
+                {backendLabel(
+                  pose.state?.backend ?? null,
+                  pose.state?.handModel ?? null,
+                )}
+              </p>
+              {fallbackLabel(pose.state?.backend ?? null) && (
+                <p className="field-hint">
+                  CPU fallback: {fallbackLabel(pose.state?.backend ?? null)}
+                </p>
+              )}
+              <Button
+                variant="outline"
+                aria-pressed={poseLab}
+                disabled={!!progress}
+                onClick={() => {
+                  setPoseLab(!poseLab);
+                  setPoseDebug(false);
+                }}
+              >
+                Pose lab
+              </Button>
+              {poseLab && (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setPoseView(poseView === "coach" ? "status" : "coach")
+                  }
+                >
+                  {poseView === "coach" ? "Status view" : "Coach view"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 aria-pressed={poseDebug}
-                onClick={() => setPoseDebug(!poseDebug)}
+                disabled={poseLab}
+                onClick={() => {
+                  setPoseDebug(!poseDebug);
+                }}
               >
                 <Eye size={18} />
                 Pose debug
@@ -627,7 +803,11 @@ export function LiveStudio() {
                 {pose.state?.count ?? 0} pose samples ·{" "}
                 {pose.state?.latest?.quality.legs_visible
                   ? "Legs visible"
-                  : "Legs not confirmed visible"}
+                  : pose.state?.latest?.quality.thighs_visible
+                    ? "Thighs visible"
+                    : pose.state?.latest?.quality.thighs_available
+                      ? "Thighs visible · lower legs estimated"
+                      : "Legs not confirmed visible"}
               </p>
               <p className="field-hint">
                 Turn the camera off to download preview JSONL. Starting a take
@@ -679,6 +859,56 @@ export function LiveStudio() {
                         evaluation?.message ??
                         "Enable your camera, then keep shoulders, hips and hands visible. Recording is optional for preview.")}
                   </p>
+                </div>
+                <div className="live-readiness" aria-label="Tracking status">
+                  <p>
+                    Pose:{" "}
+                    {pose.state?.phase === "error"
+                      ? "unavailable"
+                      : (evaluation?.phase ?? "loading")}
+                  </p>
+                  {evaluation?.phase === "calibrating" && (
+                    <progress
+                      aria-label="Pose calibration"
+                      max={1}
+                      value={evaluation.calibrationProgress}
+                    />
+                  )}
+                  <p>
+                    {!featureFlags.handTracking
+                      ? "Finger tracking off"
+                      : pose.state?.handError
+                        ? "Finger tracking unavailable"
+                        : pose.state?.handModel
+                          ? `Hands detected: ${pose.state.hands.length}`
+                          : "Loading finger tracking…"}
+                  </p>
+                  {speechEnabled && mode === "backend" && (
+                    <p role="status">
+                      {serverStatus ||
+                        "Live voice feedback starts with recording."}
+                    </p>
+                  )}
+                  {speechEnabled && mode !== "backend" && (
+                    <>
+                      <p role="status">
+                        {speech?.message ?? "Starting local voice feedback…"}
+                      </p>
+                      {speech?.phase === "calibrating" && (
+                        <progress
+                          aria-label="Voice calibration"
+                          max={1}
+                          value={speech.calibrationProgress}
+                        />
+                      )}
+                      <meter
+                        aria-label="Microphone level"
+                        min={-100}
+                        max={0}
+                        value={speech?.levelDb ?? -100}
+                      />
+                    </>
+                  )}
                 </div>
                 {latest && (
                   <span className="cue-caption">

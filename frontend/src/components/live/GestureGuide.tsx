@@ -28,11 +28,12 @@ export function GestureGuide({
       <ol>
         <li>
           <strong>Start neutral.</strong> Hold still for 3 seconds with hands
-          apart beside your waist. Each new recording calibrates again.
+          comfortably. Hand movement does not block your posture reference. Each
+          new recording calibrates again.
         </li>
         <li>
           <strong>Raise a hand.</strong> Keep it clearly above your shoulder for
-          about a second, with both hands visible.
+          about a second, with that wrist visible.
         </li>
         <li>
           <strong>Bring hands together.</strong> Hold in front of your torso for
@@ -40,8 +41,9 @@ export function GestureGuide({
         </li>
         <li>
           <strong>Move sideways.</strong> With the camera fixed, shift your body
-          about half a shoulder width and hold for about a second. A sideways lean is
-          detected separately. Only move if comfortable; then finish and replay.
+          about half a shoulder width and hold for about a second. A sideways
+          lean is detected separately. Only move if comfortable; then finish and
+          replay.
         </li>
       </ol>
       <p className="field-hint">

@@ -444,7 +444,7 @@ small {
 }
 .form-row {
   display: grid;
-  grid-template-columns: 1.12fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
   gap: 20px;
 }
 .segment-control {
@@ -545,6 +545,7 @@ small {
   display: flex;
   gap: 7px;
   align-items: center;
+  min-height: 44px;
 }
 input[type="checkbox"] {
   accent-color: var(--primary);

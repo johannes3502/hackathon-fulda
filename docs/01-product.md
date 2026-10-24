@@ -157,3 +157,16 @@ einbauen**:
 | 24.10.2026 | Lokale Whisper-Transkription als Standard | Nutzerauftrag: Speech-to-Text mit einem lokalen Modell statt Cloud-Zwang; Deepgram bleibt optional. |
 | 24.10.2026 | Lokaler Quellenvergleich und echte Text-Fragerunde im Web-Review | Nutzer präferiert freie/lokale Alternative zur zunächst gewählten OpenAI API. Keine API-Schlüssel; Zitate werden vor Anzeige geprüft. |
 | 24.10.2026 | Live-Transkription als optionale Web-Vorschau | Nutzerauftrag: Transcript nahezu in Echtzeit während der Aufnahme (`WS /speech/live`); AudioWorklet-Sender und Ausfallhinweis im Web integriert. |
+| 24.10.2026 | Pose-/Feedback-Anforderungen festgelegt | Deep Research zu Haltung, Kopforientierung, Händen, Füßen und Gesten; Research-Ziele in `docs/04-pose-tracking-requirements.md`; aktueller Integrationsstand dort separat markiert. |
+
+## Integrierte Analyse-Schalter (24.10.2026)
+
+Nutzerentscheidung: VIDEO als Standard; IMAGE/VIDEO und Lite/Heavy unabhängig
+umschaltbar, Lite bleibt Standard. GPU-first mit CPU-Fallback ohne Modellwechsel.
+Pose Lab und T12 bleiben Dev-only; Fingertracking läuft separat schaltbar
+standardmäßig im normalen Overlay, bis 5 Hz auch ohne Torso. Produktions-Evaluator,
+Zeitachse und Review aus `goal` bleiben aktiv. Sprachfeedback ist insgesamt und
+für Pause, Tempo, Füllwörter, Lautstärke und Tonhöhe einzeln schaltbar.
+„Live · in browser“ ist Standard und liefert lokale Mikrofonhinweise ohne Backend;
+der Backend-Modus nutzt den Signal-Stream. Füllwörter und Wort-Tempo kommen nach
+dem Stoppen. Die Haltungsreferenz benötigt keine stillgehaltenen Hände mehr.

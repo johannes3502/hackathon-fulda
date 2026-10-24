@@ -1,0 +1,71 @@
+{
+  "benchmark": "rag-embedding",
+  "model": "jinaai/jina-embeddings-v2-base-de",
+  "revision": "3f9eede875721714945b6a99a3198299243cf2be",
+  "model_cached_before_run": false,
+  "started_at_utc": "2026-10-24T14:16:14.410206+00:00",
+  "system": {
+    "hostname": "MacBook-M5-Pro-4.local",
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "kernel": "27.0.0",
+    "machine": "arm64",
+    "python": "3.12.13",
+    "cpu_count_logical": 15,
+    "cpu_model": "arm",
+    "ram_total_gb": 24.0,
+    "version_fastembed": "0.9.0",
+    "version_onnxruntime": "1.24.4",
+    "version_numpy": "2.4.6",
+    "version_tokenizers": "0.23.3"
+  },
+  "parameters": {
+    "query_reps": 5,
+    "num_chunks": 128,
+    "chunk_chars": 1200,
+    "document_batch_size": 16
+  },
+  "model_load_s": 0.5,
+  "query_embedding": {
+    "n": 50,
+    "mean_ms": 6.1,
+    "p50_ms": 6.13,
+    "p95_ms": 6.58,
+    "min_ms": 5.01,
+    "max_ms": 7.23,
+    "stdev_ms": 0.41,
+    "throughput_qps": 164.0,
+    "example_lengths_chars": [
+      44,
+      47,
+      50,
+      53,
+      58,
+      60,
+      62,
+      63,
+      65,
+      71
+    ]
+  },
+  "document_embedding": {
+    "batch_stats": {
+      "n": 8,
+      "mean_ms": 671.78,
+      "p50_ms": 688.26,
+      "p95_ms": 696.77,
+      "min_ms": 609.27,
+      "max_ms": 696.77,
+      "stdev_ms": 34.22
+    },
+    "total_s": 5.37,
+    "chunks_total": 128,
+    "chunks_per_second": 23.82,
+    "chars_total": 153600,
+    "chars_per_second": 28581
+  },
+  "vector": {
+    "dimension": 768,
+    "l2_norm": 1.0
+  },
+  "finished_at_utc": "2026-10-24T14:16:20.981254+00:00"
+}

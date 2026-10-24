@@ -1,9 +1,16 @@
+import type { PoseRuntime } from "./options";
 export type Landmark = {
   x: number;
   y: number;
   z: number;
   visibility?: number;
   presence?: number;
+};
+export type HandLandmark = [number, number, number];
+export type HandSample = {
+  label: string;
+  score: number;
+  landmarks: HandLandmark[];
 };
 export const POINTS = {
   nose: 0,
@@ -31,8 +38,22 @@ export const POINTS = {
 // Prototype heuristics, not validated thresholds or assessments.
 export const HEURISTICS = {
   confidence: 0.5,
+  handConfidence: 0.3,
   eyeWidthRatio: 0.65,
   eyeDepthRatio: 0.35,
+  // A detected hand belongs to the nearest pose wrist within this many
+  // shoulder widths (hand landmark 0 is the wrist).
+  handWristDist: 0.5,
+  // Thigh geometry also uses predicted knees just outside the frame. The
+  // crossing itself must lie in the visible image.
+  thighConfidence: 0.2,
+  thighMargin: 0.3,
+  thighCrossMargin: 0.1,
+  // An extended-line crossing counts as imminent when the remaining distance
+  // from the furthest knee is at most this many mean thigh lengths. The
+  // predicted point must also stay near the hips horizontally.
+  thighCloseReach: 0.75,
+  thighAimMargin: 0.5,
 };
 type PointName = keyof typeof POINTS;
 type Vector = [number, number, number];
@@ -41,15 +62,35 @@ const valid = (p?: Landmark): p is Landmark =>
   !!p && [p.x, p.y, p.z].every(Number.isFinite);
 const confidence = (n?: number) =>
   n !== undefined && Number.isFinite(n) && n >= 0 && n <= 1 ? n : null;
+const inImage = (p?: Landmark): p is Landmark =>
+  valid(p) && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
 const visible = (p?: Landmark) =>
-  valid(p) &&
-  p.x >= 0 &&
-  p.x <= 1 &&
-  p.y >= 0 &&
-  p.y <= 1 &&
+  inImage(p) &&
   (confidence(p.visibility) ?? 0) >= HEURISTICS.confidence &&
   (p.presence === undefined ||
     (confidence(p.presence) ?? 0) >= HEURISTICS.confidence);
+const inMargin = (p: Landmark, margin: number) =>
+  p.x >= -margin && p.x <= 1 + margin && p.y >= -margin && p.y <= 1 + margin;
+type Point2 = { x: number; y: number };
+type EstimatedPoint = { point: Vector; estimated: boolean };
+type LineHit = Point2 & { t: number; u: number };
+// Infinite-line intersection; t/u are segment parameters (0..1 between
+// endpoints). Parallel and touching lines are left to the caller.
+const lineIntersection = (
+  a: Point2,
+  b: Point2,
+  c: Point2,
+  d: Point2,
+): LineHit | null => {
+  const r = { x: b.x - a.x, y: b.y - a.y };
+  const s = { x: d.x - c.x, y: d.y - c.y };
+  const denominator = r.x * s.y - r.y * s.x;
+  if (Math.abs(denominator) < 1e-8) return null;
+  const q = { x: c.x - a.x, y: c.y - a.y };
+  const t = (q.x * s.y - q.y * s.x) / denominator;
+  const u = (q.x * r.y - q.y * r.x) / denominator;
+  return { x: a.x + t * r.x, y: a.y + t * r.y, t, u };
+};
 const sub = (a: Vector, b: Vector): Vector => [
   a[0] - b[0],
   a[1] - b[1],
@@ -85,6 +126,8 @@ export function poseSample(
   width: number,
   height: number,
   tMs: number,
+  // null when the hand model is unavailable; [] when it found no hands.
+  hands: HandSample[] | null = null,
 ) {
   if (
     points.length !== 33 ||
@@ -115,6 +158,142 @@ export function poseSample(
         ])
       : null;
   const planar = (p: Vector): Vector => [p[0], p[1], 0];
+  // Thigh endpoints stay usable when a knee is predicted just outside the
+  // frame. The crossing test below still requires a hit inside the image.
+  const legPoint = (
+    index: number,
+    allowEstimate: boolean,
+  ): EstimatedPoint | null => {
+    const p = points[index];
+    if (!valid(p)) return null;
+    const point: Vector = [p.x * width, p.y * height, p.z * width];
+    if (visible(p)) return { point, estimated: false };
+    if (!allowEstimate || !inMargin(p, HEURISTICS.thighMargin)) return null;
+    if (inImage(p)) {
+      const visibility = confidence(p.visibility);
+      const presence = confidence(p.presence);
+      if (
+        (visibility !== null && visibility < HEURISTICS.thighConfidence) ||
+        (presence !== null && presence < HEURISTICS.thighConfidence)
+      )
+        return null;
+    }
+    return { point, estimated: true };
+  };
+  const leftHip = legPoint(23, false);
+  const rightHip = legPoint(24, false);
+  const leftKnee = legPoint(25, true);
+  const rightKnee = legPoint(26, true);
+  const thighPoints =
+    leftHip && rightHip && leftKnee && rightKnee
+      ? { leftHip, rightHip, leftKnee, rightKnee }
+      : null;
+  const thighAngle = (() => {
+    if (!thighPoints) return null;
+    const { leftHip, rightHip, leftKnee, rightKnee } = thighPoints;
+    const left = planar(sub(leftKnee.point, leftHip.point));
+    const right = planar(sub(rightKnee.point, rightHip.point));
+    if (
+      Math.hypot(left[0], left[1]) < 1e-8 ||
+      Math.hypot(right[0], right[1]) < 1e-8
+    )
+      return null;
+    const raw = angle(left, right);
+    return raw === null ? null : Math.min(raw, 180 - raw);
+  })();
+  const thighLine =
+    thighPoints && thighAngle !== null
+      ? lineIntersection(
+          {
+            x: thighPoints.leftHip.point[0],
+            y: thighPoints.leftHip.point[1],
+          },
+          {
+            x: thighPoints.leftKnee.point[0],
+            y: thighPoints.leftKnee.point[1],
+          },
+          {
+            x: thighPoints.rightHip.point[0],
+            y: thighPoints.rightHip.point[1],
+          },
+          {
+            x: thighPoints.rightKnee.point[0],
+            y: thighPoints.rightKnee.point[1],
+          },
+        )
+      : null;
+  const thighHit =
+    thighLine &&
+    thighLine.t > 0 &&
+    thighLine.t < 1 &&
+    thighLine.u > 0 &&
+    thighLine.u < 1
+      ? thighLine
+      : null;
+  const thighCrossed =
+    thighAngle === null
+      ? null
+      : thighHit !== null &&
+        thighHit.x >= -HEURISTICS.thighCrossMargin * width &&
+        thighHit.x <= (1 + HEURISTICS.thighCrossMargin) * width &&
+        thighHit.y >= -HEURISTICS.thighCrossMargin * height &&
+        thighHit.y <= (1 + HEURISTICS.thighCrossMargin) * height;
+  // Before the knees cross, extend both thighs and check where they meet.
+  // The hit must be below the hips and near the body; at least one knee must
+  // still be short of it, and that remaining gap must be small. A thigh that
+  // already spans the hit is the support leg and does not need to move.
+  const thighAhead = (() => {
+    if (!thighPoints || thighAngle === null || !thighLine || thighHit)
+      return null;
+    const { leftHip, rightHip, leftKnee, rightKnee } = thighPoints;
+    const hipSpan = Math.hypot(
+      rightHip.point[0] - leftHip.point[0],
+      rightHip.point[1] - leftHip.point[1],
+    );
+    if (hipSpan < 1e-8) return null;
+    const hipY = (leftHip.point[1] + rightHip.point[1]) / 2;
+    if (thighLine.y <= hipY) return null;
+    const minX = Math.min(leftHip.point[0], rightHip.point[0]);
+    const maxX = Math.max(leftHip.point[0], rightHip.point[0]);
+    if (
+      thighLine.x < minX - HEURISTICS.thighAimMargin * hipSpan ||
+      thighLine.x > maxX + HEURISTICS.thighAimMargin * hipSpan
+    )
+      return null;
+    if (thighLine.t < 0 || thighLine.u < 0) return null;
+    const leftGap =
+      thighLine.t > 1
+        ? Math.hypot(
+            thighLine.x - leftKnee.point[0],
+            thighLine.y - leftKnee.point[1],
+          )
+        : null;
+    const rightGap =
+      thighLine.u > 1
+        ? Math.hypot(
+            thighLine.x - rightKnee.point[0],
+            thighLine.y - rightKnee.point[1],
+          )
+        : null;
+    if (leftGap === null && rightGap === null) return null;
+    const leftLength = Math.hypot(
+      leftKnee.point[0] - leftHip.point[0],
+      leftKnee.point[1] - leftHip.point[1],
+    );
+    const rightLength = Math.hypot(
+      rightKnee.point[0] - rightHip.point[0],
+      rightKnee.point[1] - rightHip.point[1],
+    );
+    const meanLength = (leftLength + rightLength) / 2;
+    if (meanLength < 1e-8) return null;
+    const gap = Math.max(leftGap ?? 0, rightGap ?? 0);
+    if (gap > HEURISTICS.thighCloseReach * meanLength) return null;
+    return { y: thighLine.y / height, gap: gap / meanLength };
+  })();
+  const thighClosing = thighAngle === null ? null : thighAhead !== null;
+  const thighsEstimated =
+    !!thighPoints &&
+    (thighPoints.leftKnee.estimated || thighPoints.rightKnee.estimated);
   const shoulders = get(11, 12)?.map(planar);
   const hips = get(23, 24)?.map(planar);
   const torso =
@@ -163,6 +342,67 @@ export function poseSample(
     const v = sub(p[0], mid(shoulders[0], shoulders[1]));
     return (side * (v[0] * axis[0] + v[1] * axis[1])) / span;
   };
+  // Forearm direction against the shoulder line, folded to [0,90]; 0 = level.
+  const forearm = (e: number, w: number) => {
+    const p = get(e, w)?.map(planar);
+    const a =
+      p && shoulders
+        ? angle(sub(p[1], p[0]), sub(shoulders[0], shoulders[1]))
+        : null;
+    return a === null ? null : Math.min(a, 180 - a);
+  };
+  // Wrist to same-side hip in shoulder widths. The wrist only needs to be an
+  // in-image estimate: a hand in a pocket is hidden by design.
+  const hipDist = (w: number, h: number) => {
+    const hip = get(h)?.map(planar);
+    const p = points[w];
+    const span = shoulders ? Math.hypot(...sub(shoulders[0], shoulders[1])) : 0;
+    return hip && inImage(p) && span > 1e-8
+      ? Math.hypot(p.x * width - hip[0][0], p.y * height - hip[0][1]) / span
+      : null;
+  };
+  // Highest visibility of the pinky, index and thumb points. Null when they
+  // fall outside the image, where a low value only means "out of frame".
+  const hand = (...indices: number[]) => {
+    const values = indices.map((i) =>
+      inImage(points[i]) ? confidence(points[i].visibility) : null,
+    );
+    return values.includes(null) ? null : Math.max(...(values as number[]));
+  };
+  // Each detected hand goes to the nearest pose wrist; the closer one wins.
+  const span = shoulders ? Math.hypot(...sub(shoulders[0], shoulders[1])) : 0;
+  const owner: [HandSample | null, HandSample | null] = [null, null];
+  const ownerDist = [Infinity, Infinity];
+  if (hands && span > 1e-8)
+    for (const h of hands) {
+      const root = h.landmarks[0];
+      if (h.landmarks.length !== 21 || !root || !root.every(Number.isFinite))
+        continue;
+      const dist = [15, 16].map((w) =>
+        valid(points[w])
+          ? Math.hypot(
+              (root[0] - points[w].x) * width,
+              (root[1] - points[w].y) * height,
+            ) / span
+          : Infinity,
+      );
+      const side = dist[0] <= dist[1] ? 0 : 1;
+      if (
+        dist[side] <= HEURISTICS.handWristDist &&
+        dist[side] < ownerDist[side]
+      ) {
+        owner[side] = h;
+        ownerDist[side] = dist[side];
+      }
+    }
+  // true = a hand was detected at this wrist. null when the hand model did
+  // not run or the hand is estimated outside the image (cropped, not hidden).
+  const found = (side: 0 | 1, ...fingers: number[]) =>
+    owner[side]
+      ? true
+      : hands === null || span <= 1e-8 || hand(...fingers) === null
+        ? null
+        : false;
   return {
     t_ms: Math.round(tMs),
     image: { width, height },
@@ -187,10 +427,28 @@ export function poseSample(
       right_wrist_height: wrist(12, 16),
       left_wrist_cross: cross(15, -1),
       right_wrist_cross: cross(16, 1),
+      left_forearm_deg: forearm(13, 15),
+      right_forearm_deg: forearm(14, 16),
+      left_wrist_hip_dist: hipDist(15, 23),
+      right_wrist_hip_dist: hipDist(16, 24),
+      thigh_angle_deg: thighAngle,
+      thighs_crossed: thighCrossed,
+      thigh_cross_y: thighHit ? thighHit.y / height : null,
+      thighs_closing: thighClosing,
+      thigh_close_y: thighAhead?.y ?? null,
+      thigh_close_gap: thighAhead?.gap ?? null,
+      left_hand_visibility: hand(17, 19, 21),
+      right_hand_visibility: hand(18, 20, 22),
+      left_hand_found: found(0, 17, 19, 21),
+      right_hand_found: found(1, 18, 20, 22),
     },
     quality: {
       pose_present: true,
+      hips_visible: [23, 24].every((i) => visible(points[i])),
       legs_visible: [25, 26, 27, 28].every((i) => visible(points[i])),
+      thighs_visible: [23, 24, 25, 26].every((i) => visible(points[i])),
+      thighs_available: thighPoints !== null,
+      thighs_estimated: thighsEstimated,
     },
   };
 }
@@ -210,7 +468,14 @@ export class PoseLog {
   get full() {
     return this.count >= 3000;
   }
-  add(points: Landmark[], width: number, height: number, timestamp: number) {
+  add(
+    points: Landmark[],
+    width: number,
+    height: number,
+    timestamp: number,
+    hands: HandSample[] | null = null,
+    runtime?: PoseRuntime,
+  ) {
     if (
       this.full ||
       !Number.isFinite(timestamp) ||
@@ -222,10 +487,13 @@ export class PoseLog {
       width,
       height,
       timestamp - (this.origin ?? timestamp),
+      hands,
     );
     if (sample) {
       this.origin ??= timestamp;
-      this.lines.push(JSON.stringify(sample));
+      this.lines.push(
+        JSON.stringify({ ...sample, ...(runtime ? { runtime } : {}) }),
+      );
     }
     return sample;
   }

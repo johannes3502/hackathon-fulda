@@ -18,6 +18,9 @@
   flex-direction: column;
   gap: 14px;
 }
+.sources-panel h2 {
+  font-size: 1.125rem;
+}
 .source-drop {
   display: flex;
   flex-direction: column;

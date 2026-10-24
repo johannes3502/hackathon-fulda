@@ -10,7 +10,7 @@ export function LiveBadge({ mode }: { mode: LiveConfig["mode"] }) {
     <span className={`demo-badge ${mode === "backend" ? "backend-badge" : ""}`}>
       <Radio size={13} />
       {mode === "local"
-        ? "Local gesture feedback"
+        ? "Local feedback"
         : "Local gestures + backend audio"}
     </span>
   );

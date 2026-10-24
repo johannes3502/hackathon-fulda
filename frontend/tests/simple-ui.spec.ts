@@ -121,6 +121,9 @@ test("recording consent stays visible while diagnostics and server details are o
   ).toBeHidden();
   await page.getByText("Recording options", { exact: true }).click();
   await page.getByLabel("Speech analysis").selectOption("backend");
+  await expect(page.locator(".live-audio-hint")).toContainText(
+    "Microphone audio is sent to your server",
+  );
   await expect(
     page.getByText("By starting, you agree", { exact: false }),
   ).toBeVisible();
@@ -223,6 +226,9 @@ test("shared navigation and help work with keyboard focus", async ({
     route.fulfill({ json: [] }),
   );
   await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Record your presentation" }),
+  ).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(
     page.getByRole("link", { name: "Skip to content" }),

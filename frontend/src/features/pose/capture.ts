@@ -5,16 +5,36 @@ export type PoseTiming = {
   inferenceMs: number | null;
   samplesPerSecond: number | null;
 };
+import { poseBackend, type PoseBackend } from "./backend";
+import { PoseTestTracker, type PoseTestResult } from "./testPoses";
+import type { HandSample } from "./sample";
+import {
+  DEFAULT_POSE_OPTIONS,
+  type PoseOptions,
+  type PoseRuntime,
+} from "./options";
 export type PoseState = {
   phase: "loading" | "running" | "stopped" | "error";
   count: number;
   message: string;
   latest: PoseSample | null;
+  image: { width: number; height: number } | null;
   evaluation: PoseEvaluation | null;
   timing: PoseTiming;
+  handModel: boolean | null;
+  handError: string | null;
+  hands: HandSample[];
+  backend: PoseBackend | null;
+  tests: PoseTestResult[];
 };
 export class PoseCapture {
   readonly log = new PoseLog();
+  private handModel: boolean | null = null;
+  private handError: string | null = null;
+  private hands: HandSample[] | null = [];
+  private backend: PoseBackend | null = null;
+  private tests = new PoseTestTracker();
+  private testResults: PoseTestResult[] = [];
   private worker: Worker | null = null;
   private frame = 0;
   private pending = false;
@@ -22,6 +42,7 @@ export class PoseCapture {
   private lastFrame = -Infinity;
   private timeout?: ReturnType<typeof setTimeout>;
   private latest: PoseSample | null = null;
+  private image: PoseState["image"] = null;
   private evaluator = new PoseEvaluator();
   private origin: number | null = null;
   private evaluation: PoseEvaluation | null = null;
@@ -35,6 +56,7 @@ export class PoseCapture {
   constructor(
     private video: HTMLVideoElement,
     private update: (state: PoseState) => void,
+    private options: PoseOptions = DEFAULT_POSE_OPTIONS,
   ) {}
   private publish(phase: PoseState["phase"], message: string) {
     this.update({
@@ -42,8 +64,14 @@ export class PoseCapture {
       message,
       count: this.log.count,
       latest: this.latest,
+      image: this.image,
       evaluation: this.evaluation,
       timing: this.timing,
+      handModel: this.handModel,
+      handError: this.handError,
+      hands: this.hands ?? [],
+      backend: this.backend,
+      tests: this.testResults,
     });
   }
   start() {
@@ -62,11 +90,32 @@ export class PoseCapture {
         if (this.worker !== worker) return;
         if (data.type === "ready") {
           clearTimeout(this.timeout);
+          this.handModel = data.hands === true;
+          this.handError =
+            typeof data.handError === "string" ? data.handError : null;
+          this.backend = poseBackend(data.backend);
+          this.hands = this.handModel ? [] : null;
           this.publish(
             "running",
-            "Waiting for a visible pose. Keep your upper body in frame.",
+            !this.options.handTracking || this.handModel
+              ? "Waiting for a visible pose. Keep your upper body in frame."
+              : "Pose ready. Finger tracking is unavailable; gesture and posture feedback continues.",
           );
           this.tick();
+        } else if (data.type === "backend") {
+          const backend = poseBackend(data.backend);
+          if (backend) {
+            this.backend = backend;
+            this.handModel = backend.hand !== null;
+            this.handError = backend.handError;
+            this.publish(
+              "running",
+              "Pose acceleration changed. Landmarks stay local.",
+            );
+          }
+        } else if (data.type === "dropped") {
+          clearTimeout(this.frameTimeout);
+          this.pending = false;
         } else if (data.type === "error") {
           this.fail(
             "Pose detection failed. You can download any samples already captured and retry.",
@@ -76,6 +125,8 @@ export class PoseCapture {
           this.pending = false;
           // A delayed preview inference must never affect a new take.
           if (this.origin !== null && data.timestamp < this.origin) return;
+          this.hands = Array.isArray(data.hands) ? data.hands : null;
+          this.image = { width: data.width, height: data.height };
           const elapsed = performance.now() - data.timestamp;
           this.timestamps = [...this.timestamps, data.timestamp].slice(-20);
           const duration = this.timestamps.at(-1)! - this.timestamps[0];
@@ -95,11 +146,20 @@ export class PoseCapture {
           };
           const origin = this.origin ?? Number(data.timestamp);
           this.origin = origin;
+          const runtime: PoseRuntime | undefined = this.backend
+            ? {
+                model: this.backend.model ?? this.options.model,
+                runningMode:
+                  this.backend.runningMode ?? this.options.runningMode,
+                delegate: this.backend.pose,
+              }
+            : undefined;
           const liveSample = poseSample(
             data.points,
             data.width,
             data.height,
             data.timestamp - origin,
+            this.hands,
           );
           // A frame captured before the recording anchor must not enter its log.
           const sample = this.log.full
@@ -109,12 +169,19 @@ export class PoseCapture {
                 data.width,
                 data.height,
                 data.timestamp,
+                this.hands,
+                runtime,
               );
           this.latest = sample;
           this.evaluation = this.evaluator.update(
             liveSample,
             data.timestamp - origin,
           );
+          for (const event of this.evaluation.events)
+            event.payload.runtime ??= runtime;
+          this.testResults = this.options.devMode
+            ? this.tests.update(sample, data.timestamp, this.hands ?? [])
+            : [];
           this.publish(
             "running",
             this.log.full
@@ -125,7 +192,7 @@ export class PoseCapture {
           );
         }
       };
-      worker.postMessage({ type: "init" });
+      worker.postMessage({ type: "init", options: this.options });
     } catch {
       this.fail("Pose capture is unavailable in this browser.");
     }
@@ -141,6 +208,9 @@ export class PoseCapture {
       this.origin !== null
     ) {
       this.latest = null;
+      this.hands = null;
+      this.tests.reset();
+      this.testResults = [];
       this.evaluation = this.evaluator.update(null, timestamp - this.origin);
       this.publish(
         "running",
@@ -214,6 +284,10 @@ export class PoseCapture {
     this.evaluator = new PoseEvaluator(sessionId);
     this.evaluation = null;
     this.latest = null;
+    this.timestamps = [];
+    this.hands = this.handModel ? [] : null;
+    this.tests.reset();
+    this.testResults = [];
   }
   recalibrate() {
     this.evaluator = new PoseEvaluator();
@@ -226,6 +300,8 @@ export class PoseCapture {
   private fail(message: string) {
     this.dispose();
     this.latest = null;
+    this.hands = null;
+    this.testResults = [];
     this.evaluation = this.evaluation
       ? { ...this.evaluation, phase: "framing", cue: null, message }
       : null;

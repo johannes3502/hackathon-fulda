@@ -525,6 +525,58 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
   Smoke schlug deshalb fehl. Modellqualität und vollständige echte Fragerunde
   bleiben ungeprüft; dies ist vom behobenen Verbindungs-/Startfehler getrennt.
 
+## Gemeinsamer Integrationsbranch mit Analyse-Schaltern (24.10.2026)
+
+- Nutzerauftrag: alle Teamfeatures auf einem eigenen Branch zusammenführen,
+  IMAGE/VIDEO und Lite/Heavy umschaltbar machen, VIDEO als Standard und
+  GPU-first mit CPU-Fallback verwenden. Sprach-/Pausenfeedback soll separat
+  schaltbar sein. Branch: `feat/integrated-coach-flags`; kein Merge nach `main`.
+- Integrierte Remote-Stände: `main` (`d00963d`, inklusive Start-/Readiness-Fix
+  und gemeinsamer Open-Sans-/Akzentgestaltung),
+  `goal` (`3b1ee02`), `feat/local-whisper-asr` (`4c697c0`),
+  `feat/johannes-pose-requirements` (`b22102b`, inklusive T12),
+  `hassan-poselog` (`67d1c8f`) und `bench/embedding-benchmark` (`ab8fd8a`).
+- Der Web-Worker verwendet standardmäßig Lite/VIDEO, alternativ Heavy und/oder
+  IMAGE. Beide Pose-Assets liegen lokal, float16/v1. VIDEO bekommt monoton
+  steigende Timestamps. GPU-Probe, Warm-up und Runtime-Fallback erhalten Modell
+  und Modus; Software-WebGL führt direkt zu CPU. Diagnose und JSONL/Event-Payload
+  enthalten Modell, Modus und tatsächlichen Delegate. Höchstens 10 Hz, ein Frame
+  gleichzeitig, Stale-Handling und Inferenz-Timeout bleiben erhalten.
+- Die kalibrierte Event-/Review-Pipeline aus `goal` bleibt maßgeblich. Regelversion
+  `pose-rules-v4` übernimmt die tolerantere Arme-verschränkt-Geometrie samt
+  Unterarmwinkel, weiterhin mit 2 s Mindestdauer und 20 s Cooldown. Ein Test
+  zeigte eine Überschneidung mit „Hände zusammen“: eng beieinanderliegende Hände
+  auf den eigenen Körperseiten bleiben bei dieser Regel, statt als verschränkte
+  Arme zu gelten. Baseline, Hysterese, Lückenbehandlung und gemeinsame Zeitachse
+  bleiben erhalten. Keine Gaze-, Pocket- oder Bein-Produktionsereignisse.
+- Pose Lab mit T1–T12 bleibt ein ausgeschaltetes Dev-Werkzeug. Nur dort wird
+  Hand Landmarker geladen und bei sichtbarer Pose ausgeführt. Ein Handmodellfehler
+  beendet nicht die Poseauswertung. Die Research-Anforderungen in `docs/04-pose-tracking-requirements.md`
+  trennen nun den implementierten Stand von weiterführenden Zielentwürfen.
+- **Analysis features** enthält Modell/Modus, einen Sprachfeedback-Hauptschalter
+  und einzelne Schalter für Pausen, Tempo, Füllwörter, Lautstärke und Tonhöhe.
+  Diese filtern Feedback-Marker, auch beim Wort-Import; Messwerte und Transkript
+  bleiben erhalten. Die Analyse selbst bleibt opt-in. Optionen werden pro Take
+  festgehalten, während Aufnahme/Analyse gesperrt und bis zum Reload im Workspace
+  behalten. Sprachmarker kommen nach Stop; Live-Captions bleiben separat.
+- Verifiziert: 147 Web- und 18 Mobile-Unit-Tests, 68 Playwright-Fälle auf Desktop
+  und 375 px, 84 Backend-Tests im lokalen Python-3.12-Container. Ein PostgreSQL-
+  Roundtrip-Test ohne `POSTGRES_HOST` übersprungen. Zwei Compose-Strukturtests,
+  Lint und Typecheck beider Workspaces, Next.js-Produktionsbuild und API-Schema-
+  Aktualität bestanden. Alle elf Architekturdiagramme mit Mermaid gerendert;
+  Analyse-Schalter auf Desktop und mobiler Breite visuell geprüft.
+- Browserfälle prüfen Aufnahme, Optionssperre, Pausenfilter inklusive Wort-Import,
+  Review/Navigation, Pose-Export und Fehlerpfade. Alle vier Modell-/Modus-
+  Kombinationen führen den echten lokalen Worker auf synthetischen Bildern aus;
+  API-Antworten und Bewegungs-Landmarks in den UI-Tests sind deterministische
+  Fixtures. GPU-Ausfälle werden im Worker-Test injiziert. Das belegt Datenfluss
+  und Fehlerbehandlung, keine Erkennungsqualität oder echte Hardware-GPU-Abnahme.
+- Vor Ort offen: Kamera-/Audio-Last, Heavy-Durchsatz, VIDEO-Verzögerung,
+  Erkennungsqualität der zusammengeführten Regeln und Safari/iPhone.
+  Dieser Integrationslauf hat keinen vollständigen Compose-/Whisper-/Ollama-
+  End-to-End-Lauf wiederholt; frühere Ergebnisse oben gelten für deren jeweiligen
+  Stand. Aktuelle Geräte-Checkliste: `docs/05-jury-demo.md`.
+
 ## Live-Sprechfeedback auf dem M5 Pro testen und anschließen (24.10.2026)
 
 - Nutzer meint Analyse während des Sprechens, nicht Sprachausgabe/TTS.
@@ -561,3 +613,57 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
   Browserfälle prüfen Live-Hinweis vor Stop, Caption-/Signal-Ausfall und
   weiterhin abspielbare Aufnahme. Echtes Mikrofon, Safari/iOS, parallele
   vollständige Coaching-Last und allgemeine Heuristikqualität bleiben offen.
+
+## Fingertracking, Kalibrierung und lokale Live-Sprache korrigieren (24.10.2026)
+
+- Nutzer meldet fehlende Finger und ausbleibende Live-Hinweise für Gesten sowie
+  Sprache/Pausen. Nach der Korrektur meldet er „ok it works great“ und beauftragt
+  ausdrücklich den Merge nach `main`. Das ersetzt die frühere Beschränkung auf
+  den Integrationsbranch; es ist ein informeller Test ohne Genauigkeitsmessung.
+- Der lokale Landmark-Export reproduziert den Posefehler: Modelle liefern gute
+  Schulter-/Hüftpunkte, aber die pauschale Mindest-Schulterbreite von 12 % und die
+  Hand-Stillhaltepflicht verhindern die gesamte Kalibrierung. Regelversion v5
+  entfernt die pauschale Breite, behält sichere Punkte, nicht degenerierte
+  Schultergeometrie und das Torso-Framing. Die 3-s-Haltungsreferenz hängt nur noch
+  von Torso und Position ab. Im Nachspielen wird sie nach rund 3 s fertig und
+  erzeugt Ereignisse. Der persönliche Export ist keine eingecheckte Testfixture;
+  die Regressionen verwenden handgezeichnete synthetische Geometrie.
+- Eine neutrale Handreferenz entsteht nur aus genug geeigneten Samples, sonst
+  bleibt sie `null`. Die vorhandenen Schwellen für Handhöhe/-abstand werden dann
+  geometrisch auf die Schultern bezogen; keine erfundene Referenz. Ein sichtbares
+  angehobenes Handgelenk reicht für „Hand above shoulder“. Hold, Cooldown,
+  Hysterese, Framing und die Aufnahmezeitbasis bleiben erhalten.
+- `Track fingers` ist unabhängig vom Pose Lab, standardmäßig an und auf 5 Hz
+  begrenzt. Hand Landmarker läuft auch ohne Torso; das Overlay kann allein eine
+  Hand mit allen 21 Punkten zeigen. Abschalten lädt das Modell nicht. GPU/CPU-
+  Fallback bleibt pro Modell erhalten. Pocket/T12 sind weiterhin nur Dev-Checks.
+- `Speech analysis → Live · in browser` ist Standard. Der vorhandene Kamera-/
+  Mikrostream speist ein lokales AudioWorklet (RMS, YIN, 40-ms-Frames). Ein neuer
+  lokaler Evaluator nutzt die vorhandenen Backend-Parameter für Pausen, relative
+  Lautstärke, Tonhöhenvariation und einen Energiehüllkurven-Rhythmus-Proxy.
+  Kalibrierung braucht 3 s aktive Messungen, kein Feedback aus Anfangsstille;
+  Mindestfenster, Datenlücken, ein Cue mit Mindestanzeige und Cooldown werden
+  berücksichtigt. Das ist Energieaktivität, kein Silero-VAD und keine WPM.
+- `Off · gestures only` braucht kein Mikro. Der Backend-Modus erhält den parallel
+  eingetroffenen `WS /speech/feedback`-Pfad aus `a9f9f9c`, einschließlich dessen
+  unabhängiger Whisper-Captions. Individuelle Feature-Schalter gelten auch für
+  Server-Hinweise. Lokaler und Server-Signalpfad laufen je nach gewähltem Modus;
+  keine doppelten Signalpipelines für denselben Take. Füllwörter/Wort-Tempo
+  bleiben beim Transkript. Aufnahme, Zeitachse und Review behalten die Live-
+  Marker auch bei Serverausfall; überlappende vollständige Analyse hat Vorrang.
+- UI zeigt Pose-Kalibrierung, Handzahl und lokale Mikrofonaktivität. Audio-
+  Kontexte und Worklets werden beendet, ohne den geteilten Stream vorzeitig zu
+  stoppen. Aufnahmestart setzt die Referenz und den Signal-Evaluator auf die
+  gemeinsame `MediaRecorder.onstart`-Zeit zurück.
+- Verifiziert: 166 Web- und 18 Mobile-Unit-Tests; 37 Desktop- und 37 Mobile-
+  Browserfälle bestanden. Der erste Mobil-Durchlauf fand einen seitlichen
+  Überlauf der Aufnahmeleiste; nach dem CSS-Fix die komplette Mobile-Suite
+  erneut erfolgreich. Audio-Browserfälle nutzen echte Worklet-Messungen auf
+  synthetischen Tönen und Pausen; Modell-/UI-Fixtures bleiben synthetisch.
+  Die vier Pose-Modell-/Modus-Kombinationen laden auch das echte Handmodell.
+  Geprüft sind zusätzlich Timestamp-Anker, Preview-Verwerfung, Abschalten,
+  Fehler-Fallback, Review-Erhalt und Audio-Ressourcenfreigabe. 92 Backendtests
+  bestanden; ein PostgreSQL-Roundtrip ohne `POSTGRES_HOST` übersprungen.
+  Lint/Typecheck beider Workspaces, Next.js-Produktionsbuild, API-Schema-Aktualität und alle elf Mermaid-Diagramme
+  bestanden. Reale Finger-/Sprachqualität, Raumgeräusche, Safari-Mikro und
+  längere gemeinsame Kamera-/Audio-Last sind dadurch nicht qualifiziert.

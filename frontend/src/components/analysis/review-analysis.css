@@ -242,7 +242,7 @@
 }
 .review418-chart {
   position: relative;
-  min-width: 33.75rem;
+  min-width: 37.5rem;
 }
 .review418-chart svg {
   width: 100%;
@@ -251,11 +251,11 @@
   overflow: visible;
 }
 .review418-chart text {
-  font: 0.75rem var(--font-sans);
+  font: 1rem var(--font-sans);
   fill: var(--muted);
 }
 .review418-chart text.review418-axis-title {
-  font-size: 0.75rem;
+  font-size: 1rem;
   fill: var(--muted);
 }
 .review418-plot-moment {
