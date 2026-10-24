@@ -168,6 +168,8 @@ flowchart TB
 flowchart TD
     LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>Three.js, statischer Fallback"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
+    SP["/stats-preview<br/>Stats-Karte mit Replay"] --> SC["StatsCard<br/>Three.js-Ring, vier Kriterien<br/>synthetische Demo-Werte"]
+    HOME --> SC
     LOADING -. "Suspense-Fallback beim Laden" .-> HOME
     HOME["/ - Start<br/>SessionSetupForm"] -->|"Demo starten"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
     HOME -->|"Session konfigurieren"| PRAC

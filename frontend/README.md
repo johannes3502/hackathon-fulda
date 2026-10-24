@@ -6,6 +6,14 @@ rebuild after changing dependencies or configuration.
 
 ## Use
 
+- **418 stats card**: on the start page and at `/stats-preview` (with replay).
+  Animated Three.js ring, 2×2 criteria, count-up and subtle pointer tilt.
+  `StatsCard` accepts `gesture`, `knowledge`, `flow`, `structure` values from
+  1–100; the overall value is their rounded arithmetic mean. Invalid or missing
+  values produce an unavailable overall value. The homepage currently passes
+  explicitly labeled synthetic demo values; no backend scoring is implemented.
+  Reduced motion shows final values immediately; SVG supports unavailable WebGL.
+
 - **418 loading preview** (`/loading-preview`): white background, #42ff8c rotating
   Three.js disc and locally hosted Noto Serif Display. The reusable
   `LoadingScreen` also supplies the App Router loading fallback (`app/loading.tsx`).

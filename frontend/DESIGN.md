@@ -1,5 +1,16 @@
 # Pitch Coach design
 
+## 418 stats card (2026-10-24)
+
+Explicit user request: a simplified player-card layout with an overall circle
+above Gestik, Fachwissen, Flow and Struktur (1–100%). Reuse white, #42ff8c and
+Noto Serif Display. The aggregate is interpreted as an equally weighted mean,
+not a digit sum. Three.js draws the ring; HTML values and SVG provide a readable
+fallback. Count-up runs once on entering the viewport, pointer movement adds a
+subtle card tilt, and reduced motion uses the final static state.
+This is a design prototype with labeled synthetic values, not a validated
+assessment. Actual criterion scoring remains undefined.
+
 ## 418 loading screen (2026-10-24)
 
 User-provided brand direction takes precedence for the loading screen: pure white,
