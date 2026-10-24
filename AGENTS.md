@@ -175,7 +175,9 @@ optionale Ziele, `progress.v1`, Export und Löschung. Es gibt keinen
 Gesamtscore. Profil-Löschung entkoppelt Sessions/Takes und entfernt nur die
 abgeleiteten Progress-Daten; Session-Löschung bleibt separat. Details:
 `docs/12-long-term-progress-data-design.md`; Frontend-Vertrag:
-`docs/13-long-term-progress-frontend-contract.md`; die Web-Anbindung ist offen.
+`docs/13-long-term-progress-frontend-contract.md`; die Web-UI unter `/progress`
+ist umgesetzt (Consent, Demo, Filter, Ziele, Export, Löschung); die Verknüpfung
+neuer Live-Aufnahmen mit einem Profil ist offen.
 Progress-Reads aktualisieren nur geänderte Takes (Review-Revision und
 Berechnungsversion). Explizites Recompute läuft als Celery-Job:
 `POST /profiles/{id}/progress/recompute` → `202 {runId,statusUrl}`,

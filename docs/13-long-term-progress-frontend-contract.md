@@ -1,12 +1,13 @@
 # Long-Term-Fortschritt — Frontend Data Contract und Timeline-UI
 
-Status: **In Arbeit — Johannes (24.10.2026).** Umsetzung auf dem Branch
-`feat/long-term-progress-ui`: Route `/progress` mit Profil-/Consent-Flow,
-Small Multiples, Detail-Chart, Change-Points, Qualitätstabelle und klar
-gekennzeichneten synthetischen Demo-Daten. Dieses Dokument bleibt der
+Status: **Web-UI umgesetzt (24.10.2026).** Route `/progress` mit
+Profil-/Consent-Flow, Small Multiples, Detail-Chart, Change-Points,
+Qualitätstabelle, Zielen, Export und Löschung; die synthetischen Demo-Daten
+liegen unter `/progress/demo`. Dieses Dokument bleibt der
 Arbeitsvertrag und beschreibt die API-Antwort `progress.v1`, die Bedeutung jedes
 Feldes, die Zustände und bewährte Muster für eine Timeline über viele
-Präsentationen.
+Präsentationen. Die Verknüpfung neuer Live-Aufnahmen mit einem Profil
+(Checkliste in §2) ist noch offen.
 
 Die fachliche Datenspeicherung und Auswertung steht in
 [`12-long-term-progress-data-design.md`](12-long-term-progress-data-design.md).

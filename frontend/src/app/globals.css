@@ -261,7 +261,7 @@ small {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-shrink: 0;
+  min-width: 0;
 }
 .drawer-trigger {
   gap: 7px;
@@ -399,7 +399,7 @@ small {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  flex-shrink: 0;
+  min-width: 0;
 }
 .brand-logo {
   display: inline-flex;
@@ -422,6 +422,9 @@ small {
   color: var(--muted);
   padding-left: 16px;
   border-left: 1px solid var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .app-nav {
   display: flex;
@@ -2015,6 +2018,12 @@ input[type="checkbox"] {
   }
   .tabs-list {
     gap: 18px;
+  }
+}
+@media (max-width: 480px) {
+  .app-nav a {
+    padding: 8px;
+    font-size: 0.75rem;
   }
 }
 @media (max-width: 380px) {
