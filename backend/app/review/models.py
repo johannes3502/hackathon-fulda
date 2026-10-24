@@ -13,6 +13,7 @@ from app.speech.models import AudioSummary
 from app.transcription.models import Word, WordSummary
 
 MAX_DURATION_MS = 86_400_000
+PresentationMode = Literal["startup", "thesis", "school", "nonprofit"]
 PoseCategory = Literal["posture", "head", "hands", "framing", "data-quality"]
 EventType = Literal["posture", "head", "hands", "framing", "data-quality", "gesture",
                     "filler", "pause", "pace", "volume", "pitch", "fact", "question"]
@@ -42,11 +43,14 @@ class Capture(Model):
     height: int = Field(default=720, gt=0, le=16384)
     fps: float = Field(default=30, gt=0, le=240)
     mirrored: bool = True
+    device_key: UUID | None = None
 
 
 class SessionCreate(Model):
     title: str = Field(min_length=1, max_length=200)
     collection_id: UUID | None = None
+    profile_id: UUID | None = None
+    presentation_mode: PresentationMode | None = None
     capture: Capture = Field(default_factory=Capture)
     consent: Consent
 
@@ -82,11 +86,14 @@ class TakeCreate(Model):
     duration_ms: int = Field(ge=0, le=MAX_DURATION_MS, strict=True)
     mime_type: str = Field(min_length=1, max_length=200)
     timebase: Timebase
+    recorded_at: datetime | None = None
     coverage: list[CoverageInterval] = Field(default_factory=list, max_length=10000,
         description="Measured pose-coverage intervals. Omitted time is explicitly unknown, not evaluable.")
 
     @model_validator(mode="after")
     def intervals(self):
+        if self.recorded_at is not None and self.recorded_at.tzinfo is None:
+            raise ValueError("E_RECORDED_AT_TIMEZONE: recordedAt must include a timezone")
         if any(item.t_ms + item.duration_ms > self.duration_ms for item in self.coverage):
             raise ValueError("E_EVENT_OUT_OF_RANGE: coverage exceeds take duration")
         return self
@@ -106,6 +113,8 @@ class TakeAnalysis(Model):
 class Take(TakeCreate):
     take_id: UUID
     session_id: UUID
+    profile_id: UUID | None = None
+    recorded_at_source: Literal["client", "server"] = "server"
     status: Literal["created", "audio_processing", "events_ready", "review_ready", "failed"]
     audio_probe: dict[str, Any] | None = None
     analysis: TakeAnalysis = Field(default_factory=TakeAnalysis)

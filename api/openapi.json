@@ -852,6 +852,18 @@
             "title": "Audiencemode",
             "type": "string"
           },
+          "deviceKey": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Devicekey"
+          },
           "fps": {
             "default": 30,
             "exclusiveMinimum": 0.0,
@@ -1945,6 +1957,165 @@
         "title": "Generator",
         "type": "object"
       },
+      "GoalInput": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "enum": [
+              "increase",
+              "decrease",
+              "target_band"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "targetMax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetmax"
+          },
+          "targetMin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetmin"
+          },
+          "targetValue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetvalue"
+          }
+        },
+        "required": [
+          "direction"
+        ],
+        "title": "GoalInput",
+        "type": "object"
+      },
+      "GoalListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/GoalRecord"
+            },
+            "title": "Goals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "goals"
+        ],
+        "title": "GoalListResponse",
+        "type": "object"
+      },
+      "GoalRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "increase",
+              "decrease",
+              "target_band"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "metricId": {
+            "title": "Metricid",
+            "type": "string"
+          },
+          "metricVersion": {
+            "title": "Metricversion",
+            "type": "integer"
+          },
+          "targetMax": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetmax"
+          },
+          "targetMin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetmin"
+          },
+          "targetValue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targetvalue"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metricId",
+          "metricVersion",
+          "direction",
+          "targetValue",
+          "targetMin",
+          "targetMax",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "GoalRecord",
+        "type": "object"
+      },
+      "GoalResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "goal": {
+            "$ref": "#/components/schemas/GoalRecord"
+          }
+        },
+        "required": [
+          "goal"
+        ],
+        "title": "GoalResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2084,6 +2255,188 @@
         "title": "Location",
         "type": "object"
       },
+      "MetricDefinitionOut": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Description",
+            "type": "object"
+          },
+          "heuristic": {
+            "title": "Heuristic",
+            "type": "boolean"
+          },
+          "isPrimary": {
+            "title": "Isprimary",
+            "type": "boolean"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Label",
+            "type": "object"
+          },
+          "metricId": {
+            "title": "Metricid",
+            "type": "string"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/MetricQuality"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "suggestedDirection": {
+            "enum": [
+              "increase",
+              "decrease",
+              "target_band",
+              "neutral"
+            ],
+            "title": "Suggesteddirection",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "valueType": {
+            "title": "Valuetype",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "metricId",
+          "version",
+          "label",
+          "description",
+          "unit",
+          "valueType",
+          "suggestedDirection",
+          "isPrimary",
+          "heuristic",
+          "source",
+          "quality"
+        ],
+        "title": "MetricDefinitionOut",
+        "type": "object"
+      },
+      "MetricProgressResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "generatedAt": {
+            "format": "date-time",
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProgressProfile"
+          },
+          "range": {
+            "$ref": "#/components/schemas/ProgressRange"
+          },
+          "schemaVersion": {
+            "const": "progress.v1",
+            "default": "progress.v1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "series": {
+            "$ref": "#/components/schemas/ProgressSeries"
+          }
+        },
+        "required": [
+          "generatedAt",
+          "profile",
+          "range",
+          "series"
+        ],
+        "title": "MetricProgressResponse",
+        "type": "object"
+      },
+      "MetricQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "deviceSensitive": {
+            "default": false,
+            "title": "Devicesensitive",
+            "type": "boolean"
+          },
+          "minAudioActiveRatio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minaudioactiveratio"
+          },
+          "minClaimCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minclaimcount"
+          },
+          "minDurationMs": {
+            "title": "Mindurationms",
+            "type": "integer"
+          },
+          "minPoseCoverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minposecoverage"
+          },
+          "minPoseValidRatio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minposevalidratio"
+          },
+          "minWordCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minwordcount"
+          }
+        },
+        "required": [
+          "minDurationMs"
+        ],
+        "title": "MetricQuality",
+        "type": "object"
+      },
       "NextAction": {
         "additionalProperties": false,
         "properties": {
@@ -2101,6 +2454,134 @@
           "text"
         ],
         "title": "NextAction",
+        "type": "object"
+      },
+      "PointContext": {
+        "additionalProperties": false,
+        "properties": {
+          "deviceKey": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Devicekey"
+          },
+          "durationMs": {
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "presentationMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "startup",
+                  "thesis",
+                  "school",
+                  "nonprofit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presentationmode"
+          },
+          "ruleVersions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ruleversions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "durationMs"
+        ],
+        "title": "PointContext",
+        "type": "object"
+      },
+      "PointQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "asrProvider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asrprovider"
+          },
+          "audioActiveRatio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audioactiveratio"
+          },
+          "claimCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claimcount"
+          },
+          "poseCoverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Posecoverage"
+          },
+          "poseValidRatio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Posevalidratio"
+          },
+          "syntheticDemo": {
+            "default": false,
+            "title": "Syntheticdemo",
+            "type": "boolean"
+          },
+          "wordCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wordcount"
+          }
+        },
+        "title": "PointQuality",
         "type": "object"
       },
       "PoseEvidence": {
@@ -2342,6 +2823,1297 @@
           "thresholdsStatus"
         ],
         "title": "PoseRule",
+        "type": "object"
+      },
+      "ProfileConsent": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "granted": {
+            "const": true,
+            "title": "Granted",
+            "type": "boolean"
+          },
+          "retentionUntil": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retentionuntil"
+          },
+          "scope": {
+            "const": "long-term-progress",
+            "title": "Scope",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "granted",
+          "at",
+          "version",
+          "scope"
+        ],
+        "title": "ProfileConsent",
+        "type": "object"
+      },
+      "ProfileConsentOut": {
+        "additionalProperties": false,
+        "properties": {
+          "grantedAt": {
+            "format": "date-time",
+            "title": "Grantedat",
+            "type": "string"
+          },
+          "retentionUntil": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retentionuntil"
+          },
+          "scope": {
+            "const": "long-term-progress",
+            "default": "long-term-progress",
+            "title": "Scope",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "grantedAt"
+        ],
+        "title": "ProfileConsentOut",
+        "type": "object"
+      },
+      "ProfileCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "consent": {
+            "$ref": "#/components/schemas/ProfileConsent"
+          },
+          "displayName": {
+            "default": "",
+            "maxLength": 120,
+            "title": "Displayname",
+            "type": "string"
+          },
+          "locale": {
+            "default": "de",
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Locale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "consent"
+        ],
+        "title": "ProfileCreate",
+        "type": "object"
+      },
+      "ProfileCreateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/ProfileIdentity"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "tokenIssued": {
+            "title": "Tokenissued",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile",
+          "tokenIssued"
+        ],
+        "title": "ProfileCreateResponse",
+        "type": "object"
+      },
+      "ProfileGetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/ProfileIdentity"
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "title": "ProfileGetResponse",
+        "type": "object"
+      },
+      "ProfileIdentity": {
+        "additionalProperties": false,
+        "properties": {
+          "consent": {
+            "$ref": "#/components/schemas/ProfileConsentOut"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "locale": {
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Locale",
+            "type": "string"
+          },
+          "profileId": {
+            "format": "uuid",
+            "title": "Profileid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profileId",
+          "displayName",
+          "locale",
+          "createdAt",
+          "consent"
+        ],
+        "title": "ProfileIdentity",
+        "type": "object"
+      },
+      "ProfilePatch": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayname"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "enum": [
+                  "de",
+                  "en"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          },
+          "retentionUntil": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retentionuntil"
+          }
+        },
+        "title": "ProfilePatch",
+        "type": "object"
+      },
+      "ProfileTake": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "presentationMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "startup",
+                  "thesis",
+                  "school",
+                  "nonprofit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presentationmode"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "title": "Recordedat",
+            "type": "string"
+          },
+          "recordedAtSource": {
+            "enum": [
+              "client",
+              "server"
+            ],
+            "title": "Recordedatsource",
+            "type": "string"
+          },
+          "sessionId": {
+            "format": "uuid",
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "takeId": {
+            "format": "uuid",
+            "title": "Takeid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "takeId",
+          "sessionId",
+          "recordedAt",
+          "recordedAtSource",
+          "durationMs",
+          "status"
+        ],
+        "title": "ProfileTake",
+        "type": "object"
+      },
+      "ProfileTakesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          },
+          "takes": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileTake"
+            },
+            "title": "Takes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "takes"
+        ],
+        "title": "ProfileTakesResponse",
+        "type": "object"
+      },
+      "ProfileTokenRotateResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          },
+          "tokenIssued": {
+            "default": true,
+            "title": "Tokenissued",
+            "type": "boolean"
+          }
+        },
+        "title": "ProfileTokenRotateResponse",
+        "type": "object"
+      },
+      "ProgressBaseline": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "first_3_eligible",
+              "first_5_eligible",
+              "same_mode_first_3",
+              "rolling_5",
+              "none"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "n": {
+            "default": 0,
+            "title": "N",
+            "type": "integer"
+          },
+          "takeIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Takeids",
+            "type": "array"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "ProgressBaseline",
+        "type": "object"
+      },
+      "ProgressChangePoint": {
+        "additionalProperties": false,
+        "properties": {
+          "algorithmVersion": {
+            "title": "Algorithmversion",
+            "type": "string"
+          },
+          "confidence": {
+            "default": "low",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence",
+            "type": "string"
+          },
+          "evidenceTakeIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Evidencetakeids",
+            "type": "array"
+          },
+          "fromValue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fromvalue"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "step_up",
+              "step_down",
+              "regression",
+              "recovery"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "magnitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Magnitude"
+          },
+          "metricId": {
+            "title": "Metricid",
+            "type": "string"
+          },
+          "metricVersion": {
+            "title": "Metricversion",
+            "type": "integer"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "title": "Recordedat",
+            "type": "string"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "takeId": {
+            "format": "uuid",
+            "title": "Takeid",
+            "type": "string"
+          },
+          "toValue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tovalue"
+          }
+        },
+        "required": [
+          "id",
+          "metricId",
+          "metricVersion",
+          "takeId",
+          "sequence",
+          "recordedAt",
+          "kind",
+          "algorithmVersion"
+        ],
+        "title": "ProgressChangePoint",
+        "type": "object"
+      },
+      "ProgressHighlight": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "insufficient_data",
+              "trend_up",
+              "trend_down",
+              "goal_on_track",
+              "goal_off_track",
+              "change_point",
+              "quality_warning"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "metricId": {
+            "title": "Metricid",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "takeId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Takeid"
+          },
+          "textKey": {
+            "title": "Textkey",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "metricId",
+          "textKey"
+        ],
+        "title": "ProgressHighlight",
+        "type": "object"
+      },
+      "ProgressLatest": {
+        "additionalProperties": false,
+        "properties": {
+          "changeVsBaseline": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changevsbaseline"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "title": "Recordedat",
+            "type": "string"
+          },
+          "relativeChange": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relativechange"
+          },
+          "reliableChange": {
+            "default": false,
+            "title": "Reliablechange",
+            "type": "boolean"
+          },
+          "takeId": {
+            "format": "uuid",
+            "title": "Takeid",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "zScore": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zscore"
+          }
+        },
+        "required": [
+          "takeId",
+          "recordedAt"
+        ],
+        "title": "ProgressLatest",
+        "type": "object"
+      },
+      "ProgressLimitation": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ProgressLimitation",
+        "type": "object"
+      },
+      "ProgressPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/PointContext"
+          },
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
+          "exclusionReasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Exclusionreasons",
+            "type": "array"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/PointQuality"
+          },
+          "recordedAt": {
+            "format": "date-time",
+            "title": "Recordedat",
+            "type": "string"
+          },
+          "recordedAtSource": {
+            "enum": [
+              "client",
+              "server"
+            ],
+            "title": "Recordedatsource",
+            "type": "string"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "sessionId": {
+            "format": "uuid",
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "takeId": {
+            "format": "uuid",
+            "title": "Takeid",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "takeId",
+          "sessionId",
+          "recordedAt",
+          "recordedAtSource",
+          "sequence",
+          "unit",
+          "eligible",
+          "quality",
+          "context"
+        ],
+        "title": "ProgressPoint",
+        "type": "object"
+      },
+      "ProgressProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "consent": {
+            "$ref": "#/components/schemas/ProfileConsentOut"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "eligibleTakes": {
+            "title": "Eligibletakes",
+            "type": "integer"
+          },
+          "firstRecordedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstrecordedat"
+          },
+          "lastRecordedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastrecordedat"
+          },
+          "locale": {
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Locale",
+            "type": "string"
+          },
+          "profileId": {
+            "format": "uuid",
+            "title": "Profileid",
+            "type": "string"
+          },
+          "totalTakes": {
+            "title": "Totaltakes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profileId",
+          "displayName",
+          "locale",
+          "createdAt",
+          "consent",
+          "totalTakes",
+          "eligibleTakes"
+        ],
+        "title": "ProgressProfile",
+        "type": "object"
+      },
+      "ProgressRange": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "presentationMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "startup",
+                  "thesis",
+                  "school",
+                  "nonprofit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presentationmode"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "window": {
+            "enum": [
+              "all",
+              "last_20",
+              "last_10",
+              "last_5"
+            ],
+            "title": "Window",
+            "type": "string"
+          }
+        },
+        "required": [
+          "window"
+        ],
+        "title": "ProgressRange",
+        "type": "object"
+      },
+      "ProgressResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "generatedAt": {
+            "format": "date-time",
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "highlights": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressHighlight"
+            },
+            "title": "Highlights",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressLimitation"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "metricDefinitions": {
+            "items": {
+              "$ref": "#/components/schemas/MetricDefinitionOut"
+            },
+            "title": "Metricdefinitions",
+            "type": "array"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProgressProfile"
+          },
+          "range": {
+            "$ref": "#/components/schemas/ProgressRange"
+          },
+          "schemaVersion": {
+            "const": "progress.v1",
+            "default": "progress.v1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressSeries"
+            },
+            "title": "Series",
+            "type": "array"
+          }
+        },
+        "required": [
+          "generatedAt",
+          "profile",
+          "range",
+          "metricDefinitions",
+          "series"
+        ],
+        "title": "ProgressResponse",
+        "type": "object"
+      },
+      "ProgressSeries": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProgressBaseline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changePoints": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressChangePoint"
+            },
+            "title": "Changepoints",
+            "type": "array"
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GoalRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "goalStatus": {
+            "default": "not_applicable",
+            "enum": [
+              "not_applicable",
+              "unknown",
+              "on_track",
+              "off_track",
+              "mixed"
+            ],
+            "title": "Goalstatus",
+            "type": "string"
+          },
+          "heuristic": {
+            "title": "Heuristic",
+            "type": "boolean"
+          },
+          "isPrimary": {
+            "title": "Isprimary",
+            "type": "boolean"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Label",
+            "type": "object"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProgressLatest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limitations": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressLimitation"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "metricId": {
+            "title": "Metricid",
+            "type": "string"
+          },
+          "metricVersion": {
+            "title": "Metricversion",
+            "type": "integer"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ProgressPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/ProgressSeriesQuality"
+          },
+          "suggestedDirection": {
+            "enum": [
+              "increase",
+              "decrease",
+              "target_band",
+              "neutral"
+            ],
+            "title": "Suggesteddirection",
+            "type": "string"
+          },
+          "trend": {
+            "$ref": "#/components/schemas/ProgressTrend"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metricId",
+          "metricVersion",
+          "label",
+          "unit",
+          "suggestedDirection",
+          "isPrimary",
+          "heuristic",
+          "points",
+          "trend",
+          "quality"
+        ],
+        "title": "ProgressSeries",
+        "type": "object"
+      },
+      "ProgressSeriesQuality": {
+        "additionalProperties": false,
+        "properties": {
+          "eligiblePoints": {
+            "title": "Eligiblepoints",
+            "type": "integer"
+          },
+          "excludedPoints": {
+            "title": "Excludedpoints",
+            "type": "integer"
+          },
+          "missingPoints": {
+            "title": "Missingpoints",
+            "type": "integer"
+          },
+          "ruleVersions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ruleversions",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "good",
+              "partial",
+              "poor"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "totalPoints": {
+            "title": "Totalpoints",
+            "type": "integer"
+          },
+          "versionBreak": {
+            "default": false,
+            "title": "Versionbreak",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "totalPoints",
+          "eligiblePoints",
+          "excludedPoints",
+          "missingPoints",
+          "status"
+        ],
+        "title": "ProgressSeriesQuality",
+        "type": "object"
+      },
+      "ProgressTrend": {
+        "additionalProperties": false,
+        "properties": {
+          "adjustedP": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adjustedp"
+          },
+          "algorithmVersion": {
+            "title": "Algorithmversion",
+            "type": "string"
+          },
+          "confidence": {
+            "default": "low",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "up",
+              "down",
+              "flat",
+              "unknown"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "effectSize": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectsize"
+          },
+          "mannKendallP": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mannkendallp"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "minimumDetectableChange": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimumdetectablechange"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "noiseBand": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noiseband"
+          },
+          "relativeChange": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relativechange"
+          },
+          "reliableSlope": {
+            "default": false,
+            "title": "Reliableslope",
+            "type": "boolean"
+          },
+          "slopeCi95": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slopeci95"
+          },
+          "slopePer10Takes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slopeper10Takes"
+          },
+          "slopePerTake": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slopepertake"
+          },
+          "status": {
+            "enum": [
+              "insufficient",
+              "early_signal",
+              "stable",
+              "trend_up",
+              "trend_down",
+              "unclear"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "window": {
+            "$ref": "#/components/schemas/TrendWindow"
+          }
+        },
+        "required": [
+          "status",
+          "direction",
+          "method",
+          "algorithmVersion",
+          "n",
+          "window"
+        ],
+        "title": "ProgressTrend",
         "type": "object"
       },
       "Provenance": {
@@ -3201,6 +4973,35 @@
             "title": "Createdat",
             "type": "string"
           },
+          "presentationMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "startup",
+                  "thesis",
+                  "school",
+                  "nonprofit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presentationmode"
+          },
+          "profileId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profileid"
+          },
           "sessionId": {
             "format": "uuid",
             "title": "Sessionid",
@@ -3254,6 +5055,35 @@
           },
           "consent": {
             "$ref": "#/components/schemas/Consent"
+          },
+          "presentationMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "startup",
+                  "thesis",
+                  "school",
+                  "nonprofit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presentationmode"
+          },
+          "profileId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profileid"
           },
           "title": {
             "maxLength": 200,
@@ -3527,6 +5357,39 @@
             "title": "Mimetype",
             "type": "string"
           },
+          "profileId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profileid"
+          },
+          "recordedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recordedat"
+          },
+          "recordedAtSource": {
+            "default": "server",
+            "enum": [
+              "client",
+              "server"
+            ],
+            "title": "Recordedatsource",
+            "type": "string"
+          },
           "sessionId": {
             "format": "uuid",
             "title": "Sessionid",
@@ -3704,6 +5567,18 @@
             "title": "Mimetype",
             "type": "string"
           },
+          "recordedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recordedat"
+          },
           "timebase": {
             "$ref": "#/components/schemas/Timebase"
           }
@@ -3869,6 +5744,61 @@
           "timeline"
         ],
         "title": "TimelineResponse",
+        "type": "object"
+      },
+      "TrendWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "fromRecordedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fromrecordedat"
+          },
+          "fromTakeId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fromtakeid"
+          },
+          "toRecordedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torecordedat"
+          },
+          "toTakeId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totakeid"
+          }
+        },
+        "title": "TrendWindow",
         "type": "object"
       },
       "ValidationError": {
@@ -4390,6 +6320,1967 @@
         ]
       }
     },
+    "/profiles": {
+      "post": {
+        "operationId": "create_profile_profiles_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create Profile",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/profiles/{profile_id}": {
+      "delete": {
+        "operationId": "delete_profile_profiles__profile_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete Profile",
+        "tags": [
+          "progress"
+        ]
+      },
+      "get": {
+        "operationId": "get_profile_profiles__profile_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileGetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Profile",
+        "tags": [
+          "progress"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_profile_profiles__profile_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfilePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileGetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Patch Profile",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/profiles/{profile_id}/export": {
+      "get": {
+        "operationId": "export_profiles__profile_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/profiles/{profile_id}/goals": {
+      "get": {
+        "operationId": "get_goals_profiles__profile_id__goals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Goals",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/profiles/{profile_id}/goals/{metric_id}": {
+      "delete": {
+        "operationId": "delete_goal_profiles__profile_id__goals__metric_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "metric_id",
+            "required": true,
+            "schema": {
+              "title": "Metric Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete Goal",
+        "tags": [
+          "progress"
+        ]
+      },
+      "put": {
+        "operationId": "put_goal_profiles__profile_id__goals__metric_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "metric_id",
+            "required": true,
+            "schema": {
+              "title": "Metric Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Put Goal",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/profiles/{profile_id}/progress": {
+      "get": {
+        "operationId": "get_progress_profiles__profile_id__progress_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "default": "last_20",
+              "title": "Window",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "metrics",
+            "required": false,
+            "schema": {
+              "default": "primary",
+              "title": "Metrics",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "presentationMode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Presentationmode"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeExcluded",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Includeexcluded",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeExploratory",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Includeexploratory",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Progress",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/profiles/{profile_id}/progress/recompute": {
+      "post": {
+        "operationId": "recompute_profiles__profile_id__progress_recompute_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Recompute",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/profiles/{profile_id}/progress/{metric_id}": {
+      "get": {
+        "operationId": "get_metric_progress_profiles__profile_id__progress__metric_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "metric_id",
+            "required": true,
+            "schema": {
+              "title": "Metric Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "default": "last_20",
+              "title": "Window",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "presentationMode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Presentationmode"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeExcluded",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Includeexcluded",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricProgressResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Metric Progress",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/profiles/{profile_id}/rotate-token": {
+      "post": {
+        "operationId": "rotate_token_profiles__profile_id__rotate_token_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileTokenRotateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Rotate Token",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
+    "/profiles/{profile_id}/takes": {
+      "get": {
+        "operationId": "get_takes_profiles__profile_id__takes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileTakesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Gone"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Takes",
+        "tags": [
+          "progress"
+        ]
+      }
+    },
     "/questions": {
       "post": {
         "description": "Generate follow-up questions from transcript, fact-check findings and uploads.\n\nSends transcript sentences, findings and upload passages to the configured\nOpenAI-compatible model (same as the fact-check). Questions with a spoken\npassage carry `t_ms` of the recording and appear as `question` events.",
@@ -4742,6 +8633,22 @@
               "title": "Idempotency-Key",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
+            }
           }
         ],
         "requestBody": {
@@ -5062,6 +8969,22 @@
               "minLength": 1,
               "title": "Idempotency-Key",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Profile-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Profile-Token"
             }
           }
         ],

@@ -16,6 +16,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.factcheck.llm import configured_llm
 from app.jobs import QueueUnavailable, enqueue_task
+from app.progress import service as progress_service
 from app.review import db, media, service
 from app.review.errors import ReviewError
 from app.review.models import (TakeJobAccepted, ErrorResponse, EventBatch, EventsAccepted, EvaluationResponse, FactcheckRequest,
@@ -101,7 +102,10 @@ async def dispatch(value):
 
 
 @router.post("/sessions", status_code=201, response_model=SessionResponse)
-def create_session(request: SessionCreate, idempotency_key: Key):
+def create_session(request: SessionCreate, idempotency_key: Key,
+                   profile_token: str | None = Header(default=None, alias="X-Profile-Token")):
+    if request.profile_id is not None:
+        progress_service.require_profile_token(request.profile_id, profile_token)
     return mutation_response(service.create_session(request, checked_key(idempotency_key)))
 
 
@@ -117,7 +121,9 @@ def delete_session(session_id: UUID):
 
 
 @router.post("/sessions/{session_id}/takes", status_code=201, response_model=TakeResponse)
-def create_take(session_id: UUID, request: TakeCreate, idempotency_key: Key):
+def create_take(session_id: UUID, request: TakeCreate, idempotency_key: Key,
+                profile_token: str | None = Header(default=None, alias="X-Profile-Token")):
+    progress_service.authorize_session(session_id, profile_token)
     return mutation_response(service.create_take(session_id, request, checked_key(idempotency_key)))
 
 

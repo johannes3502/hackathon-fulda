@@ -178,6 +178,25 @@ do not establish model accuracy, human claim support, browser seeking or device
 acceptance. Automatic session retention, authentication and public-host rate
 limits remain open; the confirmed deployment scope is localhost.
 
+## Long-term progress (optional)
+
+`app/progress/` adds pseudonymous profiles and a deterministic read model for
+long-term trends. It is additive: sessions without `profileId` behave exactly
+as before.
+
+- `POST /profiles` with `scope: "long-term-progress"` returns a one-time
+  `pp_…` token. Send it as `X-Profile-Token` for every profile route.
+- `POST /sessions` accepts `profileId` and `presentationMode`; when linked, the
+  token is required. Takes inherit `profileId` and `capture.deviceKey`.
+- `GET /profiles/{id}/progress` materializes `take_quality`, `take_metrics`,
+  snapshots and change-points for profiles up to 200 takes. Larger profiles use
+  the explicit `POST /profiles/{id}/progress/recompute`.
+- Metrics are heuristics, missing values stay unknown, and the response has no
+  overall score. See `docs/12-long-term-progress-data-design.md` and
+  `docs/13-long-term-progress-frontend-contract.md`.
+- `DELETE /profiles/{id}` removes progress data but unlinks sessions/takes;
+  delete a session separately for its analysis data.
+
 ## Background jobs
 
 `app/celery_app.py` configures Celery; add background tasks in `app/tasks.py`.

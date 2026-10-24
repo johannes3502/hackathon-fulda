@@ -137,9 +137,11 @@ erDiagram
 | `id` | `uuid` | PK, default `gen_random_uuid()` |
 | `title` | `text` | not null |
 | `collection_id` | `uuid` | null; verweist auf bestehende Quellen-Collection |
+| `profile_id` | `uuid` | null; FK → `speaker_profiles.id`, `ON DELETE SET NULL` |
+| `presentation_mode` | `text` | null oder `startup`, `thesis`, `school`, `nonprofit` |
 | `status` | `text` | `created`, `analyzing`, `review_ready`, `failed`, `deleted` |
 | `consent` | `jsonb` | `{granted, at, version, scope}` |
-| `capture` | `jsonb` | Framing/Audience/Resolution, ohne Videodaten |
+| `capture` | `jsonb` | Framing/Audience/Resolution und optional `deviceKey`; ohne Videodaten |
 | `created_at` | `timestamptz` | not null |
 | `deleted_at` | `timestamptz` | null |
 
@@ -149,6 +151,10 @@ erDiagram
 |---|---|---|
 | `id` | `uuid` | PK |
 | `session_id` | `uuid` | FK → `sessions.id`, `ON DELETE CASCADE` |
+| `profile_id` | `uuid` | null; denormalisiert aus Session, FK `ON DELETE SET NULL` |
+| `recorded_at` | `timestamptz` | not null; Client-Zeit oder Server-Fallback |
+| `recorded_at_source` | `text` | `client` oder `server` |
+| `device_key` | `uuid` | null; zufällige Geräte-UUID aus `capture.deviceKey`, kein Fingerprint |
 | `status` | `text` | `created`, `audio_processing`, `events_ready`, `review_ready`, `failed` |
 | `duration_ms` | `int` | `>= 0`; kanonische Dauer |
 | `mime_type` | `text` | z. B. `video/webm;codecs=vp8,opus` |
@@ -474,13 +480,16 @@ Request:
 {
   "title": "Hackathon-Pitch",
   "collectionId": "col_123",
+  "profileId": "5e0f7c2a-…",
+  "presentationMode": "startup",
   "capture": {
     "framingMode": "upper-body",
     "audienceMode": "camera",
     "width": 1280,
     "height": 720,
     "fps": 30,
-    "mirrored": true
+    "mirrored": true,
+    "deviceKey": "a3f1c9e2-…"
   },
   "consent": {
     "granted": true,
@@ -490,6 +499,9 @@ Request:
   }
 }
 ```
+
+Wenn `profileId` gesetzt ist, ist zusätzlich `X-Profile-Token: pp_…` nötig.
+Ohne `profileId` bleibt der bestehende anonyme Session-Pfad unverändert.
 
 Response:
 
@@ -513,6 +525,7 @@ Request:
 {
   "durationMs": 182200,
   "mimeType": "video/webm;codecs=vp8,opus",
+  "recordedAt": "2026-10-24T18:03:00Z",
   "timebase": {
     "onstartPerfMs": 12345.6,
     "firstVideoPtsMs": 12,
@@ -528,6 +541,11 @@ Request:
 }
 ```
 
+`recordedAt` ist optional. Fehlt es oder liegt es außerhalb des
+Plausibilitätsfensters, setzt der Server `recordedAtSource="server"`.
+`profileId` und `deviceKey` werden aus der Session kopiert; der Take-Request
+sendet sie nicht erneut.
+
 Response:
 
 ```json
@@ -535,6 +553,9 @@ Response:
   "take": {
     "takeId": "t_91c2",
     "sessionId": "s_7f3a",
+    "profileId": "5e0f7c2a-…",
+    "recordedAt": "2026-10-24T18:03:00Z",
+    "recordedAtSource": "client",
     "durationMs": 182200,
     "mimeType": "video/webm;codecs=vp8,opus",
     "status": "created",
@@ -825,6 +846,41 @@ HTTP-Codes:
   Publizieren aus, liefert die Anfrage 503; derselbe POST/Key publiziert beim
   Retry denselben noch wartenden Job. Ein periodischer Outbox-Sweeper ist
   nicht implementiert. Ein Take erlaubt höchstens einen aktiven langen Job.
+
+### 6.13 Long-Term-Progress (additiv)
+
+Die Progress-API liegt in `backend/app/progress/` und ist optional. Sie nutzt
+`X-Profile-Token: pp_…` für alle Profil-Routen; `profileId` allein reicht nicht.
+
+```text
+POST   /api/profiles
+GET    /api/profiles/{id}
+PATCH  /api/profiles/{id}
+DELETE /api/profiles/{id}
+POST   /api/profiles/{id}/rotate-token
+GET    /api/profiles/{id}/progress
+GET    /api/profiles/{id}/progress/{metricId}
+POST   /api/profiles/{id}/progress/recompute
+GET    /api/profiles/{id}/goals
+PUT    /api/profiles/{id}/goals/{metricId}
+DELETE /api/profiles/{id}/goals/{metricId}
+GET    /api/profiles/{id}/takes
+GET    /api/profiles/{id}/export?format=json|csv
+```
+
+- Neue Mutationen brauchen `Idempotency-Key`; Profil-Erstellung liefert den
+  Roh-Token nur in der ersten `201`-Antwort, ein Retry `200` ohne Token.
+- `DELETE /profiles/{id}` löscht Profil, Token, Ziele und abgeleitete
+  Progress-Daten. Sessions/Takes werden per `ON DELETE SET NULL` entkoppelt und
+  bleiben unter ihrer eigenen Session-Einwilligung; `DELETE /sessions/{id}`
+  bleibt die vollständige Session-Löschung.
+- `progress.v1` liefert `points` pro Take inklusive `eligible=false` und
+  `exclusionReasons`; es gibt keine Scores, Noten, Rankings, Wörter, Landmarks
+  oder Medien-URLs.
+- `recordedAtSource="server"` markiert fehlende/implausible Client-Zeit; das ist
+  kein Ausschlussgrund.
+- Details und DDL: `docs/12-long-term-progress-data-design.md`; Frontend-Vertrag:
+  `docs/13-long-term-progress-frontend-contract.md`.
 
 ## 7. Analyse-Pipeline
 
@@ -1193,6 +1249,7 @@ Kausalität oder Ratschläge ungültig. Menschliche Claim-Labels bleiben nötig.
 | Daten | Ort | Retention |
 |---|---|---|
 | Session/Take/Event/Review | Postgres | bis Löschung oder Retention-Frist |
+| Progress-Profil/Token/Metriken/Ziele | Postgres | Profil-Retention; Löschung entfernt abgeleitete Progress-Daten |
 | Audio-Upload | S3/SeaweedFS temporär | bis Job-Ende, dann löschen |
 | Quellen-Uploads | S3/SeaweedFS | bestehende Sources-Retention |
 | Video | Browser IndexedDB | lokal, bis Nutzer löscht |
@@ -1208,6 +1265,11 @@ Kausalität oder Ratschläge ungültig. Menschliche Claim-Labels bleiben nötig.
 - löscht **nicht** das lokale Video im Browser.
 
 Das Frontend muss die lokale Kopie separat löschen und dem Nutzer beide Wirkungen anzeigen.
+
+`DELETE /api/profiles/{id}` löscht Profil, Token, Ziele und die abgeleiteten
+Progress-Zeilen. Es entfernt **nicht** die Sessions/Takes; deren `profile_id`
+wird per `ON DELETE SET NULL` entkoppelt. Für die vollständige Löschung der
+Analyse ist zusätzlich `DELETE /api/sessions/{id}` nötig.
 
 ### 9.3 Logs
 

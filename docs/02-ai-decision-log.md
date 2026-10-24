@@ -980,3 +980,36 @@ Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
   alle zwölf Mermaid-Architekturdiagramme geparst.
 - Grenzen: synthetische Daten und simulierte Modell-Ausfälle. Kein neuer echter
   Provider-, Mikrofon-, Geräte- oder pädagogischer Genauigkeitsnachweis.
+
+## Long-Term-Progress: Validierung und Backend (24.10.2026)
+
+- Nutzerauftrag: Frontend-Plan auf `main` pushen; Backend-Plan an wichtigen
+  Architekturentscheidungen mit Deep Research validieren, verbessern und
+  implementieren; mit vorhandenen Ressourcen testen. Gearbeitet auf
+  `feat/long-term-progress` nach Fetch/Pull von `main`.
+- Statistik: Baseline bleibt Median der ersten 3 eligible Takes. Das Rauschband
+  kommt aus der MAD der Residuen um die Theil–Sen-Gerade, nicht aus nur 3
+  Startwerten. Der RCI-Vergleich nutzt den Median der letzten 3 Punkte. Der
+  Theil–Sen-CI ist das mittlere 95-%-Intervall der paarweisen Steigungen;
+  keine „exakte“ Aussage für n<10. Mann–Kendall-p erst ab n≥10; bei
+  Autokorrelation konservative AR(1)-Effektivstichprobe. CUSUM nutzt ein festes
+  Baseline-Ziel, startet nach den ersten 3 Punkten, `k=0.5`, `h=4.0`, zwei
+  aufeinanderfolgende Alarme und eine metrikspezifische Mindestwirkung.
+  CUSUM ist kein Pflicht-Gate für den Trend. Quellen: NIST CUSUM/EWMA,
+  USGS/Kendall, Theil–Sen, Jacobson–Truax, Barnett et al., Benjamini–Hochberg.
+- Architektur: materialisierte Projektion statt Event Sourcing; `take_metrics.value`
+  nullable; `goalStatus` pro Metrik ohne `mixed`; Change-Point-Valenz nur mit
+  Ziel; Profil-Löschung entfernt Progress-Daten und entkoppelt Sessions/Takes
+  (`ON DELETE SET NULL`); keine Partitionierung im MVP. Mehrfache Takes einer
+  Session werden als abhängig markiert (Confidence `low`, Limitation
+  `clustered-takes`).
+- Umsetzung: `backend/app/progress/` mit Profil/Token, additiven Session-/Take-
+  Feldern, Qualitäts-/Metriktabellen, Snapshots/Change-Points, Ziele, Export,
+  Recompute und `progress.v1`. Neue Session-/Take-Pfade prüfen den Profil-Token.
+- Geprüft: **290 Backend-Tests, 1 Skip** (Postgres/Silero), darunter 10 neue
+  Progress-Tests; OpenAPI und `api/schema.d.ts` regeneriert. Frontend-Typecheck
+  scheitert unabhängig von diesem Change an fehlendem `@elevenlabs/client` und
+  Mobile-Abhängigkeiten. Keine echten Nutzer-, Mikrofon- oder Genauigkeitsdaten;
+  keine Cloud-Keys für die Progress-Tests nötig.
+- Grenzen: Rate Limiting, Retention-Cron, Multi-Device und die Web-Anbindung
+  bleiben offen. `progress.v1` ist ein Vertrag, keine UI-Umsetzung.
