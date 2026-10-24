@@ -1,11 +1,18 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { analysisResult, apiEndpoint, parseWords } from "./analysis";
+import {
+  analysisResult,
+  apiEndpoint,
+  parseWords,
+  parseTranscript,
+} from "./analysis";
 import { AnalysisTransport } from "./transport";
 afterEach(() => vi.unstubAllGlobals());
 it("resolves the Compose API path against the current browser origin", () => {
   vi.stubGlobal("location", new URL("https://coach.example:8443/live"));
   expect(apiEndpoint("/api", true)).toBe("https://coach.example:8443/api");
-  expect(apiEndpoint("http://localhost:8000/", false)).toBe("http://localhost:8000");
+  expect(apiEndpoint("http://localhost:8000/", false)).toBe(
+    "http://localhost:8000",
+  );
   expect(() => apiEndpoint("http://localhost:8000", true)).toThrow();
 });
 
@@ -23,6 +30,85 @@ const result = {
 };
 const jobId = "12345678-1234-1234-1234-123456789abc";
 const accepted = { job_id: jobId, status_url: `/speech/jobs/${jobId}` };
+it("requests local-only ASR, retains words and avoids duplicate timestamp events", async () => {
+  const words = [{ word: "Ähm", start_ms: 0, end_ms: 250 }];
+  const event = {
+    t_ms: 0,
+    duration_ms: 250,
+    type: "filler",
+    severity: "hint",
+    source: "asr",
+    payload: { word: "Ähm" },
+  };
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ status: "ok" }))
+    .mockResolvedValueOnce(Response.json(accepted, { status: 202 }))
+    .mockResolvedValueOnce(
+      Response.json({
+        job_id: jobId,
+        status: "completed",
+        result: {
+          audio: { summary: { pause_count: 0 } },
+          transcription: { summary: { filler_count: 1 } },
+          events: [event],
+          words,
+          asr_provider: "whisper",
+          synthetic_demo: false,
+          notices: ["Check recognition errors."],
+        },
+      }),
+    );
+  vi.stubGlobal("fetch", fetcher);
+  const transport = new AnalysisTransport("http://localhost:8000", true),
+    receive = vi.fn();
+  await transport.connect({ sessionId: "test" }, receive);
+  await transport.finish(1000, new Blob(["synthetic audio"]));
+  expect(fetcher.mock.calls[1][1].body.get("local_only")).toBe("true");
+  expect(fetcher.mock.calls[1][1].body.get("transcribe")).toBe("true");
+  expect(receive.mock.calls[0][0]).toMatchObject({
+    type: "transcript",
+    transcript: { words, provider: "whisper", synthetic: false },
+  });
+  const events = receive.mock.calls.filter(
+    ([message]) => message.type === "feedback",
+  );
+  expect(events).toHaveLength(1);
+  expect(events[0][0].feedback.id).toBe("words-0");
+  expect(receive.mock.calls.at(-1)?.[0].metrics).toContainEqual({
+    id: "words-filler_count",
+    label: "Transcript: filler count",
+    value: 1,
+  });
+});
+it("accepts an empty recognized transcript but rejects malformed words", () => {
+  expect(
+    parseTranscript(
+      {
+        words: [],
+        asr_provider: "whisper",
+        synthetic_demo: false,
+        notices: [],
+      },
+      1000,
+    ).words,
+  ).toEqual([]);
+  expect(() =>
+    parseTranscript({ words: [], asr_provider: "whisper" }, 1000),
+  ).toThrow();
+  expect(() =>
+    parseWords([{ word: " ", start_ms: 0, end_ms: 20 }], 1000),
+  ).toThrow();
+  expect(() =>
+    parseWords(
+      [
+        { word: "A", start_ms: 20, end_ms: 40 },
+        { word: "B", start_ms: 0, end_ms: 10 },
+      ],
+      1000,
+    ),
+  ).toThrow("ordered");
+});
 it("uploads a complete recording only after stopping and maps real feedback", async () => {
   const fetcher = vi
     .fn()

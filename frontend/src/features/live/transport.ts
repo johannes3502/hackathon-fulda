@@ -1,11 +1,19 @@
 import type { LiveConfig, LiveMessage, VideoTransport } from "./contracts";
-import { analysisResult, request, waitForAudioJob } from "./analysis";
+import {
+  analysisResult,
+  parseTranscript,
+  request,
+  waitForAudioJob,
+} from "./analysis";
 
 export class AnalysisTransport implements VideoTransport {
   private controller = new AbortController();
   private receive?: (message: LiveMessage) => void;
   private sessionId = "";
-  constructor(private endpoint: string) {}
+  constructor(
+    private endpoint: string,
+    private transcribe = false,
+  ) {}
   async connect(
     session: { sessionId: string },
     receive: (message: LiveMessage) => void,
@@ -23,8 +31,8 @@ export class AnalysisTransport implements VideoTransport {
       recording,
       recording.type.includes("mp4") ? "take.mp4" : "take.webm",
     );
-    // Preserve this UI's local signal-analysis mode; paid ASR is opt-in via API.
-    body.append("transcribe", "false");
+    body.append("transcribe", String(this.transcribe));
+    body.append("local_only", "true");
     const accepted = await request(
       this.endpoint,
       "/speech/analyze",
@@ -34,11 +42,28 @@ export class AnalysisTransport implements VideoTransport {
         body,
       },
     );
-    const result = analysisResult(
-      await waitForAudioJob(this.endpoint, accepted, this.controller.signal),
-      "speech",
-      durationMs,
+    const raw = await waitForAudioJob(
+      this.endpoint,
+      accepted,
+      this.controller.signal,
     );
+    const result = analysisResult(raw, "speech", durationMs);
+    if (this.transcribe) {
+      const transcript = parseTranscript(raw, durationMs);
+      this.receive?.({
+        type: "transcript",
+        sessionId: this.sessionId,
+        transcript,
+      });
+      if (raw.transcription && typeof raw.transcription === "object") {
+        const wordMetrics = analysisResult(
+          { ...raw.transcription, events: [] },
+          "words",
+          durationMs,
+        );
+        result.metrics.push(...wordMetrics.metrics);
+      }
+    }
     for (const feedback of result.feedback)
       this.receive?.({ type: "feedback", sessionId: this.sessionId, feedback });
     this.receive?.({
@@ -64,5 +89,5 @@ export class LocalVideoTransport implements VideoTransport {
 export function createVideoTransport(config: LiveConfig): VideoTransport {
   return config.mode === "local"
     ? new LocalVideoTransport()
-    : new AnalysisTransport(config.endpoint);
+    : new AnalysisTransport(config.endpoint, config.transcribe);
 }

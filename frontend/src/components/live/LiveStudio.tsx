@@ -60,6 +60,7 @@ export function LiveStudio() {
   const [title, setTitle] = useState("My pitch rehearsal");
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("local");
+  const [transcribe, setTranscribe] = useState(true);
   const [endpoint, setEndpoint] = useState(
     process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
   );
@@ -132,6 +133,7 @@ export function LiveStudio() {
       targetMs,
       mode,
       endpoint: destination,
+      transcribe: mode === "backend" && transcribe,
     };
     const recorder = new LiveRecorder(
       stream,
@@ -508,12 +510,20 @@ export function LiveStudio() {
                       Local · gesture and posture observations
                     </option>
                     <option value="backend">
-                      Backend · audio analysis after recording
+                      Local server · speech analysis and transcript
                     </option>
                   </NativeSelect>
                 </div>
                 {mode === "backend" && (
                   <div className="field">
+                    <label className="loop-control">
+                      <input
+                        type="checkbox"
+                        checked={transcribe}
+                        onChange={(e) => setTranscribe(e.target.checked)}
+                      />
+                      Create a transcript with local Whisper
+                    </label>
                     <label htmlFor="live-endpoint">Backend API URL</label>
                     <Input
                       id="live-endpoint"
@@ -531,7 +541,10 @@ export function LiveStudio() {
                       microphone audio to this destination after stopping. The
                       backend stores the upload for its analysis job and removes
                       the original after processing; analysis results remain
-                      stored. No ASR or LLM request is made in this mode.
+                      stored.{" "}
+                      {transcribe
+                        ? "Whisper transcribes locally; no audio is sent to a cloud provider. Review the transcript before checking claims."
+                        : "Only local signal analysis runs; no transcription or LLM request is made."}
                     </p>
                   </div>
                 )}

@@ -20,11 +20,19 @@ import { TranscriptAnalysis } from "./TranscriptAnalysis";
 import { VideoPlayback } from "./VideoPlayback";
 import { PoseEvidence } from "./PoseEvidence";
 import { PoseEventDownload } from "./PoseEventDownload";
+import { RecordedTranscript } from "./RecordedTranscript";
+import { SourceCoaching } from "./SourceCoaching";
 
 export function LiveReview({ sessionId }: { sessionId: string }) {
   const { recordings } = useLiveSessions();
   const recording = recordings[sessionId];
   const [selected, setSelected] = useState<LiveFeedback | null>(null);
+  function replay(item: LiveFeedback) {
+    setSelected({ ...item });
+    document
+      .getElementById("review-video")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   if (!recording) return <MissingRecording />;
   const groups = [
     ...new Set(recording.feedback.map((item) => item.category)),
@@ -97,7 +105,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
           </div>
         </div>
         <div className="live-review-grid">
-          <div>
+          <div id="review-video">
             <VideoPlayback
               recording={recording}
               selected={selected}
@@ -200,8 +208,15 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             </section>
           </aside>
         </div>
+        <RecordedTranscript recording={recording} onSelect={replay} />
         {recording.config.mode === "backend" && (
-          <TranscriptAnalysis recording={recording} />
+          <>
+            <SourceCoaching recording={recording} onSelect={replay} />
+            <details className="transcript-import">
+              <summary>Import or replace word timestamps</summary>
+              <TranscriptAnalysis recording={recording} />
+            </details>
+          </>
         )}
         <section className="review-moments">
           <div className="panel-title-row">

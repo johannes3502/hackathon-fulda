@@ -22,6 +22,7 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 14 | ML-Audioanalyse mit Hintergrundjobs | Codex: Silero VAD v6.2 als gepinntes ONNX-Modell (SHA-256 geprüft), RMS/YIN beibehalten, 3-s-Kalibrierung; Deepgram Nova-3 (de, EU) hinter `Transcriber`; asynchroner Upload/Status und kombinierte Timeline, S3-Ergebnisse und Löschung der Originale | VAD nur an synthetischer Sprache/Rauschen geprüft; keine Genauigkeitsbehauptung. Deepgram-HTTP-Vertrag mit Mock geprüft, kein echter Anbieteraufruf ohne Schlüssel. Deutsche Füllworterhaltung laut Detaildokumentation nicht zugesichert; kein `filler_words=true`. Englische Feature-Unterstützung nicht auf Deutsch übertragen. JSON-Demo explizit markiert; kein stilles Ersetzen fehlgeschlagener ASR durch erfundene Wörter. S3-Ausfälle/abgebrochene Jobs können Cleanup verzögern; kein allgemeiner Retention-Job. Prozessabbruch zwischen bezahltem ASR-Aufruf und Speicherung kann diesen Aufruf wiederholen | Nutzer bestätigt vorgeschlagenes Vorgehen und eigenen Arbeitsbranch; Entscheidung für ersten austauschbaren ASR-Adapter innerhalb dieses Auftrags | `backend/tests/test_ml_audio.py`, `backend/tests/fixtures/`, `backend/scripts/smoke_audio.py`; Quellen und Prüfumfang unten |
 | 15 | README und Altbestand aufräumen | Haupt-README auf 17 Zeilen gekürzt; alten Frontend-Plan, doppelte Produktnotiz und überholte Video-WebSocket-Dokumentation entfernt; ungenutzte Validatoren und Handshake-Typen gestrichen | Referenzen vor dem Löschen geprüft; aktuelle HTTP-Upload-/Job-Grenze im Handoff dokumentiert, API-Tooling-Anleitung zentralisiert. Zwei Tests entfernten ausschließlich die gelöschten WebSocket-Helfer; Replay- und HTTP-Tests bleiben aktiv | Ausdrücklicher Nutzerauftrag für Vereinfachung und Cleanup | Compose-Start, Typecheck, Lint, 25 Frontend-Tests, Backend-Smoke-Test und lokale Markdown-Links bestanden |
 | 16 | Quellen-Upload und RAG-Retrieval (Feature 2, Vorbereitung für Fact-Check und Frage-Agent) | Claude Code: `app/sources/` mit Extraktion (PDF pro Seite, PPTX pro Folie inkl. Notizen/Tabellen, DOCX, TXT/MD), Chunking mit Seiten-/Folienangabe, lokalem Embedding-Modell hinter `Embedder`-Interface, pgvector + deutscher Volltextsuche mit Reciprocal Rank Fusion, Celery-Ingest, REST-API und Frontend-Seite `/sources`; Postgres-Image auf `pgvector/pgvector:0.8.6-pg18-trixie` umgestellt | Embedding-Anbieter war offen; lokales Modell gewählt, damit keine Dokumente an Dritte gehen (≈0,6 GB RAM pro Prozess). Erste Keyword-Suche zerlegte „260.000“ anders als PostgreSQL und fand die Zahl nicht; korrigiert, indem PostgreSQL die Suchanfrage selbst tokenisiert. Gemessener CPU-Durchsatz des Modells auf einem 12-Kern-Linux-Laptop nur ≈3 Abschnitte/s (1 MB Text ≈ 6 min); Test auf Mac M5 Pro steht aus, schnellere Alternativen gemessen (MiniLM-L12 ≈12/s, potion-multilingual ≈800/s). Next-Proxy puffert Uploads standardmäßig nur bis 10 MB; `proxyClientMaxBodySize` auf 100 MB gesetzt (betraf auch Aufnahmen). Kein OCR. Suche liefert immer Top-k, auch wenn nichts passt. Retrieval-Qualität nur mit synthetischen Mini-Dokumenten geprüft, keine Genauigkeitsaussage | Nutzerauftrag (Quellen hochladen, später für Fact-Check/Fragerunde nutzen); Modell-, Chunking- und Ranking-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_sources.py` (inkl. DB-Roundtrip gegen pgvector), `backend/scripts/smoke_sources.py` im Compose-Stack bestanden; Frontend-Unit-Tests, Typecheck, Lint; Browser-Check Desktop/375 px ohne Konsolenfehler |
+| 17 | Lokale Whisper-Transkription als Standard | Codex: faster-whisper hinter dem bestehenden `Transcriber`-Protokoll, lokales Modell im Image, Deepgram nur noch optional; `RecordingAnalysis.text` und regeneriertes API-Schema | Modellqualität, deutsche Füllwörter und Wortgrenzen nicht bewertet. Docker-Build mit Modelldownload nicht geprüft. PyAV 15.1.0 nötig, da 19.0.2 den faster-whisper-Dekoder bricht. Kein Cloud-Zwang, aber auch kein Nachweis besserer Erkennung | Nutzerauftrag: Speech-to-Text mit lokalem Modell, Review vor Push | Nach dem Merge mit main: 46 Backend-Tests bestanden, zwei übersprungen; echter `tiny`-Lauf über `run_analysis` mit synthetischer deutscher Sprache; API-Aktualitätscheck bestanden; Details unten |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -256,3 +257,56 @@ machen und das Wie/Warum der Auswertung dokumentieren.
   echten Kamera bestätigt. Daraus folgt keine gemessene Erkennungsquote.
   Die auf 0,8 s verkürzte Positionsregel ist automatisiert geprüft; eine neue
   Rückmeldung zur empfundenen Geschwindigkeit und ein Safari-Vergleich fehlen.
+## Lokale Whisper-Transkription als Standard (24.10.2026)
+
+- Nutzerauftrag: Speech-to-Text mit einem lokalen Modell statt Cloud-Zwang.
+  `faster-whisper` 1.2.1 läuft im bestehenden Celery-Worker auf CPU und liefert
+  Wort-Timestamps; `WhisperTranscriber` implementiert weiterhin das vorhandene
+  `Transcriber`-Protokoll. Deepgram bleibt als optionaler Adapter erhalten,
+  JSON nur als explizit gewählte synthetische Demo.
+- Modell: [faster-whisper](https://github.com/SYSTRAN/faster-whisper),
+  [CTranslate2](https://github.com/OpenNMT/CTranslate2),
+  [Systran/faster-whisper-small](https://huggingface.co/Systran/faster-whisper-small)
+  (MIT). Das Image lädt das Modell beim Build nach `/app/models/whisper`; zur
+  Laufzeit wird nicht nachgeladen. `WHISPER_MODEL` ist ein Build-Argument,
+  `WHISPER_MODEL_PATH` zeigt auf die eingebetteten Dateien.
+- Ergebnis enthält zusätzlich `RecordingAnalysis.text`; die Wortliste bleibt
+  für Timestamps und Events maßgeblich. Das OpenAPI-/TypeScript-Schema wurde
+  regeneriert.
+- PyAV ist auf 15.1.0 begrenzt: Mit 19.0.2 bricht der Dekoder mit
+  `TypeError: open() got an unexpected keyword argument 'metadata_errors'` ab.
+- Verifiziert nativ mit Python 3.13 und ffmpeg 7.1.5; nach dem Merge mit
+  `origin/main` erneut 46 Backend-Tests bestanden, zwei übersprungen (Silero-
+  Modell und DB-Roundtrip ohne lokale Instanzen). Ein echter `tiny`-Lauf über
+  `run_analysis` mit `tests/fixtures/speech-de.wav`, inklusive Text und
+  Wort-Timestamps, war bestanden. Standardmodell `small` wurde nicht qualitativ
+  bewertet.
+- Nicht verifiziert: Docker-Build mit Modell-Download (Docker in dieser VM nicht
+  verfügbar), deutsche Füllwortqualität, menschliche Stimmen, GPU/`cuda`,
+  Latenz und Speicherbedarf des `small`-Modells pro Worker. Keine Aussage zur
+  Erkennungsgenauigkeit.
+
+## Lokale Alternative statt OpenAI API (24.10.2026)
+
+- Der Nutzer wählte zunächst OpenAI API, fragte dann ausdrücklich nach einer
+  freien/lokalen Alternative. Umsetzung ohne API-Key: native Ollama-Inferenz
+  mit Qwen3.5 4B Q4_K_M; Teamarbeit zu lokalem Whisper aus
+  `feat/local-whisper-asr` integriert. Kein OpenAI-Aufruf durchgeführt.
+- Auf M2 Pro/32 GB getestet. Der generische Ollama-Tag lud MLX und scheiterte
+  bei JSON-Schema-Ausgabe mit HTTP 501. Expliziter GGUF-Tag funktioniert;
+  `OLLAMA_NO_CLOUD=1`, Loopback-Server und kein automatischer Anbieterwechsel.
+- Web-Review verbindet Whisper-Wörter, Zeitmarker, Quellenvergleich und
+  Textantworten. Modellzitate werden gegen die tatsächlich gefundenen Chunks
+  geprüft; ungültige Zitate unterdrücken Urteil und davon abgeleitete Rückfrage.
+  Neue Jobs laufen in Celery, Redis enthält nur IDs, Inputs/Ergebnisse liegen
+  in S3 und können im Review gelöscht werden. Kein automatischer TTL.
+- Reale lokale Prüfung: drei erfundene Aussagen korrekt als gestützt,
+  widersprochen und nicht gefunden eingeordnet (18,3 s); Korrekturantwort mit
+  gültigem Zitat (5,1 s). Quellen und Coaching-Jobs anschließend gelöscht.
+  Whisper `small` lieferte den Text der 6,845-s-eSpeak-Fixture mit 13 Wörtern.
+  Dies ist Integrations-, keine allgemeine Qualitäts-/Füllwortvalidierung.
+- Vor weiterer Main-Integration: 61 Backend- und 67 Frontend-Tests bestanden;
+  Typecheck/ESLint sowie sechs gezielte Browser-Tests (Desktop und 375 px)
+  einschließlich Transkription, Fehlererhalt, Zitatansicht, Wiederaufnahme des
+  Antwort-Pollings und Löschung bestanden. Reales Mikrofon und Safari bleiben
+  separate Gerätechecks. Setup, Begründung, Grenzen: `docs/06-local-coaching.md`.

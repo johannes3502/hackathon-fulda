@@ -27,8 +27,9 @@ flowchart TB
         SP["Speech-Router<br/>POST /speech/analyze<br/>GET /speech/jobs/id"]
         TR["Transcription-Router<br/>POST /transcription/analyze-words"]
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
+        CO["Coaching-Router<br/>Analyse, Antworten, Status, Löschen"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>analyze_coaching"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -36,6 +37,7 @@ flowchart TB
         WORDS["Wort-Analyse<br/>Füller, Pausen, Tempo"]
         INGEST["RAG-Ingest<br/>Extrakt, Chunk, Embed"]
         EMB["Lokale Embeddings<br/>jina-embeddings-v2-base-de<br/>FastEmbed/ONNX"]
+        CHECK["Aussagen + Retrieval + Zitatprüfung<br/>Fragen + Antwortvergleich"]
     end
 
     subgraph Infra["Infrastruktur (Docker Compose)"]
@@ -44,7 +46,8 @@ flowchart TB
         S3[("SeaweedFS<br/>S3-kompatibel<br/>Port 8333")]
     end
 
-    EXT["Deepgram ASR<br/>nova-3, deutsch<br/>EU-Endpunkt (extern)"]
+    EXT["ASR-Adapter<br/>Whisper lokal (Standard)<br/>Deepgram nova-3, EU (optional)"]
+    OLL["Host: Ollama lokal<br/>Qwen3.5 4B Q4_K_M<br/>kein Cloud-Fallback"]
 
     WEB -- "Kamera" --> MP_W
     MP_W --> RULES["PoseEvaluator: Baseline + Geometrie + Zeit<br/>gesture/posture Events, ein Live-Hinweis"]
@@ -52,7 +55,7 @@ flowchart TB
     WEB -- "Aufnahme" --> MR
     MOB -- "Kamera" --> MP_M
 
-    WEB -- "fetch: /speech, /sources,<br/>/transcription, /health" --> MAIN
+    WEB -- "fetch: /speech, /sources,<br/>/transcription, /coaching, /health" --> MAIN
     MOB -- "Upload + Job-Polling" --> MAIN
     WEB -. "Typen" .-> OAS
     OAS -. "Quelle der Wahrheit" .-> MAIN
@@ -60,6 +63,9 @@ flowchart TB
     MAIN --> SP
     MAIN --> TR
     MAIN --> SO
+    MAIN --> CO
+    CO --> S3
+    CO --> CEL
 
     SP -- "S3-Upload, Enqueue" --> S3
     SP -- "enqueue" --> CEL
@@ -71,6 +77,10 @@ flowchart TB
     TASKS --> SIG
     TASKS --> WORDS
     TASKS --> INGEST
+    TASKS --> CHECK
+    CHECK --> OLL
+    CHECK --> PG
+    CHECK --> S3
     INGEST --> EMB
     WORDS -. "optional, transcribe=true" .-> EXT
     SIG --> S3
@@ -104,6 +114,9 @@ flowchart LR
     WK --> PG
     WK --> ST
     WK --> RD
+    OLL["Nativer Host: Ollama :11434<br/>Qwen3.5 4B, Apple GPU<br/>nicht Teil von Compose"]
+    BE -->|"Modellstatus via host.docker.internal"| OLL
+    WK -->|"lokale JSON-Schema-Inferenz"| OLL
 ```
 
 ## 3. Datenfluss: Sprechanalyse (Live-Studio)
@@ -116,13 +129,14 @@ sequenceDiagram
     participant S3 as SeaweedFS (S3)
     participant R as Redis
     participant W as Celery Worker
-    participant DG as Deepgram (optional)
+    participant ASR as ASR<br/>(Whisper lokal / Deepgram optional)
 
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>FE: onstart: neue Baseline und gemeinsame Event-Zeitachse
     U->>FE: Stop
-    FE->>BE: POST /speech/analyze (recording, transcribe=false)
+    FE->>BE: POST /speech/analyze (recording, transcribe=Checkbox, local_only=true)
+    Note over FE,BE: Whisper standardmäßig an; Cloud/JSON bei local_only abgewiesen
     BE->>S3: Original speichern
     BE->>R: Task analyze_speech einreihen
     BE-->>FE: 202 {job_id, status_url}
@@ -132,8 +146,8 @@ sequenceDiagram
     W->>W: FFmpeg -> 16kHz mono, Frames 40ms/10ms
     W->>W: RMS-Pegel, YIN-Pitch, Silero VAD, Silben-Peaks
     opt transcribe=true
-        W->>DG: POST /v1/listen (nova-3, de)
-        DG-->>W: Wort-Timestamps
+        W->>ASR: Whisper lokal (de)
+        ASR-->>W: Wort-Timestamps, Text
         W->>W: Füller, Pausen, Tempo (Wort-Analyse)
     end
     W->>W: merge_timeline (Events deduplizieren)
@@ -145,6 +159,7 @@ sequenceDiagram
         BE-->>FE: queued / running / completed
     end
     FE->>FE: Lokale Pose-Events + Audio-Events im Review zusammenführen
+    FE->>FE: Wort-Timestamps anzeigen; Quellenvergleich explizit starten
     FE->>FE: Vollvideo im Browser bei Event abspielen (±2s, keine Server-Clips)
 ```
 
@@ -163,7 +178,14 @@ flowchart TB
     SEARCH["POST /sources/search"] --> RET["retrieval.py<br/>Hybrid: pgvector-Kosinus<br/>+ Volltextsuche<br/>Reciprocal Rank Fusion"]
     PGDB --> RET
     RET --> HITS["Top-k SourceHits<br/>mit Zitat-Ort: page/slide/<br/>paragraph/line"]
-    HITS -. "format_context / quote_in_text<br/>vorbereitet für künftigen Fact-Check" .-> FUTURE["Geplant: LLM-Fact-Check<br/>+ Frage-Agent (Quelle: factcheck/agent,<br/>Typ: fact/question im Event-Schema)"]
+    WORDS["Transkript mit Wort-Timestamps"] --> JOB["POST /coaching/analyze<br/>S3-Eingabe + Celery-ID"]
+    JOB --> CLAIMS["Ollama: bis zu 6 Wortspannen<br/>Code prüft Indizes; Zeiten aus Wörtern"]
+    CLAIMS --> RET
+    HITS --> CHECK["Ollama: supports / contradicts / not_found<br/>Code prüft Zitat im abgerufenen Chunk"]
+    CHECK --> REPORT["S3: Quellenbericht + fact-Events<br/>ungültiges Zitat: kein Urteil"]
+    REPORT --> QUESTIONS["Ollama: bis zu 3 Fragen<br/>Transkript + verifizierbare Vergleiche"]
+    QUESTIONS --> ANSWER["POST /coaching/jobs/id/answers<br/>neuer Job; Retrieval + Zitatprüfung"]
+    ANSWER --> RESULT["Antwortvergleich ohne Punkte<br/>DELETE entfernt terminale Jobs"]
 ```
 
 ## 5. Frontend-Navigation (Web)
@@ -186,12 +208,14 @@ flowchart TD
 
     LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Statistiken,<br/>Transcript-Import, Pose-/Evidenz-Download"]
     LREV --> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
+    LREV --> COACH["SourceCoaching + klickbares Transkript<br/>Quellenvergleich, Fragen, Antworten,<br/>Status-Polling, Berichte löschen"]
+    COACH -->|"neuer Tab erhält Aufnahme"| SRC
 
     SRC -->|"collection_id aus localStorage"| UPLOAD["POST /sources<br/>POST /sources/search"]
 
     subgraph Transport["VideoTransport (wahlweise)"]
-        DEMO["DemoVideoTransport<br/>skriptete Marker"]
-        ANA["AnalysisTransport<br/>Backend-Upload + Polling"]
+        LOCAL["LocalVideoTransport<br/>kein Upload, nur lokale Pose-Events"]
+        ANA["AnalysisTransport<br/>Backend-Upload + Whisper + Polling"]
     end
     LIVE --> Transport
 ```
@@ -255,9 +279,10 @@ Zusätzlich (außerhalb Postgres):
 | --- | --- |
 | SeaweedFS `sources/{id}/original` | Original-Uploads |
 | SeaweedFS `speech-jobs/{job_id}/` | Job-Konfig, Status, Analyse-Ergebnis (Original wird nach Abschluss gelöscht) |
+| SeaweedFS `coaching-jobs/{job_id}/` | `request.json` + `status.json`: Transkript/Antwort, Quellenbericht und Fragen; explizite Löschung, kein TTL |
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
-| Browser-Arbeitsspeicher | Lokales Vollvideo, Roh-Pose-JSONL, Pose-Events; gehen beim Verlassen/Neuladen verloren |
+| Browser-Arbeitsspeicher | Lokales Vollvideo, Roh-Pose-JSONL, Pose-Events, Transkript, Coaching-Job-IDs/Ergebnisse; gehen beim Verlassen/Neuladen verloren |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`) |
 
 ## 8. Event-Modell: gemeinsame Timeline
@@ -268,6 +293,7 @@ flowchart LR
         B["browser<br/>posture, gesture<br/>pose-rules-v3 (lokal, kein Gaze)"]
         A["asr<br/>Füller, Wort-Timestamps"]
         S["speech<br/>pause, pace, volume, pitch"]
+        F["factcheck<br/>fact: Aussage + Quellenvergleich"]
     end
 
     EV["Event<br/>t_ms, duration_ms<br/>type, severity (info/hint/warning)<br/>source, payload"]
@@ -276,6 +302,8 @@ flowchart LR
     BEV --> UI
     A --> EV
     S --> EV
+    F --> EV
+    F --> UI
 
     EV --> MT["merge_timeline()<br/>Deduplizierung<br/>(Tempo aus ASR,<br/>Pausen akustisch)"]
     MT --> UI["Timestamp-Timeline im Frontend<br/>Klick springt im lokalen Video ±2s"]
@@ -298,9 +326,15 @@ flowchart LR
         R3["GET /sources/{source_id}"]
         R4["DELETE /sources/{source_id}"]
         R5["POST /sources/search"]
+        C1["GET /coaching/capabilities"]
+        C2["POST /coaching/analyze"]
+        C3["GET /coaching/jobs/{id}"]
+        C4["POST /coaching/jobs/{id}/answers"]
+        C5["DELETE /coaching/jobs/{id}"]
     end
 
     WEBF["Web-Frontend"] --> H2 & S1 & S2 & T1 & R1 & R2 & R3 & R4 & R5
+    WEBF --> C1 & C2 & C3 & C4 & C5
     MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
 ```
 

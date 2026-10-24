@@ -20,13 +20,22 @@ rebuild after changing dependencies or configuration.
   feedback**. Hold a neutral position for 3 seconds, then follow the movement guide.
   Real local observations appear live and become replay markers. No scripted
   findings are attached to your recording.
-- **Backend · audio analysis after recording:** enable camera and microphone,
+- **Local server · speech analysis and transcript:** enable camera and microphone,
   then **Record & analyze audio**. Speak normally for the first three seconds
   of calibration. After stopping, local Silero/RMS/YIN analysis runs in Celery;
-  feedback and measurements appear in review. This mode uses `transcribe=false`.
+  feedback and measurements appear in review. Local Whisper transcription is on
+  by default; turn it off for signal analysis only. `local_only=true` prevents
+  a hosted or synthetic ASR provider from silently replacing local Whisper.
+- **Source review and questions:** upload sources under `/sources`, then in a
+  recorded take choose **Compare with my sources**. Local Ollama selects claims,
+  compares retrieved passages and asks follow-up questions. Enter a text answer
+  to compare it with the sources. Quotes are verified against retrieved text.
+  [Setup, evaluation and limits](../docs/06-local-coaching.md).
 - **Rewatch feedback sections:** seek to a marker, loop the surrounding section,
   or play the full take. Backend review also accepts word-timestamp JSON from
   the same take for `/transcription/analyze-words`; this import does not run ASR.
+  Automatic words are clickable for replay. Delete a source review before
+  replacing its transcript so old verdicts cannot attach to new words.
 
 Recordings stay in browser memory for replay; download before refreshing or
 leaving the workspace. Backend mode uploads the complete take after stopping
@@ -88,7 +97,8 @@ For local browser tests: `npx playwright install chromium`, then
 `npm run test:e2e`. Production build: `npm run build`.
 
 [Design notes](DESIGN.md) · [Implementation decisions](../docs/pitch-coach-ai-decision-log.md).
-Real camera hardware, Safari/iOS and public deployment still need acceptance.
+The user confirmed three camera gestures. Safari/iOS and microphone transcription
+still need physical-device acceptance; public deployment is outside the local demo scope.
 
 ## Native app
 

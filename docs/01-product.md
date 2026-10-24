@@ -57,21 +57,25 @@ Produktentscheidung.
 ### Fact-Checking
 - Quellen-Ingest ist für PDF, PPTX, DOCX, TXT und Markdown umgesetzt.
   Lokale Jina-Embeddings und pgvector/Volltextsuche liefern zitierbare Passagen;
-  der darauf aufbauende Fact-Check bleibt offen.
+  darauf läuft ein lokaler Ollama-Quellenvergleich mit Wort-Timestamps und
+  codegeprüften Zitaten. Höchstens sechs ausgewählte Aussagen, fünf Passagen je
+  Aussage; keine vollständige Wahrheitsprüfung. [Wie und warum](06-local-coaching.md).
 - Welche Web-Quellen darf der Agent abrufen?
 - Wie wird eine Quelle als glaubwürdig markiert?
-- Was passiert, wenn keine Quelle gefunden wird?
+- Fehlende Evidenz wird als „in den Quellen nicht gefunden“ gezeigt, nicht als falsch.
 
 ### Frage-Simulator
-- Wie viele Fragen, welcher Schwierigkeitsgrad?
-- Nur Text oder auch Sprache?
-- Werden Antworten bewertet?
+- Web-Prototyp: bis zu drei Textfragen aus Transkript und überprüfbaren
+  Quellenvergleichen, vorrangig zu Widersprüchen/Lücken. Textantworten werden
+  mit neu abgerufenen Passagen verglichen; keine Punkte oder Noten.
+- Sprachbasierte Fragerunde und systematischer Schwierigkeitsgrad bleiben offen.
 
 ### Daten und Datenschutz
 - Lokales Grundgerüst: PostgreSQL und S3-Dateispeicher mit persistenten
   Docker-Volumes, ausschließlich für synthetische Entwicklungsdaten.
   Expliziter Audio-Upload unter `/speech/analyze`, keine automatische Aufzeichnung.
-  Celery verarbeitet Silero-VAD/RMS/YIN sowie optional Deepgram-ASR (EU, deutsch).
+  Celery verarbeitet Silero-VAD/RMS/YIN sowie standardmäßig lokales
+  faster-whisper (deutsch); Deepgram-ASR (EU) bleibt optional.
   Originale werden nach terminaler Verarbeitung gelöscht; Ergebnisse verbleiben
   in S3. Stalled Jobs und Speicherfehler benötigen noch eine Cleanup-Regel.
   Der Smoke-Test entfernt seine synthetischen Audiodaten wieder.
@@ -87,12 +91,14 @@ Produktentscheidung.
   MediaRecorder im Browser und SeaweedFS als S3-Dateispeicher;
   FFmpeg im Backend. Celery führt lange Arbeiten in einem separaten Worker
   aus, Redis dient als Queue und temporärer Ergebnisspeicher. Die
-  Post-Transkription nutzt Deepgram Nova-3 hinter einem austauschbaren Interface.
-  Deutsche Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und Speicherverhalten:
-  `backend/README.md`.
+  Post-Transkription nutzt standardmäßig lokales faster-whisper hinter einem
+  austauschbaren Interface; Deepgram Nova-3 (EU) ist optional. Deutsche
+  Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und
+  Speicherverhalten: `backend/README.md`.
 - Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
 - Nutzerentscheidung: lokale Vorführung reicht; öffentliches Hosting ist
-  derzeit nicht nötig. Anbieter für Fact-Check/Frage-Agent bleiben offen.
+  derzeit nicht nötig. Nutzer bevorzugt freie/lokale Modelle statt OpenAI API:
+  Qwen3.5 4B Q4_K_M läuft nativ über Ollama, Whisper `small` im Worker.
 - Latenz, Ausfall-Fallback, Kosten.
 - Browser- und Geräte-Support (Laptop und Smartphone).
 
@@ -125,3 +131,5 @@ einbauen**:
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
 | 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |
 | 24.10.2026 | Echte lokale Gesten-/Haltungsbeobachtungen, synthetischer Jury-Rundgang und Evidenz-Export | Nutzerauftrag: Gesten recherchieren, nachvollziehbar auswerten und für die Jury vorführbar machen. Keine Blickkontakt-/Qualitätsbewertung. |
+| 24.10.2026 | Lokale Whisper-Transkription als Standard | Nutzerauftrag: Speech-to-Text mit einem lokalen Modell statt Cloud-Zwang; Deepgram bleibt optional. |
+| 24.10.2026 | Lokaler Quellenvergleich und echte Text-Fragerunde im Web-Review | Nutzer präferiert freie/lokale Alternative zur zunächst gewählten OpenAI API. Keine API-Schlüssel; Zitate werden vor Anzeige geprüft. |

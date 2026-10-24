@@ -10,6 +10,10 @@ docker compose up --build -d --wait
 Open **http://localhost:3000** · API docs: **http://localhost:8000/docs**.
 All six services start together; no local Node.js or Python installation needed.
 
+For **local source checking and follow-up questions**, also start Ollama on the
+host and download `qwen3.5:4b-q4_K_M` (no API key). Transcription already runs
+locally with Whisper in Compose. [Local AI setup and use](docs/06-local-coaching.md).
+
 **IntelliJ:** run **Docker Compose**. **VS Code:** **Run Build Task**
 (`Cmd/Ctrl+Shift+B`). Stop: `docker compose stop`.
 

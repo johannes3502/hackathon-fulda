@@ -321,13 +321,16 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   expect(errors).toEqual([]);
 });
 
-async function backend(page: Page) {
+async function backend(page: Page, transcribe = false) {
   await syntheticCamera(page);
   await page.route("http://localhost:8000/health/**", (route) =>
     route.fulfill({ json: { status: "ok" } }),
   );
   await page.goto("/live");
   await page.getByLabel("Feedback source").selectOption("backend");
+  await page
+    .getByLabel("Create a transcript with local Whisper")
+    .setChecked(transcribe);
   await expect(
     page.getByText("analysis results remain stored", { exact: false }),
   ).toBeVisible();
@@ -410,6 +413,9 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
   await expect(page).toHaveURL(/\/review$/);
   expect(uploads).toBe(1);
   await expect(page.getByText("Audio: pause count")).toBeVisible();
+  await page
+    .getByText("Import or replace word timestamps", { exact: true })
+    .click();
   await page.getByLabel("Word timestamps (JSON)").setInputFiles({
     name: "words.json",
     mimeType: "application/json",
@@ -438,6 +444,182 @@ test("analysis failure preserves playable recording", async ({ page }) => {
         .evaluate((el: HTMLVideoElement) => el.readyState),
     )
     .toBeGreaterThanOrEqual(2);
+});
+
+test("local transcript, cited source review, answer and deletion stay connected", async ({
+  page,
+}, info) => {
+  const audioId = "12345678-1234-1234-1234-123456789abc";
+  const reportId = "22345678-1234-1234-1234-123456789abc";
+  const answerId = "32345678-1234-1234-1234-123456789abc";
+  const collection = "42345678-1234-1234-1234-123456789abc";
+  const words = [
+    { word: "Acht", start_ms: 100, end_ms: 300 },
+    { word: "Uhr.", start_ms: 300, end_ms: 500 },
+  ];
+  const citation = {
+    chunk_id: 42,
+    source_id: collection,
+    filename: "Synthetic notes.txt",
+    location: { kind: "line", start: 1, end: 1 },
+    quote: "Das Lernlabor öffnet um neun Uhr.",
+  };
+  const report = {
+    collection_id: collection,
+    model: "synthetic-test-model",
+    notices: ["Synthetic API fixture; not model accuracy evidence."],
+    events: [],
+    checks: [
+      {
+        id: "claim-1",
+        statement: "Acht Uhr.",
+        t_ms: 100,
+        duration_ms: 400,
+        verdict: "contradicts",
+        explanation: "Die Quelle nennt neun Uhr.",
+        citations: [citation],
+        issue: null,
+      },
+    ],
+    questions: [
+      {
+        id: "question-1",
+        claim_id: "claim-1",
+        text: "Wann öffnet das Lernlabor?",
+        reason: "Die Uhrzeit weicht ab.",
+        t_ms: 100,
+      },
+    ],
+  };
+  const deleted: string[] = [];
+  await page.route("**/coaching/capabilities", (route) =>
+    route.fulfill({
+      json: { configured: true, model: "synthetic-test-model" },
+    }),
+  );
+  await page.route("**/sources?collection_id=*", (route) =>
+    route.fulfill({
+      json: [
+        { id: collection, status: "ready", filename: "Synthetic notes.txt" },
+      ],
+    }),
+  );
+  await page.route("**/speech/analyze", async (route) => {
+    expect(route.request().postDataBuffer()!.toString()).toContain(
+      'name="local_only"\r\n\r\ntrue',
+    );
+    await route.fulfill({ status: 202, json: { job_id: audioId } });
+  });
+  await page.route(`**/speech/jobs/${audioId}`, (route) =>
+    route.fulfill({
+      json: {
+        job_id: audioId,
+        status: "completed",
+        result: {
+          audio: { summary: { pause_count: 0 } },
+          transcription: { summary: { filler_count: 0 } },
+          events: [],
+          words,
+          asr_provider: "whisper",
+          synthetic_demo: false,
+          notices: [],
+        },
+      },
+    }),
+  );
+  await page.route("**/coaching/analyze", async (route) => {
+    expect(route.request().postDataJSON().words).toEqual(words);
+    await route.fulfill({ status: 202, json: { job_id: reportId } });
+  });
+  await page.route(`**/coaching/jobs/${reportId}`, (route) => {
+    if (route.request().method() === "DELETE") {
+      deleted.push(reportId);
+      return route.fulfill({ status: 204 });
+    }
+    return route.fulfill({
+      json: { job_id: reportId, status: "completed", report },
+    });
+  });
+  await page.route(`**/coaching/jobs/${reportId}/answers`, async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      question_id: "question-1",
+      answer: "Um neun Uhr.",
+    });
+    await route.fulfill({ status: 202, json: { job_id: answerId } });
+  });
+  let answerReady = false;
+  await page.route(`**/coaching/jobs/${answerId}`, (route) => {
+    if (route.request().method() === "DELETE") {
+      deleted.push(answerId);
+      return route.fulfill({ status: 204 });
+    }
+    return route.fulfill({
+      json: {
+        job_id: answerId,
+        status: answerReady ? "completed" : "running",
+        answer: answerReady
+          ? {
+              question_id: "question-1",
+              answer: "Um neun Uhr.",
+              verdict: "supports",
+              explanation:
+                "Die korrigierte Uhrzeit stimmt mit der Quelle überein.",
+              citations: [citation],
+              follow_up: null,
+              issue: null,
+              model: "synthetic-test-model",
+            }
+          : null,
+      },
+    });
+  });
+  await backend(page, true);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your transcript" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Acht", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Selected feedback section" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Compare with my sources" }).click();
+  await expect(
+    page.locator(".coaching-checks").getByText("Conflicts with sources"),
+  ).toBeVisible();
+  await expect(
+    page.locator(".source-citation").getByText("Synthetic notes.txt · Line 1"),
+  ).toBeVisible();
+  await page.getByLabel("Your answer", { exact: true }).fill("Um neun Uhr.");
+  await page
+    .getByRole("button", { name: "Compare answer with sources" })
+    .click();
+  await expect(page.getByText("Checking this answer locally…")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Delete source review and answers" }),
+  ).toBeDisabled();
+  await page
+    .getByRole("link", { name: "Feedback moments", exact: true })
+    .click();
+  answerReady = true;
+  await page
+    .getByRole("link", { name: "Stats & playback", exact: true })
+    .click();
+  await expect(
+    page.locator(".coaching-answer").getByText("Supported by sources"),
+  ).toBeVisible();
+  await noOverflow(page);
+  await page
+    .locator(".source-coaching")
+    .screenshot({ path: info.outputPath("local-source-coaching.png") });
+  await page
+    .getByRole("button", { name: "Delete source review and answers" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Compare with my sources" }),
+  ).toBeVisible();
+  expect(deleted).toEqual([answerId, reportId]);
+  await expect(page.locator(".coaching-checks")).toHaveCount(0);
+  await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
 });
 
 test("local pose worker loads real assets and runs on synthetic camera frames", async ({

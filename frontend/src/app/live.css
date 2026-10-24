@@ -788,6 +788,93 @@ body:has(.live-workspace-large) .app-footer,
   color: #275d92;
   background: #edf4fb;
 }
+.source-coaching,
+.recorded-transcript,
+.transcript-import {
+  margin-top: 24px;
+}
+.source-coaching,
+.recorded-transcript {
+  padding: clamp(18px, 3vw, 28px);
+}
+.coaching-question h4 {
+  font-weight: 600;
+}
+.source-coaching p {
+  margin: 10px 0;
+}
+.coaching-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0;
+}
+.coaching-checks article,
+.coaching-question {
+  border-top: 1px solid var(--border);
+  padding: 22px 0;
+}
+.coaching-statement {
+  font-weight: 600;
+}
+.source-citation {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--primary);
+  background: var(--secondary);
+}
+.source-citation blockquote {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+}
+.source-citation figcaption {
+  font-size: 12px;
+  color: var(--muted);
+}
+.source-coaching {
+  overflow-wrap: anywhere;
+}
+.coaching-question label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+}
+.coaching-question textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  background: var(--background);
+}
+.coaching-answer {
+  margin-top: 18px;
+  padding: 16px;
+  background: var(--secondary);
+  border-radius: 10px;
+}
+.transcript-words {
+  max-height: 220px;
+  overflow: auto;
+  line-height: 2;
+}
+.transcript-words button {
+  display: inline;
+  padding: 0 3px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.transcript-words button:hover,
+.transcript-words button:focus-visible {
+  background: #edf4fb;
+  color: #275d92;
+}
+.transcript-import summary {
+  cursor: pointer;
+  padding: 10px 0;
+}
 .timeline-marker.observation {
   background: #4b8cc5;
 }

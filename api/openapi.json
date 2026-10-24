@@ -1,6 +1,26 @@
 {
   "components": {
     "schemas": {
+      "AcceptedCoaching": {
+        "additionalProperties": false,
+        "properties": {
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status_url": {
+            "title": "Status Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status_url"
+        ],
+        "title": "AcceptedCoaching",
+        "type": "object"
+      },
       "AcceptedJob": {
         "properties": {
           "job_id": {
@@ -99,6 +119,106 @@
           "words"
         ],
         "title": "AnalyzeRequest",
+        "type": "object"
+      },
+      "AnswerRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "maxLength": 6000,
+            "minLength": 1,
+            "title": "Answer",
+            "type": "string"
+          },
+          "question_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Question Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question_id",
+          "answer"
+        ],
+        "title": "AnswerRequest",
+        "type": "object"
+      },
+      "AnswerReview": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "follow_up": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "question_id": {
+            "title": "Question Id",
+            "type": "string"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "supports",
+                  "contradicts",
+                  "not_found"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          }
+        },
+        "required": [
+          "question_id",
+          "answer",
+          "verdict",
+          "explanation",
+          "citations",
+          "follow_up",
+          "model"
+        ],
+        "title": "AnswerReview",
         "type": "object"
       },
       "AudioAnalysis": {
@@ -278,6 +398,12 @@
             "description": "AudioConfig JSON; first 3000 ms are calibration",
             "title": "Config"
           },
+          "local_only": {
+            "default": false,
+            "description": "Require local Whisper; reject hosted or synthetic ASR before storing the recording",
+            "title": "Local Only",
+            "type": "boolean"
+          },
           "recording": {
             "contentMediaType": "application/octet-stream",
             "description": "Synthetic audio/video recording (WebM, MP4, WAV, ...)",
@@ -286,7 +412,7 @@
           },
           "transcribe": {
             "default": true,
-            "description": "Send audio to configured ASR (default: Deepgram EU). false = local signal analysis only",
+            "description": "Run configured ASR (default: local Whisper). false = local signal analysis only",
             "title": "Transcribe",
             "type": "boolean"
           }
@@ -317,6 +443,226 @@
           "file"
         ],
         "title": "Body_upload_source_sources_post",
+        "type": "object"
+      },
+      "Citation": {
+        "additionalProperties": false,
+        "properties": {
+          "chunk_id": {
+            "title": "Chunk Id",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Location"
+          },
+          "quote": {
+            "title": "Quote",
+            "type": "string"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chunk_id",
+          "source_id",
+          "filename",
+          "location",
+          "quote"
+        ],
+        "title": "Citation",
+        "type": "object"
+      },
+      "CoachingJob": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CoachingReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "CoachingJob",
+        "type": "object"
+      },
+      "CoachingQuestion": {
+        "additionalProperties": false,
+        "properties": {
+          "claim_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 1200,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "t_ms": {
+            "title": "T Ms",
+            "type": "integer"
+          },
+          "text": {
+            "maxLength": 1200,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "claim_id",
+          "text",
+          "reason",
+          "id",
+          "t_ms"
+        ],
+        "title": "CoachingQuestion",
+        "type": "object"
+      },
+      "CoachingReport": {
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/FactCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "collection_id": {
+            "format": "uuid",
+            "title": "Collection Id",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/CoachingQuestion"
+            },
+            "title": "Questions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "collection_id",
+          "checks",
+          "questions",
+          "events",
+          "model",
+          "notices"
+        ],
+        "title": "CoachingReport",
+        "type": "object"
+      },
+      "CoachingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collection_id": {
+            "format": "uuid",
+            "title": "Collection Id",
+            "type": "string"
+          },
+          "duration_ms": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 600000.0,
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "collection_id",
+          "words",
+          "duration_ms"
+        ],
+        "title": "CoachingRequest",
         "type": "object"
       },
       "Event": {
@@ -380,6 +726,76 @@
           "payload"
         ],
         "title": "Event",
+        "type": "object"
+      },
+      "FactCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue"
+          },
+          "statement": {
+            "title": "Statement",
+            "type": "string"
+          },
+          "t_ms": {
+            "title": "T Ms",
+            "type": "integer"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "supports",
+                  "contradicts",
+                  "not_found"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          }
+        },
+        "required": [
+          "id",
+          "statement",
+          "t_ms",
+          "duration_ms",
+          "verdict",
+          "explanation",
+          "citations"
+        ],
+        "title": "FactCheck",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -460,6 +876,10 @@
             "title": "Synthetic Demo",
             "type": "boolean"
           },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
           "transcription": {
             "anyOf": [
               {
@@ -481,6 +901,7 @@
         "required": [
           "audio",
           "words",
+          "text",
           "transcription",
           "events",
           "asr_provider"
@@ -859,6 +1280,200 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/coaching/analyze": {
+      "post": {
+        "operationId": "analyze_coaching_analyze_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoachingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedCoaching"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyze",
+        "tags": [
+          "coaching"
+        ]
+      }
+    },
+    "/coaching/capabilities": {
+      "get": {
+        "operationId": "capabilities_coaching_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Capabilities Coaching Capabilities Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Capabilities",
+        "tags": [
+          "coaching"
+        ]
+      }
+    },
+    "/coaching/jobs/{job_id}": {
+      "delete": {
+        "operationId": "delete_job_coaching_jobs__job_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Job",
+        "tags": [
+          "coaching"
+        ]
+      },
+      "get": {
+        "operationId": "job_status_coaching_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoachingJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Status",
+        "tags": [
+          "coaching"
+        ]
+      }
+    },
+    "/coaching/jobs/{job_id}/answers": {
+      "post": {
+        "operationId": "answer_coaching_jobs__job_id__answers_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedCoaching"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer",
+        "tags": [
+          "coaching"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "live_health_live_get",
@@ -1122,7 +1737,7 @@
     },
     "/speech/analyze": {
       "post": {
-        "description": "Store in S3 and enqueue analysis. Poll status_url for the result.\n\nGerman filler preservation is unverified. Originals are deleted after\nterminal processing. Demo recordings must be synthetic.",
+        "description": "Store in S3 and enqueue analysis. Poll status_url for the result.\n\nWhisper runs locally; German filler preservation is model-dependent.\nOriginals are deleted after terminal processing. Demo recordings must be synthetic.",
         "operationId": "analyze_speech_analyze_post",
         "requestBody": {
           "content": {

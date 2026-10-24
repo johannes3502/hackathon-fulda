@@ -4,6 +4,75 @@
  */
 
 export interface paths {
+    "/coaching/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Analyze */
+        post: operations["analyze_coaching_analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/coaching/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Capabilities */
+        get: operations["capabilities_coaching_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/coaching/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Job Status */
+        get: operations["job_status_coaching_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Job */
+        delete: operations["delete_job_coaching_jobs__job_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/coaching/jobs/{job_id}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer */
+        post: operations["answer_coaching_jobs__job_id__answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -116,8 +185,8 @@ export interface paths {
          * Analyze
          * @description Store in S3 and enqueue analysis. Poll status_url for the result.
          *
-         *     German filler preservation is unverified. Originals are deleted after
-         *     terminal processing. Demo recordings must be synthetic.
+         *     Whisper runs locally; German filler preservation is model-dependent.
+         *     Originals are deleted after terminal processing. Demo recordings must be synthetic.
          */
         post: operations["analyze_speech_analyze_post"];
         delete?: never;
@@ -167,6 +236,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptedCoaching */
+        AcceptedCoaching: {
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Status Url */
+            status_url: string;
+        };
         /** AcceptedJob */
         AcceptedJob: {
             /** Job Id */
@@ -198,6 +277,32 @@ export interface components {
             config?: components["schemas"]["WordConfig"];
             /** Words */
             words: components["schemas"]["Word"][];
+        };
+        /** AnswerRequest */
+        AnswerRequest: {
+            /** Answer */
+            answer: string;
+            /** Question Id */
+            question_id: string;
+        };
+        /** AnswerReview */
+        AnswerReview: {
+            /** Answer */
+            answer: string;
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
+            /** Explanation */
+            explanation: string;
+            /** Follow Up */
+            follow_up: string | null;
+            /** Issue */
+            issue?: string | null;
+            /** Model */
+            model: string;
+            /** Question Id */
+            question_id: string;
+            /** Verdict */
+            verdict: ("supports" | "contradicts" | "not_found") | null;
         };
         /** AudioAnalysis */
         AudioAnalysis: {
@@ -257,13 +362,19 @@ export interface components {
              */
             config?: string | null;
             /**
+             * Local Only
+             * @description Require local Whisper; reject hosted or synthetic ASR before storing the recording
+             * @default false
+             */
+            local_only: boolean;
+            /**
              * Recording
              * @description Synthetic audio/video recording (WebM, MP4, WAV, ...)
              */
             recording: string;
             /**
              * Transcribe
-             * @description Send audio to configured ASR (default: Deepgram EU). false = local signal analysis only
+             * @description Run configured ASR (default: local Whisper). false = local signal analysis only
              * @default true
              */
             transcribe: boolean;
@@ -281,6 +392,81 @@ export interface components {
              * @description PDF, PPTX, DOCX, TXT or MD; synthetic content only
              */
             file: string;
+        };
+        /** Citation */
+        Citation: {
+            /** Chunk Id */
+            chunk_id: number;
+            /** Filename */
+            filename: string;
+            location: components["schemas"]["Location"];
+            /** Quote */
+            quote: string;
+            /**
+             * Source Id
+             * Format: uuid
+             */
+            source_id: string;
+        };
+        /** CoachingJob */
+        CoachingJob: {
+            answer?: components["schemas"]["AnswerReview"] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            report?: components["schemas"]["CoachingReport"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "completed" | "failed";
+        };
+        /** CoachingQuestion */
+        CoachingQuestion: {
+            /** Claim Id */
+            claim_id: string | null;
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
+            /** T Ms */
+            t_ms: number;
+            /** Text */
+            text: string;
+        };
+        /** CoachingReport */
+        CoachingReport: {
+            /** Checks */
+            checks: components["schemas"]["FactCheck"][];
+            /**
+             * Collection Id
+             * Format: uuid
+             */
+            collection_id: string;
+            /** Events */
+            events: components["schemas"]["Event"][];
+            /** Model */
+            model: string;
+            /** Notices */
+            notices: string[];
+            /** Questions */
+            questions: components["schemas"]["CoachingQuestion"][];
+        };
+        /** CoachingRequest */
+        CoachingRequest: {
+            /**
+             * Collection Id
+             * Format: uuid
+             */
+            collection_id: string;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Words */
+            words: components["schemas"]["Word"][];
         };
         /** Event */
         Event: {
@@ -307,6 +493,25 @@ export interface components {
              * @enum {string}
              */
             type: "posture" | "gesture" | "gaze" | "filler" | "pause" | "pace" | "volume" | "pitch" | "fact" | "question";
+        };
+        /** FactCheck */
+        FactCheck: {
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
+            /** Duration Ms */
+            duration_ms: number;
+            /** Explanation */
+            explanation: string;
+            /** Id */
+            id: string;
+            /** Issue */
+            issue?: string | null;
+            /** Statement */
+            statement: string;
+            /** T Ms */
+            t_ms: number;
+            /** Verdict */
+            verdict: ("supports" | "contradicts" | "not_found") | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -342,6 +547,8 @@ export interface components {
              * @default false
              */
             synthetic_demo: boolean;
+            /** Text */
+            text: string;
             transcription: components["schemas"]["WordAnalysis"] | null;
             /** Words */
             words: components["schemas"]["Word"][];
@@ -517,6 +724,156 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    analyze_coaching_analyze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedCoaching"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capabilities_coaching_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    job_status_coaching_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachingJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_job_coaching_jobs__job_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_coaching_jobs__job_id__answers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedCoaching"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     live_health_live_get: {
         parameters: {
             query?: never;

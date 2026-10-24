@@ -20,7 +20,7 @@ from app.speech.job_models import AnalysisOptions
 from app.speech.pipeline import run_analysis
 from app.speech.signal import decode_audio
 from app.speech.vad import speech_activity
-from app.transcription.transcriber import DeepgramTranscriber
+from app.transcription.transcriber import DeepgramTranscriber, WhisperTranscriber, configured_transcriber
 
 FIXTURE = Path(__file__).parent / "fixtures" / "speech-de.wav"
 
@@ -64,6 +64,95 @@ def test_real_silero_synthetic_speech_pause_and_noise():
     assert not speech_activity(np.zeros(16000, np.float32), np.arange(0, 1000, 10), AudioConfig()).any()
 
 
+class FakeWhisperWord:
+    def __init__(self, word: str, start: float, end: float):
+        self.word = word
+        self.start = start
+        self.end = end
+
+
+class FakeWhisperSegment:
+    def __init__(self, words):
+        self.words = words
+
+
+class FakeWhisperModel:
+    def __init__(self):
+        self.kwargs = None
+
+    def transcribe(self, audio_path, **kwargs):
+        self.kwargs = kwargs
+        assert Path(audio_path).is_file()
+        return (
+            [
+                FakeWhisperSegment([
+                    FakeWhisperWord(" Hallo,", 0.0, 0.45),
+                    FakeWhisperWord("Welt.", 0.5, 1.0),
+                ])
+            ],
+            object(),
+        )
+
+
+def test_whisper_contract_maps_word_timestamps(tmp_path):
+    audio = tmp_path / "synthetic.wav"
+    audio.write_bytes(b"RIFF-synthetic")
+    model = FakeWhisperModel()
+    transcriber = WhisperTranscriber(
+        "small", language="de", beam_size=3, initial_prompt="äh", loaded_model=model
+    )
+
+    words = transcriber.transcribe(audio)
+
+    assert [word.model_dump() for word in words] == [
+        {"word": "Hallo,", "start_ms": 0, "end_ms": 450},
+        {"word": "Welt.", "start_ms": 500, "end_ms": 1000},
+    ]
+    assert model.kwargs == {
+        "language": "de",
+        "beam_size": 3,
+        "vad_filter": False,
+        "word_timestamps": True,
+        "initial_prompt": "äh",
+    }
+
+
+def test_whisper_word_mapping_skips_empty_tokens_and_orders_bounds():
+    from app.transcription.transcriber import _words_from_segments
+
+    segment = FakeWhisperSegment([
+        FakeWhisperWord("  ", 0.0, 0.1),
+        FakeWhisperWord("Wort", 0.2, 0.15),
+    ])
+
+    assert [word.model_dump() for word in _words_from_segments([segment])] == [
+        {"word": "Wort", "start_ms": 200, "end_ms": 200}
+    ]
+
+
+def test_whisper_is_default_provider(monkeypatch):
+    monkeypatch.delenv("ASR_PROVIDER", raising=False)
+    monkeypatch.setenv("WHISPER_MODEL", "base")
+    monkeypatch.setenv("WHISPER_MODEL_PATH", "/app/models/whisper")
+
+    provider = configured_transcriber()
+
+    assert isinstance(provider, WhisperTranscriber)
+    assert provider.model == "base"
+    assert provider.model_path == "/app/models/whisper"
+
+
+def test_whisper_environment_is_validated(monkeypatch):
+    monkeypatch.setenv("ASR_PROVIDER", "whisper")
+    monkeypatch.setenv("WHISPER_BEAM_SIZE", "0")
+    with pytest.raises(ValueError, match="WHISPER_BEAM_SIZE"):
+        configured_transcriber()
+    monkeypatch.setenv("WHISPER_BEAM_SIZE", "5")
+    monkeypatch.setenv("WHISPER_VAD_FILTER", "perhaps")
+    with pytest.raises(ValueError, match="WHISPER_VAD_FILTER"):
+        configured_transcriber()
+
+
 def test_combined_pipeline_uses_asr_tempo_and_audio_pauses(monkeypatch):
     monkeypatch.setenv("ASR_PROVIDER", "json")
     monkeypatch.setenv("ASR_DEMO_WORDS_PATH", str(Path(__file__).parents[1] / "app/demo/words.json"))
@@ -71,6 +160,7 @@ def test_combined_pipeline_uses_asr_tempo_and_audio_pauses(monkeypatch):
     assert result.synthetic_demo
     assert result.asr_provider == "json"
     assert result.transcription.summary.filler_count == 1
+    assert result.text
     assert any(event.type == "filler" and event.t_ms == 1200 for event in result.events)
     assert all(event.source == "asr" for event in result.events if event.type == "pace")
     assert all(event.source == "speech" for event in result.events if event.type == "pause")

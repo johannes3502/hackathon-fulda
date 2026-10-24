@@ -29,9 +29,23 @@ Gesten-/Sample-Demo reicht alternativ Node.js 22.12+: `npm ci`, `npm run dev`.
 5. **Finish & review** → Beobachtung anklicken → Aufnahme an dieser Stelle ansehen.
    Eine sinnvolle Reflexionsfrage stellen: „Hat diese Bewegung deinen Punkt
    unterstützt?“ Optional Rohdaten oder Gesten-Evidenz herunterladen.
-6. Für Sprache/Fragen auf der Startseite **Try sample demo** öffnen. Dieser
-   vorbereitete Ablauf bleibt ausdrücklich ein Szenario; er analysiert keine
-   gerade gemachte Live-Aufnahme.
+6. Für Sprache/Fragen entweder **Try sample demo** als ausdrücklich vorbereitetes
+   Szenario zeigen oder den echten lokalen Quellenpfad unten nutzen.
+
+## Echte lokale Sprache und Fragen (optional, etwa 2 weitere Minuten)
+
+Ollama vorab starten, Modell laden und Smoke ausführen:
+[lokale KI einrichten](06-local-coaching.md). Unter `/sources` eine TXT-Datei
+mit erfundenem Inhalt hochladen: „Synthetische Beispieldaten: Das Lernlabor hat
+zwanzig Plätze. Es öffnet um neun Uhr.“ Auf **Ready** warten.
+
+Unter `/live` **Local server · speech analysis and transcript** wählen. Mikro
+und Kamera einschalten, normal sprechen und neutral stehen. Als synthetischen
+Vortrag z. B. sagen: „Das Lernlabor hat zwanzig Plätze. Es öffnet um acht Uhr.
+Das Lernlabor hat einen Swimmingpool.“ Nach Stop das echte Whisper-Transkript
+prüfen, dann **Compare with my sources**. Zitate ansehen, **Replay** ausprobieren
+und eine Rückfrage beantworten. Modellfehler offen ansprechen; fehlende Evidenz
+ist kein Falschheitsbeweis. Bei Ausfall die vorbereitete Sample-Session zeigen.
 
 Satz für den Pitch: **„In unserem Prototyp wird eine sichtbare Bewegung zu einer
 nachvollziehbaren Stelle im Video. Die Person entscheidet im Kontext, was sie
@@ -48,6 +62,8 @@ beibehalten oder ändern möchte.“**
 | Seitwärts-Hinweis erscheint verzögert | Positionsregel wartet bewusst 0,8 s. „Pose debug“ zeigt zusätzlich Frame-/Modellzeit und Abtastrate. Bei hoher Frame-Zeit andere Browser vergleichen; Safari ist bisher nicht als Ursache belegt. |
 | API/Netz fehlt | Lokale Gestenerkennung braucht nach Laden der App/Assets keine Anbieter-API. Synthetischer Rundgang braucht keine Kamera. Kein Service-Worker: erstmaliger Seitenaufruf braucht den App-Server. |
 | Backend-Audio schlägt fehl | Aufnahme und bereits vorhandene lokale Gesten bleiben im Review; Fehlermeldung sichtbar. |
+| Quellenmodell fehlt / Quellen nicht bereit | Ollama und Modellstatus prüfen, Quelle fertig laden lassen, **Refresh status**. Kein Cloud-Fallback. |
+| Zitat kann nicht geprüft werden | Kein Urteil anzeigen; Passage selbst prüfen. Eine Zahl von Modellurteilen ist keine Genauigkeit. |
 | Kamera bewegt / Person wechselt | Aufnahme beenden. Neue Aufnahme mit neuer Kalibrierung. |
 | Seite wird neu geladen | Lokales Video ist weg. Vorher downloaden; neuen Versuch starten. |
 
@@ -64,6 +80,7 @@ Vor-Ort-Abnahme nicht. Keine echten Juryaufnahmen als Testfixtures einchecken.
 | Reale Zeitzuordnung | Marker führt zur tatsächlich gezeigten Bewegung, einschließlich Anfang/Ende der Aufnahme | Offen – vor Ort ausführen |
 | Safari/iPhone (optional) | Berechtigung, Modell, MP4-Aufnahme, Stop, Replay und Download | Nicht qualifiziert; für die lokale Laptop-Demo nicht vorausgesetzt |
 | Lokale Dienste / Assets | App, Modell-Assets und optional Compose-Audio-Backend vor Start laden | Lokal prüfen; keine öffentliche URL benötigt |
+| Lokale KI | Whisper, Quellenvergleich, Frage und Antwort auf synthetischen Daten | Reale lokale Modelle und Desktop-/Mobile-Viewport-Flows geprüft; echtes Mikrofon vor Ort prüfen |
 | Lokaler Fallback | `/gestures` und vorbereitete Sprach-/Frage-Session vorher öffnen | Automatisiert prüfen; am Stand wiederholen |
 | Einwilligung | Vor Aufnahme erklären: lokal oder optional Backend-Audio-Upload, Speicherung, Download/Verlassen | UI-Hinweise vorhanden; Team erklärt vor Ort |
 
@@ -86,8 +103,10 @@ gezählte Versuche und dokumentierte Bedingungen, die noch nicht vorliegen.
 
 Der Kamerapfad erzeugt lokale Gesten-/Haltungsereignisse und spielt das komplette
 Video im Browser ab. Er erstellt noch keine dauerhaft gespeicherten Server-Clips.
-Audioanalyse und Quellen-Ingest/Hybrid-Retrieval sind angebunden; automatische
-ASR-Auswahl im UI, Fact-Check, Web-Fetch und echte Frage-/Antwortanalyse sind noch
-separat zu integrieren.
+Audioanalyse, lokale Whisper-Transkription, Quellen-Ingest/Hybrid-Retrieval,
+Ollama-Quellenvergleich und Text-Frage-/Antwortanalyse sind im Web angebunden.
+Web-Fetch, Live-Transkript, Blickkontakt-Auswertung und dauerhafte Server-Clips
+sind nicht Teil des aktuellen vorführbaren Pfads. Die native App behält ihren
+bisherigen Funktionsumfang; die neue lokale Fragerunde ist im Web verfügbar.
 Die bestehende Sample-Session zeigt den angestrebten Gesamtfluss mit vorbereiteten
 Daten. Das Team darf sie nicht als Analyse der Live-Aufnahme vorstellen.

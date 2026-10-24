@@ -8,7 +8,7 @@ celery_app = Celery(
     "presentation_trainer",
     broker=os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0"),
     backend=os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1"),
-    include=["app.tasks"],
+    include=["app.tasks", "app.coaching.tasks"],
 )
 celery_app.conf.update(
     task_default_queue="background",

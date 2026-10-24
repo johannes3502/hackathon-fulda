@@ -1,5 +1,5 @@
 import type { components } from "../../../../api/schema";
-import type { LiveFeedback, LiveMetric } from "./contracts";
+import type { LiveFeedback, LiveMetric, LiveTranscript } from "./contracts";
 
 type Word = components["schemas"]["Word"];
 const object = (v: unknown): v is Record<string, unknown> =>
@@ -35,10 +35,18 @@ export async function request(
     signal: AbortSignal.any([signal, AbortSignal.timeout(120000)]),
     cache: "no-store",
   });
-  if (!response.ok)
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const body = await response.json();
+      if (typeof body.detail === "string")
+        detail = ` ${body.detail.slice(0, 250)}`;
+    } catch {}
     throw new Error(
-      `Backend ${path} failed (HTTP ${response.status}). Your local recording is preserved.`,
+      `Backend ${path} failed (HTTP ${response.status}).${detail} Your local recording is preserved.`,
     );
+  }
+  if (response.status === 204) return undefined;
   return response.json() as Promise<unknown>;
 }
 
@@ -70,7 +78,12 @@ export async function waitForAudioJob(
     if (job.status === "completed") {
       if (!object(job.result) || !object(job.result.audio))
         throw new Error("The backend returned an invalid analysis.");
-      return { summary: job.result.audio.summary, events: job.result.events };
+      return {
+        ...job.result,
+        summary: job.result.audio.summary,
+        events: job.result.events,
+        transcription: job.result.transcription,
+      };
     }
     if (job.status !== "queued" && job.status !== "running")
       throw new Error("The backend returned an invalid analysis job.");
@@ -98,6 +111,7 @@ export function parseWords(value: unknown, durationMs: number): Word[] {
       (w) =>
         object(w) &&
         typeof w.word === "string" &&
+        !!w.word.trim() &&
         time(w.start_ms) &&
         time(w.end_ms) &&
         Number.isInteger(w.start_ms) &&
@@ -109,7 +123,34 @@ export function parseWords(value: unknown, durationMs: number): Word[] {
     throw new Error(
       "Provide a JSON array of words with word, start_ms and end_ms within this recording.",
     );
+  if (
+    value.some(
+      (word, index) => index > 0 && word.start_ms < value[index - 1].start_ms,
+    )
+  )
+    throw new Error("Transcript words must be ordered by their start time.");
   return value as Word[];
+}
+
+export function parseTranscript(
+  value: unknown,
+  durationMs: number,
+): LiveTranscript {
+  if (
+    !object(value) ||
+    !Array.isArray(value.words) ||
+    (value.asr_provider !== null && typeof value.asr_provider !== "string") ||
+    typeof value.synthetic_demo !== "boolean" ||
+    !Array.isArray(value.notices) ||
+    !value.notices.every((n) => typeof n === "string")
+  )
+    throw new Error("The backend returned an invalid transcript.");
+  return {
+    words: value.words.length ? parseWords(value.words, durationMs) : [],
+    provider: value.asr_provider as string | null,
+    synthetic: value.synthetic_demo,
+    notices: value.notices as string[],
+  };
 }
 
 export function analysisResult(
@@ -148,13 +189,13 @@ export function analysisResult(
     const word =
       typeof e.payload.word === "string" ? `: “${e.payload.word}”` : "";
     return {
-      id: `${source}-${i}`,
+      id: `${e.source === "asr" ? "words" : source}-${i}`,
       category: String(e.type),
       kind: e.severity === "warning" ? "attention" : "suggestion",
       startMs: e.t_ms,
       endMs: Math.min(durationMs, e.t_ms + e.duration_ms),
       title: `${e.type}${direction}${word}`,
-      detail: `${source === "speech" ? "Audio signal" : "Word timestamp"} heuristic. Review this observation in context; it is not a performance score.`,
+      detail: `${source === "words" || e.source === "asr" ? "Word timestamp" : "Audio signal"} heuristic. Review this observation in context; it is not a performance score.`,
       action:
         "Replay the surrounding seconds and decide whether you want to practice this moment.",
     };

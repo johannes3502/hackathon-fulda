@@ -141,20 +141,34 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
   this replaces the previous synchronous 200 response. Poll the status URL:
   `queued` → `running` → `completed` (with `result`) or `failed` (with `error`).
   Decode failures occur in the worker and are reported as failed jobs.
-- The frontend camera flow uploads completed recordings with `transcribe=false`
-  and polls this job API. This keeps its signal analysis local. Optional paid
-  ASR is available through the API; the UI still imports word timestamps separately.
+- The frontend backend mode uploads completed recordings with local Whisper
+  transcription on by default, and polls this job API. The checkbox can disable
+  transcription. It always sends `local_only=true`; when transcribing, a hosted
+  or synthetic ASR configuration is rejected before storing the recording.
 - `result.events` uses word-based tempo and acoustic pauses without duplicate
   events. Raw pipeline events remain in `audio.events` / `transcription.events`.
 - Silero v6.2 is installed and checksum-verified at image build time. CPU ONNX
   inference runs locally, without PyTorch or runtime downloads. `activity_detector:
   "energy"` explicitly selects the old energy gate for DSP tests/debugging.
-- Set `DEEPGRAM_API_KEY` in `.env`, then recreate backend/worker. Default ASR:
-  Nova-3, German, batch upload to `https://api.eu.deepgram.com/v1/listen`.
-  The audio is sent to this third party; only synthetic demo recordings are
-  intended at this stage. German filler preservation is **unverified** and the
-  English-only `filler_words` feature is not enabled.
-- Without a key, submit `transcribe=false` for local signal analysis, or set
+- Default ASR is local `faster-whisper` (`ASR_PROVIDER=whisper`, German).
+  The worker loads the model once per process; audio stays on the VM. Word
+  timestamps come from `word_timestamps=True`. Filler preservation and German
+  quality are model-dependent and not measured here.
+- `WHISPER_MODEL` is a **build argument** (default `small`). The Dockerfile
+  downloads the CTranslate2 model into `/app/models/whisper`; the runtime path
+  is `WHISPER_MODEL_PATH`. Change the model in `.env`, then
+  `docker compose up --build -d --wait`. CPU defaults to `int8`; available
+  sizes include `tiny`, `base`, `small`, `medium`, `large-v3`. Each worker
+  process holds its own model, so raise `CELERY_WORKER_CONCURRENCY` only with
+  enough RAM.
+- Optional tuning: `WHISPER_DEVICE` (`cpu`/`cuda`), `WHISPER_COMPUTE_TYPE`,
+  `WHISPER_LANGUAGE` (empty = auto-detect), `WHISPER_BEAM_SIZE`,
+  `WHISPER_VAD_FILTER`, `WHISPER_INITIAL_PROMPT`.
+- `ASR_PROVIDER=deepgram` remains available: set `DEEPGRAM_API_KEY` and
+  recreate backend/worker. Audio is then sent to the EU endpoint; only
+  synthetic demo recordings are intended. German filler preservation is
+  **unverified** and the English-only `filler_words` feature is not enabled.
+- Without ASR, submit `transcribe=false` for local signal analysis, or set
   `ASR_PROVIDER=json` to explicitly replay `app/demo/words.json`. Demo output is
   flagged `synthetic_demo=true`; those words are invented and not aligned to an
   arbitrary upload. Failed ASR never silently turns into fabricated feedback.
@@ -180,9 +194,44 @@ docker compose cp backend/tests/fixtures/speech-de.wav backend:/tmp/speech-de.wa
 docker compose exec -T backend python -m scripts.smoke_audio /tmp/speech-de.wav
 ```
 
-Use `--transcribe` only when the desired provider is configured. With
-`ASR_PROVIDER=json` this checks the explicit deterministic demo; with
-`ASR_PROVIDER=deepgram` it sends the synthetic audio to the paid ASR API.
+Use `--transcribe` to run the configured provider. The default local Whisper
+model works without credentials; `ASR_PROVIDER=json` checks the explicit
+deterministic demo, and `ASR_PROVIDER=deepgram` sends synthetic audio to the
+paid ASR API.
+
+## Local source comparison and questions
+
+Start native Ollama and download **`qwen3.5:4b-q4_K_M`** as described in
+[the local AI guide](../docs/06-local-coaching.md). Compose uses
+`OLLAMA_URL=http://host.docker.internal:11434`, so Apple Silicon inference uses
+the host GPU. There is no cloud fallback or API key. The explicit GGUF tag is
+required: the default macOS MLX variant returned HTTP 501 for structured output
+in the tested Ollama version.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /coaching/capabilities` | Local model installed/reachable; not a quality or inference-health guarantee |
+| `POST /coaching/analyze` | `{collection_id, words, duration_ms}` → 202 + job ID |
+| `GET /coaching/jobs/{id}` | queued/running/completed/failed + report or answer |
+| `POST /coaching/jobs/{id}/answers` | `{question_id, answer}` → separate asynchronous job |
+| `DELETE /coaching/jobs/{id}` | Delete terminal job input and result; active jobs return 409 |
+
+`analyze_coaching` receives only a job ID through Redis. Inputs and outputs live
+under `coaching-jobs/{id}/` in S3. Completed/failed redeliveries reuse their result;
+interrupted jobs fail visibly instead of restarting unnoticed. No automatic
+expiry exists. The web review deletes its answer jobs and parent report together;
+source uploads and speech-analysis results have separate lifetimes. Refreshing
+the page loses browser state and does not delete server objects.
+
+Synthetic real-model integration check (Ollama must be running):
+
+```sh
+docker compose exec -T backend python - < backend/scripts/smoke_coaching.py
+```
+
+This uploads an invented source, checks support/contradiction/missing evidence,
+answers one question, then deletes its sources and coaching jobs. It does not
+measure general model accuracy or human speech recognition.
 
 For local inference outside Docker, from `backend/`:
 
@@ -198,12 +247,15 @@ contract tests use mocked HTTP responses and do not prove German ASR quality.
 ### Transcription (`app/transcription/`, `POST /transcription/analyze-words`)
 
 ```
-recording → FFmpeg WAV → Transcriber → words {word, start_ms, end_ms}
-  → events: filler (incl. repetition) | pause | pace   (source "asr")
+recording → FFmpeg 16 kHz WAV → Transcriber → words {word, start_ms, end_ms}
+  → text + events: filler (incl. repetition) | pause | pace   (source "asr")
 ```
 
-- `Transcriber` keeps the provider exchangeable. `DeepgramTranscriber` maps
-  seconds to millisecond word timestamps; `JsonTranscriber` replays demo words.
+- `Transcriber` keeps the provider exchangeable. `WhisperTranscriber` runs
+  `faster-whisper` locally and maps CTranslate2 word timestamps to
+  milliseconds; `DeepgramTranscriber` is the optional hosted adapter and
+  `JsonTranscriber` replays demo words. `RecordingAnalysis.text` joins the
+  words into a readable transcript; timestamps remain authoritative.
 - Fillers use a configurable list (still open, see `docs/01-product.md`);
   repetitions ("ich ich") are `filler` events with `payload.kind = "repetition"`.
 - Word-based pause and words-per-minute complement the signal-based values.

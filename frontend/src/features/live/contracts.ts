@@ -1,4 +1,13 @@
 import type { PoseEvent } from "../pose/evaluation";
+import type { CoachingState } from "../coaching/api";
+import type { components } from "../../../../api/schema";
+export type TranscriptWord = components["schemas"]["Word"];
+export type LiveTranscript = {
+  words: TranscriptWord[];
+  provider: string | null;
+  synthetic: boolean;
+  notices: string[];
+};
 export type FeedbackKind =
   "positive" | "suggestion" | "attention" | "observation";
 export type LiveFeedback = {
@@ -23,6 +32,7 @@ export type LiveConfig = {
   targetMs: number;
   mode: "local" | "backend";
   endpoint: string;
+  transcribe?: boolean;
 };
 export type VideoChunkMeta = {
   type: "video.chunk";
@@ -35,7 +45,8 @@ export type VideoChunkMeta = {
 export type LiveMessage =
   | { type: "feedback"; sessionId: string; feedback: LiveFeedback }
   | { type: "metrics"; sessionId: string; atMs: number; metrics: LiveMetric[] }
-  | { type: "error"; sessionId: string; message: string };
+  | { type: "error"; sessionId: string; message: string }
+  | { type: "transcript"; sessionId: string; transcript: LiveTranscript };
 export type LiveProgress = {
   phase: "connecting" | "recording" | "finishing";
   elapsedMs: number;
@@ -46,6 +57,8 @@ export type LiveProgress = {
   notice: string | null;
 };
 export type LiveRecording = {
+  coaching?: CoachingState;
+  transcript?: LiveTranscript;
   poseEvents?: PoseEvent[];
   poseLog?: Blob;
   id: string;
