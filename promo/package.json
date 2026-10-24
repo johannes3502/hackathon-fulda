@@ -1,0 +1,21 @@
+{
+  "name": "pitch-practice-promo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Promo video for Pitch Practice (8. Hackathon Fulda 2026)",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts PitchPractice out/PitchPractice-Promo.mp4 --codec h264 --crf 16",
+    "still": "remotion still src/index.ts PitchPractice out/preview.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.417",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.417"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "typescript": "5.9.3"
+  }
+}

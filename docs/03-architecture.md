@@ -32,7 +32,7 @@ flowchart TB
         RV["Review-Router (additiv)<br/>/sessions, /takes, /jobs<br/>Idempotency-Key, camelCase<br/>verknüpft: X-Profile-Token"]
         PR["Progress-Router (additiv)<br/>/profiles, /progress, /goals<br/>X-Profile-Token, Idempotency-Key"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job, recompute_progress"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job,<br/>recompute_progress, worker_probe (Smoke)"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -69,8 +69,9 @@ flowchart TB
     SP -- "nur bei provider=deepgram; PCM, serverseitiger Schlüssel" --> DG["Deepgram EU Nova-3<br/>Deutsch, live + Wort-Timestamps"]
     DG -- "vorläufig/final, CloseStream-Abschluss" --> SP
     PCM -- "WS /api/speech/feedback: PCM" --> SP
-    SP --> LIVE_SIG["API-Thread: gleiche Signalregeln alle 5 s<br/>Adaptive Referenz ab stimmhafter Sprache<br/>max. 5 min, ein Slot; PCM nur im RAM"]
-    LIVE_SIG -- "feedback: position_ms + Events<br/>ein Hinweis, 15-s-Cooldown pro Typ" --> WEB
+    SP --> LIVE_SIG["API-Thread: gleiche Signalregeln je ≥5 s neues PCM<br/>Adaptive Referenz ab stimmhafter Sprache<br/>max. 5 min, ein Slot; PCM nur im RAM"]
+    LIVE_SIG -- "feedback: position_ms + alle qualifizierenden Events" --> WEB
+    WEB --> HINT_FILTER["Client: ein Hinweis gleichzeitig,<br/>15-s-Cooldown pro Typ, 10-s-Frische"]
     MP_W --> RULES["PoseEvaluator: Neutralstellung, Geometrie, Mindestdauer<br/>posture/gesture-Events; lokale Evidenz"]
     MOB -- "Kamera" --> MP_M
 
@@ -158,11 +159,11 @@ flowchart LR
     BE -->|"storage healthy"| ST
     BE -->|"redis healthy"| RD
     WK -->|"backend healthy vor Start"| BE
-    WK --> PG
-    WK --> ST
-    WK --> RD
+    WK -. "Runtime-Verbindungen über x-backend-Umgebung,<br/>keine eigenen Health-Gates" .-> PG
+    WK -.-> ST
+    WK -.-> RD
     WK -. "LLM_BASE_URL / LLM_MODEL<br/>(Gemini, OpenAI-kompatibel)" .-> LLM(["Gemini; austauschbarer Adapter"])
-    BE -. "ELEVENLABS_API_KEY + ELEVENLABS_AGENT_ID" .-> EL(["ElevenLabs; Voice optional"])
+    BE -. "ELEVENLABS_API_KEY + ELEVENLABS_AGENT_ID<br/>(x-backend: BE + WK, wie alle LLM-/ASR-Variablen)" .-> EL(["ElevenLabs; Voice optional"])
     User -. "Signed WebSocket" .-> EL
     WK -. "WEB_SEARCH_PROVIDER" .-> WS(["Wikipedia / Tavily"])
 ```
@@ -189,7 +190,7 @@ sequenceDiagram
 
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>BE: WS /speech/feedback: start, PCM nach ready
-    loop alle 5 Sekunden, maximal 5 Minuten
+    loop je ≥5 s neu angekommenes PCM (meldungsbasiert, kein Timer), maximal 5 Minuten
         BE->>BE: Auf Sprache warten, danach kausale adaptive Referenz aus bisherigem Audio
         BE-->>FE: feedback: position_ms, aktuelle Events (Heuristik)
         FE->>FE: Zeitoffset zu MediaRecorder.onstart, ein Hinweis, Cooldown
@@ -221,7 +222,7 @@ sequenceDiagram
     W->>R: Job holen (Lock 660s)
     W->>S3: Datei laden
     W->>W: FFmpeg -> 16kHz mono, Frames 40ms/10ms
-    W->>W: RMS-Pegel, YIN-Pitch, Silero VAD, Silben-Peaks
+    W->>W: RMS-Pegel, Silero VAD, YIN-Pitch nur auf stimmhaften Frames, Silben-Peaks
     W->>W: 3 s stimmhafte Sprache sammeln, Referenz nur bei Sprache langsam nachführen
     Note over BE,W: Gleicher kausaler Referenzablauf<br/>Pausen/Rauschen trainieren nicht, Referenz je Event-Fenster speichern
     opt transcribe=true
@@ -262,11 +263,11 @@ sequenceDiagram
     C->>A: POST /takes/id/events (max 500 abgeleitete Pose-Events)
     A->>P: Validierung + Upsert (take_id, dedupe_key)
     opt Audio/ASR gewünscht
-        C->>A: POST /takes/id/audio (file, transcribe, config)
+        C->>A: POST /takes/id/audio (file, transcribe, config, local_only, optional live_transcript)
         A->>P: Job + idempotente Response atomar reservieren
         A->>S: Upload temporär, unter Session-Lock
         A->>Q: Job-ID
-        Q->>W: audio_analyze
+        Q->>W: run_take_job (Job-Kind audio_analyze)
         W->>S: Upload laden
         W->>W: FFprobe, Signal/ASR, Audio-Offset auf Take-Zeitachse
         W->>S: Upload in finally löschen, auch bei Analysefehlern
@@ -314,7 +315,7 @@ flowchart TB
     RET --> HITS["Top-k SourceHits<br/>mit Zitat-Ort: page/slide/<br/>paragraph/line"]
     FCQ["Fact-Check je Aussage<br/>(app/factcheck/pipeline.py)"] -- "Suchanfrage" --> RET
     HITS --> JUDGE["LLM-Urteil mit Zitat<br/>exakt oder konservativ fuzzy; Fundort bindend<br/>Zahlen/Negation bleiben gleich<br/>ungültiges Zitat: unchecked"]
-    JUDGE -. "nicht belegt" .-> WEBQ["Websuche als Zweitquelle<br/>(Wikipedia / Tavily)"]
+    JUDGE -. "keine geprüfte Evidenz<br/>(nicht belegt oder unchecked)" .-> WEBQ["Websuche als Zweitquelle<br/>(Wikipedia / Tavily)"]
     JUDGE --> EVT["fact-Events auf der Timeline"]
     HITS --> QA["Frage-Simulator<br/>(app/questions/pipeline.py)<br/>Lücken-Fragen + Antwort-Abgleich"]
     EVT --> QA
@@ -347,7 +348,7 @@ sequenceDiagram
         W->>PG: Hybrid-Suche in den Quellen der Collection
         W->>L: Urteil + wörtliches Zitat aus den Auszügen
         W->>W: quote_in_text prüft Zitat, sonst verworfen
-        opt nicht belegt und use_web
+        opt keine geprüfte Evidenz (nicht belegt oder unchecked) und use_web
             W->>WS: Suchanfrage (MediaWiki-API / Tavily)
             W->>L: Urteil + Zitat aus Web-Auszügen
             W->>W: Zitat prüfen
@@ -432,7 +433,7 @@ kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
 
 ```mermaid
 flowchart TD
-    DRAWER["AppShell: modaler Drawer + Header außerhalb des Live-Studio<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>verbindet /, /live, /sources, /review-preview, /gestures, /demo, /admin<br/>geplant: /progress"]
+    DRAWER["AppShell: modaler Drawer + Header außerhalb des Live-Studio<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>Drawer: /, /live, /sources, /review-preview, /gestures, /demo<br/>Header-Nav zusätzlich: /admin; geplant: /progress"]
     THEME["Root-Layout: gespeicherte Darstellung vor First Paint<br/>localStorage, CSS-Tokens, OS-Fallback"] -.-> DRAWER
     JOURNEY["Gemeinsamer Ablauf: Prepare / Record / Review<br/>aktuelle oder letzte Aufnahme, sonst markiertes Beispiel"] --> SRC
     JOURNEY --> LIVE
@@ -479,9 +480,9 @@ flowchart TD
 
     SRC -->|"collection_id aus localStorage"| UPLOAD["POST /sources<br/>POST /sources/search"]
 
-    subgraph Transport["VideoTransport (wahlweise)"]
-        DEMO["LocalVideoTransport<br/>kein Upload; echte Pose-Events"]
-        ANA["AnalysisTransport<br/>Backend-Upload + Polling"]
+    subgraph Transport["VideoTransport: LiveStudio fest auf backend<br/>(Modus-Schalter entfernt)"]
+        ANA["AnalysisTransport<br/>Backend-Upload + Polling, jede Web-Aufnahme"]
+        DEMO["LocalVideoTransport<br/>nur noch Tests; kein Upload"]
     end
     LIVE --> Transport
 ```
@@ -546,6 +547,7 @@ erDiagram
         jsonb consent
         jsonb capture "inkl. deviceKey"
         timestamptz created_at
+        timestamptz deleted_at
     }
     TAKES {
         uuid id PK
@@ -561,7 +563,10 @@ erDiagram
         timestamptz recorded_at "Client oder Server"
         text recorded_at_source "client/server"
         uuid device_key
+        jsonb warnings
         int revision
+        timestamptz created_at
+        timestamptz deleted_at
     }
     TAKE_QUALITY {
         uuid take_id PK,FK
@@ -646,6 +651,7 @@ erDiagram
         text stage
         jsonb payload
         text rule_version
+        timestamptz created_at
     }
     REVIEWS {
         uuid id PK
@@ -654,6 +660,8 @@ erDiagram
         jsonb report "review.v1"
         jsonb generator
         jsonb verification
+        timestamptz created_at
+        timestamptz updated_at
     }
     JOBS {
         uuid id PK
@@ -666,6 +674,8 @@ erDiagram
         jsonb input "bei terminalem Status geleert"
         text object_key "privat, nur temporäres Audio"
         bool upload_ready
+        timestamptz created_at
+        timestamptz updated_at
     }
     REVIEW_IDEMPOTENCY {
         text scope PK
@@ -701,11 +711,19 @@ erDiagram
         int location_start
         int location_end
         text text
-        vector embedding "768 dim (pgvector)"
+        vector embedding "ohne feste Dimension (Modell austauschbar); 768 ist der Jina-Output"
         string embedding_model
         tsv tsv "GENERATED, to_tsvector(german)"
     }
 ```
+
+Zusätzlich gelten Constraints: `events.peak_ms` liegt innerhalb
+`[t_ms, t_ms + duration_ms]`, `t_ms + duration_ms` ist auf 24 h begrenzt;
+`source_chunks` hat `UNIQUE (source_id, ordinal)`; ein aktiver Job je
+`(take_id, kind)` über partiellem Unique-Index (`queued`/`running`).
+Die Embedding-Spalte ist bewusst dimensionsfrei, damit das Modell
+ausgetauscht werden kann; Abfragen vergleichen nur Vektoren desselben
+`embedding_model`.
 
 Zusätzlich (außerhalb Postgres):
 
@@ -742,7 +760,7 @@ flowchart LR
     F --> EV
     G --> EV
 
-    EV --> MT["Legacy merge_timeline()<br/>Tempo und Pausenkontext aus ASR<br/>nur überlappende Signalpausen ersetzen"]
+    EV --> MT["Legacy-Pfad run_analysis + merge_timeline()<br/>Wortpausen mit Satzkontext behalten,<br/>überlappende Signalpausen ersetzen;<br/>Signal-Tempo entfällt mit ASR-Wörtern<br/>merge_timeline selbst sortiert nur"]
     EV --> PERSIST["Take-Adapter + Browser-Pose-Vertrag<br/>eventId, dedupeKey, tMs, peakMs,<br/>durationMs, stage, ruleVersion<br/>kein gaze, kein Medien-Key"]
     PERSIST --> REVIEWMERGE["Finale Review-Timeline<br/>Pausen: ASR innerhalb des Satzes oder mit belegtem Satzende<br/>sonst längste, alle Event-IDs behalten<br/>WPM und Silben/s getrennt, stabil nach Start, Peak, ID"]
     REVIEWMERGE --> REPORT["Aggregate + explizite Coverage<br/>max 3 geerdete Findings + 3 belegte Stärken<br/>Beobachtung, feste Erklärung und Übungsschritt<br/>review.v1 in Postgres, auch ohne LLM"]
@@ -754,10 +772,14 @@ flowchart LR
 Pose-Event-Payload und JSONL tragen optional `runtime` mit Modell, Modus und
 tatsächlichem Delegate; synthetische Fixtures haben keine erfundene Laufzeit.
 Hand-/Lab-Ergebnisse fließen nicht in das gemeinsame Event-Modell.
-Lokale Sprachmarker tragen Start/Ende ab `MediaRecorder.onstart` im Feedback-
-Vertrag. Bei überlappenden Typen ersetzt die vollständige Backend-Analyse den
-Live-Marker im Review. Ein fehlender neutraler Handwert im Pose-Payload ist
-`null`; die Haltungsreferenz benötigt keine ruhigen oder sichtbaren Hände.
+Das lokale Browser-Modell typisiert Kopfregeln (`head_turned`, `head_down`)
+als `gaze`; der persistente Vertrag kennt kein `gaze` — Kategorie ist dort
+`head` (`head-lateral`, `head-orientation`), die Legacy-Anzeige mappt `gaze`
+zu `gesture`. Lokale Sprachmarker tragen Start/Ende ab `MediaRecorder.onstart`
+im Feedback-Vertrag. Bei überlappenden Typen ersetzt die vollständige
+Backend-Analyse den Live-Marker im Review. Ein fehlender neutraler Handwert im
+Pose-Payload ist `null`; die Haltungsreferenz benötigt keine ruhigen oder
+sichtbaren Hände.
 
 Alle Kennwerte sind Messwerte ohne Notenbewertung ("Measured values only; no score or grade").
 
