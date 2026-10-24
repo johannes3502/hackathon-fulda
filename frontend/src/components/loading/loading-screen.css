@@ -12,8 +12,9 @@
   gap: 24px;
   padding: 32px;
 }
-.loading418-center .brand-mark {
-  font-size: 2rem;
+.loading418-center .brand-logo {
+  width: 128px;
+  height: 128px;
 }
 .loading418-status {
   display: flex;

@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { BrandLogo } from "./BrandLogo";
 import { usePathname } from "next/navigation";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
@@ -131,7 +132,7 @@ export function AppShell({
             <span className="drawer-trigger-label">Menü</span>
           </Button>
           <Link href="/" className="brand" aria-label="418 home">
-            <span className="brand-mark">418</span>
+            <BrandLogo />
             <span className="brand-caption">Presentation studio</span>
           </Link>
         </div>
@@ -269,7 +270,7 @@ export function AppShell({
             </DialogPrimitive.Description>
             <div className="nav-drawer-header">
               <div className="brand">
-                <span className="brand-mark">418</span>
+                <BrandLogo />
                 <div>
                   <DialogPrimitive.Title className="nav-drawer-title">
                     Navigation
