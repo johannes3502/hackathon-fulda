@@ -166,6 +166,9 @@ flowchart TB
 
 ```mermaid
 flowchart TD
+    LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>Three.js, statischer Fallback"]
+    LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
+    LOADING -. "Suspense-Fallback beim Laden" .-> HOME
     HOME["/ - Start<br/>SessionSetupForm"] -->|"Demo starten"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
     HOME -->|"Session konfigurieren"| PRAC
     HOME --> LIVE["/live<br/>LiveStudio: Kamera, Pose-Overlay,<br/>MediaRecorder"]
