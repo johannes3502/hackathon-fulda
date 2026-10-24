@@ -336,6 +336,10 @@ Vor der Aufnahme stehen Material-Upload und vier Präsentationstypen bereit:
 ElevenLabs ist auf Nutzerwunsch als optionaler Sprachdialog integriert; Nutzer
 konfiguriert `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` selbst. Kontext als
 Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Sprachreaktionen sind nicht zitateverifiziert; die Auswertung nach der getippten Runde ist ein Client-Heuristik-Score aus gemessenen Events (siehe Abschnitt 6, Frage-Simulator).
+Bei unzureichenden Upload-Auszügen nutzt der ElevenLabs-Agent das Webhook-Tool
+`search_web` (Tavily, Secret im ElevenLabs-Konto) für gezielte öffentliche
+Sachfragen. Webquellen werden benannt; Suchfehler/fehlende Belege bleiben offen.
+Vorlage: `templates/elevenlabs-web-search.json`; keine API-Keys im Browser/Prompt.
 Einrichtung und offene Grenzen: `docs/07-review-and-agent.md`.
 
 ## Datenbasierter Kurzreview-Fallback (24.10.2026)

@@ -56,6 +56,7 @@ flowchart TB
     LLM["LLM: Gemini (Cloud)<br/>3.1 Flash Lite / 3.8 Flash<br/>JSON-Modus, austauschbarer Adapter"]
     ELEVEN["ElevenLabs Agent, optional<br/>Live-Audio + Gespräch; serverseitiger Schlüssel"]
     WEBS["Websuche (Zweitquelle)<br/>Wikipedia-API oder Tavily"]
+    ELEVEN -->|"search_web bei unzureichenden Upload-Auszügen<br/>Secret im ElevenLabs-Konto"| TAVILY["Tavily Search API<br/>Titel, URLs, Auszüge"]
 
     WEB -- "Kamera/Mikro" --> MP_W
     WEB -- "Aufnahme" --> MR
@@ -382,6 +383,7 @@ sequenceDiagram
     participant W as Celery Worker
     participant PG as Postgres + pgvector
     participant E as ElevenLabs Agent
+    participant T as Tavily (Websuche)
     participant L as Gemini (JSON-Modus)
 
     U->>FE: Practice questions
@@ -411,6 +413,11 @@ sequenceDiagram
             E->>FE: Frage / Reaktion, Audio + Text
             U->>FE: Gesprochene Antwort
             FE->>E: Mikrofon-Audio
+            opt Upload-Auszüge fehlen oder klären Sachfrage nicht
+                E->>T: search_web: gezielte öffentliche Sachfrage
+                T-->>E: Bis zu drei Treffer mit Titel, URL und Auszug
+                Note over E: Webquelle nennen; bei Fehler/fehlendem Beleg Urteil offenlassen
+            end
             Note over E: Prompt: höchstens zwei Nachfragen, danach nächste Hauptfrage
         end
         alt End conversation oder reguläres Agent-Ende

@@ -364,7 +364,9 @@ export function QuestionPractice({
               )}
               <p className="field-hint">
                 Starting shares your transcript, matching material and live
-                microphone audio with ElevenLabs. Spoken feedback is an AI
+                microphone audio with ElevenLabs. When materials are insufficient,
+                the agent sends focused search queries to Tavily to check public
+                web sources. Spoken feedback is an AI
                 suggestion; use source checks to verify factual claims. You can
                 end the conversation at any time.
               </p>
