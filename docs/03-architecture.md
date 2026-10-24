@@ -146,8 +146,8 @@ sequenceDiagram
     participant ASR as Whisper lokal (optional)
 
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
-    FE->>FE: FeatureFlags im Take festhalten; Lite/Heavy, VIDEO/IMAGE
-    FE->>FE: Pose-Worker GPU-first/CPU-Fallback; Handmodell nur im Pose Lab
+    FE->>FE: FeatureFlags im Take festhalten (Lite/Heavy, VIDEO/IMAGE)
+    FE->>FE: Pose-Worker GPU-first/CPU-Fallback, Handmodell nur im Pose Lab
     opt Live captions aktiviert
         FE->>BE: WS /speech/live: start, PCM nach ready
         BE-->>FE: Kumulativer Text als Vorschau (kein Review-Transkript)

@@ -290,7 +290,7 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   expect(evidence[0].payload).toMatchObject({
     rule: "hand_raised",
     heuristic: true,
-    rule_version: "pose-rules-v3",
+    rule_version: "pose-rules-v4",
   });
   expect(evidence[0].t_ms).toBeGreaterThanOrEqual(4000);
   expect(
