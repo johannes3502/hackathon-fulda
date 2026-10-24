@@ -11,18 +11,47 @@ Die KI fragt evidenzgebunden nach; der Mensch entscheidet.
 
 ---
 
+## 0. Challenge-Fit
+
+**Primär:** Challenge #1 „Prüfungen im Zeitalter von KI“ — Prüfungen fair,
+aussagekräftig und möglichst täuschungssicher gestalten oder neu denken.
+
+**Sekundär:** Challenge #6 „KI als kritischer Lernbegleiter in der
+Hochschullehre“ — eine KI, die widerspricht, nachfragt und
+Argumentationslücken aufzeigt.
+
+**Unsere eigene Challenge:** Viva ist keine Eins-zu-eins-Umsetzung der
+Vorschläge. Die sechs Challenges sind Orientierung; Viva ist unsere eigene
+Antwort auf die Frage: *Wie beweisen wir Verständnis, wenn der Text nicht mehr
+der Beweis ist?*
+
+**Konsequenz für den Build:**
+- Jede Frage ist an ein verifiziertes Zitat gebunden.
+- Mindestens eine Frage fordert eine Gegenposition oder ein Gegenargument.
+- Das Debrief zeigt Argumentationslücken, nicht nur richtig/falsch.
+- Keine KI-Detection, kein Proctoring, keine Note.
+- **Keine Täuschungssicherheit versprechen.** Viva verschiebt den Nachweis auf
+  Erklärungskompetenz; die menschliche Entscheidung bleibt.
+
+---
+
 ## 1. Produktprinzipien
 
 1. **Formativ, nicht summativ.** Keine Note, kein „AI-Prüfer“. Sprache:
    „Übungsraum“, „Vorbereitung“, „Evidenz“, „nächster Schritt“.
-2. **Ein Essay, eine Rubrik, ein Demo-Pfad.** Alles andere ist Stretch.
-3. **Jede KI-Behauptung hat ein Zitat.** Kein Zitat → „nicht genug Evidenz“.
-4. **Der Mensch entscheidet.** Lehrkraft kann Fragen editieren, Feedback
+2. **Kritisch, nicht gefällig.** Die KI widerspricht, fragt nach und zeigt
+   Argumentationslücken — sie bestätigt keine unbegründeten Annahmen
+   (Challenge #6).
+3. **Ein Essay, eine Rubrik, ein Demo-Pfad.** Alles andere ist Stretch.
+4. **Jede KI-Behauptung hat ein Zitat.** Kein Zitat → „nicht genug Evidenz“.
+5. **Der Mensch entscheidet.** Lehrkraft kann Fragen editieren, Feedback
    übersteuern, ein echtes Viva planen.
-5. **Kein Login für Juroren.** Seed-Demo, Reset, öffentliche URL.
-6. **Text first, Voice optional.** Kein Audio-Storage.
-7. **Deterministischer Fallback.** Wenn LLM/API ausfällt, läuft die Demo weiter.
-8. **Synthetische Daten.** Keine echten Studierendenarbeiten.
+6. **Kein Login für Juroren.** Seed-Demo, Reset, öffentliche URL.
+7. **Text first, Voice optional.** Kein Audio-Storage.
+8. **Deterministischer Fallback.** Wenn LLM/API ausfällt, läuft die Demo weiter.
+9. **Synthetische Daten.** Keine echten Studierendenarbeiten.
+10. **Keine Täuschungssicherheit versprechen.** Viva erkennt keine KI; es macht
+    Erklärungskompetenz sichtbar. Das ist der ehrliche Claim.
 
 ---
 
@@ -53,7 +82,8 @@ Die KI fragt evidenzgebunden nach; der Mensch entscheidet.
   Opportunitätskosten?“ (BWL), „Korrelation oder Kausalität?“ (Statistik).
 - Textarea: „Oder füge deinen eigenen Text ein (max. 5.000 Zeichen).“
 - CTA: „Viva starten“.
-- Footer: „Formativ. Keine Note. Keine Weitergabe. Keine Audio-Speicherung.“
+- Footer: „Formativ. Keine Note. Keine Weitergabe. Keine Audio-Speicherung.
+  Keine KI-Detection.“
 
 **Screen 2 — Analyse (`/session/[id]/claims`)**
 - „Wir haben 5 Aussagen gefunden, die du verteidigen können solltest.“
@@ -67,10 +97,13 @@ Die KI fragt evidenzgebunden nach; der Mensch entscheidet.
 - Antwortfeld (Text) + Mikrofon-Button (optional).
 - Button: „Antworten“.
 - Nach der Antwort: Follow-up-Karte: „Du sagst X — was folgt daraus für Y?“
+  oder Gegenargument-Karte: „Eine alternative Erklärung wäre Z. Was spricht
+  dagegen?“ (mindestens einmal pro Session).
 - Kein Score während der Viva (vermeidet Gamification/Stress).
 
 **Screen 4 — Debrief (`/session/[id]/debrief`)**
-- „Das kannst du verteidigen“ / „Hier ist es vage“ / „Das fehlt“.
+- „Das kannst du verteidigen“ / „Hier ist es vage“ / „Hier fehlt die
+  Begründung oder eine Annahme ist unbegründet“.
 - Evidenzkarte pro Claim: Zitat aus dem Essay + Zitat aus der Antwort +
   Einschätzung + „nächster Schritt“.
 - Rubrik: 4 Dimensionen (Verständnis, Evidenz, Kohärenz, Reflexion), je 3
@@ -92,7 +125,8 @@ Die KI fragt evidenzgebunden nach; der Mensch entscheidet.
 2. **0:10–0:20:** Claims erscheinen; „Die KI hat fünf Aussagen extrahiert —
    jede mit Zitat.“
 3. **0:20–0:50:** Frage 1; Juror antwortet mündlich/textlich (eine kurze
-   Antwort). Follow-up erscheint: „Du sagst X; was folgt daraus für Y?“
+   Antwort). Follow-up oder Gegenargument erscheint: „Du sagst X; was folgt
+   daraus für Y?“ / „Eine alternative Erklärung wäre Z. Was spricht dagegen?“
 4. **0:50–1:10:** Debrief: Evidenzkarte; „Diese Aussage kannst du verteidigen,
    diese ist vage, hier fehlt die Begründung.“
 5. **1:10–1:30:** Teacher View: „3 von 5 brauchen ein menschliches Viva“;
@@ -184,7 +218,8 @@ questions (
   text text,
   follow_up text,
   dimension text, -- 'understanding' | 'evidence' | 'coherence' | 'reflection'
-  difficulty text, -- 'recall' | 'explain' | 'transfer'
+  difficulty text, -- 'explain' | 'justify' | 'transfer' | 'assumption'
+  question_type text, -- 'clarify' | 'justify' | 'counter' | 'transfer'
   edited_by_teacher boolean
 )
 
@@ -266,15 +301,20 @@ Du bist ein erfahrener Prüfer für mündliche Verteidigung.
 Generiere pro Behauptung eine Frage, die nur beantworten kann,
 wer die Behauptung wirklich versteht — nicht durch Paraphrasieren.
 Nutze Bloom-Ebenen: erklären, begründen, Transfer, Annahmen prüfen.
+Mindestens eine Frage MUSS eine Gegenposition oder ein Gegenargument
+provozieren (Challenge #6: widersprechen, nachfragen,
+Argumentationslücken aufzeigen).
 Jede Frage MUSS das Claim-Zitat enthalten.
 Füge eine Follow-up-Frage hinzu, die auf eine wahrscheinliche Lücke zielt.
-Sei respektvoll, konkret, nicht suggestiv.
+Sei respektvoll, konkret, nicht suggestiv und nicht belehrend.
 Schema: { "questions": [ { "claim_quote": "...", "question": "...",
-"follow_up": "...", "dimension": "...", "difficulty": "..." } ] }
+"follow_up": "...", "dimension": "...", "difficulty": "...",
+"question_type": "clarify|justify|counter|transfer" } ] }
 ```
 
 **Qualitätscheck:** Keine Ja/Nein-Fragen; keine Wissensabfrage, die nicht im
-Text steht; keine Frage, die den Text nur zusammenfasst; keine Unterstellung.
+Text steht; keine Frage, die den Text nur zusammenfasst; keine Unterstellung;
+mindestens eine Frage mit `question_type = "counter"`.
 
 ### 6.3 Answer Evaluation
 
@@ -286,8 +326,12 @@ System:
 Du gibst formative Rückmeldung. Du benotest nicht.
 Bewerte die Antwort auf vier Dimensionen (1-3):
 Verständnis, Evidenz, Kohärenz, Reflexion.
+Achte auf Argumentationslücken: fehlende Begründung, unbegründete
+Annahme, fehlender Transfer, Widerspruch im Text.
 Jede Kritik MUSS ein wörtliches Zitat aus der Antwort enthalten.
 Wenn die Antwort die Frage nicht adressiert, sage das klar.
+Wenn die Antwort nur den Essay paraphrasiert, sage:
+"Das ist eine Paraphrase, keine Erklärung."
 Wenn du etwas nicht beurteilen kannst, schreibe "nicht genug Evidenz".
 Gib genau einen konkreten nächsten Schritt.
 Schema: { "scores": {...}, "evidence_quotes": [...],
@@ -315,6 +359,7 @@ Schema: { "defended": [...], "vague": [...], "missing": [...],
 ### 6.5 Guardrails
 
 - Keine Noten, keine Prozent-Scores, keine „Bestanden“-Aussage.
+- Keine KI-Detection, kein Proctoring, keine Täuschungssicherheits-Garantie.
 - Keine erfundenen Quellen oder Zitate.
 - Keine Aussagen über Charakter, Intelligenz, Motivation.
 - Keine medizinischen/rechtlichen Ratschläge.
@@ -337,7 +382,8 @@ Schema: { "defended": [...], "vague": [...], "missing": [...],
   4. Die Evolution hat Schlaf erhalten, obwohl er riskant ist.
   5. Acht Stunden sind für alle optimal. (schwacher Claim, gute
      Nachfrage)
-- 3 Fragen + Follow-ups; 1 Musterantwort (gut), 1 vage, 1 „weiß nicht“.
+- 3 Fragen + Follow-ups, davon 1 Gegenargument; 1 Musterantwort (gut), 1 vage,
+  1 „weiß nicht“.
 - Teacher View: 5 synthetische Sessions, 3 mit Lücken.
 
 **Essay 2: „Opportunitätskosten“**
@@ -368,7 +414,7 @@ stehen, müssen sie echt oder klar als fiktiv markiert sein.
 
 | Zeit | Ziel | Gate |
 |---|---|---|
-| 09:00–10:30 | Registrierung, Challenge lesen, Teambuilding, Konzept bestätigen | **10:30: Idee & Scope locked** |
+| 09:00–10:30 | Registrierung, Challenge gegen #1/#6 prüfen, Teambuilding, Konzept bestätigen | **10:30: Idee & Scope locked** |
 | 10:30–11:00 | Rollen, Repo, Tasks, API-Test | Build startet 11:00 |
 | 11:00–12:30 | Skeleton: Landing, Session, DB, Deploy | Hello World öffentlich |
 | 12:30–14:00 | Claim Extraction + Quote Verifier + Claims-UI | Essay → 5 verifizierte Claims |
@@ -423,6 +469,8 @@ Design. Jede Person muss in 2–3 Minuten das Produkt erklären können.
 | Seed-Essay → Claims | 5 Claims, alle Zitate verifiziert |
 | „Ich weiß nicht“ als Antwort | Ehrliche Lücke, kein erfundener Score |
 | Off-topic-Antwort | „adressiert die Frage nicht“ + nächster Schritt |
+| Antwort paraphrasiert den Essay | „Das ist eine Paraphrase, keine Erklärung“ |
+| Vage, aber selbstsichere Antwort | Gegenargument + sichtbare Argumentationslücke |
 | Prompt-Injection im Essay | Wird als Daten behandelt, keine Systemänderung |
 | Prompt-Injection in der Antwort | Keine Regelumgehung |
 | Erfundenes Zitat | Quote-Verifier blockt, „nicht genug Evidenz“ |
@@ -494,6 +542,7 @@ Während des Builds kontinuierlich ausfüllen
 | Team > 8, unklare Rollen | Mittel | Mittel | RACI, tägliche 15-Min-Standups | Product |
 | Mobile kaputt | Mittel | Mittel | Früher Responsive-Test, Tailwind | Frontend |
 | Bias/Vertrauensverlust | Mittel | Hoch | Rubrik, Human Review, formative Sprache | AI/Product |
+| Täuschungssicherheit überversprechen | Mittel | Hoch | Immer „keine Detection“ sagen; Erklärungskompetenz | Product/Pitch |
 | Deployment fehlschlägt | Mittel | Hoch | Vercel + statische Fallback-Seite | QA |
 | Zeit für Pitch fehlt | Mittel | Hoch | Pitch Lead ab 17:30 frei, Skript parallel | Pitch |
 
@@ -505,6 +554,7 @@ Während des Builds kontinuierlich ausfüllen
 - [ ] Demo-Modus ohne Login
 - [ ] Seed-Daten + Reset
 - [ ] 1-Seiter (PDF): Problem, Lösung, Evidenz, Technik, Ethik
+- [ ] Challenge-Mapping: #1/#6 und unsere eigene Challenge in einem Satz
 - [ ] 60–90-Sekunden-Bildschirmvideo als Fallback
 - [ ] Architektur-Skizze
 - [ ] AI Decision Log (Auszug)
@@ -526,5 +576,9 @@ Der Prototyp ist fertig, wenn:
 5. Ein API-Ausfall die Demo nicht stoppt.
 6. Der Pitch 3:00 + 2:00 geprobt ist.
 7. Die Einreichung vor 11:00 hochgeladen ist.
+8. Mindestens eine Frage eine Gegenposition/ein Gegenargument fordert und das
+   Debrief eine Argumentationslücke sichtbar macht.
+9. Der Pitch den Challenge-Fit #1/#6 und die eigene Challenge in einem Satz
+   erklärt.
 
 **Wenn 1–3 nicht erreicht sind: Scope kürzen, nicht Features hinzufügen.**

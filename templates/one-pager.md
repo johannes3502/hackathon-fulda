@@ -2,6 +2,8 @@
 
 **Produkt:** Viva — der Übungsraum für mündliche Verteidigung
 **Tagline:** Du hast es geschrieben. Kannst du es erklären?
+**Challenge-Fit:** #1 Prüfungen im KI-Zeitalter + #6 KI als kritischer
+Lernbegleiter. Viva ist unsere eigene Challenge.
 **Demo:** [URL] · **QR:** [QR-Code]
 
 ---
@@ -12,7 +14,9 @@ KI hat schriftliche Arbeiten als Verständnisnachweis destabilisiert.
 Studierende nutzen GenAI für bewertete Arbeiten; AI-Detektoren sind
 unzuverlässig und umgehbar. Hochschulen verlagern sich auf mündliche
 Prüfungen — aber die skalieren nicht, und Studierende haben kaum Gelegenheit,
-sie zu üben.
+sie zu üben. Die Challenge fordert faire, aussagekräftige und möglichst
+täuschungssichere Prüfungen — und eine KI, die widerspricht, nachfragt und
+Argumentationslücken aufzeigt.
 
 ## Lösung
 
@@ -25,7 +29,7 @@ sieht, wer ein menschliches Viva braucht, und kann jede Frage und jedes Feedback
 
 1. **Text einfügen** → 5 zentrale Claims, jede mit verifiziertem Zitat.
 2. **Viva** → 3 adaptive Fragen, Antwort per Text oder Sprache.
-3. **Follow-up** → gezielte Nachfrage auf eine Lücke.
+3. **Follow-up / Gegenargument** → gezielte Nachfrage oder Widerspruch.
 4. **Debrief** → Evidenzkarte, Rubrik, ein nächster Schritt.
 5. **Teacher Review** → aggregierte Lücken, Editieren, menschliches Viva.
 
@@ -36,6 +40,8 @@ sieht, wer ein menschliches Viva braucht, und kann jede Frage und jedes Feedback
 - **Human-in-the-loop:** Die Lehrkraft entscheidet, nicht die KI.
 - **Audit-Log:** Modell, Prompt-Version, Entscheidung, Review.
 - **Synthetische Daten:** Kein Audio-Storage, keine echten Studierendendaten.
+- **Keine Detection:** Viva erkennt keine KI und verspricht keine
+  Täuschungssicherheit; es macht Erklärungskompetenz sichtbar.
 
 ## Evidenz
 

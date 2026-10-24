@@ -1,6 +1,6 @@
 # Assessment, AI Literacy, Integrity & Regulation
 
-**Research note for Hackathon Fulda 2026 — "Future Education – Lernen neu denken"**
+**Research note for Hackathon Fulda 2026 — "Future Education – Lernen, Lehren und Prüfen neu denken"**
 Prepared: 2026-10-23 · Slice: assessment in the AI era, AI literacy, academic integrity, ethics and EU/German regulation.
 
 **How to use this note.** Sections 1–4 are the evidence base. Section 5 is the design-pattern catalogue. Section 6 contains three 24-hour prototype concepts. Section 7 is a 3-minute product-review script. Section 8 lists sources by type. Sections 9–10 are the honest uncertainties and the do-not-build list. Claims are tagged where useful:
@@ -458,7 +458,7 @@ For a hackathon prototype, the honest position is:
 - Directly addresses the integrity problem without detection.
 - Uses AI for something AI is good at (question generation, text analysis) and keeps the high-stakes judgment human.
 - Demo is inherently dramatic: the student answers, the AI asks a follow-up, the teacher sees a gap.
-- Fits "Lernen neu denken": assessment as a conversation about understanding, not a text product.
+- Fits the challenge: assessment as a conversation about understanding, not a text product.
 
 **Risks / guardrails:**
 

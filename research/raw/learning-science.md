@@ -1,6 +1,6 @@
 # Learning Science, Future Skills & the German/EU Education Context
 
-**Research note for Hackathon Fulda 2026 — “Future Education – Lernen neu denken”**
+**Research note for Hackathon Fulda 2026 — “Future Education – Lernen, Lehren und Prüfen neu denken”**
 Prepared 2026-10-23. Scope: learning-science foundations, future-skills frameworks, German/EU policy context, and build implications for a 24-hour prototype.
 
 **How to read this note.** Claims are labelled with their source type in the source table (peer-reviewed, policy report, industry research, institutional, opinion/commentary). Effect sizes are reported as the authors reported them (`d`, `g`, or percentage points). They are not directly comparable across studies. For education-field effects, use Kraft’s benchmarks (below), not Cohen’s generic labels.

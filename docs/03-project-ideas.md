@@ -1,13 +1,16 @@
 # Projektideen — mit dem Ziel, den Hackathon zu gewinnen
 
-**Grundlage:** `docs/00-requirements.md` (Bewertung 40/40/20) und
+**Grundlage:** `docs/00-requirements.md` (Bewertung 40/40/20),
+`docs/01-challenge.md` (offizielle Challenge, sechs Beispiel-Challenges) und
 `docs/02-deep-research.md` (Evidenz).
-**Stand:** 23.10.2026, vor Bekanntgabe der endgültigen Challenge-Felder.
+**Stand:** 24.10.2026, nach Bekanntgabe der offiziellen Challenge-PDF.
 
-> Die Challenge-Felder werden erst Samstagmorgen freigeschaltet. Die Ideen sind
-> so gebaut, dass sie sich **framen** lassen: als KI-Tutor, interaktive
-> Lernsimulation, Serious Game oder neuer Ansatz. Am Samstag wird nicht die
-> Technik neu erfunden, sondern die Story auf das Feld angepasst.
+> Die sechs Beispiel-Challenges sind ausdrücklich **Orientierung, keine
+> Pflicht**. Eigene Ideen sind erlaubt. Viva ist unsere eigene Challenge und
+> trifft zugleich **#1 „Prüfungen im Zeitalter von KI“** (primär) und **#6 „KI
+> als kritischer Lernbegleiter“** (sekundär). Am Samstag wird nicht die Technik
+> neu erfunden, sondern die Story auf die mündliche Einweisung und die
+> Teamstärke abgestimmt.
 
 ---
 
@@ -25,23 +28,25 @@ Die Jury bewertet:
 
 Die Scores unten sind **Pre-Build-Schätzungen** (1–5), keine Garantie.
 
-| Idee | Produkt (40 %) | Pitch (40 %) | Tech (20 %) | Gewichtet | Risiko |
-|---|---:|---:|---:|---:|---|
-| **Viva / Nachgefragt** | 5,0 | 5,0 | 4,0 | **4,8** | Mittel |
-| Socratic Lock | 4,0 | 5,0 | 4,0 | 4,4 | Mittel |
-| Klassenzimmer-Simulator | 4,5 | 4,5 | 4,0 | 4,4 | Mittel |
-| Failure First Lab | 4,0 | 5,0 | 3,5 | 4,3 | Mittel–hoch |
-| AI Literacy Lab | 4,5 | 4,5 | 3,0 | 4,2 | Niedrig |
-| Azubi Talk | 4,5 | 4,0 | 3,5 | 4,1 | Mittel |
-| SkillPass | 3,5 | 3,5 | 4,0 | 3,6 | Mittel |
-| Recall Coach | 4,0 | 3,5 | 3,0 | 3,6 | Niedrig |
+| Idee | Produkt (40 %) | Pitch (40 %) | Tech (20 %) | Gewichtet | Challenge-Fit | Risiko |
+|---|---|---:|---:|---:|---|---|
+| **Viva / Nachgefragt** | 5,0 | 5,0 | 4,0 | **4,8** | **#1 + #6 (sehr stark)** | Mittel |
+| Socratic Lock | 4,0 | 5,0 | 4,0 | 4,4 | #6 (stark), #1 (mittel) | Mittel |
+| Klassenzimmer-Simulator | 4,5 | 4,5 | 4,0 | 4,4 | eigene Idee / #2 (schwach) | Mittel |
+| Failure First Lab | 4,0 | 5,0 | 3,5 | 4,3 | #6 (mittel) | Mittel–hoch |
+| AI Literacy Lab | 4,5 | 4,5 | 3,0 | 4,2 | #6 (stark), #3 (schwach) | Niedrig |
+| Azubi Talk | 4,5 | 4,0 | 3,5 | 4,1 | #4 (stark), #2 (mittel) | Mittel |
+| SkillPass | 3,5 | 3,5 | 4,0 | 3,6 | #2/#5 (stark) | Mittel |
+| Recall Coach | 4,0 | 3,5 | 3,0 | 3,6 | #6 (schwach), #1 (schwach) | Niedrig |
 
 **Empfehlung:** **Viva** bauen. Es hat die stärkste Kombination aus
-„Why now“, Demo-Dramatik, Produktreview-Fähigkeit und einer glaubwürdigen
-AI-Reflection. Falls das Team am Samstag merkt, dass Speech/LLM zu riskant ist
-oder die Challenge klar in Richtung Spiel/Simulation geht: **AI Literacy Lab**
-oder **Klassenzimmer-Simulator** als Pivot — die Kernmechanik bleibt jeweils
-ein interaktiver Dialog mit Evidenz und Debrief.
+Challenge-Fit (#1 + #6), „Why now“, Demo-Dramatik, Produktreview-Fähigkeit und
+einer glaubwürdigen AI-Reflection. Falls das Team am Samstag merkt, dass
+Speech/LLM zu riskant ist oder die mündliche Einweisung klar in Richtung
+Spiel/Simulation geht: **AI Literacy Lab** oder **Klassenzimmer-Simulator** als
+Pivot — die Kernmechanik bleibt jeweils ein interaktiver Dialog mit Evidenz und
+Debrief. Viva ist unsere eigene Challenge; die sechs Vorschläge sind kein
+Pflichtrahmen.
 
 ---
 
@@ -53,6 +58,18 @@ mündliche Verteidigung**: Die KI fragt nach, der Mensch entscheidet.
 **One-Liner:** „KI hat die Hausarbeit als Verständnisnachweis destabilisiert.
 Viva stellt die eine Frage, die ein Text nicht beantworten kann: Kannst du
 erklären, was du geschrieben hast?“
+
+**Challenge-Fit:**
+- **#1 Prüfungen im Zeitalter von KI:** Viva ist kein Detector, sondern ein
+  evidenzgebundenes Verständnisgespräch. Es macht Prüfungen fairer (gleiche
+  Rubrik, mehrere Fragen, Text-Alternative, Human Review), aussagekräftiger
+  (Claim-Bindung, Follow-ups, Transfer) und täuschungsresistenter, ohne
+  Täuschungssicherheit zu versprechen: Der Nachweis verschiebt sich von der
+  Texturheberschaft auf die Erklärungskompetenz.
+- **#6 KI als kritischer Lernbegleiter:** Viva liefert genau das, was die
+  Challenge beschreibt — die KI widerspricht, fragt nach und zeigt
+  Argumentationslücken. Sie gibt keine Antworten aus und bestätigt keine
+  unbegründeten Annahmen.
 
 **Nutzer und Pain:**
 - **Studierende:** Bereiten sich auf mündliche Prüfungen, Thesis-Verteidigung
@@ -73,13 +90,15 @@ erklären, was du geschrieben hast?“
 
 **Kernschleife (MVP):**
 1. **Input:** Essay/Projekttext einfügen oder ein seeded Beispiel wählen.
-2. **Claims:** System extrahiert 5–8 zentrale Behauptungen und verankert sie
+2. **Claims:** System extrahiert 3–5 zentrale Behauptungen und verankert sie
    als Zitate.
-3. **Fragen:** generiert 5 adaptive Fragen, jede an ein Zitat gebunden:
+3. **Fragen:** generiert 3–5 adaptive Fragen, jede an ein Zitat gebunden:
    „Du behauptest X in Absatz 3 — welche Evidenz würde deine Aussage
    widerlegen?“; „Du zitierst Y — woran erkennst du, dass Y Z stützt?“
 4. **Antwort:** Lernende:r antwortet per Text (Default) oder Sprache (optional).
-5. **Follow-up:** Eine Nachfrage, die auf eine Lücke im Antworttext zielt.
+5. **Follow-up:** Eine Nachfrage, die auf eine Lücke im Antworttext zielt —
+   oder ein **Gegenargument**, das eine unbegründete Annahme herausfordert
+   (Challenge #6).
 6. **Feedback:** Rubrik-basiert, mit Zitaten aus der Antwort: „Du hast A
    erklärt, aber B nur benannt; hier fehlt der kausale Schritt.“
 7. **Evidenzkarte:** „sicher erklärt / vage / nicht erklärt“ + „nicht genug
@@ -91,8 +110,8 @@ erklären, was du geschrieben hast?“
 - Seed-Essay öffnen (z. B. Biologie, Geschichte, BWL).
 - „Viva starten“ → Frage mit Zitat.
 - Juror antwortet 20 Sekunden (Text oder Sprache).
-- System zeigt Follow-up + Evidenzkarte: „Diese Behauptung kannst du
-  verteidigen; diese Lücke solltest du üben.“
+- System zeigt Follow-up oder Gegenargument + Evidenzkarte: „Diese Behauptung
+  kannst du verteidigen; diese Lücke solltest du üben.“
 - Wechsel in Teacher View: „3 von 5 Studierenden brauchen ein menschliches
   Viva; Konzept X ist die häufigste Lücke.“
 - Reset.
@@ -123,7 +142,8 @@ erklären, was du geschrieben hast?“
 - ASR verhörte einen Fachbegriff → Glossar + Text-Fallback.
 - Fragen waren zu generisch → Claim-spezifische Prompt-Schablone + menschliche
   Editierbarkeit.
-- Die KI war zu nett → kontrastive Follow-ups + Rubrik statt Lob.
+- Die KI bestätigte eine unbegründete Annahme → Gegenargument-Frage +
+  Rubrik-Anker statt Lob.
 
 **Risiken:**
 | Risiko | Mitigation |
@@ -165,7 +185,8 @@ Misconception-Typen, Pre/Post, Red-Team-Set.
 **Warum gewinnen:** starker, kontraintuitiver Hook; messbarer Transfer;
 technisch inspectable.
 
-**Wann statt Viva:** Wenn das Challenge-Feld explizit „KI-Tutor“ ist und das
+**Wann statt Viva:** Wenn die mündliche Einweisung #6 „KI als kritischer
+Lernbegleiter“ stark macht, die Jury eher Tutor/Guardrails sehen will und das
 Team einen starken Mathe-/Physik-Domain-Experten hat.
 
 ---
@@ -195,7 +216,8 @@ LLM-Feedback generisch.
 **Warum gewinnen:** mutiger, memori erbarer Pitch; differenziert von Quiz-Apps.
 
 **Wann statt Viva:** Wenn das Team eine starke fachdidaktische Person hat und
-die Challenge „interaktive Lernsimulation“ oder „Serious Game“ betont.
+die mündliche Einweisung #6 (kritisches Denken/Argumentationslücken) oder eine
+eigene Lernsimulation betont.
 
 ---
 
@@ -228,11 +250,13 @@ Session.
 kann abstoßen. **Mitigation:** „Übungsraum, keine Note“; State Machine;
 Debrief mit Optionen.
 
-**Warum gewinnen:** bestes Fit zu „interaktive Lernsimulation“; dramatische,
-sofort verständliche Demo; B2B-Story (Lehrerfortbildung, DigitalPakt 2.0).
+**Warum gewinnen:** bestes Fit zu einer eigenen Lernsimulation (oder #2);
+dramatische, sofort verständliche Demo; B2B-Story (Lehrerfortbildung,
+DigitalPakt 2.0).
 
 **Wann statt Viva:** Wenn das Team stark in Frontend/Game/Simulation ist und
-die Challenge Simulationen besonders betont.
+die mündliche Einweisung eine eigene Simulation oder Challenge #2 (smarte
+Steuerung) besonders betont.
 
 ---
 
@@ -264,8 +288,12 @@ Flagging-UI, Scoring, Teacher Dashboard, Seed-Klasse, Text-only, DE/EN.
 **Mitigation:** subtile Fehler, Quellenkarten, Begründungspflicht, mehrere
 Domänen.
 
-**Warum gewinnen:** höchste Theme-Fit, niedrigstes technisches Risiko, sofort
-spielbar, Policy-Tailwind. **Bester Pivot**, wenn die Zeit knapp wird.
+**Warum gewinnen:** starker Fit zu #6 (kritisches Prüfen von KI-Aussagen) und
+#3 (Medienkompetenz), niedrigstes technisches Risiko, sofort spielbar,
+Policy-Tailwind. **Bester Pivot**, wenn die Zeit knapp wird.
+
+**Wann statt Viva:** Wenn die mündliche Einweisung #3 oder #6 stark macht und
+das Team lieber mit kuratiertem Content als mit Live-LLM arbeitet.
 
 ---
 
@@ -296,8 +324,8 @@ Debrief, Trainer-Dashboard, Text-first, Voice optional.
 **Warum gewinnen:** viszeral, regional (Mittelstand/Ausbildung), misst Soft
 Skills statt Quizwissen.
 
-**Wann statt Viva:** Wenn das Team VET-/IHK-Zugang hat und die Challenge
-„Fachkräfte der Zukunft“ stark macht.
+**Wann statt Viva:** Wenn das Team VET-/IHK-Zugang hat und die mündliche
+Einweisung #4 (KI-Coach im Bewerbungsprozess) oder #2 (Ausbildung) stark macht.
 
 ---
 
@@ -327,6 +355,10 @@ mit Confidence, Trainer-Approval, Open-Badge-JSON, Verify-Page, PDF.
 
 **Warum gewinnen:** stärkster Policy-Tailwind; tangible Artefakt; aber weniger
 Demo-Wow und mehr rechtliche Grauzone.
+
+**Wann statt Viva:** Wenn die mündliche Einweisung #2 (smarte Steuerung) oder
+#5 (Orientierung Arbeitswelt) stark macht und das Team einen klaren
+Kompetenzrahmen hat.
 
 ---
 
@@ -363,19 +395,21 @@ einfach zu erklären. **Fallback für ein kleines/unerfahrenes Team.**
 | VET/IHK/Regionaler Arbeitgeber | **Azubi Talk** oder **SkillPass** |
 | Kleines Team, wenig Zeit | **AI Literacy Lab** oder **Recall Coach** |
 
-### Nach Challenge-Feld (Samstagmorgen)
+### Nach Challenge / mündlicher Einweisung (Samstagmorgen)
 
-| Feld | Framing |
+| Offizielle Beispiel-Challenge | Framing |
 |---|---|
-| KI-Tutor | Viva als „Tutor für mündliche Kompetenz“; Socratic Lock als „Tutor, der nicht verrät“ |
-| Interaktive Lernsimulation | Viva als „Viva-Simulation“; Klassenzimmer-Simulator |
-| Serious Game | AI Literacy Lab als „Hallucination Hunt“; Klassenzimmer als „Sim-Game“ |
-| Neuer Ansatz | Viva („Assessment as conversation“) |
-| Fachkräfte der Zukunft | Azubi Talk / SkillPass / Viva (Fachgespräch) |
-| AI Literacy | AI Literacy Lab / Viva (AI-gestützte Reflexion) |
+| #1 Prüfungen im KI-Zeitalter | Viva direkt: evidenzgebundenes Verständnisgespräch + Triage |
+| #2 Smarte Steuerung | SkillPass oder Teacher-View-Erweiterung |
+| #3 Social Learning | AI Literacy Lab als „kritischer Feed“; schwacher Fit |
+| #4 KI-Coach Bewerbung | Azubi Talk / Interview-Coach |
+| #5 Orientierung Arbeitswelt | SkillPass |
+| #6 Kritischer Lernbegleiter | Viva als kritischer Tutor; Socratic Lock als Alternative |
+| Eigene Idee | Viva, wenn es um Verständnis/Assessment geht |
 
 **Regel:** Am Samstag um 10:30 muss die Idee stehen. Danach wird gebaut, nicht
-mehr strategiert.
+mehr strategiert. Die sechs Challenges sind Inspiration; eine eigene Challenge
+ist ausdrücklich erlaubt.
 
 ---
 

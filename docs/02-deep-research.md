@@ -1,8 +1,8 @@
 # Deep Research — Future Education / EdTech
 
 **Für:** Hackathon Fulda 2026, 24.–25. Oktober 2026
-**Thema:** Future Education — Lernen neu denken
-**Stand:** 23.10.2026
+**Thema:** Future Education – Lernen, Lehren und Prüfen neu denken
+**Stand:** 24.10.2026
 **Methode:** Fünf parallele Research-Streams (KI-Tutoren, Lernwissenschaft, Serious Games/Simulationen, Assessment/Ethik/Regulierung, EdTech-Trends/Hackathon-Strategie). Fokus auf 2024–2026; Grundlagenwerke nur, wo sie für die Einordnung nötig sind.
 
 **Evidenz-Legende:**
@@ -14,6 +14,16 @@
 > Scheinsicherheit und verschlechtern unassisted Leistungen. Für den Hackathon
 > heißt das: **ein schmaler, glaubwürdiger Lernmechanismus, sichtbar gemacht,
 > mit ehrlicher Messung** schlägt jede breite „AI Learning Platform“.
+
+> **Challenge-Anker (24.10.2026):** Die offizielle PDF nennt sechs
+> Beispiel-Challenges. Viva adressiert **#1 „Prüfungen im Zeitalter von KI“**
+> (fair, aussagekräftig, möglichst täuschungssicher) und **#6 „KI als
+> kritischer Lernbegleiter“** (widersprechen, nachfragen,
+> Argumentationslücken aufzeigen). Die Evidenz unten stützt den Kern: Detection
+> ist unzuverlässig, strukturierte Vivas sind reliabler, Self-Explanation und
+> Feedback sind starke Mechanismen. Viva verspricht keine Täuschungssicherheit;
+> es verschiebt den Nachweis auf Erklärungskompetenz. Viva ist unsere eigene
+> Challenge; #1/#6 sind der Fit, kein Pflichtrahmen.
 
 ---
 
@@ -525,21 +535,23 @@ mindestens eine Person am Stand, die in 2–3 Minuten erklären kann.
 
 ## 8. Ideenlandschaft (Detail in `docs/03-project-ideas.md`)
 
-| Idee | Kern | Evidenz | 24h | Produkt-Wow | Pitch-Story | Empfehlung |
-|---|---|---|---|---|---|---|
-| **Viva / Nachgefragt** | Mündliche Verteidigung üben; KI fragt evidenzgebunden nach | Assessment-Integrität, Viva-Reliabilität, Self-Explanation | Mittel | Hoch | Sehr hoch | **Top-Empfehlung** |
-| Socratic Lock | Tutor, der Antworten verweigert; Hint-Ladder + Transfer | Bastani, Hint-Ladder, Self-Explanation | Mittel | Mittel–hoch | Hoch | Runner-up |
-| Failure First Lab | Productive Failure: erst scheitern, dann konsolidieren | Sinha & Kapur, contrasting cases | Mittel | Hoch | Sehr hoch | Stark, aber Content-Risiko |
-| Klassenzimmer-Simulator | Lehrer:innen üben schwierige Gespräche mit KI-Schülern | Simulation, Debriefing, Teacher Education | Mittel | Hoch | Hoch | Beste Simulation |
-| AI Literacy Lab | Halluzinationsjagd + Quellenprüfung | AI Literacy, Calibration, Detection-Problem | Niedrig | Hoch | Sehr hoch | Sicherster Build |
-| Azubi Talk | Berufliches Rollenspiel mit Rubrik-Debrief | Simulation, LLM-Roleplay, VET | Mittel | Hoch | Hoch | Regional stark |
-| SkillPass | Kompetenznachweis für Azubis | Micro-Credentials, VET | Mittel | Mittel | Mittel | Policy-Tailwind, weniger Wow |
-| Recall Coach | Retrieval + Calibration + Spacing | Retrieval, Spacing, Feedback | Niedrig | Mittel | Mittel | Sicher, aber crowded |
+| Idee | Kern | Evidenz | 24h | Produkt-Wow | Pitch-Story | Challenge-Fit | Empfehlung |
+|---|---|---|---|---|---|---|---|
+| **Viva / Nachgefragt** | Mündliche Verteidigung üben; KI fragt evidenzgebunden nach | Assessment-Integrität, Viva-Reliabilität, Self-Explanation | Mittel | Hoch | Sehr hoch | **#1 + #6** | **Top-Empfehlung** |
+| Socratic Lock | Tutor, der Antworten verweigert; Hint-Ladder + Transfer | Bastani, Hint-Ladder, Self-Explanation | Mittel | Mittel–hoch | Hoch | #6 | Runner-up |
+| Failure First Lab | Productive Failure: erst scheitern, dann konsolidieren | Sinha & Kapur, contrasting cases | Mittel | Hoch | Sehr hoch | #6 / eigene Idee | Stark, aber Content-Risiko |
+| Klassenzimmer-Simulator | Lehrer:innen üben schwierige Gespräche mit KI-Schülern | Simulation, Debriefing, Teacher Education | Mittel | Hoch | Hoch | eigene Idee / #2 | Beste Simulation |
+| AI Literacy Lab | Halluzinationsjagd + Quellenprüfung | AI Literacy, Calibration, Detection-Problem | Niedrig | Hoch | Sehr hoch | #6 / #3 | Sicherster Build |
+| Azubi Talk | Berufliches Rollenspiel mit Rubrik-Debrief | Simulation, LLM-Roleplay, VET | Mittel | Hoch | Hoch | #4 | Regional stark |
+| SkillPass | Kompetenznachweis für Azubis | Micro-Credentials, VET | Mittel | Mittel | Mittel | #2 / #5 | Policy-Tailwind, weniger Wow |
+| Recall Coach | Retrieval + Calibration + Spacing | Retrieval, Spacing, Feedback | Niedrig | Mittel | Mittel | #1/#6 (schwach) | Sicher, aber crowded |
 
-**Entscheidungsregel:** Wenn die Challenge am Samstag ein bestimmtes Feld
-vorgibt, **Framing anpassen, nicht die Technik neu bauen.** Viva kann als
-„interaktive Lernsimulation“, „AI Tutor für mündliche Kompetenz“ oder
-„Assessment-Innovation“ gerahmt werden. Die Kernschleife bleibt.
+**Entscheidungsregel:** Die sechs Beispiel-Challenges sind Orientierung, keine
+Pflicht. Wenn die mündliche Einweisung eine andere Challenge oder eine eigene
+Idee nahelegt, **Framing anpassen, nicht die Technik neu bauen.** Viva passt
+primär zu #1 und #6; für #2–#5 gibt es die Pivots in
+`docs/03-project-ideas.md`. Die Kernschleife bleibt jeweils ein interaktiver
+Dialog mit Evidenz und Debrief.
 
 ---
 
@@ -704,5 +716,7 @@ vorgibt, **Framing anpassen, nicht die Technik neu bauen.** Viva kann als
    Claims prüfen.
 9. **Ein 24h-Demo validiert nichts.** Formativ testen, ehrlich berichten,
    keine „Evidenz“ behaupten, die nicht existiert.
-10. **Die Challenge-Details sind bis Samstag gesperrt.** Dieses Dokument ist
-    eine Vorbereitung, keine Garantie, dass die Themenfelder exakt passen.
+10. **Die Challenge ist bekannt, aber die mündliche Einweisung kann
+    präzisieren.** Die sechs Beispiel-Challenges sind Orientierung; eigene
+    Ideen sind erlaubt. Viva ist unsere eigene Challenge und passt zu #1/#6.
+    Vor Ort gegen die Orga-Vorgaben prüfen.

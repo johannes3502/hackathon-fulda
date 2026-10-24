@@ -1,6 +1,6 @@
 # AI Tutors, Adaptive Learning & Learner Modeling
 
-**Research note for Hackathon Fulda 2026 — "Future Education – Lernen neu denken"**
+**Research note for Hackathon Fulda 2026 — "Future Education – Lernen, Lehren und Prüfen neu denken"**
 Prepared: 2026-10-23 · Slice: AI tutors, LLM tutoring, adaptive learning, intelligent tutoring systems (ITS), AI feedback, learner modeling
 Purpose: evidence base for a 24h prototype + 3-min pitch + product review
 

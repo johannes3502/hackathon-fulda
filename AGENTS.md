@@ -12,15 +12,20 @@
 funktionsfähigen, evidenzbasierten und menschzentrierten Future-Education-
 Prototyp gewinnen.
 
-**Status (23.10.2026, Abend):**
-- Anforderungen aus den Organisator-Mails sind konsolidiert.
-- Deep Research zu Future Education/EdTech ist abgeschlossen.
-- Projektideen sind bewertet; **Empfehlung: Viva** (mündliche Verteidigung).
-- Die offizielle Challenge-Beschreibung ist **bis Samstagmorgen gesperrt**.
-- Team, Rollen und Stack müssen heute/morgen früh bestätigt werden.
+**Status (24.10.2026, 10:00):**
+- Die offizielle Challenge liegt als PDF vor
+  (`Challenge_HackathonFulda2026_de.pdf`).
+- Sechs Beispiel-Challenges; ausdrücklich Orientierung, keine Pflicht-Challenge.
+  Eigene Ideen sind erlaubt.
+- **Viva passt primär zu Challenge #1 „Prüfungen im Zeitalter von KI“ und
+  sekundär zu #6 „KI als kritischer Lernbegleiter“.**
+- **Eigene Challenge ist ausdrücklich erlaubt:** Die sechs Challenges sind nur
+  Orientierung. Viva ist unsere eigene Challenge; #1/#6 sind unser Fit, kein
+  Pflichtrahmen.
+- Team, Rollen und Stack jetzt bestätigen; **10:30 Scope lock**.
 
-**Ein Satz:** *Viva ist der Übungsraum, in dem KI nachfragt und der Mensch
-entscheidet.*
+**Ein Satz:** *Viva ist der Übungsraum für faire, aussagekräftige Prüfungen im
+KI-Zeitalter: Die KI fragt nach und widerspricht, der Mensch entscheidet.*
 
 ---
 
@@ -30,11 +35,12 @@ entscheidet.*
 |---|---|
 | Event | 8. Hackathon Fulda, 24.–25.10.2026 |
 | Ort | Hochschule Fulda, Halle 8 |
-| Thema | Future Education — Lernen neu denken |
-| Formate | KI-Tutor, interaktive Lernsimulation, Serious Game, neuer Ansatz |
+| Thema | Future Education – Lernen, Lehren und Prüfen neu denken |
+| Beispiel-Challenges | 6: Prüfungen im KI-Zeitalter; smarte Steuerung; Social Learning; KI-Bewerbungscoach; Orientierung Arbeitswelt; KI als kritischer Lernbegleiter |
+| Unser Fit | **#1 primär**, **#6 sekundär**; keine Pflicht-Challenge, eigene Ideen erlaubt |
 | Team | mind. 8 Mitglieder (laut Mail; vor Ort bestätigen) |
 | Registrierung | https://hackathon.kaleidoscode.de/register-team (ab Sa morgen) |
-| Challenge | https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK (passwortgeschützt) |
+| Challenge | `Challenge_HackathonFulda2026_de.pdf` (24.10.2026); Original: https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK |
 | Bewertung | 40 % Pitch (3 Min + 2 Min AI Reflection), 40 % Produktreview, 20 % Technik |
 | Prototyp | lauffähig, eigenständig testbar, Web auf Laptop/Smartphone |
 | WLAN | SSID `Hackathon`, Passwort `Hackathon2026` |
@@ -85,6 +91,7 @@ datiere die Änderung.
 
 ```
 AGENTS.md                      # dieser Einstiegspunkt
+Challenge_HackathonFulda2026_de.pdf  # offizielle Challenge (24.10.2026)
 docs/
   00-requirements.md           # Anforderungen, Regeln, Deadlines, Checklisten
   01-challenge.md              # Challenge-Interpretation + Samstag-Protokoll
@@ -111,15 +118,26 @@ templates/
 
 ## 4. Empfehlung: Viva
 
+**Challenge-Fit:** Viva ist primär eine Lösung für **Challenge #1 „Prüfungen
+im Zeitalter von KI“** und sekundär für **#6 „KI als kritischer Lernbegleiter
+in der Hochschullehre“**. #1 fordert faire, aussagekräftige und möglichst
+täuschungssichere Prüfungen; #6 fordert eine KI, die widerspricht, nachfragt
+und Argumentationslücken aufzeigt. Viva macht beides — ohne KI-Detection.
+
 **Problem:** KI hat schriftliche Arbeiten als Verständnisnachweis
 destabilisiert; Detektoren sind unzuverlässig; mündliche Prüfungen skalieren
-nicht.
+nicht. Die Challenge #6 ergänzt: KI bestätigt oft bestehende Annahmen, statt
+sie kritisch zu prüfen.
 
 **Lösung:** Viva extrahiert zentrale Behauptungen aus einer Arbeit, stellt
-evidenzgebundene Nachfragen und gibt eine formative Evidenzkarte. Die Lehrkraft
-sieht Lücken und entscheidet, wer ein menschliches Viva braucht.
+evidenzgebundene Nachfragen, fordert mindestens einmal eine Gegenposition und
+gibt eine formative Evidenzkarte. Die Lehrkraft sieht Lücken und entscheidet,
+wer ein menschliches Viva braucht. **Viva erkennt keine KI und verspricht keine
+Täuschungssicherheit; es verschiebt den Nachweis auf Erklärungskompetenz.**
 
 **Warum es gewinnen kann:**
+- **Challenge-Fit:** trifft #1 und #6 wörtlich, statt nur allgemein „Future
+  Education“ zu bedienen.
 - **40 % Produktreview:** Der Juror erlebt in 90 Sekunden, ob er seinen eigenen
   Text erklären kann. Kein Login, sofort verständlich.
 - **40 % Pitch:** Starke „Why now“-Story (AI + Assessment-Integrität),
@@ -132,14 +150,19 @@ sieht Lücken und entscheidet, wer ein menschliches Viva braucht.
 1. „KI hat die Hausarbeit als Verständnisnachweis destabilisiert — Detektoren
    helfen nicht, mündliche Prüfungen skalieren nicht.“
 2. „Viva macht das Gespräch über Verständnis übbar: Die KI fragt
-   evidenzgebunden nach, der Mensch entscheidet.“
+   evidenzgebunden nach, widerspricht und zeigt Argumentationslücken; der Mensch
+   entscheidet.“
 3. „Kein Zitat, keine Behauptung — und keine Note.“
 
-**Fallbacks, falls die Challenge oder das Team pivotiert:**
+**Fallbacks, falls die mündliche Einweisung oder das Team pivotiert:**
+- **Socratic Lock:** bester Fit zu #6, wenn die Jury stärker Tutor/Guardrails
+  sehen will.
 - **AI Literacy Lab** (Hallucination Hunt): niedrigstes technisches Risiko,
-  höchste Theme-Fit, sofort spielbar.
-- **Klassenzimmer-Simulator:** bestes Fit zu „interaktive Simulation“.
-- **Socratic Lock:** bestes Fit zu „KI-Tutor“, starker kontraintuitiver Hook.
+  guter Fit zu #6/#3, sofort spielbar.
+- **Klassenzimmer-Simulator:** eigene Idee/#2; bestes Fit zu „interaktive
+  Simulation“, falls die Challenge dorthin zeigt.
+- **SkillPass** (#2/#5) und **Azubi Talk** (#4), falls die Challenge klar in
+  Richtung Studien-/Berufsorientierung oder Bewerbung geht.
 
 Entscheidung am Samstag um **10:30**. Danach wird gebaut.
 
@@ -160,6 +183,9 @@ Entscheidung am Samstag um **10:30**. Danach wird gebaut.
 10. **AI Decision Log** ab Samstag 11:00 führen — mindestens 5 Einträge.
 11. **3:00 + 2:00 geprobt.** Kein Overrun.
 12. **Submission vor 11:00 Sonntag.**
+13. **Keine Detection, keine Täuschungssicherheit versprechen.** Viva macht
+    Erklärungskompetenz sichtbar; der Mensch entscheidet.
+14. **Eigene Challenge ist erlaubt.** #1/#6 sind unser Fit, kein Pflichtrahmen.
 
 ---
 
@@ -167,15 +193,18 @@ Entscheidung am Samstag um **10:30**. Danach wird gebaut.
 
 ### 09:00–09:30 — Ankommen
 - Registrierung, Plattform-Zugang, WLAN/LAN, API-Erreichbarkeit testen.
-- Challenge-Seite öffnen und Passwort notieren.
+- Challenge-PDF gegen die mündliche Einweisung prüfen.
 
-### 09:30–10:00 — Challenge lesen
-- Themenfelder, Pflichten, Sponsoren, Daten, Ausschlüsse.
+### 09:30–10:00 — Challenge abgleichen
+- Sechs Beispiel-Challenges: Stimmen sie mit der PDF überein?
+- Gibt es zusätzliche Pflicht-Szenarien, Daten oder Ausschlüsse?
 - Bewertung/Rubrik gegen die Mail prüfen.
 - Offene Fragen notieren und die Orga fragen.
 
 ### 10:00–10:20 — Mapping
-- Welches Feld passt zu Viva? Welche zwei Pivots?
+- **Primär:** Challenge #1 „Prüfungen im Zeitalter von KI“.
+- **Sekundär:** Challenge #6 „KI als kritischer Lernbegleiter“.
+- Pivots: Socratic Lock, AI Literacy Lab, Klassenzimmer-Simulator.
 - Welche Story/Folie ändert sich, welche Technik bleibt?
 
 ### 10:20–10:30 — Entscheidung
@@ -187,7 +216,12 @@ Entscheidung am Samstag um **10:30**. Danach wird gebaut.
 - Repo, Deploy, API-Key, DB, Seed-Daten.
 - Erste Tasks; AI Decision Log starten.
 
-**Wenn die Challenge Viva nicht hergibt:** Pivot-Matrix in
+**Wichtig:** Die Challenge fordert „möglichst täuschungssicher“. Viva
+verspricht **keine** Detection und **keine** Täuschungssicherheit. Es verschiebt
+den Nachweis von der Texturheberschaft auf die Erklärungskompetenz. Diesen
+Unterschied im Pitch explizit machen.
+
+**Wenn die mündliche Einweisung Viva nicht hergibt:** Pivot-Matrix in
 `docs/01-challenge.md` nutzen. Framing ändern, Technik behalten.
 
 ---
@@ -227,34 +261,34 @@ Details: `docs/05-pitch-playbook.md`.
 
 ## 9. Offene Punkte (am Samstag klären)
 
-1. Themenfelder der Challenge: Welche? Pflicht oder Inspiration?
-2. Gibt es Pflicht-Szenarien, Daten oder Ausschlüsse?
-3. Exakte 40/40/20-Anwendung und Tie-Breaker?
-4. Submission-Cutoff und Upload-Format?
-5. Pitch-Deck erforderlich? Format/Seitenverhältnis?
-6. Dürfen externe APIs genutzt werden? Netzwerk-Restriktionen?
-7. Ist „mindestens 8“ hart oder Empfehlung?
-8. Gibt es einen „Best Code“-Preis (Website vs. Mail)?
-9. Wo steht die Jury beim Walkthrough? Strom/Display?
-10. Datenschutzvorgaben für Demo-Daten?
+1. Gibt es zusätzliche Pflicht-Szenarien, Daten oder Ausschlüsse? Die PDF nennt
+   die sechs Challenges ausdrücklich als Orientierung.
+2. Exakte 40/40/20-Anwendung und Tie-Breaker? Gibt es ein Scoring-Sheet?
+3. Submission-Cutoff und Upload-Format?
+4. Pitch-Deck erforderlich? Format/Seitenverhältnis?
+5. Dürfen externe APIs genutzt werden? Netzwerk-Restriktionen?
+6. Ist „mindestens 8“ hart oder Empfehlung?
+7. Gibt es einen „Best Code“-Preis? (Mail sagt Nein; vor Ort bestätigen.)
+8. Wo steht die Jury beim Walkthrough? Strom/Display?
+9. Datenschutzvorgaben für Demo-Daten?
+10. Gibt es zusätzliche Preise/Kategorien?
 
 ---
 
 ## 10. Nächste Aktionen (jetzt)
 
-### Heute (Freitagabend)
+### Jetzt (Sa 10:00–10:30)
+- [x] Challenge-PDF gelesen; #1/#6 als stärksten Fit identifiziert.
 - [ ] Team bestätigen; 8 Rollen besetzen (`templates/team-roles.md`).
-- [ ] Stack entscheiden; Repo anlegen; „Hello World“ deployen.
-- [ ] LLM-API-Key + Fallback-Provider testen.
+- [ ] Eigene Challenge/Scope bestätigen; **10:30 Lock**.
+- [ ] Stack entscheiden; Repo/Deploy/API testen.
 - [ ] Seed-Essay 1 + Rubrik entwerfen.
-- [ ] QR-Code-Generator und Demo-Geräte bereitstellen.
-- [ ] Dieses Repo an das Team teilen; Leseordnung kommunizieren.
+- [ ] AI Decision Log anlegen.
 
-### Samstag früh
-- [ ] Challenge-Seite lesen; offene Punkte klären.
-- [ ] 10:30 Entscheidung; Scope locken.
-- [ ] AI Decision Log starten.
+### Samstag ab 11:00
 - [ ] Build starten.
+- [ ] Deploy „Hello World“ vor 12:30.
+- [ ] AI Decision Log ab 11:00 führen.
 
 ### Sonntag
 - [ ] 09:30 Feature Freeze.
@@ -286,12 +320,14 @@ Details: `docs/05-pitch-playbook.md`.
 ## 12. Quellen & Updates
 
 - **Source of Truth:** `docs/00-requirements.md` (Organisator-Mails) und die
-  offizielle Challenge-Seite (ab Samstag).
-- **Challenge-Seite:** am 23.10.2026 ohne Passwort nicht zugänglich.
+  offizielle Challenge-PDF (`Challenge_HackathonFulda2026_de.pdf`, 24.10.2026).
+- **Challenge-PDF:** sechs Beispiel-Challenges, ausdrücklich als Orientierung;
+  eigene Ideen erlaubt. Original:
+  https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK
 - **Website:** https://hackathon-fulda.de
 - **„eatec“** aus dem Auftrag wird als **EdTech / Education Technology**
   interpretiert.
-- **Stand:** 23.10.2026. Änderungen datieren und begründen.
+- **Stand:** 24.10.2026. Änderungen datieren und begründen.
 
 ---
 

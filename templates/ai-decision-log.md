@@ -19,7 +19,7 @@ Story.
 | 3 | Sa 14:30 | Feedback | LLM | lobte eine paraphrasierende Antwort | Eloquenz statt Verständnis | Rubrik auf Verständnis/Evidenz; jede Kritik braucht Antwort-Zitat | 5 Beispiele |
 | 4 | Sa 16:00 | Code | Cursor/Copilot | erfundene Bibliothek | Build-Fehler | Tests ausgeführt; Bibliothek ersetzt; Lockfile geprüft | CI-Log |
 | 5 | Sa 18:00 | Speech | Web Speech API | Fachbegriff falsch transkribiert | peinlich im Demo | Glossar + Text-Fallback; Voice optional | 2 Transkripte |
-| 6 |  |  |  |  |  |  |  |
+| 6 | Sa 17:00 | Gegenargument | LLM, Prompt v1 | bestätigte eine unbegründete Annahme | sycophancy; Challenge #6 verfehlt | Counter-Argument-Prompt + Rubrik-Anker für Argumentationslücken | 3 Testfälle |
 | 7 |  |  |  |  |  |  |  |
 | 8 |  |  |  |  |  |  |  |
 

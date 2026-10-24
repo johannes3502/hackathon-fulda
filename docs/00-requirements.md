@@ -1,43 +1,74 @@
 # Anforderungen & Regeln — Hackathon Fulda 2026
 
-**Status:** konsolidiert aus den beiden Organisator-Mails (Stand 23.10.2026)
+**Status:** konsolidiert aus den beiden Organisator-Mails und der offiziellen
+Challenge-PDF (Stand 24.10.2026)
 **Event:** 8. Hackathon Fulda, 24.–25. Oktober 2026
-**Thema:** Future Education — Lernen neu denken
+**Thema:** Future Education – Lernen, Lehren und Prüfen neu denken
 **Ort:** Hochschule Fulda, Halle 8
 **Website:** https://www.hackathon-fulda.de
-**Challenge-Beschreibung:** https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK
+**Challenge-PDF:** `Challenge_HackathonFulda2026_de.pdf` (erhalten 24.10.2026)
+**Challenge-Original-Link:** https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK
 **Team-Registrierung & Einreichung:** https://hackathon.kaleidoscode.de/register-team
 
-> Die vollständige Challenge-Beschreibung ist bis Samstagmorgen passwortgeschützt.
-> Zugang und Registrierung werden erst am Samstag freigeschaltet. Alle hier
-> festgehaltenen Punkte stammen aus den Organisator-Mails; vor Ort gegen die
-> Plattform und die mündliche Einweisung prüfen.
+> Die offizielle Challenge liegt seit dem 24.10.2026 als PDF vor. Sie enthält
+> sechs Beispiel-Challenges, die ausdrücklich als Orientierung und möglicher
+> Ausgangspunkt dienen. Alle hier festgehaltenen Punkte aus den
+> Organisator-Mails bleiben gültig; vor Ort gegen die Plattform und die
+> mündliche Einweisung prüfen.
 
 ---
 
 ## 1. Challenge 2026
 
-**Leitfrage:** Wie lernen wir morgen — und welche Kompetenzen brauchen die
-Fachkräfte der Zukunft?
+**Offizieller Titel:** „Future Education – Lernen, Lehren und Prüfen neu
+denken“
 
-**Ausgangslage laut Orga:**
-- KI verändert, *wie* wir lernen und lehren, und *was* wir künftig lernen müssen.
-- Serious Games, Simulationen und interaktive Lernwelten eröffnen neue Wege,
-  Wissen zu vermitteln und Kompetenzen zu entwickeln.
-- Gesucht werden innovative digitale Lösungen für die Zukunft des Lernens und
-  Arbeitens.
+**Ziel laut PDF:** Digitale Anwendungen, technische Prototypen und neue
+Konzepte, die Lernen individueller, wirksamer und zugänglicher machen,
+Lehrende und Ausbildungsverantwortliche unterstützen oder bestehende
+Bildungsprozesse grundlegend neu denken.
 
-**Struktur:**
-- Eine gemeinsame Challenge mit verschiedenen Themenfeldern und praxisnahen
-  Szenarien.
-- Die Themenfelder sind **Inspiration**, keine Pflicht. Eigene Ansätze und
-  Erfahrungen sind ausdrücklich erwünscht.
-- Genannte Beispielformate: **KI-Tutor**, **interaktive Lernsimulation**,
-  **Serious Game** oder **völlig neuer Ansatz**.
+**Besonders wichtig:**
 
-**Implikation:** Eine Lösung muss nicht alle Felder bedienen. Entscheidend ist
-ein überzeugender, konkreter Nutzen für eine klar definierte Lern- oder
-Arbeitssituation.
+- **Kreativität** und die **Qualität des zugrunde liegenden Konzepts**.
+- Ein **erkennbarer Praxis-Nutzen** für Lehrende oder Lernende.
+- **Technisch ausgereifte, vorführungsfähige Ergebnisse**, deren Funktionsweise
+  und Mehrwert an einem Prototyp oder Demonstrator nachvollziehbar werden.
+- **Problemlösung, Originalität, Nutzerorientierung, Konzeptqualität und
+  überzeugende Umsetzung**.
+- **Nicht** der reine Umfang oder die technische Komplexität des Codes.
+
+**Sechs Beispiel-Challenges (Orientierung, keine Pflicht):**
+
+| # | Challenge | Kern |
+|---|---|---|
+| 1 | **Prüfungen im Zeitalter von KI** | Prüfungen fair, aussagekräftig und möglichst täuschungssicher gestalten oder neu denken |
+| 2 | **Smarte Steuerung von Ausbildung und Studium** | Lerninhalte, Praxisstationen und Fortschritte intelligent verknüpfen |
+| 3 | **Social Learning statt Social Scrolling** | Mechanismen sozialer Medien für wirksames, motivierendes Lernen nutzen |
+| 4 | **KI-Coach im Bewerbungsprozess** | Verantwortungsvoller KI-Begleiter, der Selbstständigkeit stärkt |
+| 5 | **Orientierung in einer Arbeitswelt im Wandel** | Interessen, Fähigkeiten und passende Bildungs-/Berufswege sichtbar machen |
+| 6 | **KI als kritischer Lernbegleiter in der Hochschullehre** | KI, die widerspricht, nachfragt und Argumentationslücken aufzeigt |
+
+**Wichtig:** Die sechs Challenges sind ausdrücklich „Orientierung und möglicher
+Ausgangspunkt“. Eigene Erfahrungen, konkrete Probleme und Ideen aus Schule,
+Hochschule, Ausbildung oder Berufsleben sind erlaubt. Die PDF nennt keine
+Pflicht-Challenge; ob es zusätzliche Pflicht-Szenarien oder Daten gibt, vor Ort
+klären.
+
+**Unsere eigene Challenge:** Wir müssen keine der sechs Vorschläge eins zu eins
+bauen. Viva ist unsere eigene Challenge — sie passt zu #1 und #6, ist aber
+nicht darauf beschränkt. Entscheidend ist, dass die Lösung unter „Future
+Education“ einen klaren Praxis-Nutzen hat und als Prototyp funktioniert.
+
+**Unser Fit:** Viva ist primär eine Lösung für **Challenge #1** und sekundär
+für **Challenge #6**. Viva erkennt keine KI und verspricht keine
+Täuschungssicherheit; es verschiebt den Nachweis von der Texturheberschaft auf
+die Erklärungskompetenz. Die Challenge #6 beschreibt mit „widerspricht,
+fragt nach und zeigt Argumentationslücken“ genau die Viva-Follow-ups.
+
+**Frühere Mail-Formate:** Die Organisator-Mails nannten zusätzlich KI-Tutor,
+interaktive Lernsimulation, Serious Game und „völlig neuer Ansatz“. Die PDF
+erweitert diese Formatideen um sechs konkrete Beispiel-Challenges.
 
 ---
 
@@ -140,6 +171,14 @@ Arbeitssituation.
   sinnvoll KI und andere Technologien eingesetzt werden und welches Ergebnis
   erzielt wird.
 
+**Qualitative Schwerpunkte aus der Challenge-PDF (24.10.2026):**
+- **Problemlösung, Originalität, Nutzerorientierung, Konzeptqualität und
+  überzeugende Umsetzung** werden stärker gewichtet.
+- Der reine **Umfang oder die technische Komplexität des Codes** verliert an
+  Bedeutung.
+- Gleichzeitig erwartet die Challenge **technisch ausgereifte, vorführungsfähige
+  Ergebnisse**. „Technische Reife“ ist also nicht dasselbe wie „viel Code“.
+
 **Implikation:**
 - Architektur und Technologieentscheidungen begründen können.
 - KI als **Kern der Lösung**, nicht als austauschbarer Chat-Wrapper.
@@ -186,19 +225,22 @@ Arbeitssituation.
 
 ## 10. Offene Punkte — am Samstagmorgen klären
 
-1. **Challenge-Details:** Passwortgeschützte Seite; Themenfelder, Impulse,
-   Szenarien und ggf. Pflichtkriterien lesen.
-2. **Submission-Cutoff:** exakte Uhrzeit und technischer Ablauf.
-3. **Teamgröße:** Ist „mindestens 8“ hart oder Empfehlung?
-4. **Pitch-Format:** Slides erforderlich? Upload? Seitenverhältnis? Zeitmessung?
-5. **Produktreview:** Wo steht die Jury? Wie wird getestet? Gibt es ein Gerät
+1. **Pflicht-Szenarien/Daten:** Gibt es zusätzliche Pflicht-Szenarien, Daten
+   oder Ausschlüsse? Die PDF nennt die sechs Beispiel-Challenges ausdrücklich
+   als Orientierung.
+2. **Bewertungsrubrik:** Wie genau wird die 40/40/20-Bewertung angewendet? Gibt
+   es ein separates Scoring-Sheet oder Tie-Breaker?
+3. **Submission-Cutoff:** exakte Uhrzeit und technischer Ablauf.
+4. **Teamgröße:** Ist „mindestens 8“ hart oder Empfehlung?
+5. **Pitch-Format:** Slides erforderlich? Upload? Seitenverhältnis? Zeitmessung?
+6. **Produktreview:** Wo steht die Jury? Wie wird getestet? Gibt es ein Gerät
    oder bringen Juroren eigene Laptops/Smartphones?
-6. **Hosting:** Müssen wir selbst hosten? Ist lokales LAN erlaubt?
-7. **API-Zugriff:** Dürfen externe KI-Dienste genutzt werden? Gibt es
+7. **Hosting:** Müssen wir selbst hosten? Ist lokales LAN erlaubt?
+8. **API-Zugriff:** Dürfen externe KI-Dienste genutzt werden? Gibt es
    Restricted Networks?
-8. **Datenschutz:** Vorgaben für Demo-Daten, personenbezogene Daten, DSGVO.
-9. **Tie-Breaker / Jury-Fragen:** zusätzliche Kriterien?
-10. **Preise:** Kategorien (falls relevant für Story/Fokus).
+9. **Datenschutz:** Vorgaben für Demo-Daten, personenbezogene Daten, DSGVO.
+10. **Preise:** Kategorien (falls relevant für Story/Fokus); gibt es einen
+    „Best Code“-Preis? (Mail sagt Nein; vor Ort bestätigen.)
 
 ---
 
@@ -206,8 +248,9 @@ Arbeitssituation.
 
 ### Vor dem Start
 - [ ] Team registriert (Plattform ab Sa morgen)
-- [ ] Challenge-Seite gelesen, Themenfelder notiert
-- [ ] Scope & Rollen festgelegt
+- [x] Challenge-PDF gelesen; sechs Beispiel-Challenges notiert
+- [ ] Mapping #1/#6 und Scope entschieden
+- [ ] Rollen festgelegt
 - [ ] Repo, Hosting, API-Keys, Fallback getestet
 - [ ] AI Decision Log angelegt
 
@@ -239,6 +282,18 @@ Arbeitssituation.
 
 ## 12. Abgeleitete Gewinnstrategie
 
+Die Challenge-PDF verschiebt den Fokus noch stärker auf **Problemlösung,
+Originalität, Nutzerorientierung, Konzeptqualität und überzeugende Umsetzung**;
+der reine Code-Umfang ist nachrangig. Gleichzeitig bleiben die 40 % Pitch,
+40 % Produktreview und 20 % Technik aus den Organisator-Mails gültig. Daraus
+folgt: Die Lösung muss in 90 Sekunden verständlich sein, einen echten
+Praxis-Nutzen zeigen und technisch zuverlässig laufen — nicht möglichst groß
+sein.
+
+Die sechs Beispiel-Challenges sind Orientierung, keine Pflicht. **Viva ist
+unsere eigene Challenge**; #1 und #6 sind der stärkste Fit, aber nicht der
+einzige erlaubte Rahmen.
+
 Die Bewertung ist ungewöhnlich produktlastig (40 % praktisches Testen) und
 stellt die KI-Reflection gleichberechtigt neben den Pitch (2 von 5 Minuten).
 
@@ -261,8 +316,12 @@ stellt die KI-Reflection gleichberechtigt neben den Pitch (2 von 5 Minuten).
 ## 13. Quellenhinweis
 
 - Zwei Organisator-Mails zum 8. Hackathon Fulda 2026 (deutsch/englisch).
-- Challenge-Seite: passwortgeschützt, Abruf am 23.10.2026 ohne Passwort nicht
-  möglich.
+- Offizielle Challenge-PDF: `Challenge_HackathonFulda2026_de.pdf`, erhalten am
+  24.10.2026; Original-Link:
+  https://transfer.kaleidoscode.de/s/JRjZfZ6KEk23KgK
+- Die PDF ist die aktuelle Grundlage für Thema, sechs Beispiel-Challenges und
+  qualitative Bewertungsschwerpunkte; die mündliche Einweisung vor Ort
+  gegenprüfen.
 - Website: https://www.hackathon-fulda.de
 - Der Begriff „eatec“ aus dem Auftrag wird als **EdTech / Education
   Technology** interpretiert.

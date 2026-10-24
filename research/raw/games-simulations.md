@@ -1,6 +1,6 @@
 # Serious games, simulations, scenario-based learning, XR, gamification, and assessment inside games
 
-**Research note for Hackathon Fulda 2026 (24–25 Oct 2026), theme "Future Education – Lernen neu denken"**
+**Research note for Hackathon Fulda 2026 (24–25 Oct 2026), theme "Future Education – Lernen, Lehren und Prüfen neu denken"**
 Prepared 2026-10-23. Scope: evidence on learning outcomes, design mechanisms, assessment, landscape, 24-hour feasibility, and concrete prototype concepts.
 
 **Evidence labels used below:** [MA] meta-analysis; [SR] systematic review; [RCT] randomised controlled trial; [P] peer-reviewed journal/article; [C] conference proceedings; [Pre] preprint (not yet peer-reviewed); [Rep] government/industry report; [V] vendor or tool documentation (claim, not independent evidence); [F] foundational work.

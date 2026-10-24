@@ -7,6 +7,12 @@ KI-Fehler/Korrekturen). Die Jury kann Fragen stellen.
 **Ziel:** In 5 Minuten beweisen, dass ihr (a) ein echtes Problem löst,
 (b) einen funktionierenden Prototyp habt, (c) KI sinnvoll und ehrlich einsetzt.
 
+**Challenge-Fit:** **#1 „Prüfungen im Zeitalter von KI“** (primär) und
+**#6 „KI als kritischer Lernbegleiter“** (sekundär). Die sechs
+Beispiel-Challenges sind ausdrücklich Orientierung; Viva ist unsere eigene
+Challenge. Im Pitch klar sagen: Wir erkennen keine KI und versprechen keine
+Täuschungssicherheit — wir verschieben den Nachweis auf Erklärungskompetenz.
+
 ---
 
 ## 1. Die Grundregeln
@@ -21,6 +27,8 @@ KI-Fehler/Korrekturen). Die Jury kann Fragen stellen.
 5. **3:00 und 2:00 sind hart.** Probt mit Timer; schneidet 20 %.
 6. **Ein Sprecher, ein Driver.** Kein Hin-und-Her.
 7. **Fallback bereit.** Video/Screenshots, falls die Live-Demo scheitert.
+8. **Eigene Challenge ist erlaubt.** Die sechs Vorschläge sind Orientierung;
+   Viva ist unsere eigene Challenge. Kein Overfitting auf eine Nummer.
 
 ---
 
@@ -47,9 +55,11 @@ KI-Fehler/Korrekturen). Die Jury kann Fragen stellen.
 **0:20–0:45 — Problem**
 > „KI hat die schriftliche Hausarbeit als Verständnisnachweis destabilisiert.
 > 94 % der Studierenden nutzen GenAI für bewertete Arbeiten; Detektoren erkennen
-> KI-Text unzuverlässig und lassen sich umgehen. Hochschulen reagieren mit
-> mündlichen Prüfungen — aber die skalieren nicht. Studierende brauchen
-> Übung, Lehrkräfte brauchen Zeit.“
+> KI-Text unzuverlässig und lassen sich umgehen. Die Challenge fordert deshalb
+> Prüfungen, die fair, aussagekräftig und möglichst täuschungssicher sind — und
+> eine KI, die widerspricht, nachfragt und Argumentationslücken aufzeigt. Genau
+> dort setzen wir an: Mündliche Prüfungen skalieren nicht — also braucht es
+> einen Übungsraum.“
 
 **0:45–1:00 — Insight**
 > „Die knappe Ressource ist nicht Text. Es ist das Gespräch über Verständnis.
@@ -61,18 +71,21 @@ KI-Fehler/Korrekturen). Die Jury kann Fragen stellen.
 > Behauptungen, jede mit Zitat. Jetzt die erste Frage: ‚Du schreibst, Schlaf
 > fördert Gedächtnis — welche Evidenz würde deine Aussage widerlegen?‘
 > [Juror antwortet.] Die KI fragt nach: ‚Du sagst X — was folgt daraus für Y?‘
-> [Antwort.] Jetzt der Debrief: Diese Aussage kannst du verteidigen; diese ist
-> vage; hier fehlt die Begründung. Keine Note — eine Evidenzkarte und ein
-> nächster Schritt. In der Lehrkraft-Ansicht sehen wir: Drei von fünf
+> Oder sie hält dagegen: ‚Eine alternative Erklärung wäre Z. Was spricht
+> dagegen?‘ [Antwort.] Jetzt der Debrief: Diese Aussage kannst du verteidigen;
+> diese ist vage; hier fehlt die Begründung. Keine Note — eine Evidenzkarte und
+> ein nächster Schritt. In der Lehrkraft-Ansicht sehen wir: Drei von fünf
 > Studierenden brauchen ein menschliches Viva. Die Lehrkraft kann jede Frage
 > editieren und jedes Feedback übersteuern.“
 
 **2:10–2:35 — Evidenz & Technik**
-> „Drei Dinge machen das vertrauenswürdig: Erstens, jede KI-Behauptung ist an
+> „Vier Dinge machen das vertrauenswürdig: Erstens, jede KI-Behauptung ist an
 > ein verifiziertes Zitat gebunden — kein Zitat, keine Aussage. Zweitens, die
-> Rubrik und die menschliche Freigabe sind architektonisch eingebaut.
-> Drittens, wir messen nicht nur Übung, sondern unassisted Transfer. In unserem
-> 10-Personen-Pilot [konkretes Ergebnis].“
+> Rubrik und die menschliche Freigabe sind architektonisch eingebaut. Drittens,
+> wir erkennen keine KI und versprechen keine Täuschungssicherheit; wir
+> verschieben den Nachweis auf Erklärungskompetenz. Viertens, wir messen nicht
+> nur Übung, sondern unassisted Transfer. In unserem 10-Personen-Pilot
+> [konkretes Ergebnis].“
 
 **2:35–3:00 — Ask & Close**
 > „Viva ist kein Prüfer und kein Detector. Es ist der Trainingsraum, in dem
@@ -147,13 +160,15 @@ Gold.
 > Prompts, das ist Architektur.“
 
 **1:15–1:45 — Fehler & Korrekturen**
-> „Die KI hat zweimal versagt. Sie hat ein Zitat erfunden, das nicht im Essay
+> „Die KI hat mehrfach versagt. Sie hat ein Zitat erfunden, das nicht im Essay
 > stand — wir haben einen String-Match-Verifier eingebaut, der seitdem jedes
 > Zitat prüft. Und sie hat eine Antwort gelobt, die nur den Text
 > paraphrasierte — wir haben die Rubrik auf Verständnis und Evidenz umgestellt
 > und verlangen jetzt, dass jede Kritik ein Zitat aus der Antwort enthält.
-> Beim Coding hat sie eine Bibliothek erfunden, die es nicht gibt; wir haben
-> die Tests laufen lassen und es gemerkt.“
+> Außerdem hat sie eine unbegründete Annahme bestätigt — wir haben
+> Gegenargument-Fragen und einen Rubrik-Anker für Argumentationslücken
+> eingebaut. Beim Coding hat sie eine Bibliothek erfunden, die es nicht gibt;
+> wir haben die Tests laufen lassen und es gemerkt.“
 
 **1:45–2:00 — Prinzip**
 > „Unser Prinzip: Die KI darf den ersten Entwurf machen, aber nicht die
@@ -167,6 +182,7 @@ Gold.
 - „Wir hatten keine Zeit, das zu prüfen.“ (schlecht)
 - „Die KI ist zu 95 % genau.“ (ohne Testset)
 - „Wir haben keine Fehler gefunden.“ (unglaubwürdig)
+- „Unsere Prüfung ist täuschungssicher.“ (wir erkennen keine KI)
 
 ### 3.5 AI Decision Log
 
@@ -239,6 +255,22 @@ passen. Nicht erfinden. Die Jury merkt es.
 > „Deshalb ist es formativ, privat und optional, mit Text-Alternative und
 > mehreren Fragen. Es ist Übung, keine Prüfung. Die Entscheidung bleibt
 > menschlich.“
+
+**„Die Challenge fordert täuschungssichere Prüfungen — erkennt ihr KI?“**
+> „Nein. Detection ist unzuverlässig und umgehbar. Wir versprechen keine
+> Täuschungssicherheit. Viva verschiebt den Nachweis von der Texturheberschaft
+> auf die Erklärungskompetenz: Wer den eigenen Text im Gespräch nicht erklären
+> kann, hat ein Evidenzproblem — unabhängig davon, wer ihn geschrieben hat.“
+
+**„Wie stellt ihr Fairness sicher?“**
+> „Gleiche Rubrik für alle, mehrere Fragen, Text-Alternative, keine
+> Charakter- oder Motivationsurteile, menschliche Freigabe. Wir behaupten keine
+> validierte Fairness — wir bauen für Reviewbarkeit und Override.“
+
+**„Was macht ihr anders als ein KI-Tutor?“**
+> „Ein Tutor gibt Antworten. Viva gibt keine Antworten; es fragt nach, fordert
+> eine Gegenposition und zeigt Argumentationslücken. Genau das verlangt
+> Challenge #6 — kritisches Denken statt Bestätigung.“
 
 **„Warum nicht einfach mündliche Prüfungen?“**
 > „Weil sie personalintensiv sind. Viva ersetzt sie nicht; es bereitet darauf
@@ -319,6 +351,7 @@ passen. Nicht erfinden. Die Jury merkt es.
 - „AI ersetzt Lehrkräfte“
 - „100 % genau“
 - „Das ist ein AI-Prüfer“
+- „Täuschungssicher“ / „wir erkennen KI“
 
 ---
 
@@ -326,10 +359,14 @@ passen. Nicht erfinden. Die Jury merkt es.
 
 **Titel:** Viva — der Übungsraum für mündliche Verteidigung
 **Tagline:** Du hast es geschrieben. Kannst du es erklären?
+**Challenge-Fit:** #1 Prüfungen im KI-Zeitalter (primär) + #6 KI als
+kritischer Lernbegleiter (sekundär). Viva ist unsere eigene Challenge.
 
 **Problem:** KI hat schriftliche Arbeiten als Verständnisnachweis
 destabilisiert; Detektoren sind unzuverlässig; mündliche Prüfungen skalieren
-nicht.
+nicht. Die Challenge fordert faire, aussagekräftige und möglichst
+täuschungssichere Prüfungen — und eine KI, die widerspricht, nachfragt und
+Argumentationslücken aufzeigt.
 
 **Lösung:** Viva extrahiert zentrale Behauptungen aus einer Arbeit, stellt
 evidenzgebundene Nachfragen und gibt eine formative Evidenzkarte. Die
@@ -338,11 +375,11 @@ Lehrkraft sieht Lücken und entscheidet, wer ein menschliches Viva braucht.
 **How it works:**
 1. Text einfügen → 5 Claims mit Zitat.
 2. 3 adaptive Fragen → Antwort per Text/Sprache.
-3. Follow-up → Evidenzkarte + Rubrik + nächster Schritt.
+3. Follow-up oder Gegenargument → Evidenzkarte + Rubrik + nächster Schritt.
 4. Teacher Review → menschliches Viva.
 
 **Warum vertrauenswürdig:** Quote-Verifier, Rubrik, Human-in-the-loop,
-Audit-Log, synthetische Daten, kein Audio-Storage.
+Audit-Log, synthetische Daten, kein Audio-Storage, keine Detection.
 
 **Evidenz:** Detection unzuverlässig; strukturierte Vivas reliabler als
 unstrukturierte; Self-Explanation und Feedback sind evidenzstarke

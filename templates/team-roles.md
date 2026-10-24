@@ -9,12 +9,12 @@ Doppelarbeit, kein Bus-Faktor 1.
 
 | Rolle | Person | Verantwortung | Hauptartefakt |
 |---|---|---|---|
-| Product Lead |  | Scope, Entscheidungen, Story, User Journey, Gates | Scope-One-Pager, Entscheidungen |
+| Product Lead |  | Scope, Entscheidungen, Story, User Journey, Gates, Challenge-Mapping #1/#6 | Scope-One-Pager, Entscheidungen |
 | Frontend Lead |  | Viva-UI, State, Responsive | Kernschleife im Browser |
 | Frontend/Design |  | Landing, Debrief, Teacher View, Mobile | UI-Polish, Mobile-Test |
 | Backend/API |  | API, DB, Deploy, Timeout/Fallback | Öffentliche URL, stabile API |
 | AI/Prompt Engineer |  | Claims, Fragen, Evaluation, JSON, Red-Team | Pipeline + Testset |
-| Content/Domain |  | Seed-Essays, Rubrik, Ground Truth, Fachprüfung | 3 Essays, 1 Rubrik |
+| Content/Domain |  | Seed-Essays, Rubrik, Ground Truth, Fachprüfung, Challenge-#1/#6-Sprache | 3 Essays, 1 Rubrik |
 | QA/Demo Ops |  | Testmatrix, Geräte, Reset, Video, Submission | Grüne Tests, Submission |
 | Pitch/AI Reflection |  | 3+2-Minuten-Skript, Timing, Log, Q&A | Geprobter Pitch |
 
@@ -54,7 +54,7 @@ macht und warum es vertrauenswürdig ist.
 
 | Zeit | Gate | Owner | Konsequenz bei Verfehlen |
 |---|---|---|---|
-| Sa 10:30 | Idee/Scope locked | Product | Sofort entscheiden, nicht diskutieren |
+| Sa 10:30 | Idee/Scope + Challenge-Mapping #1/#6 locked | Product | Sofort entscheiden, nicht diskutieren |
 | Sa 12:30 | Deploy + Skeleton | Backend | Lokale Demo + später deployen |
 | Sa 14:00 | Claims + Verifier | AI | Auf 3 Claims kürzen |
 | Sa 15:30 | Viva-UI + Antworten | Frontend | Eine Frage statt drei |
@@ -99,6 +99,9 @@ Legende: R = verantwortlich, A = accountable, C = consulted, I = informed.
 
 - [ ] Jede Person kann die 3 Sätze: „Die KI fragt nach, statt zu antworten.“
   „Kein Zitat, keine Behauptung.“ „Der Mensch entscheidet.“
+- [ ] Jede Person kann den Challenge-Fit in einem Satz erklären: #1 faire,
+  aussagekräftige Prüfungen + #6 kritischer Lernbegleiter; Viva ist unsere
+  eigene Challenge.
 - [ ] Jede Person kann die Demo in 90 Sekunden zeigen.
 - [ ] Jede Person kennt die drei AI-Reflection-Beispiele.
 - [ ] Jede Person weiß, wo das Fallback-Video liegt.
