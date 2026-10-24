@@ -1,4 +1,5 @@
 import { CrossArmsCue, armsCrossed } from "./cues";
+import { poseBackend, type PoseBackend } from "./backend";
 import { PoseTestTracker, type PoseTestResult } from "./testPoses";
 import {
   PoseLog,
@@ -15,6 +16,7 @@ export type PoseState = {
   handModel: boolean | null;
   handError: string | null;
   hands: HandSample[];
+  backend: PoseBackend | null;
   tests: PoseTestResult[];
 };
 export class PoseCapture {
@@ -24,6 +26,7 @@ export class PoseCapture {
   private handModel: boolean | null = null;
   private handError: string | null = null;
   private hands: HandSample[] | null = [];
+  private backend: PoseBackend | null = null;
   private tests = new PoseTestTracker();
   private testResults: PoseTestResult[] = [];
   private worker: Worker | null = null;
@@ -47,13 +50,14 @@ export class PoseCapture {
       handModel: this.handModel,
       handError: this.handError,
       hands: this.hands ?? [],
+      backend: this.backend,
       tests: this.testResults,
     });
   }
   start() {
     this.publish("loading", "Loading the local pose model…");
     try {
-      const worker = (this.worker = new Worker("/pose/worker.js?v=4"));
+      const worker = (this.worker = new Worker("/pose/worker.js?v=5"));
       this.timeout = setTimeout(
         () => this.fail("Pose model loading timed out. Try again."),
         30000,
@@ -69,6 +73,7 @@ export class PoseCapture {
           this.handModel = data.hands === true;
           this.handError =
             typeof data.handError === "string" ? data.handError : null;
+          this.backend = poseBackend(data.backend);
           this.hands = this.handModel ? [] : null;
           this.publish(
             "running",
@@ -77,6 +82,17 @@ export class PoseCapture {
               : "Pose ready. Hand model unavailable; pocket check is off.",
           );
           this.tick();
+        } else if (data.type === "backend") {
+          const backend = poseBackend(data.backend);
+          if (backend) {
+            this.backend = backend;
+            this.handModel = backend.hand !== null;
+            this.handError = backend.handError;
+            this.publish(
+              "running",
+              "Pose acceleration changed. Landmarks stay local.",
+            );
+          }
         } else if (data.type === "error") {
           this.fail(
             "Pose detection failed. You can download any samples already captured and retry.",

@@ -321,6 +321,7 @@ export function LiveStudio() {
                     handModel={pose.state.handModel}
                     handError={pose.state.handError}
                     hands={pose.state.hands.length}
+                    backend={pose.state.backend}
                     view={poseView}
                   />
                 )}

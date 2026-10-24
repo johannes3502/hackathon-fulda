@@ -346,6 +346,15 @@ body:has(.live-workspace-large) .app-footer,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.pose-status-backend {
+  color: #c7d2fe;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.pose-status-backend[data-delegate="CPU"] {
+  color: #fcd34d;
+}
 .live-pose-lab small {
   color: #9ca3af;
   font-size: 9px;

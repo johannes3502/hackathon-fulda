@@ -164,8 +164,11 @@ zwölf Testposen in zwei umschaltbaren Darstellungen: Coach-Sprechblase
 fehlgeschlagenen Bedingungen. Der Hand Landmarker läuft auf jedem Pose-Frame
 mit Confidence 0,5 und zeichnet die Hand-Landmarks pink ins Overlay; die
 Pocket-Heuristik prüft den Abstand des Handgelenks zur eigenen Hüfte
-(≤ 0,45 Schulterbreiten) und ob das Hand-Modell dort eine Hand findet. T12
-erkennt gekreuzte Unterschenkel.
+(≤ 0,45 Schulterbreiten) und ob das Hand-Modell dort eine Hand findet. Pose-
+und Hand-Modell starten im Worker bevorzugt auf dem GPU-Delegate; bei fehlendem
+Hardware-WebGL2, Software-Renderer oder Fehlern in Erstellung, Warm-up oder
+Inferenz wechseln sie einmalig auf CPU. Das Dev-Statusfeld zeigt Delegate,
+Fallback-Grund und Renderer. T12 erkennt gekreuzte Unterschenkel.
 Treffer bleiben Dev-only, ohne Event. Die finalen Pose-/Feedback-Regeln stehen
 in `docs/04-pose-tracking-requirements.md`; die Umsetzung ist noch offen
 (`frontend/DATA_POINTS.md` beschreibt das Roh-Logging).

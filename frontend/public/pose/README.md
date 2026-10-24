@@ -27,3 +27,9 @@ frontend; clients load them from the app's own origin.
 
 `worker.js` runs the detector and releases transferred image frames. It does not
 send camera content or landmarks to a backend or third-party service.
+
+Both models use the same settings as `hassan-poselog`: `IMAGE`, confidence 0.5,
+pose Lite, up to two hands. The worker starts on the GPU delegate when a
+hardware WebGL2 context is available. It falls back to CPU if WebGL2 is
+missing, the renderer is software, or GPU creation, warm-up, or inference
+fails. The dev status view reports the active delegate and WebGL renderer.
