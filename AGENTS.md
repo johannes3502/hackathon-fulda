@@ -137,7 +137,9 @@ templates/
 Das lokale Grundgerüst startet aktuell FastAPI mit MediaPipe/FFmpeg,
 PostgreSQL **ohne pgvector** und **SeaweedFS als S3-Speicher**. MinIO,
 pgvector, das Next.js-Frontend und die Analyse-/Aufnahme-Pipeline aus der
-Zielarchitektur sind noch nicht umgesetzt. Die Umstellung des Speichers
+Zielarchitektur sind noch nicht umgesetzt. Umgesetzt ist die Sprachanalyse
+aus Wort-Timestamps (`backend/app/speech/`, ohne gewählten ASR-Anbieter und
+ohne Persistenz). Die Umstellung des Speichers
 ist eine separate Implementierungsaufgabe; dieser Merge ändert keine Dienste.
 
 Start, Smoke-Test und IDE-Debugging: `backend/README.md`. Persistente Volumes

@@ -14,6 +14,8 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 6 | Infrastruktur tatsächlich prüfen | Compose-Build, Smoke-Test und Ausfall-/Wiederanlaufprüfung ausgeführt | Ein erfolgreicher Build allein belegt weder S3-Zugriff noch Persistenz; Inferenz und Browser-Aufnahme bleiben ungeprüft | Codex ergänzte reale Verbindungs-, Datei- und Lebenszyklusprüfungen mit synthetischen Daten | Prüfprotokoll unten |
 | 7 | IntelliJ IDEA und VS Code einrichten | Geteilte Compose-Aktionen und Python-Debug-Konfigurationen angelegt | Container-Hostnamen funktionieren nicht für eine lokale Python-Instanz; gleichzeitig gestartete APIs belegen denselben Port | Nutzerauftrag; gemeinsamer lokaler Launcher liest `.env`, verwendet localhost und stoppt den Docker-Backend-Container vor dem lokalen Start | `.run/`, `.vscode/`, `backend/scripts/dev.py`; lokaler Readiness-Check mit PostgreSQL/S3 bestanden |
 
+| 8 | Sprachanalyse-Pipeline (Feature 3, Backend) | Claude Code: `app/speech/` mit `Transcriber`-Interface, FFmpeg-Audioextraktion, Pausen-, Füllwort-, Wiederholungs- und Tempo-Events, `POST /speech/analyze` | Kein ASR-Anbieter gewählt, daher nur `JsonTranscriber` (vorberechnete Wörter); Schwellenwerte sind ungeprüfte Heuristik-Startwerte; Tempo nur relativ zum Session-Median, nicht absolut | Nutzerauftrag; Anbieter, Füllwortliste und Schwellenwerte bleiben Teamentscheidung | `backend/tests/test_speech.py`: 12 Tests mit synthetischen Daten bestanden (Python 3.12, lokal) |
+
 ## Prüfprotokoll (24.10.2026)
 
 Umgebung: Docker Desktop auf ARM64. Keine Aussage zu einem Deployment.
