@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { LiveRecorder } from "./recorder";
-import type { LiveRecording, VideoTransport } from "./contracts";
+import type { LiveConfig, LiveRecording, VideoTransport } from "./contracts";
 
 class Recorder {
   static isTypeSupported = () => true;
@@ -19,7 +19,7 @@ class Recorder {
     this.onstop?.();
   }
 }
-function setup(transport: VideoTransport) {
+function setup(transport: VideoTransport, mode: LiveConfig["mode"] = "demo") {
   vi.useFakeTimers();
   vi.stubGlobal("MediaRecorder", Recorder);
   const stopTrack = vi.fn();
@@ -29,12 +29,13 @@ function setup(transport: VideoTransport) {
   });
   const stream = {
     getVideoTracks: () => [track],
+    getAudioTracks: () => [],
     getTracks: () => [track],
   } as unknown as MediaStream;
   const complete = vi.fn<(recording: LiveRecording) => void>();
   const recorder = new LiveRecorder(
     stream,
-    { title: "Practice", targetMs: 60000, mode: "demo", endpoint: "" },
+    { title: "Practice", targetMs: 60000, mode, endpoint: "" },
     transport,
     vi.fn(),
     complete,
@@ -60,7 +61,7 @@ it("automatically stops at the recording limit and finalizes captured media", as
     expect.any(Blob),
     expect.objectContaining({ startMs: 0, endMs: 60000, seq: 1 }),
   );
-  expect(transport.finish).toHaveBeenCalledWith(60000);
+  expect(transport.finish).toHaveBeenCalledWith(60000, expect.any(Blob));
   expect(complete).toHaveBeenCalledOnce();
   const recording = complete.mock.calls[0][0];
   expect(recording.durationMs).toBe(60000);
@@ -91,4 +92,33 @@ it("a late backend acknowledgement cannot start recording after disposal", async
   expect(transport.send).not.toHaveBeenCalled();
   expect(complete).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
+});
+it("preserves captured media when post-recording analysis fails", async () => {
+  const { recorder, complete } = setup({
+    connect: async () => {},
+    send: async () => {},
+    finish: async () => {
+      throw new Error("Analysis unavailable");
+    },
+    close: () => {},
+  });
+  await recorder.start();
+  await vi.advanceTimersByTimeAsync(60000);
+  const recording = complete.mock.calls[0][0];
+  expect(await recording.video.text()).toBe("captured video");
+  expect(recording.notice).toBe("Analysis unavailable");
+  URL.revokeObjectURL(recording.videoUrl);
+});
+
+it("requires a microphone for backend analysis before contacting the API", async () => {
+  const transport = {
+    connect: vi.fn(async () => {}),
+    send: async () => {},
+    finish: async () => {},
+    close: () => {},
+  };
+  const { recorder } = setup(transport, "backend");
+  await expect(recorder.start()).rejects.toThrow("microphone");
+  expect(transport.connect).not.toHaveBeenCalled();
+  recorder.dispose();
 });

@@ -22,7 +22,11 @@ Open http://localhost:3000/live or choose **Open camera studio** from setup.
 3. Choose **Rewatch feedback sections** to filter by category, seek to a feedback moment, loop the surrounding section, or watch the full take.
 4. Download before refreshing or leaving the live workspace. Recordings are held in browser memory only.
 
-For backend streaming, choose **Backend**, enter its WebSocket URL and start. The app sends contiguous encoded video chunks and accepts timestamped feedback. The replaceable proposed protocol, JSON examples and integration seam are in [live-camera-protocol.md](../docs/live-camera-protocol.md). No backend server or detection model is included. `frontend/.env.example` provides an optional URL prefill.
+For real audio analysis, choose **Backend · audio analysis after recording**, enable the camera and microphone, then **Record & analyze audio**. The API URL defaults to `http://localhost:8000` (`NEXT_PUBLIC_API_URL` overrides it at build time). The browser checks `/health/ready` for service status and `/health/live` before capture. After stopping it uploads the complete recording to `POST /speech/analyze`; feedback and measurements appear in review. No partial MediaRecorder chunks are uploaded. Failed analysis preserves the local recording.
+
+In backend review, optionally upload a JSON array of `{word,start_ms,end_ms}` from the same take to call `POST /transcription/analyze-words`. This endpoint analyzes existing words; it does not perform ASR. Imported timestamps must fall within the recording. Requests are cancellable and time out after two minutes. Use a reachable HTTPS API URL when the frontend is served over HTTPS, and configure the existing backend CORS setting for the frontend origin.
+
+Missing endpoints remain mocked in the sample rehearsal. See [the integration handoff](../docs/pitch-coach-handoff.md) for pending work. No backend implementation is part of this integration.
 
 ## Demo walkthrough
 
@@ -47,7 +51,7 @@ npm run test:e2e
 npm run build
 ```
 
-Unit tests exercise the sample session lifecycle and the live protocol, feedback validation, ordering, clip ranges, backpressure and cancellation. Playwright checks both journeys at 1366px and 375px, including generated camera video, actual MediaRecorder playback, a WebSocket protocol harness, recovery, overflow and camera cleanup. Screenshots and failure traces go to ignored `frontend/test-results/`.
+Unit tests exercise the sample session lifecycle and the live protocol, feedback validation, ordering, clip ranges, backpressure and cancellation. Playwright checks both journeys at 1366px and 375px, including generated camera video, actual MediaRecorder playback, an HTTP analysis harness, recovery, overflow and camera cleanup. Screenshots and failure traces go to ignored `frontend/test-results/`.
 
 ## Boundaries
 
@@ -57,8 +61,8 @@ Unit tests exercise the sample session lifecycle and the live protocol, feedback
 - `reducer.ts` handles normalized events, sequence/ID deduplication, transcript upserts, metric patches, cues, evidence selection, and reports.
 - `mock/MockCoachGateway.ts` is the only fixture consumer. Its monotonic clock freezes during pauses; cleanup stops subscription timers.
 - `session-repository.ts` stores synthetic setup and report data in this browser tab’s `sessionStorage`. Refresh restores completed reports and offers a restart for an interrupted active attempt.
-- `useCameraPreview.ts` requests **video only**, on an explicit user action. Tracks stop on exit; late permission results are immediately released. Preview alone does not record or upload; the live workspace has a separate explicit recording action.
-- `features/live/recorder.ts` owns actual capture, monotonic timestamps and local video. `transport.ts` is its replaceable stream boundary. `LiveSessionProvider` owns in-memory recordings and releases object URLs on exit.
+- `useCameraPreview.ts` requests video only for demos and video plus microphone audio for backend mode, on an explicit user action. Tracks stop on exit; late permission results are immediately released. Preview alone does not record or upload; the live workspace has a separate explicit recording action.
+- `features/live/recorder.ts` owns actual capture, monotonic timestamps and local video. `transport.ts` keeps demo markers local and uploads complete takes for backend audio analysis. `LiveSessionProvider` owns in-memory recordings and releases object URLs on exit.
 
 `NEXT_PUBLIC_COACH_GATEWAY` applies only to the sample rehearsal and defaults to `mock`. Selecting anything else shows a configuration error. Never put provider credentials in a public variable. The sample judge/transcript integration is separate from the video contract; see [the integration handoff](../docs/pitch-coach-handoff.md).
 
