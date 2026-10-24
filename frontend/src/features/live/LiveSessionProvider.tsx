@@ -9,7 +9,10 @@ import {
   type ReactNode,
 } from "react";
 import type { LiveRecording } from "./contracts";
+import { DEFAULT_FEATURE_FLAGS, type FeatureFlags } from "./feature-flags";
 type LiveContext = {
+  featureFlags: FeatureFlags;
+  setFeatureFlags: (flags: FeatureFlags) => void;
   recordings: Record<string, LiveRecording>;
   save: (recording: LiveRecording) => void;
   /** Apply `change` to the newest stored version; for async results. */
@@ -20,6 +23,9 @@ type LiveContext = {
 };
 const Context = createContext<LiveContext | null>(null);
 export function LiveSessionProvider({ children }: { children: ReactNode }) {
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(
+    DEFAULT_FEATURE_FLAGS,
+  );
   // shortcut: recordings last only in this workspace; add persistent storage when saved history is required.
   const [recordings, setRecordings] = useState<Record<string, LiveRecording>>(
     {},
@@ -44,7 +50,9 @@ export function LiveSessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
   return (
-    <Context.Provider value={{ recordings, save, update }}>
+    <Context.Provider
+      value={{ recordings, save, update, featureFlags, setFeatureFlags }}
+    >
       {children}
     </Context.Provider>
   );

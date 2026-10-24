@@ -13,7 +13,7 @@ flowchart TB
     end
 
     subgraph ClientAI["KI im Client (lokal, kein Upload)"]
-        MP_W["MediaPipe Pose<br/>@mediapipe/tasks-vision<br/>Web Worker"]
+        MP_W["MediaPipe Pose: Lite / Heavy<br/>VIDEO (Standard) / IMAGE<br/>GPU-first, CPU-Fallback; max. 10 Hz"]
         MP_M["react-native-mediapipe<br/>Pose Landmarker Lite"]
         MR["MediaRecorder / Vision Camera<br/>Video + Audio"]
     end
@@ -57,6 +57,13 @@ flowchart TB
     WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>Live-Sprechfeedback im Backend-Modus"]
     PCM -- "WS /api/speech/live: PCM" --> SP
     SP -- "kumulativer Vorschautext" --> WEB
+    FLAGS["FeatureFlags pro Take<br/>Modell, Modus, Pose Lab,<br/>Sprachfeedback pro Typ"] --> MP_W
+    MP_W -. "Track fingers, bis 5 Hz" .-> HAND["Hand Landmarker: 21 Punkte pro Hand<br/>auch ohne Torso, kein Upload"]
+    HAND -. "Pose Lab" .-> LAB["T1–T12, Pocket<br/>lokale Diagnose, keine Events"]
+    WEB --> DSP["AudioWorklet lokal: RMS/YIN<br/>Energiehüllkurven-Tempo-Proxy"]
+    DSP --> LOCAL_SPEECH["SpeechEvaluator: 3 s normales Sprechen<br/>Pausen, Pegel, Pitch, Rhythmus<br/>ein Live-Hinweis + Review-Marker"]
+    LOCAL_SPEECH --> WEB
+
     PCM -- "WS /api/speech/feedback: PCM" --> SP
     SP --> LIVE_SIG["API-Thread: gleiche Signalregeln alle 5 s<br/>3-s-Baseline, maximal 5 min, ein Live-Slot<br/>PCM nur im RAM; unabhängig von Whisper"]
     LIVE_SIG -- "feedback: position_ms + Events<br/>ein Hinweis, 15-s-Cooldown pro Typ" --> WEB
@@ -150,12 +157,16 @@ sequenceDiagram
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
     FE->>BE: GET /health/ready (10-s-Startfrist)
     BE-->>FE: Bereit, oder Abbruch vor Aufnahme mit Retry-Hinweis
+    FE->>FE: FeatureFlags im Take festhalten (Lite/Heavy, VIDEO/IMAGE)
+    FE->>FE: Pose-Worker GPU-first/CPU-Fallback, Fingertracking separat bis 5 Hz
+    Note over FE: Im lokalen Live-Modus AudioWorklet und SpeechEvaluator ohne Upload
+
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>BE: WS /speech/feedback: start, PCM nach ready
     loop alle 5 Sekunden, maximal 5 Minuten
         BE->>BE: Signalregeln auf bisherigem Audio, feste Anfangskalibrierung
         BE-->>FE: feedback: position_ms, aktuelle Events (Heuristik)
-        FE->>FE: Zeitoffset zu MediaRecorder.onstart; ein Hinweis, Cooldown
+        FE->>FE: Zeitoffset zu MediaRecorder.onstart, ein Hinweis, Cooldown
     end
     Note over FE,BE: Mehr als 15 s Analyse-Rückstand: Vorschau stoppen, Aufnahme erhalten
     opt Live captions aktiviert
@@ -165,7 +176,7 @@ sequenceDiagram
     end
     U->>FE: Stop
     FE->>BE: WS stop, AudioWorklet schließen
-    FE->>BE: POST /speech/analyze (recording, transcribe = Checkbox, standardmäßig an; local_only=true)
+    FE->>BE: POST /speech/analyze (recording, transcribe = Checkbox, standardmäßig an, local_only=true)
     BE->>S3: Original speichern
     BE->>R: Task analyze_speech einreihen
     BE-->>FE: 202 {job_id, status_url}
@@ -187,6 +198,7 @@ sequenceDiagram
         BE->>S3: Status/Ergebnis lesen
         BE-->>FE: queued / running / completed
     end
+    FE->>FE: Sprachmarker nach FeatureFlags des Takes filtern (auch bei Wort-Import)
     FE->>FE: Timeline mit Video-Clips (±2s) verknüpfen,<br/>Wörter an der Aufnahme speichern (Eingabe für Fact-Check)
 ```
 
@@ -313,7 +325,7 @@ flowchart TD
     SP["/stats-preview<br/>Stats-Karte mit Replay"] --> SC["StatsCard<br/>Three.js-Ring, vier Kriterien<br/>synthetische Demo-Werte"]
     SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
-    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
     LIVE --> DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
@@ -407,14 +419,14 @@ Zusätzlich (außerhalb Postgres):
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), auch vom Fact-Check genutzt |
-| Browser-Speicher (Live-Workspace) | Wörter, Fact-Check-Ergebnis, Fragen und Antworten einer Aufnahme, nur bis zum Neuladen |
+| Browser-Speicher (Live-Workspace) | FeatureFlags pro Take, Wörter, Pose-Events mit runtime, Fact-Check-Ergebnis, Fragen und Antworten; nur bis zum Neuladen |
 
 ## 9. Event-Modell: gemeinsame Timeline
 
 ```mermaid
 flowchart LR
     subgraph Quellen
-        B["browser<br/>posture, gesture, gaze<br/>(MediaPipe, lokal)"]
+        B["browser<br/>posture, gesture, lokale Sprachmarker<br/>(kalibrierte Heuristiken, kein Pocket/Gaze/T12)"]
         A["asr<br/>Füller, Wort-Timestamps"]
         S["speech<br/>pause, pace, volume, pitch"]
         F["factcheck<br/>fact: stützt (info), nicht gefunden (hint),<br/>widerspricht (warning)"]
@@ -430,8 +442,17 @@ flowchart LR
     G --> EV
 
     EV --> MT["merge_timeline()<br/>Deduplizierung<br/>(Tempo aus ASR,<br/>Pausen akustisch)"]
-    MT --> UI["Timestamp-Timeline im Frontend<br/>Klick springt zum Videoclip ±2s"]
+    MT --> FILTER["Sprachmarker-Filter pro Take<br/>Speech / pause / pace / filler / volume / pitch"]
+    FILTER --> UI["Timestamp-Timeline im Frontend<br/>Klick springt zum Videoclip ±2s"]
 ```
+
+Pose-Event-Payload und JSONL tragen optional `runtime` mit Modell, Modus und
+tatsächlichem Delegate; synthetische Fixtures haben keine erfundene Laufzeit.
+Hand-/Lab-Ergebnisse fließen nicht in das gemeinsame Event-Modell.
+Lokale Sprachmarker tragen Start/Ende ab `MediaRecorder.onstart` im Feedback-
+Vertrag. Bei überlappenden Typen ersetzt die vollständige Backend-Analyse den
+Live-Marker im Review. Ein fehlender neutraler Handwert im Pose-Payload ist
+`null`; die Haltungsreferenz benötigt keine ruhigen oder sichtbaren Hände.
 
 Alle Kennwerte sind Messwerte ohne Notenbewertung ("Measured values only; no score or grade").
 

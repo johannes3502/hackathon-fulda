@@ -7,9 +7,16 @@ import {
   type RefObject,
 } from "react";
 import { PoseCapture, type PoseState } from "./capture";
+import { DEFAULT_POSE_OPTIONS, type PoseOptions } from "./options";
 export function usePoseCapture(
   video: RefObject<HTMLVideoElement | null>,
   enabled: boolean,
+  {
+    model,
+    runningMode,
+    devMode,
+    handTracking,
+  }: PoseOptions = DEFAULT_POSE_OPTIONS,
 ) {
   const owner = useRef<PoseCapture | null>(null);
   const recording = useRef(false);
@@ -19,15 +26,19 @@ export function usePoseCapture(
     if (!video.current) return;
     owner.current?.dispose();
     recording.current = false;
-    const capture = new PoseCapture(video.current, (next) => {
-      setState(next);
-      if (next.phase === "loading") setDownload(undefined);
-      if (next.phase === "stopped" || next.phase === "error")
-        setDownload(capture.log.blob());
-    });
+    const capture = new PoseCapture(
+      video.current,
+      (next) => {
+        setState(next);
+        if (next.phase === "loading") setDownload(undefined);
+        if (next.phase === "stopped" || next.phase === "error")
+          setDownload(capture.log.blob());
+      },
+      { model, runningMode, devMode, handTracking },
+    );
     owner.current = capture;
     capture.start();
-  }, [video]);
+  }, [video, model, runningMode, devMode, handTracking]);
   useEffect(() => {
     if (!enabled) return;
     start();
@@ -46,7 +57,14 @@ export function usePoseCapture(
       owner.current.beginRecording(timestamp, sessionId);
       setState((previous) =>
         previous
-          ? { ...previous, count: 0, latest: null, evaluation: null }
+          ? {
+              ...previous,
+              count: 0,
+              latest: null,
+              evaluation: null,
+              hands: [],
+              tests: [],
+            }
           : previous,
       );
       setDownload(undefined);

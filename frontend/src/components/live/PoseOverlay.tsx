@@ -1,17 +1,49 @@
-import type { PoseSample } from "@/features/pose/sample";
+import type { PoseSample, HandSample } from "@/features/pose/sample";
 import { connections, visiblePosePoints } from "@/features/pose/overlay";
+
+const handConnections: [number, number][] = [
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 4],
+  [0, 5],
+  [5, 6],
+  [6, 7],
+  [7, 8],
+  [5, 9],
+  [9, 10],
+  [10, 11],
+  [11, 12],
+  [9, 13],
+  [13, 14],
+  [14, 15],
+  [15, 16],
+  [13, 17],
+  [17, 18],
+  [18, 19],
+  [19, 20],
+  [0, 17],
+];
 
 export function PoseOverlay({
   sample,
+  image,
   largeView,
-  label = "Live pose landmarks",
+  hands = [],
+  showHands = false,
+  label = showHands ? "Live pose and hand landmarks" : "Live pose landmarks",
 }: {
-  sample: PoseSample;
+  sample: PoseSample | null;
+  image?: { width: number; height: number } | null;
   largeView: boolean;
   label?: string;
+  hands?: HandSample[];
+  showHands?: boolean;
 }) {
-  const points = visiblePosePoints(sample);
-  const { width, height } = sample.image;
+  const points = sample ? visiblePosePoints(sample) : {};
+  const dimensions = sample?.image ?? image;
+  if (!dimensions) return null;
+  const { width, height } = dimensions;
   return (
     <svg
       className="live-pose-overlay"
@@ -47,6 +79,43 @@ export function PoseOverlay({
             />
           ),
       )}
+      {showHands &&
+        hands.map((hand, handIndex) => (
+          <g key={`hand-${handIndex}`} data-hand={hand.label}>
+            {handConnections.map(([from, to]) => {
+              const a = hand.landmarks[from];
+              const b = hand.landmarks[to];
+              return a && b ? (
+                <line
+                  key={`${from}-${to}`}
+                  className="hand-connection"
+                  x1={a[0] * width}
+                  y1={a[1] * height}
+                  x2={b[0] * width}
+                  y2={b[1] * height}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ) : null;
+            })}
+            {hand.landmarks.map((point, index) =>
+              point &&
+              point[0] >= 0 &&
+              point[0] <= 1 &&
+              point[1] >= 0 &&
+              point[1] <= 1 ? (
+                <circle
+                  key={index}
+                  className="hand-landmark"
+                  data-hand-landmark={index}
+                  cx={point[0] * width}
+                  cy={point[1] * height}
+                  r={4}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ) : null,
+            )}
+          </g>
+        ))}
     </svg>
   );
 }

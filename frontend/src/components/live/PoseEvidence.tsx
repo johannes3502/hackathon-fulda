@@ -20,9 +20,11 @@ export function PoseEvidence({ event }: { event?: PoseEvent }) {
       </p>
       <p>
         Prototype trigger: {p.threshold.toFixed(2)} {p.unit}. Neutral reference:{" "}
-        {p.baseline.toFixed(2)} {p.unit}. Confirmed after{" "}
-        {((p.confirmed_at_ms - event.t_ms) / 1000).toFixed(1)} seconds of
-        continuous evidence.
+        {p.baseline === null
+          ? "not measured for hands; shoulder geometry used"
+          : `${p.baseline.toFixed(2)} ${p.unit}`}
+        . Confirmed after {((p.confirmed_at_ms - event.t_ms) / 1000).toFixed(1)}{" "}
+        seconds of continuous evidence.
       </p>
       <p>
         Last observed value: {p.measurement.toFixed(2)} {p.unit}. A wider

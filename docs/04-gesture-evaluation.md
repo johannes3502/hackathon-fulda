@@ -1,7 +1,7 @@
 # Gesten und Haltung: Was wir beobachten und warum
 
 Stand: 24.10.2026. **Prototyp, keine validierte Beurteilung.**
-Implementierung: `frontend/src/features/pose/evaluation.ts` (`pose-rules-v3`).
+Implementierung: `frontend/src/features/pose/evaluation.ts` (`pose-rules-v5`).
 Kamera: `/live`. Synthetischer, reproduzierbarer Rundgang: `/gestures`.
 Diese Regeln beschreiben den Web-Pfad. Die native App verwendet weiterhin
 ihren separaten `CrossArmsCue`-Adapter; dessen bisherige Release-Zeiten wurden
@@ -16,9 +16,9 @@ keinen Gesamtwert, keine Note und keine Emotions- oder Persönlichkeitsinferenz.
 
 | Option | Was sie liefert | Entscheidung für diesen Prototyp |
 | --- | --- | --- |
-| MediaPipe Pose Landmarker Lite | Körperlandmarks; bereits lokal im Browser eingebunden | Verwenden: Schultern, Hüften, Ellbogen und Handgelenke reichen für die groben Beobachtungen. Keine neue Modellkette für diese Aufgabe nötig. |
+| MediaPipe Pose Landmarker Lite / Heavy | Körperlandmarks; bereits lokal im Browser eingebunden | Lite als Standard, Heavy per Feature-Schalter. Beide liefern die benötigten Körperpunkte; kein gemessener Qualitätsvergleich. |
 | MediaPipe Gesture Recognizer | Vordefinierte Handformen, etwa offene Hand, Faust, Daumen hoch; Handlandmarks | Gute Wahl für explizite Handzeichen. Nicht gewählt: diese Kategorien bewerten keine Vortragsgestik; kleine oder verdeckte Hände benötigen eigene Tests. Ein Daumen-hoch wäre keine positive Vortragsbewertung. |
-| MediaPipe Hand Landmarker | 21 Punkte pro Hand | Sinnvoll, falls Fingergeometrie tatsächlich gebraucht wird. Aktuell kein zusätzlicher Nutzen für Handhöhe, Handabstand oder Torsoachse. |
+| MediaPipe Hand Landmarker | 21 Punkte pro Hand | Nur im Pose Lab für Pocket/Self-Touch und Hand-Overlay. Im normalen Aufnahmepfad nicht geladen. |
 | MoveNet Lightning / Thunder | 17 Körperpunkte; zwei Varianten mit unterschiedlichem Latenz-/Qualitätsziel | Technisch plausible Alternative. Kein eigener Vergleich auf unseren Geräten durchgeführt; deshalb kein behaupteter Genauigkeitsgewinner und kein unbegründeter Modellwechsel. |
 | Face-/Iris-Landmarks | Gesichts- bzw. Irisgeometrie | Für tatsächlichen Blickkontakt nicht ausreichend. Keine Blickkontakt-Events aus `eyes_forward=false`; fehlende Augenpunkte sind keine Abwendung. |
 | Eigener zeitlicher Gestenklassifikator | Könnte Bewegungsfolgen statt statischer Handformen unterscheiden | Erst mit geeigneten, annotierten Sequenzen, unabhängigen Testpersonen und klarer Gestentaxonomie sinnvoll. Solche Daten liegen nicht vor. |
@@ -47,13 +47,13 @@ flowchart LR
   F --> H[Timeline und Video-Replay]
 ```
 
-`@mediapipe/tasks-vision` und das Lite-Modell sind lokal ausgeliefert. Frames und
-Landmarks gehen nicht an einen KI-Anbieter. Maximal ein Frame gleichzeitig,
-Zieltakt höchstens 10 Hz. Der bestehende IMAGE-Modus bleibt erhalten, damit der
-Roh-Export keine zusätzliche zeitliche Glättung bekommt. VIDEO-Tracking kann
-Rechenzeit sparen; ein Wechsel muss Rohdatenvertrag und Latenz gemeinsam prüfen.
-Wir behaupten nicht, IMAGE sei generell besser. Unsere Zeitregeln ersetzen keine
-Erkennungsqualität und verändern den Roh-Log nicht.
+`@mediapipe/tasks-vision`, Lite und Heavy werden lokal ausgeliefert. Frames
+und Landmarks gehen nicht an einen KI-Anbieter. Maximal ein Frame gleichzeitig,
+höchstens 10 Hz. Nutzerentscheidung: **VIDEO als Standard**, IMAGE per Schalter.
+VIDEO nutzt zeitliches Tracking und Modell-Glättung, IMAGE unabhängige Bilder.
+Das Log enthält die unveränderten Modell-Ausgaben, in VIDEO also bereits
+zeitlich geglättet, plus Modell/Modus/Delegate als `runtime`. GPU-first mit
+CPU-Fallback ohne Modellwechsel. Ein Geräte-/Qualitätsvergleich ist noch offen.
 
 X/Y werden vor geometrischen Berechnungen in Pixel umgerechnet. Abstände werden
 durch die aktuelle Schulterbreite geteilt. Das reduziert Abhängigkeit von
@@ -69,7 +69,7 @@ zur Orientierung gespiegelt; die Daten sind ungespiegelt.
 | **Hands held together** | Abstand beider Handgelenke im Schulter-Hüft-Band, geteilt durch Schulterbreite; deutlich kleiner als bei neutral getrennten Händen | Zeigt eine gehaltene Handposition zum Rückblick. | Kein Nachweis von Verschränken, Berührung, Nervosität oder „geschlossener Körpersprache“. |
 | **Sideways lean** | Absoluter Unterschied des Torso-Bildwinkels zur persönlichen Neutralstellung | Sichtbarer Vergleich mit der eigenen Ausgangslage; auch sitzend möglich. | Keine medizinische Haltungsbewertung, kein Vor-/Zurücklehnen, keine Aussage über Sicherheit. |
 | **Sideways position change** | Horizontale Änderung des Mittelpunkts der beiden Schultern und Hüften, geteilt durch die neutrale Schulterbreite | Erfasst auch eine seitliche Versetzung des ganzen Körpers ohne Torso-Neigung; aus dem Nutzer-Test ergänzt. | Kein Nachweis von Unruhe oder schlechter Position; eine Kamerabewegung kann dasselbe Bildsignal erzeugen. |
-| **Arms crossed in front of torso** | Beide Handgelenke über Körpermitte, im Rumpfbereich, Ellbogen gebeugt; Geometrie aus der Team-Implementierung | Macht die vorhandene Team-Regel auch timestamp-genau zurückspulbar. | Keine Aussage über Abwehr, Gefühle oder Persönlichkeit; verdeckte Handgelenke bleiben unbekannt. |
+| **Arms crossed in front of torso** | Handgelenke an/nahe der Körpermitte, im Rumpfbereich, Ellbogen gebeugt, Unterarme grob parallel zur Schulterlinie | Macht die vorhandene Team-Regel auch timestamp-genau zurückspulbar. | Keine Aussage über Abwehr, Gefühle oder Persönlichkeit; verdeckte Handgelenke bleiben unbekannt. |
 
 Beine sind für diese Regeln nicht erforderlich. Ein leicht schiefer, aber
 stabiler neutraler Torso ist eine gültige Referenz. Nicht bequeme Bewegungen
@@ -87,16 +87,16 @@ Regelversion, Tests und erneute Prüfung vor Ort.
 | Einstellung | Wert | Technischer Zweck |
 | --- | --- | --- |
 | Landmark visibility / optionale presence | mindestens 0,5, im Bild, endlich | An bestehende MediaPipe-Prototypkonfiguration anschließen; nicht als 50 % Genauigkeit interpretieren. |
-| Framing | Schulterbreite ≥ 12 % der Bildbreite; Schulter-Hüft-Höhe ≥ 12 % der Bildhöhe | Winzige/degenerierte Geometrie nicht auswerten. Keine Entfernungsangabe in Metern. |
+| Framing | Sichtbare, sichere Schultern/Hüften, nicht degenerierte Schulterlinie; Schulter-Hüft-Höhe ≥ 12 % der Bildhöhe | Die frühere pauschale Schulterbreite von 12 % verwarf im Nutzer-Test gute Landmarks und entfällt in v5. Keine Entfernungsangabe in Metern. |
 | Kalibrierung | 3 s zusammenhängend, mindestens 15 Samples | Eine kurze stabile Referenz statt eines einzelnen Ausreißers. Median für die Baseline. |
-| Neutrale Hände | Höhe ≤ −0,15 Schulterbreiten, Abstand ≥ 0,65 Schulterbreiten; im Torso-Band | Neutrale getrennte Hände als verständliche Referenz. UI erklärt die Pose. |
-| Stabilität der Kalibrierung | Spannweite Torso ≤ 6°; Höhe/Abstand/seitliche Position jeweils ≤ 0,3 Schulterbreiten | Während Bewegung keine scheinbar neutrale Baseline übernehmen; Kalibrierung beginnt neu. |
+| Neutrale Hände | Optional: Höhe ≤ −0,15 Schulterbreiten, Abstand ≥ 0,65 Schulterbreiten; im Torso-Band | Mindestens 15 geeignete Samples für eine Handreferenz. Sonst `null`; Handhöhe/-abstand nutzen die bestehende Schultergeometrie-Schwelle. Hände blockieren keine Haltungsreferenz. |
+| Stabilität der Kalibrierung | Spannweite Torso ≤ 6°; seitliche Position ≤ 0,3 Schulterbreiten | Handbewegungen setzen die Haltungsreferenz nicht zurück. Körperbewegung startet die Kalibrierung neu. |
 | Maximaler Sample-Abstand | 350 ms | Lücken nicht als gehaltene Bewegung zählen. Sehr langsame Geräte können so nicht kalibrieren. |
 | Hand hoch | Eintritt max(0,15; neutrale Höhe + 0,5); Austritt 0,1 darunter | Klar über der Schulter; Hysterese reduziert Flackern an der Grenze. 0,8 s halten. |
 | Hände zusammen | Eintritt min(0,35; neutraler Abstand / 2); Austritt 0,15 darüber | Deutlich näher als neutral. 1,2 s halten, nur im Torso-Band. |
 | Seitlicher Torso | Eintritt 12° Veränderung; Austritt 8° | Nur größere Bildwinkeländerungen markieren. 1,5 s halten. |
 | Seitliche Position | Eintritt 0,35 neutrale Schulterbreiten; Austritt 0,2; 0,8 s halten | Erkennt den vom Nutzer getesteten seitlichen Körperversatz. Auf Rückmeldung zur Verzögerung von 1,5 s verkürzt. Bei ≥ 8° Torsoänderung wird die Position nicht zusätzlich markiert; dafür gilt die Neigungsregel. |
-| Arme verschränkt | Beide Wrist-Cross-Werte ≥ 0,1; Höhen in [−1,3; 0,2]; Ellbogen ≤ 120°; 2 s halten | Übernimmt die Team-Geometrie. Im gemeinsamen Evaluator: keine Überbrückung fehlender Frames, 20 s Cooldown. Nicht gleichzeitig als Hände-zusammen markieren. |
+| Arme verschränkt | Beide Wrist-Cross-Werte ≥ −0,25; Höhen in [−1,3; 0,2]; Ellbogen ≤ 120°; Unterarme ≤ 40°; 2 s halten | Übernimmt die Team-Geometrie. Im gemeinsamen Evaluator: keine Überbrückung fehlender Frames, 20 s Cooldown. Nahe Hände, deren Wrist-Cross-Werte beide negativ sind, bleiben Hände-zusammen; bestehende Abstandsschwelle und Hysterese gelten. Keine gleichzeitigen gegensätzlichen Marker. |
 | Cooldown | 5 s (Arme verschränkt: 20 s) nach Ende der letzten bestätigten Beobachtung dieses Typs | Eine gehaltene Bewegung bleibt ein Event. Rückkehr/Lücke plus erneute Mindestdauer nötig. |
 | Kameraframe wird alt | nach 700 ms Overlay/aktuellen Hinweis ausblenden; nach 5 s hängender Inferenz Fehler | Keine eingefrorene Erkennung als aktuellen Zustand zeigen. |
 

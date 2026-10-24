@@ -1,4 +1,5 @@
 import type { LiveConfig, LiveMessage, VideoTransport } from "./contracts";
+import type { FeatureFlags } from "./feature-flags";
 import {
   analysisResult,
   parseTranscript,
@@ -13,6 +14,7 @@ export class AnalysisTransport implements VideoTransport {
   constructor(
     private endpoint: string,
     private transcribe = false,
+    private flags?: FeatureFlags,
   ) {}
   async connect(
     session: { sessionId: string },
@@ -59,7 +61,7 @@ export class AnalysisTransport implements VideoTransport {
       accepted,
       this.controller.signal,
     );
-    const result = analysisResult(raw, "speech", durationMs);
+    const result = analysisResult(raw, "speech", durationMs, this.flags);
     if (this.transcribe) {
       const transcript = parseTranscript(raw, durationMs);
       this.receive?.({
@@ -101,5 +103,9 @@ export class LocalVideoTransport implements VideoTransport {
 export function createVideoTransport(config: LiveConfig): VideoTransport {
   return config.mode === "local"
     ? new LocalVideoTransport()
-    : new AnalysisTransport(config.endpoint, config.transcribe);
+    : new AnalysisTransport(
+        config.endpoint,
+        config.transcribe,
+        config.featureFlags,
+      );
 }

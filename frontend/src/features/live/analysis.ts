@@ -1,5 +1,6 @@
 import type { components } from "../../../../api/schema";
 import type { LiveFeedback, LiveMetric, LiveTranscript } from "./contracts";
+import { feedbackEnabled, type FeatureFlags } from "./feature-flags";
 
 type Word = components["schemas"]["Word"];
 const object = (v: unknown): v is Record<string, unknown> =>
@@ -158,6 +159,7 @@ export function analysisResult(
   value: unknown,
   source: "speech" | "words",
   durationMs: number,
+  flags?: FeatureFlags,
 ) {
   if (!object(value) || !object(value.summary) || !Array.isArray(value.events))
     throw new Error("The backend returned an invalid analysis.");
@@ -215,5 +217,8 @@ export function analysisResult(
       };
     },
   );
-  return { feedback, metrics };
+  return {
+    feedback: feedback.filter((item) => feedbackEnabled(item.category, flags)),
+    metrics,
+  };
 }

@@ -5,6 +5,7 @@ async function syntheticCamera(page: Page) {
     const state = window as unknown as {
       stoppedTracks: number;
       mediaConstraints: MediaStreamConstraints | undefined;
+      speechGain: GainNode;
     };
     state.stoppedTracks = 0;
     navigator.mediaDevices.getUserMedia = async (constraints) => {
@@ -31,8 +32,12 @@ async function syntheticCamera(page: Page) {
       if (constraints?.audio) {
         const audio = new AudioContext();
         const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+        gain.gain.value = 0.05;
+        state.speechGain = gain;
         const destination = audio.createMediaStreamDestination();
-        oscillator.connect(destination);
+        oscillator.connect(gain);
+        gain.connect(destination);
         oscillator.start();
         const track = destination.stream.getAudioTracks()[0];
         track.addEventListener("ended", () => void audio.close());
@@ -111,6 +116,7 @@ async function noOverflow(page: Page) {
 }
 async function enable(page: Page) {
   await page.goto("/");
+  await page.getByLabel("Speech analysis").selectOption("local");
   await page
     .getByRole("button", { name: "Standard view", exact: true })
     .click();
@@ -119,6 +125,80 @@ async function enable(page: Page) {
     page.getByRole("button", { name: "Turn camera off" }),
   ).toBeVisible();
 }
+test("local microphone feedback emits live volume/pause markers and preserves them in review without an analysis upload", async ({
+  page,
+}, info) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  let uploads = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("/speech/"))
+      uploads++;
+  });
+  await page.goto("/");
+  await expect(page.getByLabel("Speech analysis")).toHaveValue("live");
+  await page
+    .getByRole("button", { name: "Enable camera", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  await expect(page.getByLabel("Tracking status")).toContainText(
+    "Live voice feedback ready",
+    { timeout: 10000 },
+  );
+  await page.evaluate(() => {
+    (window as unknown as { speechGain: GainNode }).speechGain.gain.value = 0.2;
+  });
+  await expect(page.locator(".cue-message")).toHaveText(
+    "Voice louder than your baseline",
+    { timeout: 7000 },
+  );
+  await page.evaluate(() => {
+    (window as unknown as { speechGain: GainNode }).speechGain.gain.value = 0;
+  });
+  await expect(page.locator(".cue-message")).toHaveText("Pause in speaking", {
+    timeout: 7000,
+  });
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("live-pause-feedback.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(page.locator(".review-moments")).toContainText(
+    "Pause in speaking",
+  );
+  await expect(page.locator(".review-moments")).toContainText(
+    "Voice louder than your baseline",
+  );
+  expect(uploads).toBe(0);
+});
+
+test("normal preview displays all finger points without enabling the lab, including a hand-only frame", async ({
+  page,
+}) => {
+  await syntheticCamera(page);
+  await page.route("**/pose/worker.js", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: `onmessage=({data})=>{
+    if(data.type==='init') postMessage({type:'ready',hands:true});
+    if(data.type==='frame') { postMessage({type:'sample',timestamp:data.timestamp,width:640,height:360,points:[],hands:[{label:'Left',score:.99,landmarks:Array.from({length:21},(_,i)=>[.3+i*.01,.4+i*.005,0])}]});data.frame.close(); }
+  }`,
+    }),
+  );
+  await enable(page);
+  await expect(
+    page.locator('[data-hand="Left"] [data-hand-landmark]'),
+  ).toHaveCount(21);
+  await page.getByText("Camera diagnostics", { exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Pose lab", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+});
+
 test("speech analysis is visible above the camera and in large view", async ({
   page,
 }, info) => {
@@ -290,7 +370,7 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   expect(evidence[0].payload).toMatchObject({
     rule: "hand_raised",
     heuristic: true,
-    rule_version: "pose-rules-v3",
+    rule_version: "pose-rules-v5",
   });
   expect(evidence[0].t_ms).toBeGreaterThanOrEqual(4000);
   expect(
@@ -357,7 +437,11 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   expect(errors).toEqual([]);
 });
 
-async function backend(page: Page, transcribe = false) {
+async function backend(
+  page: Page,
+  transcribe = false,
+  configure?: () => Promise<void>,
+) {
   await syntheticCamera(page);
   await page.route("**/api/health/**", (route) =>
     route.fulfill({ json: { status: "ok" } }),
@@ -374,6 +458,7 @@ async function backend(page: Page, transcribe = false) {
   await page
     .getByLabel("Create a transcript with local Whisper")
     .setChecked(transcribe);
+  await configure?.();
   await page.getByRole("button", { name: "Enable camera" }).click();
   await page.getByRole("button", { name: "Start recording" }).click();
   await expect(
@@ -381,6 +466,93 @@ async function backend(page: Page, transcribe = false) {
   ).toBeVisible();
   await page.waitForTimeout(1200);
 }
+
+test("feature options lock per take, filter speech markers and survive review navigation", async ({
+  page,
+}, info) => {
+  await syntheticPose(page);
+  const jobId = "12345678-1234-1234-1234-123456789abc";
+  const events = ["pause", "pitch"].map((type) => ({
+    t_ms: 100,
+    duration_ms: 200,
+    type,
+    severity: "hint",
+    source: "speech",
+    payload: {},
+  }));
+  await page.route("**/api/speech/analyze", (route) =>
+    route.fulfill({ status: 202, json: { job_id: jobId } }),
+  );
+  await page.route("**/api/speech/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        job_id: jobId,
+        status: "completed",
+        result: { audio: { summary: { pause_count: 1 } }, events },
+      },
+    }),
+  );
+  await page.route("**/api/transcription/analyze-words", (route) =>
+    route.fulfill({
+      json: {
+        summary: { pause_count: 1 },
+        events: events.map((e) => ({ ...e, source: "asr" })),
+      },
+    }),
+  );
+  await backend(page, false, async () => {
+    await page.getByText("Analysis features", { exact: true }).click();
+    await expect(page.getByLabel("Pose processing")).toHaveValue("VIDEO");
+    await expect(page.getByLabel("Pose model")).toHaveValue("lite");
+    await page.getByLabel("Pose processing").selectOption("IMAGE");
+    await page.getByLabel("Pose model").selectOption("heavy");
+    await page.getByLabel("Pauses", { exact: true }).uncheck();
+    await page.getByText("Camera diagnostics", { exact: true }).click();
+  });
+  await expect(page.getByLabel("Pose processing")).toBeDisabled();
+  await expect(page.getByLabel("Pose model")).toBeDisabled();
+  await expect(
+    page.getByLabel("Speech feedback", { exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByLabel("Pauses", { exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Pose lab", exact: true }),
+  ).toBeDisabled();
+  await noOverflow(page);
+  await page.screenshot({
+    path: info.outputPath("feature-options.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(page.getByText("pause", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Audio: pause count", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("pitch", { exact: true }).first()).toBeVisible();
+  await page
+    .getByText("Import or replace word timestamps", { exact: true })
+    .click();
+  await page.getByLabel("Word timestamps (JSON)").setInputFiles({
+    name: "words.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('[{"word":"Test","start_ms":100,"end_ms":300}]'),
+  });
+  await expect(
+    page.getByText("Transcript analysis added to this take."),
+  ).toBeVisible();
+  await expect(page.getByText("pause", { exact: true })).toHaveCount(0);
+  await page.getByRole("link", { name: "Record another take" }).click();
+  await page
+    .getByRole("button", { name: "Standard view", exact: true })
+    .click();
+  await page.getByText("Analysis features", { exact: true }).click();
+  await expect(page.getByLabel("Pose processing")).toHaveValue("IMAGE");
+  await expect(page.getByLabel("Pose model")).toHaveValue("heavy");
+  await expect(page.getByLabel("Pauses", { exact: true })).not.toBeChecked();
+  await page.getByLabel("Speech feedback", { exact: true }).uncheck();
+  await expect(page.getByLabel("Pitch variation")).toBeDisabled();
+});
 
 test("REST analysis uploads recorded audio/video and merges word feedback into review", async ({
   page,
@@ -564,9 +736,10 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
   expect(samples.at(-1).t_ms).toBeLessThan(1200);
   expect(Object.keys(samples[0].pose)).toHaveLength(21);
   expect(samples[0].pose.left_knee).toBeNull();
-  expect(samples[0].quality).toEqual({
+  expect(samples[0].quality).toMatchObject({
     pose_present: true,
     legs_visible: false,
+    hips_visible: true,
   });
   expect(uploads).toEqual([]);
   await noOverflow(page);
@@ -607,7 +780,9 @@ test("automatic landmarks align with the mirrored video in both sizes and clear 
     }),
   );
   await enable(page);
-  const overlay = page.getByRole("img", { name: "Live pose landmarks" });
+  const overlay = page.getByRole("img", {
+    name: "Live pose and hand landmarks",
+  });
   await expect(overlay).toBeVisible();
   await expect(overlay.locator("circle")).toHaveCount(16);
   await expect(overlay.locator('[data-landmark="left_elbow"]')).toHaveCount(0);

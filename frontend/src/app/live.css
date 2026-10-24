@@ -184,6 +184,12 @@ body:has(.live-workspace-large) .app-footer,
   stroke: #111827;
   stroke-width: 2px;
 }
+.live-pose-overlay .hand-connection {
+  stroke: #f472b6;
+}
+.live-pose-overlay .hand-landmark {
+  fill: #f472b6;
+}
 .live-pose-status {
   position: absolute;
   top: 62px;
@@ -193,6 +199,111 @@ body:has(.live-workspace-large) .app-footer,
   background: #111827;
   color: white;
   font-size: 12px;
+}
+.live-pose-cue {
+  position: absolute;
+  top: 100px;
+  left: 16px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  max-width: calc(100% - 32px);
+}
+.coach-avatar {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: #f4924d;
+  box-shadow: 0 4px 12px #11182740;
+}
+.coach-avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.coach-bubble {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 10px 18px;
+  border: 2px solid #f8c9a6;
+  border-radius: 12px;
+  background: white;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  box-shadow: 0 4px 12px #11182740;
+}
+/* Tail pointing at the avatar: border-coloured triangle under a white one. */
+.coach-bubble::before,
+.coach-bubble::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  border-style: solid;
+  border-color: transparent;
+  transform: translateY(-50%);
+}
+.coach-bubble::before {
+  left: -13px;
+  border-width: 9px 13px 9px 0;
+  border-right-color: #f8c9a6;
+}
+.coach-bubble::after {
+  left: -10px;
+  border-width: 7px 10px 7px 0;
+  border-right-color: white;
+}
+.coach-bubble small {
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 500;
+}
+.live-pose-cue[data-state="alert"] .coach-bubble {
+  border-color: #ef4444;
+  background: #7f1d1d;
+  color: #fff;
+}
+.live-pose-cue[data-state="alert"] .coach-bubble small {
+  color: #fecaca;
+}
+.live-pose-cue[data-state="alert"] .coach-bubble::before {
+  border-right-color: #ef4444;
+}
+.live-pose-cue[data-state="alert"] .coach-bubble::after {
+  border-right-color: #7f1d1d;
+}
+.live-pose-cue[data-state="ok"] .coach-bubble {
+  border-color: #22c55e;
+  background: #14532d;
+  color: #fff;
+}
+.live-pose-cue[data-state="ok"] .coach-bubble small {
+  color: #bbf7d0;
+}
+.live-pose-cue[data-state="ok"] .coach-bubble::before {
+  border-right-color: #22c55e;
+}
+.live-pose-cue[data-state="ok"] .coach-bubble::after {
+  border-right-color: #14532d;
+}
+.live-pose-cue-lab {
+  top: 100px;
+}
+@media (max-width: 640px) {
+  .coach-avatar {
+    width: 48px;
+    height: 48px;
+  }
+  .coach-bubble {
+    font-size: 15px;
+  }
 }
 .live-pose-debug {
   position: absolute;
@@ -231,6 +342,101 @@ body:has(.live-workspace-large) .app-footer,
 .live-pose-debug small {
   color: oklch(0.8 0.02 264);
   font-size: 10px;
+}
+.live-pose-lab {
+  position: absolute;
+  top: 62px;
+  right: 16px;
+  z-index: 2;
+  display: grid;
+  width: min(380px, calc(100% - 32px));
+  gap: 4px;
+  padding: 16px 18px;
+  border: 2px solid #374151;
+  border-radius: 12px;
+  background: #111827f2;
+  color: white;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.pose-status-kicker {
+  color: #9ca3af;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.live-pose-lab strong {
+  font-size: clamp(1.7rem, 4.2vw, 3rem);
+  letter-spacing: -0.02em;
+  line-height: 1.03;
+}
+.pose-status-detail {
+  color: #e5e7eb;
+  font-size: 14px;
+}
+.pose-status-failing {
+  color: #fca5a5;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.pose-status-hands {
+  overflow: hidden;
+  color: #9ca3af;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pose-status-backend {
+  color: #c7d2fe;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.pose-status-backend[data-delegate="CPU"] {
+  color: #fcd34d;
+}
+.live-pose-lab small {
+  color: #9ca3af;
+  font-size: 9px;
+}
+.pose-status-warning {
+  color: #fca5a5;
+  font-size: 10px;
+}
+.live-pose-lab[data-state="alert"] {
+  border-color: #ef4444;
+  background: #7f1d1de6;
+  animation: pose-alert-pulse 1.1s ease-in-out infinite;
+}
+.live-pose-lab[data-state="ok"] {
+  border-color: #22c55e;
+  background: #14532de6;
+}
+.live-pose-lab[data-state="idle"] {
+  opacity: 0.85;
+}
+@keyframes pose-alert-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 #ef4444b3;
+  }
+  50% {
+    box-shadow: 0 0 0 18px #ef444400;
+  }
+}
+.live-camera-stage.pose-alert {
+  box-shadow: inset 0 0 0 5px #ef4444;
+  animation: pose-frame-pulse 1.1s ease-in-out infinite;
+}
+@keyframes pose-frame-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 5px #ef4444;
+  }
+  50% {
+    box-shadow: inset 0 0 0 5px #ef4444aa;
+  }
 }
 .live-camera-stage .stage-top,
 .live-camera-stage .stage-bottom {
@@ -1140,4 +1346,50 @@ body:has(.live-workspace-large) .app-footer,
 }
 .studio-diagnostics > .button {
   margin-bottom: 12px;
+}
+.live-audio-hint {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+}
+.studio-main > .live-control-bar {
+  align-items: center;
+}
+.live-readiness {
+  margin: 0.75rem 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.live-readiness p {
+  margin: 0.25rem 0;
+}
+.live-readiness progress,
+.live-readiness meter {
+  width: 100%;
+  height: 0.5rem;
+}
+.live-workspace-large .live-readiness {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 4px 0;
+}
+.live-workspace-large .live-readiness p {
+  margin: 0;
+}
+.live-workspace-large .live-readiness progress,
+.live-workspace-large .live-readiness meter {
+  max-width: 100px;
+}
+@media (max-width: 760px) {
+  .live-control-bar {
+    flex-wrap: nowrap;
+  }
+  .studio-main > .live-control-bar {
+    align-items: stretch;
+  }
+  .live-audio-hint {
+    flex-basis: auto;
+  }
 }
