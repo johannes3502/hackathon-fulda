@@ -1,72 +1,64 @@
-# 418 presentation practice design
+# 418 presentation studio
 
-## Shared web interface (2026-10-24)
+## Design direction
 
-The web interface uses locally hosted Open Sans Variable and accent #3803bf.
-Shared tokens in `src/app/globals.css` also supply the hover and soft accent
-colors. Loading, stats and review previews follow the same typography and accent.
-Primary buttons use white text. Neutral backgrounds and the dark camera stage
-remain unchanged. The historical directions below are superseded by this update.
+The presenter rehearses at a laptop in a bright hackathon hall, or checks a take
+on a phone. The interface should be quiet, readable, and consistent while the
+presentation remains the focus. Apply Apple's hierarchy, legibility, familiar
+controls, and progressive disclosure to the web; this is not a native Apple UI.
 
-Both `/` and `/live` render the recording studio directly. Large view is the
-default; Standard view reveals settings and navigation. The monitoring preview
-leads with a central Enable camera button and explicit permission guidance.
-Start recording appears only once the preview is ready. Empty feedback is hidden
-until recording starts. Recording
-options are collapsed; the sample remains available at `/demo`. Optional sample
-context and practice options are disclosures. The home screen no longer shows
-a synthetic score card or a second explanation of the rehearsal flow. Sources
-lead directly into recording. Camera diagnostics, server settings, title and
-duration are available on demand. Consent, upload destination, transcription
-opt-in, errors and recording-retention notices remain visible. Empty observation
-feeds are omitted before recording; review leads with duration and moments.
+## Shared system
 
-Desktop and mobile use the same buttons, fields and spacing. The sample setup
-moved to `/demo`; scoring logic, recording defaults and service dependencies
-are unchanged.
-The sections below record earlier component directions; this shared interface
-supersedes the shared green theme while retaining the common analysis header.
+- Use the platform system font: San Francisco on Apple devices, platform fallbacks
+  elsewhere. No downloaded fonts. Body text is 1rem; page titles are 2rem on desktop.
+  Small supporting text is at least 0.75rem. Text scales with browser preferences.
+- Use the semantic tokens in `src/app/globals.css` for backgrounds, surfaces,
+  foreground, secondary text, borders, and state colors. Light appearance uses
+  neutral gray and white; dark appearance follows the system preference.
+- Retain the 418 violet for primary actions and selections. Use the lighter text
+  accent separately from filled buttons in dark appearance. Warning and error
+  colors always accompany a label or symbol.
+- Shared content width: 1280px including gutters. Use 32px desktop gutters and
+  16–24px on phones. Panels use a 16px radius; controls use 10px. Separate related
+  rows with spacing and dividers, rather than nested cards or decorative stripes.
+- Primary controls and icon buttons have a minimum 44px target. Native inputs
+  use 1rem text. Keyboard focus, the skip link, and dialog focus restoration remain
+  visible. Reduced motion disables animation; increased contrast strengthens
+  separators and secondary text.
+- AppShell owns Studio, Sources, Sample demo, help, and the footer. The active
+  destination is identified visually and with `aria-current`. Screen-specific
+  tabs belong inside the workspace.
 
-## 418 review analysis (2026-10-24)
+## Screens
 
-White analysis workspace, Noto Serif Display headings, #42ff8c accents. Four
-criterion summaries sit above the video. An SVG performance graph below it uses
-a shared video clock, an advancing cursor, timestamps and selectable moments.
-Green checkmarks denote strengths, dark exclamation marks practice moments,
-outlined information marks annotations. Text and symbols accompany color.
-The side panel combines the observation, optional source quote and next action.
-The preview uses a generated, silent illustrated video and synthetic scores;
-live recordings expose existing events without inventing per-time performance.
-On narrow screens the chart scrolls horizontally and annotation/list stack.
+- **Studio:** normal view is the default, with visible navigation, speech choice,
+  timer, and camera stage. Before feedback exists, the stage uses the available
+  width. Large view is optional and preserves the active camera and recording;
+  Escape returns to normal view. Recording options and diagnostics are disclosures.
+- **Review:** use the same type scale, controls, and surfaces as the studio.
+  Video, timeline, selected observation, and moment list remain connected to the
+  existing video clock. On phones, playback and timeline precede the observation.
+  The chart may scroll within its container; the page must not scroll sideways.
+- **Sources:** place the document library and source search beside one another on
+  desktop and stack them on phones. Show supported formats, upload state, errors,
+  and when search becomes available. Continue to recording is the main action.
+- **Sample:** retain explicit synthetic-data labels. Existing sample scores are
+  illustrations, not validated assessments; the redesign does not invent scores
+  for actual recordings. The stats preview uses an SVG ring, without a 3D renderer.
+- **Loading:** small wordmark and announced status, with a reduced-motion-safe
+  indicator. Loading must not download a font or initialize WebGL.
 
-## 418 stats card (2026-10-24)
+Camera permission is requested only on an explicit click. Consent, destination,
+retention information, unavailable services, and retry paths must remain readable.
+The interface must not imply that missing observations mean good performance.
 
-Explicit user request: a simplified player-card layout with an overall circle
-above Gestik, Fachwissen, Flow and Struktur (1–100%). Reuse white, #42ff8c and
-Noto Serif Display. The aggregate is interpreted as an equally weighted mean,
-not a digit sum. Three.js draws the ring; HTML values and SVG provide a readable
-fallback. Count-up runs once on entering the viewport, pointer movement adds a
-subtle card tilt, and reduced motion uses the final static state.
-This is a design prototype with labeled synthetic values, not a validated
-assessment. Actual criterion scoring remains undefined.
+## References
 
-## 418 loading screen (2026-10-24)
+- [Apple: Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
+- [Apple: Typography](https://developer.apple.com/design/human-interface-guidelines/typography)
+- [Apple: Color](https://developer.apple.com/design/human-interface-guidelines/color)
+- [Apple: Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)
 
-User-provided brand direction takes precedence for the loading screen: pure white,
-accent #42ff8c, black 418 typography in locally hosted Noto Serif Display.
-A slowly rotating flat Three.js disc echoes the supplied logo. The mark remains
-readable as HTML before JavaScript and without WebGL; reduced motion is static.
-Preview at `/loading-preview`. Other workspace styling is unchanged.
-
-The presenter is rehearsing at a laptop in a brightly lit hackathon hall, with limited time and attention. A light workspace provides readable controls; a dark stage separates the practice area from feedback.
-
-Restrained palette: neutral page, white surfaces, dark slate text and stage, blue primary action. The explicit plan palette takes precedence over generated color suggestions. One system sans family, 16px body, tabular timers, 12–16px panels, 44px main controls. Semantic warning/error colors only signal those states.
-
-## Mobbin references inspected, 2026-10-24
-- [Riverside studio](https://mobbin.com/screens/57ce5e02-c5ef-4349-8a2f-9dce51cc8315): large stage beside a compact secondary column, controls below the stage.
-- [VEED recording](https://mobbin.com/screens/dde42152-7be1-49c9-8311-6390504a2ef5): prominent timer and persistent session actions.
-- [Typeform report](https://mobbin.com/screens/71dbe2c0-580a-4814-a068-2e13cb4a5559): quiet report typography and generous separation between findings.
-
-These inform structure, not copied assets. On mobile, stack stage and feedback; use disclosures for secondary information. Motion only communicates changing state and respects reduced motion.
-
-The added camera workspace carries the Riverside/VEED stage-and-feedback layout into actual recording. Review separates the full video from category frequencies and the next practice action; the feedback browser puts category filtering alongside a native video player. Mobile puts playback before the section list. Keep script labels adjacent to feedback and distinguish observation counts from performance scores.
+Browser checks cover desktop and mobile layouts, light and dark appearance,
+enlarged text, keyboard navigation, synthetic recording, review, and source flows.
+These checks do not establish real-camera, real-microphone, or device acceptance.

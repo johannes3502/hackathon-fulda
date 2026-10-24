@@ -39,7 +39,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
     recording.feedback.find((item) => item.kind === "attention") ??
     recording.feedback.find((item) => item.kind === "suggestion");
   return (
-    <AppShell experience="live" step={2}>
+    <AppShell experience="live">
       <div className="workspace live-review">
         <LiveNav
           sessionId={sessionId}

@@ -119,7 +119,7 @@ export function SessionProvider({
     );
   if (!state)
     return (
-      <AppShell step={2}>
+      <AppShell>
         <div className="workspace loading-state" aria-busy="true">
           <p>Opening your practice space…</p>
           <div className="skeleton" />

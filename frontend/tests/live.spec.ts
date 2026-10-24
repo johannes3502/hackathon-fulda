@@ -111,9 +111,6 @@ async function noOverflow(page: Page) {
 }
 async function enable(page: Page) {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Standard view", exact: true })
-    .click();
   await page.getByRole("button", { name: "Enable camera" }).click();
   await expect(
     page.getByRole("button", { name: "Turn camera off" }),
@@ -363,9 +360,6 @@ async function backend(page: Page, transcribe = false) {
     route.fulfill({ json: { status: "ok" } }),
   );
   await page.goto("/live");
-  await page
-    .getByRole("button", { name: "Standard view", exact: true })
-    .click();
   await page.getByText("Recording options", { exact: true }).click();
   await page.getByLabel("Speech analysis").selectOption("backend");
   await expect(
@@ -1005,9 +999,6 @@ test("live captions send PCM only during recording and a disconnect keeps the ta
   });
   await page.goto("/");
   await page.getByLabel("Speech analysis").selectOption("backend");
-  await page
-    .getByRole("button", { name: "Standard view", exact: true })
-    .click();
   await page.getByText("Recording options", { exact: true }).click();
   await page.getByLabel("Show live captions (preview)").check();
   await expect(page.locator(".recording-consent")).toContainText(

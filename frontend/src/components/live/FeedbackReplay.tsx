@@ -24,7 +24,7 @@ export function FeedbackReplay({ sessionId }: { sessionId: string }) {
       : (items[0] ?? null);
   const index = items.findIndex((item) => item.id === current?.id);
   return (
-    <AppShell experience="live" step={3}>
+    <AppShell experience="live">
       <div className="workspace live-review">
         <LiveNav
           sessionId={sessionId}

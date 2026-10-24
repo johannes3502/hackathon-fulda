@@ -71,7 +71,7 @@ export function PracticeStudio() {
   const blocked =
     pending || state.isPaused || restored || state.connection !== "connected";
   return (
-    <AppShell step={2}>
+    <AppShell>
       <div className="workspace">
         <div className="workspace-back">
           <Link href="/demo">

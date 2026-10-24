@@ -13,7 +13,7 @@
   align-items: start;
 }
 .sources-panel {
-  padding: 22px;
+  padding: 28px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -23,8 +23,8 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 26px 18px;
-  border: 1.5px dashed var(--border);
+  padding: 40px 20px;
+  border: 1px dashed var(--control-border);
   border-radius: 12px;
   text-align: center;
   cursor: pointer;
@@ -32,7 +32,7 @@
 }
 .source-drop strong {
   color: var(--foreground);
-  font-size: 14px;
+  font-size: 0.9375rem;
 }
 .source-drop:hover,
 .source-drop.dragging,
@@ -41,7 +41,7 @@
   background: var(--soft-accent);
 }
 .source-empty {
-  font-size: 13px;
+  font-size: 0.875rem;
 }
 .source-list,
 .source-hits {
@@ -57,9 +57,8 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
 }
 .source-list li > div {
   display: flex;
@@ -69,7 +68,7 @@
   min-width: 0;
 }
 .source-list strong {
-  font-size: 14px;
+  font-size: 0.9375rem;
   overflow-wrap: anywhere;
 }
 .source-status {
@@ -77,11 +76,11 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .source-status.ready {
-  color: var(--primary);
+  color: var(--success);
 }
 .source-status.failed {
   color: var(--error);
@@ -112,14 +111,14 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: 0.8125rem;
   margin-bottom: 6px;
 }
 .source-hit-meta strong {
   overflow-wrap: anywhere;
 }
 .source-hits p {
-  font-size: 13px;
+  font-size: 0.875rem;
   white-space: pre-line;
 }
 @media (max-width: 760px) {
@@ -137,5 +136,17 @@
 }
 
 .sources-workspace > .context-disclosure {
-  margin-top: 24px;
+  margin-top: 32px;
+}
+.sources-workspace > .context-disclosure .input {
+  max-width: 520px;
+  margin-block: 16px;
+}
+@media (max-width: 760px) {
+  .sources-panel {
+    padding: 20px;
+  }
+  .source-drop {
+    padding: 28px 16px;
+  }
 }

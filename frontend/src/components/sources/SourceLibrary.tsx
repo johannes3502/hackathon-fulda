@@ -177,7 +177,7 @@ export function SourceLibrary() {
       <div className="workspace sources-workspace">
         <div className="workspace-back">
           <Link href="/">
-            <ArrowLeft size={15} /> Back to setup
+            <ArrowLeft size={15} /> Back to studio
           </Link>
         </div>
         <div className="workspace-heading">
@@ -207,6 +207,10 @@ export function SourceLibrary() {
             className="panel sources-panel"
             aria-label="Uploaded sources"
           >
+            <div className="panel-title-row">
+              <h2>Source library</h2>
+              <span className="badge">{sources.length} files</span>
+            </div>
             <label
               className={dragging ? "source-drop dragging" : "source-drop"}
               onDragOver={(event) => {
@@ -242,7 +246,9 @@ export function SourceLibrary() {
               />
             </label>
             {sources.length === 0 ? (
-              <p className="muted source-empty">No sources yet.</p>
+              <p className="muted source-empty">
+                No sources yet. Add a document to get started.
+              </p>
             ) : (
               <ul className="source-list">
                 {sources.map((source) => (

@@ -83,8 +83,8 @@ export function PerformanceGraph({
           >
             <defs>
               <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3803bf" stopOpacity="0.22" />
-                <stop offset="100%" stopColor="#3803bf" stopOpacity="0.015" />
+                <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.22" />
+                <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.015" />
               </linearGradient>
             </defs>
             <text x={left} y="13" className="review418-axis-title">
@@ -97,7 +97,7 @@ export function PerformanceGraph({
                   x2={right}
                   y1={y(value)}
                   y2={y(value)}
-                  stroke="#e7ece8"
+                  stroke="var(--border)"
                   strokeDasharray={value === 0 ? undefined : "3 5"}
                 />
                 {points.length > 0 && (
@@ -116,7 +116,7 @@ export function PerformanceGraph({
                 <path
                   d={path}
                   fill="none"
-                  stroke="#17271c"
+                  stroke="var(--primary)"
                   strokeWidth="2"
                   strokeLinejoin="round"
                 />
@@ -132,7 +132,7 @@ export function PerformanceGraph({
               x2={cursorX}
               y1={top}
               y2={bottom}
-              stroke="#536659"
+              stroke="var(--muted)"
               strokeDasharray="4 4"
             />
             {Array.from({ length: 7 }, (_, index) => (

@@ -3,8 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  FileText,
-  Play,
   Camera,
   CameraOff,
   CheckCircle2,
@@ -84,7 +82,7 @@ export function LiveStudio() {
   const [progress, setProgress] = useState<LiveProgress | null>(null);
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [largeView, setLargeView] = useState(true);
+  const [largeView, setLargeView] = useState(false);
   const [showCues, setShowCues] = useState(true);
   const [poseDebug, setPoseDebug] = useState(false);
   const owner = useRef<LiveRecorder | null>(null);
@@ -267,28 +265,20 @@ export function LiveStudio() {
       <div
         className={`workspace live-workspace${largeView ? " live-workspace-large" : ""}`}
       >
-        <div className="workspace-back">
-          <nav className="studio-links" aria-label="Studio resources">
-            <Link href="/sources">
-              <FileText size={15} /> Sources
-            </Link>
-            <Link href="/demo">
-              <Play size={15} /> Sample demo
-            </Link>
-          </nav>
-          <LiveBadge mode={mode} />
-        </div>
         <div className="workspace-heading">
           <div>
             <h1>Record your presentation</h1>
             <p>Enable your camera, check your framing, then start recording.</p>
           </div>
-          <div className="session-time">
-            <Clock3 size={18} />
-            <strong>{time(progress?.elapsedMs ?? 0)}</strong>
-            <span>
-              {progress ? "recording time" : `${targetMs / 60000}-minute limit`}
-            </span>
+          <div className="studio-session-status">
+            <LiveBadge mode={mode} />
+            <div className="session-time">
+              <Clock3 size={18} />
+              <strong>{time(progress?.elapsedMs ?? 0)}</strong>
+              <span>
+                {progress ? "recording time" : `${targetMs / 60000}-minute limit`}
+              </span>
+            </div>
           </div>
         </div>
         {error && (
@@ -435,7 +425,7 @@ export function LiveStudio() {
               {cameraStatus !== "active" && (
                 <div className="stage-placeholder">
                   <span className="stage-camera">
-                    <CameraOff size={32} />
+                    <Video size={30} strokeWidth={1.5} />
                   </span>
                   <h2>Practice your presentation.</h2>
                   <p>

@@ -17,7 +17,7 @@ export function LiveBadge({ mode }: { mode: LiveConfig["mode"] }) {
 }
 export function MissingRecording() {
   return (
-    <AppShell experience="live" step={2}>
+    <AppShell experience="live">
       <div className="empty-state panel">
         <h1>This recording isn’t in this workspace.</h1>
         <p>

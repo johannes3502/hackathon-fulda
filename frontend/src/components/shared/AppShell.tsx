@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { CircleHelp, FlaskConical, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -13,13 +14,12 @@ export function DemoBadge() {
 }
 export function AppShell({
   children,
-  step = 1,
   experience = "sample",
 }: {
   children: ReactNode;
-  step?: number;
   experience?: "sample" | "live";
 }) {
+  const pathname = usePathname();
   return (
     <>
       <a className="skip-link" href="#main">
@@ -28,24 +28,37 @@ export function AppShell({
       <header className="app-header">
         <Link href="/" className="brand" aria-label="418 home">
           <span className="brand-mark">418</span>
-          <span className="brand-caption">Presentation practice</span>
+          <span className="brand-caption">Presentation studio</span>
         </Link>
-        <nav aria-label="Practice progress" className="step-nav">
-          {(experience === "live"
-            ? ["Record", "Review", "Replay"]
-            : ["Start", "Practice", "Review"]
-          ).map((label, index) => (
-            <div
-              key={label}
-              className={
-                step === index + 1 ? "current" : step > index + 1 ? "done" : ""
-              }
-              aria-current={step === index + 1 ? "step" : undefined}
-            >
-              <span>{step > index + 1 ? "✓" : index + 1}</span>
-              {label}
-            </div>
-          ))}
+        <nav aria-label="Main navigation" className="app-nav">
+          <Link
+            href="/live"
+            aria-current={
+              pathname === "/" || pathname.startsWith("/live")
+                ? "page"
+                : undefined
+            }
+          >
+            Studio
+          </Link>
+          <Link
+            href="/sources"
+            aria-current={pathname === "/sources" ? "page" : undefined}
+          >
+            Sources
+          </Link>
+          <Link
+            href="/demo"
+            aria-current={
+              /^\/(demo|practice|gestures|review-preview|stats-preview)(\/|$)/.test(
+                pathname,
+              )
+                ? "page"
+                : undefined
+            }
+          >
+            Sample demo
+          </Link>
         </nav>
         <Dialog
           title="How this practice works"
@@ -55,9 +68,8 @@ export function AppShell({
               : undefined
           }
           trigger={
-            <Button variant="ghost" size="sm" aria-label="How it works">
-              <CircleHelp size={17} />
-              <span className="help-label">How it works</span>
+            <Button variant="ghost" size="icon" aria-label="How it works">
+              <CircleHelp size={20} />
             </Button>
           }
         >

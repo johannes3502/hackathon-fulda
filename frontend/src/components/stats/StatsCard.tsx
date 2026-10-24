@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import "@fontsource-variable/open-sans";
+import { AppShell } from "@/components/shared/AppShell";
 import { StatsRing } from "./StatsRing";
 import {
   DEMO_STATS,
@@ -68,22 +68,6 @@ export function StatsCard({
       aria-label={
         demo ? "Deine Stats – Demo mit synthetischen Werten" : "Deine Stats"
       }
-      onPointerMove={(event) => {
-        if (event.pointerType !== "mouse") return;
-        const bounds = event.currentTarget.getBoundingClientRect();
-        event.currentTarget.style.setProperty(
-          "--tilt-x",
-          `${(0.5 - (event.clientY - bounds.top) / bounds.height) * 5}deg`,
-        );
-        event.currentTarget.style.setProperty(
-          "--tilt-y",
-          `${((event.clientX - bounds.left) / bounds.width - 0.5) * 5}deg`,
-        );
-      }}
-      onPointerLeave={(event) => {
-        event.currentTarget.style.setProperty("--tilt-x", "0deg");
-        event.currentTarget.style.setProperty("--tilt-y", "0deg");
-      }}
     >
       <div
         className="stats418-overall"
@@ -166,24 +150,19 @@ export function DemoStatsCard() {
 export function StatsPreview() {
   const [replay, setReplay] = useState(0);
   return (
-    <main className="stats418-preview" lang="de">
-      <header className="stats418-preview-header">
-        <Link href="/" aria-label="418 – zur Startseite">
-          418
-          <span />
-        </Link>
-        <span>Deine Stats</span>
-      </header>
-      <div className="stats418-preview-center">
-        <DemoStatsCard key={replay} />
-        <button
-          type="button"
-          className="stats418-replay"
-          onClick={() => setReplay((value) => value + 1)}
-        >
-          <span aria-hidden="true">↻</span> Animation wiederholen
-        </button>
+    <AppShell>
+      <div className="stats418-preview" lang="de">
+        <div className="stats418-preview-center">
+          <DemoStatsCard key={replay} />
+          <button
+            type="button"
+            className="stats418-replay"
+            onClick={() => setReplay((value) => value + 1)}
+          >
+            <span aria-hidden="true">↻</span> Animation wiederholen
+          </button>
+        </div>
       </div>
-    </main>
+    </AppShell>
   );
 }

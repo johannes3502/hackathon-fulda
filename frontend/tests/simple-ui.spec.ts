@@ -8,16 +8,10 @@ test("home opens monitoring directly and keeps the sample optional", async ({
   );
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
-  expect(
-    await page.evaluate(
-      async () =>
-        (await document.fonts.load('16px "Open Sans Variable"')).length,
-    ),
-  ).toBeGreaterThan(0);
   for (const [selector, color] of [
-    ["body", "oklch(0.976 0.004 260)"],
+    ["body", "#f5f5f7"],
     [".stage-placeholder .button", "#3803bf"],
-    [".live-camera-stage", "oklch(0.205 0.029 264)"],
+    [".live-camera-stage", "#1c1c1f"],
   ]) {
     const matches = await page
       .locator(selector)
@@ -45,13 +39,10 @@ test("home opens monitoring directly and keeps the sample optional", async ({
       name: "Practice your presentation.",
       exact: true,
     }),
-  ).toHaveCSS(
-    "font-family",
-    '"Open Sans Variable", Arial, Helvetica, sans-serif',
-  );
+  ).toHaveCSS("font-family", /-apple-system/);
   await expect(
-    page.getByRole("button", { name: "Standard view", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+    page.getByRole("button", { name: "Large view", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
   await expect(
     page.getByRole("region", { name: "Live camera preview" }),
   ).toBeVisible();
@@ -78,15 +69,19 @@ test("home opens monitoring directly and keeps the sample optional", async ({
   const monitor = await page
     .getByRole("region", { name: "Live camera preview" })
     .boundingBox();
-  if (info.project.name === "desktop")
-    expect(monitor!.width).toBeGreaterThan(1000);
+  const workspace = await page.locator(".live-studio-grid").boundingBox();
+  // Before feedback exists, the camera must not reserve an empty sidebar.
+  expect(monitor!.width / workspace!.width).toBeGreaterThan(0.98);
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Studio", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
   await page.screenshot({
     path: info.outputPath("monitoring-entry.png"),
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "Standard view", exact: true })
-    .click();
   await page.getByRole("link", { name: "Sample demo", exact: true }).click();
   await expect(page).toHaveURL(/\/demo$/);
   await expect(
@@ -103,10 +98,6 @@ test("home opens monitoring directly and keeps the sample optional", async ({
 
   for (const path of ["/", "/live", "/sources", "/review-preview"]) {
     await page.goto(path);
-    if (path === "/" || path === "/live")
-      await page
-        .getByRole("button", { name: "Standard view", exact: true })
-        .click();
     await expect(page.getByRole("link", { name: "418 home" })).toBeVisible();
     await expect(page.locator("main")).toHaveCount(1);
     expect(
@@ -125,9 +116,6 @@ test("recording consent stays visible while diagnostics and server details are o
   page,
 }) => {
   await page.goto("/live");
-  await page
-    .getByRole("button", { name: "Standard view", exact: true })
-    .click();
   await expect(
     page.getByRole("button", { name: "Pose debug", exact: true }),
   ).toBeHidden();
@@ -223,10 +211,140 @@ test("camera permission is requested only on click, with a clear retry after den
   await expect(
     page.getByRole("button", { name: "Enable camera", exact: true }),
   ).toBeEnabled();
-  await page
-    .getByRole("button", { name: "Standard view", exact: true })
-    .click();
   await expect(
     page.getByRole("link", { name: "Sample demo", exact: true }),
   ).toBeVisible();
+});
+
+test("shared navigation and help work with keyboard focus", async ({
+  page,
+}) => {
+  await page.route("**/sources?collection_id=*", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.goto("/");
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("link", { name: "Skip to content" }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("main")).toBeFocused();
+  const navigation = page.getByRole("navigation", { name: "Main navigation" });
+  for (const [label, path] of [
+    ["Sources", "/sources"],
+    ["Sample demo", "/demo"],
+    ["Studio", "/live"],
+  ]) {
+    const link = navigation.getByRole("link", { name: label, exact: true });
+    await link.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(new RegExp(`${path}$`));
+    await expect(link).toHaveAttribute("aria-current", "page");
+  }
+  const help = page.getByRole("button", { name: "How it works" });
+  await help.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(help).toBeFocused();
+});
+
+test("shared surfaces stay readable in light and dark appearance", async ({
+  page,
+}) => {
+  await page.route("**/sources?collection_id=*", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+    for (const path of [
+      "/",
+      "/sources",
+      "/demo",
+      "/review-preview",
+      "/stats-preview",
+    ]) {
+      await page.goto(path);
+      await expect(
+        page.getByRole("navigation", { name: "Main navigation" }),
+      ).toBeVisible();
+      await expect(page.locator("html")).toHaveCSS("color-scheme", colorScheme);
+      const ratios = await page.evaluate(() => {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext("2d")!;
+        const luminance = (color: string) => {
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+          const rgb = [...context.getImageData(0, 0, 1, 1).data]
+            .slice(0, 3)
+            .map((value) => {
+              const channel = value / 255;
+              return channel <= 0.04045
+                ? channel / 12.92
+                : ((channel + 0.055) / 1.055) ** 2.4;
+            });
+          return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+        };
+        const contrast = (a: string, b: string) => {
+          const values = [luminance(a), luminance(b)].sort((x, y) => y - x);
+          return (values[0] + 0.05) / (values[1] + 0.05);
+        };
+        const body = getComputedStyle(document.body);
+        const footer = getComputedStyle(document.querySelector(".app-footer")!);
+        const primary = document.querySelector(
+          ".button-primary, .review418-play-section",
+        );
+        const action = primary ? getComputedStyle(primary) : null;
+        return [
+          contrast(body.color, body.backgroundColor),
+          contrast(footer.color, body.backgroundColor),
+          ...(action ? [contrast(action.color, action.backgroundColor)] : []),
+        ];
+      });
+      for (const ratio of ratios)
+        expect(ratio, `${path} in ${colorScheme}`).toBeGreaterThanOrEqual(4.5);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+    }
+  }
+});
+
+test("enlarged text reflows without hiding navigation or primary controls", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.route("**/sources?collection_id=*", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  for (const path of ["/", "/sources", "/demo", "/review-preview"]) {
+    await page.goto(path);
+    await expect(
+      page.getByRole("navigation", { name: "Main navigation" }),
+    ).toBeVisible();
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "200%";
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      path,
+    ).toBe(true);
+    for (const link of await page.locator(".app-nav a").all()) {
+      await expect(link).toBeVisible();
+      expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
+    if (path === "/") {
+      const camera = page.getByRole("button", {
+        name: "Enable camera",
+        exact: true,
+      });
+      await camera.scrollIntoViewIfNeeded();
+      await expect(camera).toBeInViewport();
+    }
+  }
 });

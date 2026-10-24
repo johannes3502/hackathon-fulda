@@ -32,7 +32,7 @@ export function ReviewWorkspace() {
   );
   if (!report)
     return (
-      <AppShell step={3}>
+      <AppShell>
         <div className="empty-state panel">
           <h1>Your review is not ready yet.</h1>
           <p>
@@ -89,7 +89,7 @@ export function ReviewWorkspace() {
     );
   }
   return (
-    <AppShell step={3}>
+    <AppShell>
       <div className="workspace review-workspace">
         <div className="workspace-back">
           <Link href="/demo">

@@ -106,7 +106,7 @@ export function ReviewAnalysis({
   }
 
   return (
-    <AppShell experience={data.demo ? "sample" : "live"} step={3}>
+    <AppShell experience={data.demo ? "sample" : "live"}>
       <div className="review418-page" lang="de">
         <header className="review418-header">
           <Link href={backHref} className="review418-back">
@@ -120,8 +120,7 @@ export function ReviewAnalysis({
         <div className="review418-workspace">
           <div className="review418-intro">
             <div>
-              <span className="review418-eyebrow">Deine Analyse</span>
-              <h1>Jeder Moment zählt.</h1>
+              <h1>Deine Analyse</h1>
               <p>
                 {data.title} <span>·</span> {timestamp(data.durationMs)} Minuten
               </p>
@@ -145,7 +144,7 @@ export function ReviewAnalysis({
             className="review418-criteria"
             aria-label="Kriterien und Filter für Momente"
           >
-            {Object.entries(STAT_LABELS).map(([key, label], index) => {
+            {Object.entries(STAT_LABELS).map(([key, label]) => {
               const value = data.stats?.[key as Criterion];
               return (
                 <button
@@ -157,10 +156,7 @@ export function ReviewAnalysis({
                     setCriterion(criterion === key ? null : (key as Criterion))
                   }
                 >
-                  <span>
-                    <small>0{index + 1}</small>
-                    {label}
-                  </span>
+                  <span>{label}</span>
                   <strong>
                     {value ?? "–"}
                     {value !== undefined && <small>%</small>}

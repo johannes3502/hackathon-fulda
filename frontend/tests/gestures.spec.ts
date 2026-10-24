@@ -7,9 +7,6 @@ test("jury walkthrough runs the real rules with explicit synthetic labels, evide
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await page
-    .getByRole("button", { name: "Standard view", exact: true })
-    .click();
-  await page
     .getByText("Gesture guide and calibration", { exact: true })
     .click();
   await page.getByRole("link", { name: "Try synthetic walkthrough" }).click();
@@ -55,9 +52,6 @@ test("jury walkthrough runs the real rules with explicit synthetic labels, evide
   await expect(
     page.getByRole("button", { name: "Enable camera" }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Standard view", exact: true })
-    .click();
   await page
     .getByText("Gesture guide and calibration", { exact: true })
     .click();
