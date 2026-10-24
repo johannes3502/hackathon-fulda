@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  ArrowLeft,
   Camera,
   CameraOff,
   CheckCircle2,
@@ -411,6 +412,13 @@ export function LiveStudio() {
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <div className="live-control-bar">
+              {/* Hidden while recording so a stray click cannot drop the take. */}
+              {!progress && (
+                <Link href="/" className="live-back-link">
+                  <ArrowLeft size={16} aria-hidden />
+                  Back
+                </Link>
+              )}
               <fieldset className="live-analysis-choice" disabled={!!progress}>
                 <div className="field">
                   <label htmlFor="live-source">Speech analysis</label>

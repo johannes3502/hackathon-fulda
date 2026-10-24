@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { LiveSessionProvider } from "@/features/live/LiveSessionProvider";
 import { appearanceScript } from "@/lib/appearance";
 import "@fontsource-variable/open-sans";
@@ -16,10 +17,11 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: appearanceScript }} />
-      </head>
       <body>
+        {/* Sets the saved appearance before hydration to avoid a theme flash. */}
+        <Script id="appearance" strategy="beforeInteractive">
+          {appearanceScript}
+        </Script>
         <LiveSessionProvider>{children}</LiveSessionProvider>
       </body>
     </html>

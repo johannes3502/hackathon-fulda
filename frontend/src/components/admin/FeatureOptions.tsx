@@ -1,9 +1,11 @@
 "use client";
+import { Cpu, Mic } from "lucide-react";
 import { NativeSelect } from "@/components/ui/input";
 import {
   SPEECH_FEEDBACK_FLAGS,
   type FeatureFlags,
 } from "@/features/live/feature-flags";
+import { AdminSection, SettingRow, Switch, SwitchTile } from "./parts";
 
 export function FeatureOptions({
   flags,
@@ -12,17 +14,24 @@ export function FeatureOptions({
   flags: FeatureFlags;
   change: (flags: FeatureFlags) => void;
 }) {
+  const speechOn = SPEECH_FEEDBACK_FLAGS.filter(([key]) => flags[key]).length;
   return (
-    <section className="panel admin-panel" aria-labelledby="analysis-features">
-      <div className="panel-title-row">
-        <h2 id="analysis-features">Analysis features</h2>
-        <span className="badge">Saved instantly</span>
-      </div>
-      <div className="form-row">
-        <div className="field">
-          <label htmlFor="pose-mode">Pose processing</label>
+    <>
+      <AdminSection
+        id="analysis-features"
+        icon={Cpu}
+        title="Analysis features"
+        badge="Saved instantly"
+        description="How the camera is analysed. Changing pose options restarts calibration and applies to the next recording."
+      >
+        <SettingRow
+          label="Pose processing"
+          htmlFor="pose-mode"
+          description="Video tracks and smooths between frames; Image treats every frame on its own."
+        >
           <NativeSelect
             id="pose-mode"
+            aria-describedby="pose-mode-description"
             value={flags.runningMode}
             onChange={(e) =>
               change({
@@ -34,11 +43,15 @@ export function FeatureOptions({
             <option value="VIDEO">Video · tracking and smoothing</option>
             <option value="IMAGE">Image · independent frames</option>
           </NativeSelect>
-        </div>
-        <div className="field">
-          <label htmlFor="pose-model">Pose model</label>
+        </SettingRow>
+        <SettingRow
+          label="Pose model"
+          htmlFor="pose-model"
+          description="Both prefer GPU and fall back to CPU. Heavy’s benefit has not been measured on this device."
+        >
           <NativeSelect
             id="pose-model"
+            aria-describedby="pose-model-description"
             value={flags.model}
             onChange={(e) =>
               change({
@@ -47,61 +60,70 @@ export function FeatureOptions({
               })
             }
           >
-            <option value="lite">Lite</option>
-            <option value="heavy">Heavy</option>
+            <option value="lite">Lite · faster</option>
+            <option value="heavy">Heavy · larger model</option>
           </NativeSelect>
-        </div>
-      </div>
-      <label className="live-transcribe">
-        <input
-          type="checkbox"
-          checked={flags.handTracking}
-          onChange={(e) => change({ ...flags, handTracking: e.target.checked })}
-        />
-        Track fingers
-      </label>
-      <p className="field-hint">
-        Fingers are tracked locally, up to 5 times per second. Both models
-        prefer GPU and fall back to CPU. Changing pose options restarts
-        calibration. Heavy’s benefit has not been measured on this device.
-      </p>
-      <label className="live-transcribe">
-        <input
-          type="checkbox"
-          checked={flags.speechFeedback}
-          onChange={(e) =>
-            change({ ...flags, speechFeedback: e.target.checked })
-          }
-        />
-        Speech feedback
-      </label>
-      <fieldset
-        disabled={!flags.speechFeedback}
-        className="speech-feature-options"
+        </SettingRow>
+        <SettingRow
+          label="Track fingers"
+          htmlFor="track-fingers"
+          description="Hand landmarks are tracked locally, up to 5 times per second."
+        >
+          <Switch
+            id="track-fingers"
+            describedBy="track-fingers-description"
+            checked={flags.handTracking}
+            onChange={(handTracking) => change({ ...flags, handTracking })}
+          />
+        </SettingRow>
+      </AdminSection>
+      <AdminSection
+        id="speech-hints"
+        icon={Mic}
+        title="Speech hints"
+        badge={
+          flags.speechFeedback
+            ? `${speechOn} of ${SPEECH_FEEDBACK_FLAGS.length} on`
+            : "Off"
+        }
+        description="Which voice observations become hints and review markers. Analysis, measurements and transcription keep their own settings."
       >
-        <legend>Speech feedback types</legend>
-        {SPEECH_FEEDBACK_FLAGS.map(([key, label]) => (
-          <label key={key} className="live-transcribe">
-            <input
-              type="checkbox"
+        <SettingRow
+          label="Speech feedback"
+          htmlFor="speech-feedback-toggle"
+          description="Master switch for every type below."
+        >
+          <Switch
+            id="speech-feedback-toggle"
+            describedBy="speech-feedback-toggle-description"
+            checked={flags.speechFeedback}
+            onChange={(speechFeedback) => change({ ...flags, speechFeedback })}
+          />
+        </SettingRow>
+        <fieldset
+          disabled={!flags.speechFeedback}
+          className="switch-grid"
+          aria-describedby="speech-types-hint"
+        >
+          <legend className="visually-hidden">Speech feedback types</legend>
+          {SPEECH_FEEDBACK_FLAGS.map(([key, label]) => (
+            <SwitchTile
+              key={key}
+              id={`speech-${key}`}
+              label={label}
               checked={flags[key]}
-              onChange={(e) => change({ ...flags, [key]: e.target.checked })}
+              disabled={!flags.speechFeedback}
+              onChange={(on) => change({ ...flags, [key]: on })}
             />
-            {label}
-          </label>
-        ))}
-      </fieldset>
-      <p className="field-hint">
-        Pauses, volume, pitch variation and speaking rhythm are shown live when
-        Speech analysis in the studio is live. Filler words and word-based pace
-        need the transcript after stopping. These switches control feedback
-        markers; analysis, measurements and transcription keep their own
-        settings.
-      </p>
-      <p className="field-hint">
-        Saved in this browser and with each take. Changes apply to the next
-        recording.
-      </p>
-    </section>
+          ))}
+        </fieldset>
+        <p className="field-hint" id="speech-types-hint">
+          Pauses, volume, pitch variation and rhythm appear live while speech
+          analysis runs in the studio. Filler words and word-based pace need the
+          transcript after stopping. Saved with each take; changes apply to the
+          next recording.
+        </p>
+      </AdminSection>
+    </>
   );
 }
