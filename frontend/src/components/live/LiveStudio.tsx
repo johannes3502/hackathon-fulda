@@ -30,6 +30,7 @@ import type { LiveConfig, LiveProgress } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
 import { PoseDownload } from "./PoseDownload";
+import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
 
 const cameraCopy = {
@@ -52,7 +53,7 @@ export function LiveStudio() {
     stop: stopCamera,
     getStream,
   } = useCameraPreview();
-  const pose = usePoseCapture(videoRef);
+  const pose = usePoseCapture(videoRef, cameraStatus === "active");
   const [title, setTitle] = useState("My pitch rehearsal");
   const [targetMs, setTargetMs] = useState(180000);
   const [mode, setMode] = useState<LiveConfig["mode"]>("demo");
@@ -250,6 +251,27 @@ export function LiveStudio() {
                 }
                 aria-label="Your local camera feed"
               />
+              {cameraStatus === "active" &&
+                pose.state?.phase === "running" &&
+                pose.state.latest && (
+                  <PoseOverlay
+                    sample={pose.state.latest}
+                    largeView={largeView}
+                  />
+                )}
+              {cameraStatus === "active" && (
+                <span className="live-pose-status">
+                  {pose.state?.phase === "error"
+                    ? "Landmarks unavailable"
+                    : pose.state?.phase === "running"
+                      ? pose.state.latest
+                        ? "Pose landmarks · local"
+                        : "No pose in frame"
+                      : pose.state?.phase === "stopped"
+                        ? "Landmarks stopped"
+                        : "Loading landmarks…"}
+                </span>
+              )}
               {cameraStatus !== "active" && (
                 <div className="stage-placeholder">
                   <span className="stage-camera">
@@ -270,7 +292,7 @@ export function LiveStudio() {
                 </span>
                 <span>
                   {mode === "demo"
-                    ? "Demo markers · no detection"
+                    ? "Scripted feedback · local landmarks"
                     : progress?.phase === "recording"
                       ? "Audio analysis after stopping"
                       : "Backend mode"}
@@ -330,7 +352,7 @@ export function LiveStudio() {
               {progress
                 ? (progress.notice ??
                   (mode === "demo"
-                    ? "Demo feedback is scripted. No video is uploaded. Optional pose logging is local."
+                    ? "Demo feedback is scripted. No video is uploaded. Pose landmarks and logging stay local."
                     : `After stopping, your complete video and audio will be sent to ${endpoint} for audio analysis.`))
                 : cameraCopy[cameraStatus]}
             </p>
@@ -340,33 +362,27 @@ export function LiveStudio() {
             >
               <h2>Local pose capture</h2>
               <p>
-                Log body landmarks on this device. No pose data is uploaded or
-                used to score your presentation.
+                Landmarks appear automatically while the camera is on. No pose
+                data is uploaded or used to score your presentation.
               </p>
               <p className="field-hint">
                 Head angles and frontal-eye visibility are uncalibrated
                 heuristics, not gaze tracking. Missing measurements stay empty.
               </p>
               <div className="live-control-bar">
-                {pose.state?.phase === "running" ||
-                pose.state?.phase === "loading" ? (
-                  <Button variant="outline" onClick={pose.stop}>
-                    Stop pose capture
-                  </Button>
-                ) : (
+                {pose.state?.phase === "error" && (
                   <Button
                     variant="outline"
                     disabled={cameraStatus !== "active" || !!progress}
                     onClick={pose.start}
                   >
-                    {pose.state ? "Start new pose log" : "Start pose capture"}
+                    Retry landmarks
                   </Button>
                 )}
                 <PoseDownload blob={pose.download} />
               </div>
               <p role="status">
-                {pose.state?.message ??
-                  "Enable your camera, then start pose capture."}
+                {pose.state?.message ?? "Enable your camera to see landmarks."}
               </p>
               <p>
                 {pose.state?.count ?? 0} pose samples ·{" "}
@@ -375,9 +391,10 @@ export function LiveStudio() {
                   : "Legs not confirmed visible"}
               </p>
               <p className="field-hint">
-                Stop to download JSONL. Starting a take resets the preview log
-                and aligns timestamps to the video. Download preview samples
-                first if you need them. Logs are released when you leave.
+                Turn the camera off to download preview JSONL. Starting a take
+                resets the preview log and aligns timestamps to the video.
+                Download preview samples first if you need them. Logs are
+                released when you leave.
               </p>
             </section>
             <section className="panel live-settings">

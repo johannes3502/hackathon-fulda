@@ -350,17 +350,16 @@ test("local pose worker loads real assets and runs on synthetic camera frames", 
 }) => {
   await syntheticCamera(page);
   await enable(page);
-  await page
-    .getByRole("button", { name: "Start pose capture", exact: true })
-    .click();
   await expect(
     page.getByText("No usable pose. Keep your upper body in frame."),
   ).toBeVisible({ timeout: 45000 });
   await page
-    .getByRole("button", { name: "Stop pose capture", exact: true })
+    .getByRole("button", { name: "Turn camera off", exact: true })
     .click();
   await expect(
-    page.getByText("Pose capture stopped. Your samples are ready to download."),
+    page.getByText(
+      "Camera stopped. Your captured samples are ready to download.",
+    ),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Download pose JSONL" }),
@@ -391,9 +390,6 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
     }),
   );
   await enable(page);
-  await page
-    .getByRole("button", { name: "Start pose capture", exact: true })
-    .click();
   await expect(
     page.getByText("Pose samples stay in this browser."),
   ).toBeVisible();
@@ -440,6 +436,100 @@ test("pose JSONL stays local, resets for recording and survives review navigatio
   });
 });
 
+test("automatic landmarks align with the mirrored video in both sizes and clear when lost", async ({
+  page,
+}, info) => {
+  await syntheticCamera(page);
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        if (String(url).includes("/pose/worker.js"))
+          (window as unknown as { poseWorker: Worker }).poseWorker = this;
+      }
+    };
+  });
+  await page.route("**/pose/worker.js", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: `let visible = true;
+      onmessage = ({data}) => {
+        if (data.type === 'init') postMessage({type:'ready'});
+        if (data.type === 'visible') visible = data.value;
+        if (data.type === 'frame') {
+          const points = Array.from({length:33}, (_,i) => ({x:.4+(i%2)*.2,y:.2+i*.01,z:0,visibility:i>=25?.1:.99,presence:.99}));
+          points[13].visibility = .1;
+          postMessage({type:'sample',timestamp:data.timestamp,width:data.frame.width,height:data.frame.height,points:visible?points:[]});
+          data.frame.close();
+        }
+      };`,
+    }),
+  );
+  await enable(page);
+  const overlay = page.getByRole("img", { name: "Live pose landmarks" });
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator("circle")).toHaveCount(16);
+  await expect(overlay.locator('[data-landmark="left_elbow"]')).toHaveCount(0);
+  await expect(overlay.locator('[data-landmark="left_knee"]')).toHaveCount(0);
+  for (const large of [false, true]) {
+    if (large)
+      await page
+        .getByRole("button", { name: "Large view", exact: true })
+        .click();
+    const expected = await page
+      .getByLabel("Your local camera feed")
+      .evaluate((video: HTMLVideoElement) => {
+        const rect = video.getBoundingClientRect();
+        const scale =
+          getComputedStyle(video).objectFit === "contain"
+            ? Math.min(
+                rect.width / video.videoWidth,
+                rect.height / video.videoHeight,
+              )
+            : Math.max(
+                rect.width / video.videoWidth,
+                rect.height / video.videoHeight,
+              );
+        return {
+          x: rect.x + rect.width / 2 + 0.1 * video.videoWidth * scale,
+          y: rect.y + rect.height / 2 - 0.3 * video.videoHeight * scale,
+        };
+      });
+    const nose = (await overlay
+      .locator('[data-landmark="nose"]')
+      .boundingBox())!;
+    expect(nose.x + nose.width / 2).toBeCloseTo(expected.x, 0);
+    expect(nose.y + nose.height / 2).toBeCloseTo(expected.y, 0);
+    await noOverflow(page);
+    await page.screenshot({
+      path: info.outputPath(`landmarks-${large ? "large" : "standard"}.png`),
+      fullPage: true,
+    });
+  }
+  await page.evaluate(() =>
+    (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
+      type: "visible",
+      value: false,
+    }),
+  );
+  await expect(overlay).toHaveCount(0);
+  await expect(
+    page.getByText("No pose in frame", { exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() =>
+    (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
+      type: "visible",
+      value: true,
+    }),
+  );
+  await expect(overlay).toBeVisible();
+  await page.getByRole("button", { name: "Turn camera off" }).click();
+  await expect(overlay).toHaveCount(0);
+  await page.getByRole("button", { name: "Enable camera preview" }).click();
+  await expect(overlay).toBeVisible();
+});
+
 test("pose model failure preserves camera recording controls", async ({
   page,
 }) => {
@@ -451,9 +541,6 @@ test("pose model failure preserves camera recording controls", async ({
     }),
   );
   await enable(page);
-  await page
-    .getByRole("button", { name: "Start pose capture", exact: true })
-    .click();
   await expect(
     page.getByText("Pose detection failed.", { exact: false }),
   ).toBeVisible();
@@ -461,6 +548,6 @@ test("pose model failure preserves camera recording controls", async ({
     page.getByRole("button", { name: "Record with demo feedback" }),
   ).toBeEnabled();
   await expect(
-    page.getByRole("button", { name: "Start new pose log" }),
+    page.getByRole("button", { name: "Retry landmarks" }),
   ).toBeEnabled();
 });

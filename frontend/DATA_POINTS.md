@@ -133,17 +133,22 @@ Regeln:
 
 ## Implementierter Frontend-Vertrag (24.10.2026)
 
-In `/live`: Kamera aktivieren → **Start pose capture** → **Stop pose capture** →
-**Download pose JSONL**. Das ist unabhängig vom Feedback-Modus. Pose-Logs werden
+In `/live`: Kamera aktivieren → Landmarks und Logging starten automatisch → Kamera
+ausschalten → **Download pose JSONL**. Das ist unabhängig vom Feedback-Modus. Pose-Logs werden
 nicht an die Audio-API geschickt. Bei einer Aufnahme beginnt ein neuer Log exakt
 mit `MediaRecorder.onstart`; vorher gestartete Frames werden verworfen. Den
-Preview-Log bei Bedarf vorher stoppen und herunterladen. Der Aufnahme-Log steht
+Preview-Log bei Bedarf durch Ausschalten der Kamera stoppen und herunterladen. Der Aufnahme-Log steht
 auch im Review zum Download bereit. Gestoppte Preview-Logs werden nicht als
 Aufnahme-Logs ausgegeben.
 
 - Ein Worker verarbeitet höchstens einen Frame gleichzeitig, maximal 10 Hz.
   Kein Nachholen oder Interpolieren ausgelassener Frames. Bei 3.000 Samples stoppt
   der Logger mit einem Hinweis, ohne die vorhandenen Samples zu überschreiben.
+  Das Live-Overlay läuft weiter; der Aufnahmestart setzt den Log zurück.
+- Das gespiegelte Overlay folgt dem Video-Ausschnitt in Standard- und Großansicht.
+  Punkte außerhalb des Bildes oder unter der bestehenden Konfidenz-Heuristik werden
+  nicht gezeichnet. Ohne Pose wird das Overlay entfernt. Es ist nur eine
+  Vorschau und wird nicht in die Videodatei eingebrannt.
 - MediaPipe Tasks Vision ist im Lockfile gepinnt. Pose Landmarker **Lite**, float16,
   Modellversion 1, wird lokal mitgeliefert. `predev` und `prebuild` kopieren die
   installierten JS-/WASM-Dateien nach `public/pose/runtime` (generiert, gitignored).

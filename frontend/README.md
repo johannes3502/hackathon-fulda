@@ -37,7 +37,7 @@ Open http://localhost:3000 and choose **Try sample demo**. No credentials, micro
 
 Open http://localhost:3000/live or choose **Open camera studio** from setup.
 
-1. Enable the camera preview, then **Record with demo feedback**. This records actual silent video while scripted feedback markers appear in the first ten seconds. No upload runs in local demo mode; pose logging is a separate optional action.
+1. Enable the camera preview, then **Record with demo feedback**. This records actual silent video while scripted feedback markers appear in the first ten seconds. No upload runs in local demo mode; local pose landmarks and logging start automatically with the camera.
 2. Choose **Finish & review** for recording stats, feedback frequencies, optional backend measurements and a video player.
 3. Choose **Rewatch feedback sections** to filter by category, seek to a feedback moment, loop the surrounding section, or watch the full take.
 4. Download before refreshing or leaving the live workspace. Recordings are held in browser memory only.
@@ -98,11 +98,15 @@ Real camera hardware, Safari/iOS behavior, and a public deployment still require
 
 ## Local pose data capture
 
-The camera studio has an independent **Start pose capture** action. It uses a
-local MediaPipe worker; stop to download the raw JSONL. Starting a recording
+The camera studio automatically runs a local MediaPipe worker while the camera
+is on. Visible pose landmarks and skeleton connections overlay the mirrored video
+in standard and large views; low-confidence points are hidden. The overlay is
+preview-only and is not burned into the recorded video. Turn the camera off to
+download the preview JSONL. Starting a recording
 resets the preview log and anchors it to video start; its log remains downloadable
 in review. Download preview data before starting a take if you want to keep it.
 Pose samples never go to the backend and do not replace scripted feedback.
+Landmarks continue updating when the 3,000-sample log limit is reached.
 All points, heuristics, null handling and limits are documented in
 [DATA_POINTS.md](DATA_POINTS.md). Model/runtime failures leave recording available.
 

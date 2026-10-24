@@ -126,6 +126,33 @@ body:has(.live-workspace-large) .app-footer,
 .live-camera-stage {
   aspect-ratio: 16 / 10;
 }
+.live-pose-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1);
+  pointer-events: none;
+}
+.live-pose-overlay line {
+  stroke: #67e8f9;
+  stroke-width: 3px;
+}
+.live-pose-overlay circle {
+  fill: #fef08a;
+  stroke: #111827;
+  stroke-width: 2px;
+}
+.live-pose-status {
+  position: absolute;
+  top: 62px;
+  left: 16px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #111827;
+  color: white;
+  font-size: 12px;
+}
 .live-camera-stage .stage-top,
 .live-camera-stage .stage-bottom {
   background: #111827d9;

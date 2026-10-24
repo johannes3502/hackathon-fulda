@@ -11,8 +11,42 @@ class FakeWorker {
   }
 }
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+it("keeps landmarks live when the bounded log is full and clears a lost pose", () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("Worker", FakeWorker);
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  const update = vi.fn();
+  const capture = new PoseCapture({} as HTMLVideoElement, update);
+  vi.spyOn(capture.log, "full", "get").mockReturnValue(true);
+  capture.start();
+  const worker = FakeWorker.latest;
+  const sample = {
+    type: "sample",
+    width: 640,
+    height: 360,
+    timestamp: 1000,
+    points: Array.from({ length: 33 }, () => ({
+      x: 0.5,
+      y: 0.5,
+      z: 0,
+      visibility: 0.99,
+    })),
+  };
+  worker.onmessage?.({ data: sample });
+  expect(update).toHaveBeenLastCalledWith(
+    expect.objectContaining({ phase: "running", latest: expect.any(Object) }),
+  );
+  expect(capture.log.count).toBe(0);
+  expect(worker.terminate).not.toHaveBeenCalled();
+  worker.onmessage?.({ data: { ...sample, points: [] } });
+  expect(update).toHaveBeenLastCalledWith(
+    expect.objectContaining({ phase: "running", latest: null }),
+  );
+  capture.dispose();
 });
 it("terminates loading and ignores late worker results", () => {
   vi.useFakeTimers();

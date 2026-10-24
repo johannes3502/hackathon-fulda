@@ -1,4 +1,4 @@
-import { PoseLog, type PoseSample } from "./sample";
+import { PoseLog, poseSample, type PoseSample } from "./sample";
 export type PoseState = {
   phase: "loading" | "running" | "stopped" | "error";
   count: number;
@@ -49,24 +49,23 @@ export class PoseCapture {
         } else if (data.type === "sample") {
           this.pending = false;
           // A frame captured before the recording anchor must not enter its log.
-          const sample = this.log.add(
-            data.points,
-            data.width,
-            data.height,
-            data.timestamp,
-          );
+          const sample = this.log.full
+            ? poseSample(data.points, data.width, data.height, 0)
+            : this.log.add(
+                data.points,
+                data.width,
+                data.height,
+                data.timestamp,
+              );
           this.latest = sample;
-          if (this.log.full)
-            this.stop(
-              "Sample limit reached. Download the log before starting another.",
-            );
-          else
-            this.publish(
-              "running",
-              sample
+          this.publish(
+            "running",
+            this.log.full
+              ? "Log limit reached. Landmarks remain live; start a take to reset the log."
+              : sample
                 ? "Pose samples stay in this browser."
                 : "No usable pose. Keep your upper body in frame.",
-            );
+          );
         }
       };
       worker.postMessage({ type: "init" });
