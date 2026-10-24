@@ -1,167 +1,120 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import { ArrowRight, BarChart3, FileText, Video } from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
-import { StatsRing } from "./StatsRing";
-import {
-  DEMO_STATS,
-  STAT_LABELS,
-  summarizeStats,
-  type PresentationStats,
-} from "./stats";
+import { useLiveSessions } from "@/features/live/LiveSessionProvider";
+import { time } from "@/lib/utils";
+import { summarizeRecordings } from "./stats";
 import "./stats-card.css";
 
-export function StatsCard({
-  stats,
-  demo = false,
-}: {
-  stats: PresentationStats;
-  demo?: boolean;
-}) {
-  const card = useRef<HTMLElement>(null);
-  const [progress, setProgress] = useState(1);
-  const overall = summarizeStats(stats);
-  const signature = JSON.stringify(stats);
-
-  useEffect(() => {
-    const element = card.current;
-    if (!element) return;
-    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let frame = 0;
-    let start: number | undefined;
-    const tick = (now: number) => {
-      start ??= now;
-      const fraction = Math.min((now - start) / 1500, 1);
-      setProgress(1 - Math.pow(1 - fraction, 3));
-      if (fraction < 1) frame = requestAnimationFrame(tick);
-    };
-    const stop = () => {
-      if (motion.matches) {
-        cancelAnimationFrame(frame);
-        setProgress(1);
-      }
-    };
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          observer.disconnect();
-          if (!motion.matches) frame = requestAnimationFrame(tick);
-        }
-      },
-      { threshold: 0.3 },
-    );
-    observer.observe(element);
-    motion.addEventListener("change", stop);
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-      motion.removeEventListener("change", stop);
-    };
-  }, [signature]);
-
-  return (
-    <article
-      className="stats418-card"
-      ref={card}
-      lang="de"
-      aria-label={
-        demo ? "Deine Stats – Demo mit synthetischen Werten" : "Deine Stats"
-      }
-    >
-      <div
-        className="stats418-overall"
-        role="img"
-        aria-label={
-          overall === null
-            ? "Gesamtwertung nicht verfügbar"
-            : `Gesamtwertung ${overall} Prozent, gleich gewichteter Durchschnitt`
-        }
-      >
-        <StatsRing value={overall === null ? 0 : overall * progress} />
-        <div className="stats418-overall-text" aria-hidden="true">
-          <span className="stats418-eyebrow">Gesamt</span>
-          <span className="stats418-total">
-            {overall === null ? "–" : Math.round(overall * progress)}
-            <span>%</span>
-          </span>
-          <span className="stats418-ring-caption">von 100</span>
-        </div>
-      </div>
-      <div className="stats418-heading">
-        <span className="stats418-brand" aria-hidden="true">
-          418
-        </span>
-        <h2>Dein Auftritt.</h2>
-        <p>Vier Stärken. Ein Gesamtbild.</p>
-      </div>
-      <dl className="stats418-grid">
-        {Object.entries(STAT_LABELS).map(([key, label], index) => {
-          const value = stats[key as keyof PresentationStats];
-          const valid = Number.isFinite(value) && value >= 1 && value <= 100;
-          const animated = valid ? Math.round(value * progress) : null;
-          return (
-            <div className="stats418-stat" key={key}>
-              <dt>
-                <span aria-hidden="true">0{index + 1}</span>
-                {label}
-              </dt>
-              <dd aria-label={valid ? `${value} Prozent` : "Nicht verfügbar"}>
-                <span aria-hidden="true">
-                  {animated ?? "–"}
-                  <small>%</small>
-                </span>
-              </dd>
-              <div className="stats418-bar" aria-hidden="true">
-                <span
-                  style={
-                    {
-                      "--fill": valid ? (value * progress) / 100 : 0,
-                    } as CSSProperties
-                  }
-                />
-              </div>
-            </div>
-          );
-        })}
-      </dl>
-      <footer className="stats418-footnote">
-        <p>Gesamt = Durchschnitt der vier Kriterien.</p>
-        {demo && (
-          <span className="stats418-demo">
-            <i aria-hidden="true" />
-            Demo · synthetische Werte
-          </span>
-        )}
-        {demo && (
-          <Link className="stats418-review-link" href="/review-preview">
-            Analyse-Beispiel ansehen ↗
-          </Link>
-        )}
-      </footer>
-    </article>
+export function StatsDashboard() {
+  const { recordings } = useLiveSessions();
+  const takes = Object.values(recordings).sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
   );
-}
+  const summary = summarizeRecordings(takes);
+  const latest = takes[0];
 
-export function DemoStatsCard() {
-  return <StatsCard stats={DEMO_STATS} demo />;
-}
-
-export function StatsPreview() {
-  const [replay, setReplay] = useState(0);
   return (
-    <AppShell>
-      <div className="stats418-preview" lang="de">
-        <div className="stats418-preview-center">
-          <DemoStatsCard key={replay} />
-          <button
-            type="button"
-            className="stats418-replay"
-            onClick={() => setReplay((value) => value + 1)}
-          >
-            <span aria-hidden="true">↻</span> Animation wiederholen
-          </button>
-        </div>
+    <AppShell experience="live">
+      <div className="stats418-dashboard" lang="de">
+        <section className="stats418-hero" aria-label="Deine Aufnahmen">
+          <div className="stats418-hero-info">
+            <span className="stats418-section-eyebrow">
+              <BarChart3 size={16} /> Dein Arbeitsbereich
+            </span>
+            <h1>Deine Aufnahmen im Überblick.</h1>
+            <p>
+              Nimm deine Präsentation auf und schau dir konkrete Hinweise mit
+              Zeitmarken an. Lade Quellen hoch, um Aussagen zu vergleichen und
+              Rückfragen vorzubereiten.
+            </p>
+            <div className="stats418-hero-actions">
+              <Link href="/live" className="button button-primary">
+                <Video size={17} /> Live-Aufnahme starten
+              </Link>
+              <Link href="/sources" className="button button-outline">
+                <FileText size={16} /> Quellen (RAG)
+              </Link>
+            </div>
+            <p className="stats418-retention">
+              Diese Übersicht zählt die Aufnahmen in diesem
+              Browser-Arbeitsbereich. Lade dein Video vor dem Neuladen herunter.
+            </p>
+          </div>
+          <article className="stats418-card" aria-label="Aufnahmeübersicht">
+            <span className="stats418-section-eyebrow">
+              {latest ? "Letzte Aufnahme" : "Bereit für deinen ersten Take"}
+            </span>
+            <h2>{latest?.config.title ?? "Noch keine Aufnahmen"}</h2>
+            <p>
+              {latest
+                ? `${time(latest.durationMs)} · ${latest.feedback.length} Hinweise`
+                : "Starte eine Aufnahme, um hier deine Dauer und Hinweise zu sehen."}
+            </p>
+            {latest && (
+              <Link
+                href={`/live/${latest.id}/review`}
+                className="button button-outline"
+              >
+                Aufnahme ansehen <ArrowRight size={16} />
+              </Link>
+            )}
+          </article>
+        </section>
+
+        <dl className="stats418-kpi-grid" aria-label="Aufgenommene Takes">
+          <div className="stats418-kpi">
+            <dt>Aufnahmen</dt>
+            <dd>{summary.sessions}</dd>
+          </div>
+          <div className="stats418-kpi">
+            <dt>Aufnahmezeit</dt>
+            <dd>{time(summary.durationMs)}</dd>
+          </div>
+          <div className="stats418-kpi">
+            <dt>Hinweise</dt>
+            <dd>{summary.moments}</dd>
+          </div>
+          <div className="stats418-kpi">
+            <dt>Mit Transkript</dt>
+            <dd>{summary.transcripts}</dd>
+          </div>
+        </dl>
+
+        <section
+          className="stats418-recordings"
+          aria-labelledby="recordings-heading"
+        >
+          <h2 id="recordings-heading">Deine Takes</h2>
+          <p>Hinweise sind Beobachtungen zum Nachschauen, keine Bewertung.</p>
+          {takes.length ? (
+            <ul className="stats418-take-list">
+              {takes.map((take) => (
+                <li key={take.id}>
+                  <Link href={`/live/${take.id}/review`}>
+                    <span>
+                      <strong>{take.config.title}</strong>
+                      <small>
+                        {time(take.durationMs)} · {take.feedback.length}{" "}
+                        Hinweise
+                        {take.completion === "interrupted"
+                          ? " · Verarbeitung unterbrochen"
+                          : ""}
+                      </small>
+                    </span>
+                    <ArrowRight size={18} aria-hidden="true" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="stats418-empty" role="status">
+              Hier erscheinen deine aufgenommenen Präsentationen.
+            </p>
+          )}
+        </section>
       </div>
     </AppShell>
   );

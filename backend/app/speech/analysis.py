@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from app.events import Event
+from app.speech.baseline import AdaptiveSpeechBaseline, BaselineFrame
 from app.speech.config import AudioConfig
 from app.speech.models import AudioAnalysis, AudioSeries, AudioSummary
 from app.speech.signal import decode_audio, envelope_peaks, frame_signal, level_db, yin_f0
@@ -48,24 +49,31 @@ def analyze_samples(samples: np.ndarray, config: AudioConfig | None = None) -> A
 
     f0 = np.full(len(frames), np.nan)
     f0[active] = yin_f0(frames[active], sr, config.f0_min_hz, config.f0_max_hz, config.yin_threshold)
-    voiced = ~np.isnan(f0)
+    voiced = np.isfinite(f0) & (f0 >= config.f0_min_hz) & (f0 <= config.f0_max_hz)
+    f0[~voiced] = np.nan
 
     half_width = max(1, config.syllable_min_distance_ms // hop_ms // 2)
     peaks = envelope_peaks(level, active, half_width, config.syllable_prominence_db)
     is_peak = np.zeros(len(frames), dtype=bool)
     is_peak[peaks] = True
 
-    baseline = t_ms < config.baseline_ms if config.baseline_ms else np.ones(len(frames), dtype=bool)
-    base_level = _median(level[active & baseline])
-    base_f0 = _median(f0[voiced & baseline])
-    base_rate = _rate(is_peak[baseline], active[baseline], hop_ms)
+    if config.baseline_ms is None:
+        # Explicit compatibility mode for clients requesting a global reference.
+        global_level, global_rate = _median(level[active]), _rate(is_peak, active, hop_ms)
+        base_level = np.full(len(frames), global_level if global_level is not None else np.nan)
+        base_rate = np.full(len(frames), global_rate if global_rate is not None else np.nan)
+    else:
+        base_level, base_rate = _reference_series(level, f0, active, is_peak, config)
+    ready = np.isfinite(base_level)
+    # Pitch spread must not include motion of the adaptive reference itself.
+    base_f0 = _median(f0[voiced])
     semitones = 12 * np.log2(f0 / base_f0) if base_f0 else np.full(len(frames), np.nan)
 
     events = sorted(
         _pauses(active, t_ms, config)
-        + _volume(level, active, t_ms, base_level, config)
-        + _pitch(semitones, voiced, t_ms, config)
-        + _pace(is_peak, active, t_ms, base_rate, config),
+        + _volume(level, voiced if config.baseline_ms is not None else active, t_ms, base_level, config)
+        + _pitch(semitones, voiced, t_ms, config, ready)
+        + _pace(is_peak, active, voiced, t_ms, base_rate, config),
         key=lambda e: (e.t_ms, e.type),
     )
     duration_ms = round(len(samples) / sr * 1000)
@@ -91,7 +99,22 @@ def analyze_samples(samples: np.ndarray, config: AudioConfig | None = None) -> A
         active=active.tolist(),
         syllable_peaks_ms=t_ms[peaks].tolist(),
     )
-    return AudioAnalysis(summary=summary, series=series, events=events, heuristics=config.model_dump())
+    return AudioAnalysis(summary=summary, series=series, events=events, heuristics={
+        **config.model_dump(),
+        "baseline_mode": "adaptive" if config.baseline_ms is not None else "whole-recording",
+        "baseline_ready": bool(ready.any()),
+    })
+
+
+def _reference_series(level, f0, active, is_peak, config: AudioConfig):
+    """Reference available BEFORE each sample: future audio cannot train the past."""
+    tracker = AdaptiveSpeechBaseline(config)
+    levels, rates = np.full(len(level), np.nan), np.full(len(level), np.nan)
+    for i in range(len(level)):
+        if tracker.current is not None:
+            levels[i], rates[i] = tracker.current.level, tracker.current.rate
+        tracker.observe(BaselineFrame(float(level[i]), float(f0[i]), bool(active[i]), bool(is_peak[i]), config.hop_ms))
+    return levels, rates
 
 
 def _median(values: np.ndarray) -> float | None:
@@ -135,7 +158,7 @@ def _windowed(
     measure,
     event_type: str,
     value_key: str,
-    baseline: dict,
+    baseline,
 ) -> list[Event]:
     """Evaluate fixed windows; `measure(slice)` returns (value, direction) or None.
     Adjacent windows with the same direction become one event."""
@@ -154,11 +177,15 @@ def _windowed(
         if previous == direction:
             events[-1].duration_ms = end_ms - events[-1].t_ms
             events[-1].payload[value_key].append(value)
+            if callable(baseline):
+                for key, item in baseline(window).items():
+                    if key.startswith("window_baseline_"):
+                        events[-1].payload[key].extend(item)
         else:
             events.append(Event(
                 t_ms=int(t_ms[window.start]), duration_ms=end_ms - int(t_ms[window.start]),
                 type=event_type, severity="hint", source="speech",
-                payload={"direction": direction, value_key: [value], **baseline},
+                payload={"direction": direction, value_key: [value], **(baseline(window) if callable(baseline) else baseline)},
             ))
         previous = direction
     return events
@@ -169,23 +196,24 @@ def _enough(mask: np.ndarray, config: AudioConfig) -> bool:
 
 
 def _volume(level, active, t_ms, base_level, config: AudioConfig) -> list[Event]:
-    if base_level is None:
-        return []
-
     def measure(window):
-        if not _enough(active[window], config):
+        if not np.isfinite(base_level[window.start]) or not _enough(active[window], config):
             return None
-        delta = float(np.median(level[window][active[window]])) - base_level
+        if config.baseline_ms is not None and (window.stop - window.start) * config.hop_ms < config.volume_window_ms:
+            return None
+        delta = float(np.median(level[window][active[window]])) - base_level[window.start]
         direction = "quiet" if delta <= -config.volume_quiet_db else "loud" if delta >= config.volume_loud_db else None
         return delta, direction
 
     return _windowed(t_ms, config.volume_window_ms, config, measure, "volume", "window_delta_db",
-                     {"baseline_level_db": round(base_level, 1)})
+                     lambda w: _reference_payload("level_db", base_level[w.start], config))
 
 
-def _pitch(semitones, voiced, t_ms, config: AudioConfig) -> list[Event]:
+def _pitch(semitones, voiced, t_ms, config: AudioConfig, ready) -> list[Event]:
     def measure(window):
-        if not _enough(voiced[window], config):
+        if not ready[window.start] or not _enough(voiced[window], config):
+            return None
+        if config.baseline_ms is not None and (window.stop - window.start) * config.hop_ms < config.pitch_window_ms:
             return None
         spread = float(np.std(semitones[window][voiced[window]]))
         return spread, "monotone" if spread <= config.pitch_monotone_max_st else None
@@ -193,17 +221,27 @@ def _pitch(semitones, voiced, t_ms, config: AudioConfig) -> list[Event]:
     return _windowed(t_ms, config.pitch_window_ms, config, measure, "pitch", "window_std_st", {})
 
 
-def _pace(is_peak, active, t_ms, base_rate, config: AudioConfig) -> list[Event]:
-    if not base_rate:
-        return []
-
+def _pace(is_peak, active, voiced, t_ms, base_rate, config: AudioConfig) -> list[Event]:
     def measure(window):
-        if not _enough(active[window], config):
+        reference = base_rate[window.start]
+        if not np.isfinite(reference) or reference <= 0 or not _enough(active[window], config):
+            return None
+        if config.baseline_ms is not None and (window.stop - window.start) * config.hop_ms < config.pace_window_ms:
+            return None
+        if config.baseline_ms is not None and not _enough(voiced[window], config):
             return None
         rate = _rate(is_peak[window], active[window], config.hop_ms)
-        ratio = rate / base_rate
+        ratio = rate / reference
         direction = "fast" if ratio >= config.pace_fast_ratio else "slow" if ratio <= config.pace_slow_ratio else None
         return rate, direction
 
     return _windowed(t_ms, config.pace_window_ms, config, measure, "pace", "window_syllables_per_s",
-                     {"baseline_syllables_per_s": round(base_rate, 2)})
+                     lambda w: _reference_payload("syllables_per_s", base_rate[w.start], config))
+
+
+def _reference_payload(unit: str, value: float, config: AudioConfig) -> dict:
+    return {
+        f"baseline_{unit}": round(float(value), 2),
+        f"window_baseline_{unit}": [round(float(value), 2)],
+        "baseline_mode": "adaptive" if config.baseline_ms is not None else "whole-recording",
+    }

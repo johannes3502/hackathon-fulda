@@ -1,6 +1,8 @@
 # Backend — Review-API, Timestamps und Event-Persistenz
 
-Status: definierter Zielvertrag für die Backend-Implementierung.
+Status: Backend-P0 und technische P1/P2-Anbindung implementiert (24.10.2026).
+Frontend-Anbindung bleibt ein separater Team-Change. Menschlich gelabelte
+Evaluation und Geräte-/Browser-Abnahme stehen aus; Prüfumfang in §13.
 Bezug: `docs/03-architecture.md`, `docs/04-pose-tracking-requirements.md`, `docs/05-frontend-review-ux.md`, `AGENTS.md`.
 
 ## 1. Scope und Non-Goals
@@ -37,6 +39,7 @@ Das Video bleibt im Browser (IndexedDB). Der Server liefert `t_ms`, `peak_ms` un
 Für Speech/ASR darf die Audiospur (oder die komplette Aufnahme, aus der Audio extrahiert wird) **temporär** hochgeladen werden. Sie wird nach Abschluss des Jobs gelöscht. Persistiert werden nur:
 
 - `audio_probe` (Stream-Startzeiten, Dauer),
+- Wörter mit Timestamps (Eingabe für Quellenvergleich und Fragerunde),
 - Speech-/ASR-Events,
 - WPM/Pausen/Füller-Metriken.
 
@@ -66,7 +69,7 @@ erDiagram
     SESSIONS {
         uuid id PK
         text title
-        text collection_id
+        uuid collection_id
         text status
         jsonb consent
         jsonb capture
@@ -81,6 +84,9 @@ erDiagram
         text mime_type
         jsonb timebase
         jsonb audio_probe
+        jsonb coverage
+        jsonb analysis
+        int revision
         timestamptz created_at
         timestamptz deleted_at
     }
@@ -116,6 +122,7 @@ erDiagram
         text status
         int progress
         jsonb error
+        jsonb result
         timestamptz created_at
         timestamptz updated_at
     }
@@ -129,7 +136,7 @@ erDiagram
 |---|---|---|
 | `id` | `uuid` | PK, default `gen_random_uuid()` |
 | `title` | `text` | not null |
-| `collection_id` | `text` | null; verweist auf bestehende Quellen-Collection |
+| `collection_id` | `uuid` | null; verweist auf bestehende Quellen-Collection |
 | `status` | `text` | `created`, `analyzing`, `review_ready`, `failed`, `deleted` |
 | `consent` | `jsonb` | `{granted, at, version, scope}` |
 | `capture` | `jsonb` | Framing/Audience/Resolution, ohne Videodaten |
@@ -147,6 +154,9 @@ erDiagram
 | `mime_type` | `text` | z. B. `video/webm;codecs=vp8,opus` |
 | `timebase` | `jsonb` | siehe §5 |
 | `audio_probe` | `jsonb` | Ergebnis des FFprobe beim Audio-Upload |
+| `coverage` | `jsonb` | gemessene Intervalle; nicht gemeldete Zeit bleibt unbekannt |
+| `analysis` | `jsonb` | Wörter mit Timestamps, Audio-/Wort-Summaries, Anbieterhinweise; optional Fact-Check und Fragen; keine Signal-/Landmark-Arrays |
+| `revision` | `int` | Änderungsversion für atomare Review-Snapshots |
 | `created_at` | `timestamptz` | not null |
 | `deleted_at` | `timestamptz` | null |
 
@@ -171,6 +181,9 @@ erDiagram
 Constraints:
 
 - `UNIQUE (take_id, dedupe_key)` für Idempotenz.
+- Fehlt `dedupeKey` im JSON-Beispiel, wird `eventId` verwendet. Ein expliziter
+  Key muss nichtleer sein. Event-IDs sind Token aus ASCII-Buchstaben, Zahlen,
+  `:`, `_`, `.`, `-` (maximal 200 Zeichen); damit bleiben Platzhalter eindeutig.
 - `PRIMARY KEY (take_id, id)`; Event-IDs müssen nur pro Take eindeutig sein.
 - `CHECK (t_ms >= 0 AND duration_ms >= 0 AND peak_ms >= t_ms)`.
 - `CHECK (t_ms + duration_ms <= 86_400_000)` als harte Obergrenze.
@@ -195,10 +208,11 @@ Constraints:
 |---|---|---|
 | `id` | `uuid` | PK |
 | `take_id` | `uuid` | FK → `takes.id`, `ON DELETE CASCADE` |
-| `kind` | `text` | `audio_analyze`, `review_generate` |
+| `kind` | `text` | `audio_analyze`, `review_generate`, `factcheck`, `questions_generate`, `answer_review` |
 | `status` | `text` | `queued`, `running`, `completed`, `failed` |
 | `progress` | `int` | 0–100 |
 | `error` | `jsonb` | null |
+| `result` | `jsonb` | Review-ID oder typisiertes Fact-Check-/Frage-/Antwort-Ergebnis |
 | `created_at` | `timestamptz` | not null |
 | `updated_at` | `timestamptz` | not null |
 
@@ -325,11 +339,20 @@ Regeln für die Annahme:
 Das Backend erzeugt sie selbst. Payloads bleiben typabhängig:
 
 - `pause`: `{ gap_ms, before, after, mid_sentence }`
-- `volume`: `{ direction, delta_db_median, baseline_level_db }`
+- `volume`: `{ direction, delta_db_median, baseline_level_db }`; Signal-Pipeline alternativ mit `window_delta_db` und `window_baseline_level_db` (gleich lange Arrays).
 - `pitch`: `{ direction, std_st_median }`
 - `pace` (ASR): `{ direction, window_wpm, baseline_wpm }`
 - `pace` (Audio): `{ direction, window_syllables_per_s, baseline_syllables_per_s }`
 - `filler`: `{ kind: "filler" | "repetition", word }`
+
+Bei der adaptiven Signalreferenz trägt das Payload zusätzlich
+`baseline_mode: "adaptive"`; `window_baseline_level_db` bzw.
+`window_baseline_syllables_per_s` speichert die Referenz vor jedem Messfenster.
+Die vorhandene skalare Baseline bleibt als Referenz des ersten Fensters erhalten.
+Der Review-Text benennt eine nachgeführte Stimmreferenz und verwendet deren
+Fensterwerte. Ältere Events ohne diese Felder bleiben lesbar. Kalibrierung beginnt
+erst nach genügend stimmhafter Sprache; spätere Audioabschnitte verändern keine
+früheren Referenzen. Wortbasiertes ASR-Tempo bleibt separat.
 
 Wichtig:
 
@@ -371,7 +394,7 @@ Das Frontend sendet die Timebase beim Anlegen des Takes. Das Backend validiert s
 | `abs(container_duration_ms - duration_ms) <= 2000` | `E_DURATION_MISMATCH` (Warning, nicht hart ablehnen) |
 | `abs(av_offset_ms) <= 500` | `E_AV_OFFSET_IMPLAUSIBLE` (Warning) |
 | `0 <= t_ms <= duration_ms + 1000` | `E_EVENT_OUT_OF_RANGE` |
-| `0 <= duration_ms <= duration_ms + 1000` | `E_EVENT_DURATION_INVALID` |
+| `event.t_ms + event.duration_ms <= take.duration_ms + 1000` und `<= 86_400_000` | `E_EVENT_DURATION_INVALID` |
 | `t_ms <= peak_ms <= t_ms + duration_ms` | `E_PEAK_OUT_OF_RANGE` |
 | `validRatio` in `[0, 1]` | `E_VALID_RATIO_INVALID` |
 | `dedupe_key` nicht leer | `E_DEDUPE_KEY_MISSING` |
@@ -424,6 +447,11 @@ Bei fehlendem Video-Upload wird `first_video_pts_ms` aus der Take-Timebase verwe
 | `POST` | `/api/takes/{takeId}/audio` | Audio/Aufnahme temporär hochladen | `202 { jobId, statusUrl }` |
 | `POST` | `/api/takes/{takeId}/events` | Browser-Events upserten | `200 { accepted, rejected }` |
 | `POST` | `/api/takes/{takeId}/review` | Review erzeugen | `202 { jobId, statusUrl }` |
+| `POST` | `/api/takes/{takeId}/factcheck` | gespeicherte Wörter gegen Session-Collection prüfen; `useWeb` standardmäßig aus | `202 { jobId, statusUrl }` |
+| `POST` | `/api/takes/{takeId}/questions` | Fragen aus gespeichertem Transkript und Funden; `persona` | `202 { jobId, statusUrl }` |
+| `GET` | `/api/takes/{takeId}/questions` | gespeichertes `QuestionResult`, ggf. null | `200 { questions }` |
+| `POST` | `/api/takes/{takeId}/questions/answers` | `{questionId, answer, persona?}`; nur Fragen dieses Takes | `202 { jobId, statusUrl }` |
+| `GET` | `/api/takes/{takeId}/evaluation` | technische Failure-Codes/Fallback-Rate, keine menschliche Qualitätsmessung | `200 { evaluation }` |
 | `GET` | `/api/takes/{takeId}/timeline` | Timeline + Aggregates + Coverage | `200 { timeline }` |
 | `GET` | `/api/takes/{takeId}/review` | ReviewReport | `200 { review }`, `404` wenn noch nicht erzeugt |
 | `GET` | `/api/jobs/{jobId}` | Job-Status | `200 { job }` |
@@ -431,6 +459,10 @@ Bei fehlendem Video-Upload wird `first_video_pts_ms` aus der Take-Timebase verwe
 | `GET` | `/api/health/ready` | Readiness | `200` |
 
 Es gibt bewusst **keine** Endpunkte für Clips, Snapshots oder Videodateien.
+Die Präfixe `s_`, `t_`, `j_`, `r_` in Beispielen sind illustrative Kürzel;
+die implementierte API verwendet UUIDs. Alle neuen POSTs benötigen den Header
+`Idempotency-Key`. Bestehende `/speech`, `/factcheck`, `/questions`, `/sources`
+bleiben kompatibel; deren bisherige Snake-Case-Verträge werden nicht migriert.
 
 ### 6.2 `POST /api/sessions`
 
@@ -486,7 +518,11 @@ Request:
     "avOffsetMs": 12,
     "containerDurationMs": 182200,
     "wallDurationMs": 182340
-  }
+  },
+  "coverage": [
+    { "tMs": 0, "durationMs": 163800, "evaluable": true },
+    { "tMs": 163800, "durationMs": 18400, "evaluable": false, "reason": "hips-not-visible" }
+  ]
 }
 ```
 
@@ -520,6 +556,8 @@ Multipart:
 file: recording (audio/* oder video/*)
 transcribe: true|false
 config: optional JSON
+local_only: true|false (optional)
+live_transcript: optional finales Deepgram-Wörter-JSON (wie /speech/analyze)
 ```
 
 Der Server:
@@ -542,6 +580,10 @@ Response:
 ```
 
 Wenn `transcribe=true` und kein ASR-Provider konfiguriert ist: `503 E_ASR_UNAVAILABLE`.
+Maximal 128 MiB pro Upload. Ein Cloud-Transcriber, gehostetes LLM oder Web-Fetch
+braucht Session-Einwilligung mit `scope: "local-and-cloud-analysis"`; ein
+lokaler Job funktioniert mit `local-analysis`. Wort-/Audio-Summaries und
+Anbieterhinweise sind anschließend in `GET /takes/{id}` unter `analysis`.
 
 ### 6.5 `POST /api/takes/{takeId}/events`
 
@@ -603,6 +645,8 @@ Response:
 ```
 
 Bei Teilfehlern: akzeptierte Events werden gespeichert, abgelehnte mit Code und Index zurückgegeben. Maximal 500 Events pro Request; größere Batches aufteilen.
+Identische Upserts invalidieren keine fertige Review. Ein verspätetes `live`-
+Event ersetzt kein bereits finales Event mit demselben Dedupe-Key.
 
 Upsert:
 
@@ -693,7 +737,7 @@ Keine Clip-/Snapshot-Felder.
 
 ### 6.8 `GET /api/takes/{takeId}/review`
 
-Response: `review.v1` (siehe §8.3). Wenn noch keine Review existiert:
+Response: `{ "review": <review.v1> }` (siehe §8.3). Wenn noch keine fertige Review existiert:
 
 ```json
 {
@@ -770,9 +814,15 @@ HTTP-Codes:
 
 - `Idempotency-Key`-Header auf allen POSTs.
 - Server speichert `key + request_hash` für 24 h.
+- Keys gelten pro Operation/Pfad. Abgelaufene Einträge werden beim nächsten
+  POST entfernt; Session-Löschung entfernt ihre Einträge sofort.
 - Gleicher Key + gleicher Hash → gleiche Response/Job-ID.
 - Gleicher Key + anderer Hash → `409 E_IDEMPOTENCY_CONFLICT`.
 - Event-Upserts sind zusätzlich über `(take_id, dedupe_key)` idempotent.
+- UUID-Job und Response werden vor dem Enqueue atomar gespeichert. Fällt das
+  Publizieren aus, liefert die Anfrage 503; derselbe POST/Key publiziert beim
+  Retry denselben noch wartenden Job. Ein periodischer Outbox-Sweeper ist
+  nicht implementiert. Ein Take erlaubt höchstens einen aktiven langen Job.
 
 ## 7. Analyse-Pipeline
 
@@ -789,6 +839,10 @@ Upload → temporär speichern → ffprobe → Audio extrahieren
 - `takes.audio_probe` bleibt.
 - Kein Video-Frame, kein Snapshot, kein Clip.
 - ASR-Wortzeiten werden mit dem Audio-Offset auf die Take-Zeitachse verschoben.
+- Vollständige Live-Wörter sind bereits Take-relativ und werden nicht nochmals
+  verschoben. Ohne belastbares Peak-Sample ist `peakMs = tMs` mit
+  `payload.peakBasis: "event-start-no-peak-sample"` explizit markiert; ein
+  stärkster Moment wird dann nicht behauptet.
 - `transcribe=false` überspringt ASR, führt aber Speech-Analyse aus.
 
 ### 7.2 Pose-Events
@@ -814,6 +868,12 @@ Beim Review-Start:
 4. Stabil sortieren: `(t_ms, peak_ms, id)`.
 5. Aggregates berechnen: Count, Dauer, Share, längstes Event, nicht auswertbare Zeit.
 6. Coverage berechnen: `duration_ms`, `evaluable_ms`, `not_evaluable_ms`, Gründe.
+
+Coverage ist Haltungs-/Framing-Abdeckung. Gemeldete Messintervalle im Take
+liefern die Grundlage; finale `framing`-/`data-quality`-Events überschreiben
+sie als nicht auswertbar. Lücken heißen `coverage-not-reported`, nicht gültig.
+Überlappungen werden für die Gesamtdauer vereinigt; einzelne Gründe können
+sich überschneiden. Aus „keine Abweichung gemeldet“ wird keine Stärke abgeleitet.
 
 ### 7.4 Review-Job
 
@@ -871,6 +931,10 @@ Regeln:
 ### 8.2 P1 — LLM als Formulierer
 
 Das LLM bekommt **keine** rohen Events und keine ganze Session, sondern 8–15 Evidence Cards.
+Bei weniger Ereignissen entsprechend weniger Karten. Der umgesetzte Writer
+gibt pro Karte geprüfte `allowedTexts` mit Platzhaltern vor; das Modell wählt
+daraus, statt neue Tatsachen oder freie Ratschläge zu formulieren. Maximal drei
+Fokus-Findings, Kategorienvielfalt vor Wiederholungen. Die Summary bleibt in Code.
 
 Evidence Card:
 
@@ -1034,6 +1098,8 @@ Jede Claim wird geprüft:
 | Maximale Länge | `E_TOO_LONG` | Claim droppen |
 
 Wenn ein Claim zweimal fehlschlägt: Template für dieses Finding. Wenn > 20 % der Claims fallbacken: Job als `failed` markieren und Prompt/Katalog prüfen.
+Die geprüfte Template-/Teilfallback-Review bleibt dabei per GET verfügbar;
+der Job meldet `E_REVIEW_VERIFICATION`. Kein Report mit ungeprüften Claims wird gespeichert.
 
 ### 8.5 Zitatprüfung
 
@@ -1047,7 +1113,8 @@ Normalisierung:
 6. Casefold.
 7. Soft-Hyphen entfernen.
 8. `ß`/`ss` nur fürs Matching mappen.
-9. Seitenkopf/-fuß entfernen.
+9. Nur den referenzierten Chunk/Fundort prüfen. Seitenköpfe/-füße werden ohne
+   verlässliche Layout-Metadaten nicht automatisch gelöscht; das könnte Zitattext verändern.
 
 Dann:
 
@@ -1056,6 +1123,8 @@ Dann:
 - sonst kein Zitat.
 
 Scope: Das Zitat muss aus der zitierten Quelle und der zitierten Fundstelle stammen. Nicht irgendwo im Korpus.
+Fuzzy-Matching darf Zahlen oder Negationen nicht verändern. Ein expliziter
+Auszug-Verweis ist bindend; ein Zitat wird nicht auf einen anderen Auszug umgebucht.
 
 Fact-Check-Urteil ist fix:
 
@@ -1089,6 +1158,12 @@ Niemals „falsch“, „erfunden“, „halluziniert“, „beweist“.
 | Kontext | Systemregeln → Evidence Cards → Aufgabe → Schema → harte Regeln |
 | Kartenanzahl | 8–15, nicht die ganze Session |
 | Verifier | anderes Modell, claim-level, 3 Votes, Temperatur 0 |
+
+Die Tabelle war eine Empfehlung des Entwurfs. Implementiert sind lokale
+Ollama-JSON-Schema-Ausgabe und harte Code-Prüfungen für alle Adapter. Ein
+mehrfach abstimmendes zweites Modell wird nicht als Qualitätsbeweis verwendet.
+Die endliche Formulierungsauswahl macht unbekannte Einheiten, Quellen,
+Kausalität oder Ratschläge ungültig. Menschliche Claim-Labels bleiben nötig.
 
 ## 9. Speicherung, Retention, Privacy
 
@@ -1196,3 +1271,50 @@ Das Frontend muss die lokale Kopie separat löschen und dem Nutzer beide Wirkung
 - Gibt es Auth? Wenn nein: unguessable IDs, Rate Limits, CORS, keine sensiblen Daten in Logs.
 - Wird die Review auf Deutsch oder Englisch erzeugt? UI und Review-Text konsistent halten.
 - Sollen Aggregates persistiert oder bei jedem Timeline-Request berechnet werden? Für 60 Events reicht Berechnung; bei Wachstum cachen.
+
+## 13. Umsetzung und Review-Ergebnis (24.10.2026)
+
+Der Nutzerauftrag gilt ausschließlich dem Backend. Änderungen liegen in
+`backend/app/review/`, der gemeinsamen Quellen-Zitatprüfung, Backend-Tests,
+Backend-/Architekturdokumentation und dem generierten `api/`-Vertrag. Keine
+Frontend-/Mobile-Implementierung geändert.
+
+| Schritt | Stand / Beleg |
+|---|---|
+| P0 Tabellen, Event-Upsert, Timebase, Timeline, Coverage | implementiert; echte Postgres-Roundtrips in `backend/tests/test_review_db.py` |
+| P0 temporäres Audio, Probe, A/V-Offset, Merge | bestehende Pipeline adaptiert; Original-Löschung vor `completed`, auch bei Analysefehler; Worker verhindert Wiederanlegen nach Session-Löschung |
+| P0 Template, Idempotenz, Delete, kein Medien-Schema | implementiert; atomare Keys/Jobs, Ready-Review-Wiederverwendung, Cascade inkl. temporärem Audio |
+| P1 Fact-Check, Quellenbezug, exakte/fuzzy Zitate | bestehende Pipeline angebunden; Auszug-Verweis bindend, Unicode-/Hyphen-/Bidi-Normalisierung, Zahlen-/Negationsschutz |
+| P1 Evidence Cards, Verifier, Template-Fallback | implementiert; lokales Qwen über Ollama im echten Queue-/HTTP-Pfad geprüft; keine Tools oder Retrieval im Writer |
+| P1 adversariale Fixtures | zwanzig Writer-Fälle plus Schema-, Quote-, Timestamp- und Coverage-Tests; synthetisch, keine Genauigkeitsvalidierung |
+| P1 dreißig menschliche Claim-Labels | **offen**; dreißig synthetische Fälle in `backend/tests/fixtures/review-human-labels.json` vorbereitet, alle Labels bewusst null |
+| P2 Fragen und Antwortvergleich | Take-Routen implementiert; gespeicherte Wörter, Collection und Funde; Antwort nur auf Fragen dieses Takes, keine Note |
+| P2 Web-Zweitquelle | vorhandener Adapter explizit zuschaltbar; standardmäßig aus, getrennt als Web-Evidenz; kein Live-Web-Qualitätsnachweis |
+| P2 Evaluation | Backend-Endpunkt mit Failure-Codes/Fallback-/Verifier-Counts; keine Frontend-Dashboard-Arbeit in diesem Change |
+| API-Vertrag | FastAPI → `api/openapi.json` → `api/schema.d.ts`; Browser-Pose-Payload und Review-Report typisiert |
+
+Synthetischer HTTP-/Celery-/Postgres-/S3-Smoke: Template-Review ca. **0,25 s**;
+fünfminütiger Take mit 60 Events ohne Medien-Upload ca. **0,23 s** inklusive
+Queue/Polling (Budget < 10 s). Lokaler LLM-Pfad ca. **17,3 s** beim separaten
+Smoke; das ist kein Latenzversprechen. Beide Pfade prüften Audio-Löschung im
+Objektspeicher, Wiederholung desselben Job-Keys, Ready-Review-Wiederverwendung
+und idempotente Session-Löschung. Startbefehle: `backend/README.md`.
+
+Zusätzlicher synthetischer Durchlauf nach Integration der Team-Commits:
+echte lokale Whisper-ASR → 13 Wörter → Fact-Check → eine quellengebundene
+Frage → Antwortvergleich → Template-Review. Alle Jobs abgeschlossen, Session
+und Testquelle anschließend gelöscht. Der Vortrag ergab keine extrahierten
+Tatsachenbehauptungen; damit wurde kein reales Fact-Check-Urteil abgenommen.
+Die Modellreaktion auf die Antwort ist ebenfalls kein menschliches Qualitätslabel.
+
+Bei der Gesamtprüfung zeigte der bestehende Deepgram-Disconnect-Test auch auf
+unverändertem `HEAD` einen TestClient-Abbruch während Cleanup. Der Test wartet
+nun auf den tatsächlichen Protokoll-Disconnect vor Verlassen des Kontextes;
+Produktions-Streaming wurde dabei nicht geändert.
+
+Offene Abnahme: menschliche Labels/Modellqualität, echtes Mikrofon und Geräte,
+Browser-IndexedDB und Video-Sprünge (Frontend-Team), öffentliche Absicherung
+und automatische Retention. Lokaler Scope bleibt bestätigt. Ohne erneuten
+POST/Key oder Session-Löschung gibt es keine automatische Bergung eines vor
+dem Enqueue verwaisten Jobs. Harte Worker-Abbrüche verzögern Audio-Cleanup bis
+zur erneuten Zustellung; ein allgemeiner Retention-Sweeper ist nicht Teil dieser Umsetzung.

@@ -1,3 +1,5 @@
+import type { LiveRecording } from "@/features/live/contracts";
+
 export const STAT_LABELS = {
   gesture: "Gestik",
   knowledge: "Fachwissen",
@@ -5,26 +7,15 @@ export const STAT_LABELS = {
   structure: "Struktur",
 } as const;
 
-export type PresentationStats = Record<keyof typeof STAT_LABELS, number>;
-
-/** Synthetic design fixture, not an assessment of a real presentation. */
-export const DEMO_STATS: PresentationStats = {
-  gesture: 78,
-  knowledge: 88,
-  flow: 84,
-  structure: 78,
-};
-
-export function summarizeStats(stats: PresentationStats) {
-  const values = Object.keys(STAT_LABELS).map(
-    (key) => stats[key as keyof PresentationStats],
-  );
-  if (
-    values.some((value) => !Number.isFinite(value) || value < 1 || value > 100)
-  ) {
-    return null;
-  }
-  return Math.round(
-    values.reduce((sum, value) => sum + value, 0) / values.length,
-  );
+/** Counts and durations from captured takes; observations are not quality scores. */
+export function summarizeRecordings(
+  recordings: Pick<LiveRecording, "durationMs" | "feedback" | "words">[],
+) {
+  return {
+    sessions: recordings.length,
+    durationMs: recordings.reduce((sum, take) => sum + take.durationMs, 0),
+    moments: recordings.reduce((sum, take) => sum + take.feedback.length, 0),
+    transcripts: recordings.filter((take) => (take.words?.length ?? 0) > 0)
+      .length,
+  };
 }

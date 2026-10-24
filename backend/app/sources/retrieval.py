@@ -5,13 +5,12 @@ candidates; both rankings are combined with reciprocal rank fusion (RRF).
 Keywords catch exact numbers and names that embeddings tend to blur.
 """
 
-import re
-import unicodedata
 from uuid import UUID
 
 from app.sources import db
 from app.sources.embeddings import Embedder, configured_embedder
 from app.sources.models import Location, SourceHit
+from app.sources.quotes import normalize as normalize_quote
 
 CANDIDATES = 20
 RRF_K = 60  # Common constant from the original RRF paper; not tuned here.
@@ -85,10 +84,7 @@ def format_context(hits: list[SourceHit]) -> str:
 
 
 def normalize(text: str) -> str:
-    text = unicodedata.normalize("NFKC", text).casefold()
-    text = text.translate(str.maketrans({"„": '"', "“": '"', "”": '"', "‚": "'", "‘": "'", "’": "'",
-                                         "–": "-", "—": "-", "­": None}))
-    return re.sub(r"\s+", " ", text).strip()
+    return normalize_quote(text)
 
 
 def quote_in_text(quote: str, text: str) -> bool:

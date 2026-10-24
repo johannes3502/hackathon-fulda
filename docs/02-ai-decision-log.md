@@ -763,3 +763,109 @@ neue Erfolgsfall. Die lokale `.env` stand noch auf Deepgram ohne Schlüssel;
 `ASR_PROVIDER=whisper` wurde als lokaler Ersatzweg eingerichtet, kein Schlüssel
 geändert oder eingecheckt. Aktivierung: `DEEPGRAM_API_KEY` setzen und Frontend,
 Backend sowie Worker neu bauen/starten. Kein echter Anbieteraufruf getestet.
+
+## Review und ElevenLabs (24.10.2026)
+
+Nutzerauftrag: Review im Stil des Live-Monitorings vereinfachen, Material vorab
+hochladen und anschließend durch einen ElevenLabs-Agenten befragen lassen.
+Vier Modi (Startup, Thesis, Schule, Nonprofit) verändern die Schwerpunkte der
+Fragen. Nutzer bestätigt: Integration bauen, Agent-Konfiguration trägt er später ein.
+
+Codex: vorhandene Wiedergabe-, Quellen-, Celery- und Frage-APIs wiederverwendet;
+Review auf zwei Ansichten reduziert, kurze Replay-Abschnitte mit Video-Anmerkungen,
+Einzelfragen mit getipptem Quellenvergleich und optionalem ElevenLabs-Dialog.
+Collection-ID und Präsentationstyp werden bei Aufnahmestart festgehalten.
+Das offizielle ElevenLabs-SDK übernimmt Audio und Verbindung; Schlüssel nur im
+Backend, Signed URL ohne Cache. Kontext-Aufbereitung als wiederholbarer Job.
+
+Grenzen: keine echten ElevenLabs-Zugangsdaten in diesem Lauf, keine Aussage
+zur Audio- oder pädagogischen Qualität. Sprachreaktionen haben keinen
+serverseitigen Zitat-Check. Replay nutzt weiterhin das lokale Vollvideo;
+Clips werden bewusst lokal wiedergegeben; persistente Browser-Aufnahmehistorie bleibt offen.
+Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
+
+## Persistente Backend-Review ohne Server-Clips (24.10.2026)
+
+- Nutzerauftrag: `docs/06-backend-review-api.md` prüfen und umsetzen,
+  ausschließlich Backend; Frontend-Arbeit läuft beim Team parallel.
+- Implementiert: Postgres-Sessions/Takes/Events/Reviews/Jobs, abgeleitete
+  Wort-/Audio-Summaries, atomare Idempotenz, validierte Browser-Pose-Events,
+  A/V-Probe/Offset, finale Timeline mit Pausen-Dedupe und getrennten Tempo-
+  Einheiten, explizite Coverage, Template-Review und geprüfte LLM-Auswahl,
+  Fact-Check-/Frage-/Antwort-Anbindung, technische Evaluation und Cascade-Delete.
+  Keine serverseitigen Wiedergabe-Medien oder Clip-/Snapshot-Felder.
+- Korrigierte Entwurfsunklarheiten: Dedupe-Key fehlt im Beispiel und fällt
+  deshalb auf Event-ID zurück; unbekannte Coverage wird nicht als gültig
+  interpretiert; fehlende Peak-Messung wird als Event-Anfang gekennzeichnet;
+  Token-IDs und echte UUIDs sind dokumentiert. Ein Zitat bleibt am angegebenen
+  Fundort, fuzzy Matching darf Zahlen/Negationen nicht verändern. Seitenköpfe
+  werden ohne Layout-Evidenz nicht heuristisch aus Zitaten gelöscht.
+- Der Writer bekommt einen begrenzten Karten-Pack mit erlaubten Textframes.
+  Native Ollama-JSON-Schema-Ausgabe plus Code-Verifier ersetzen unbelegte
+  freie Formulierungen. Summary und Kennwerte kommen aus Code. Nach einem
+  Retry Template-Fallback, bei mehr als 20 % Fallback fehlgeschlagener Job
+  mit weiter abrufbarer geerdeter Review. Keine behauptete Modellgenauigkeit.
+- Geprüft: **183 Backend-Tests bestanden**, inklusive echter Postgres- und
+  Silero-ONNX-Prüfung. Zwanzig adversariale Writer-Fixtures sowie Cleanup-
+  Ausfälle, Queue-Retry, Event-ID-Konflikt, Delete während Verarbeitung,
+  Teilfehler und take-gebundene Antworten. Die bestehende Deepgram-
+  Disconnect-TestClient-Race war auch auf unverändertem HEAD reproduzierbar;
+  Test wartet nun auf Protokoll-Cleanup, keine Änderung am Streaming-Code.
+- Reale lokale Infrastruktur mit synthetischen Daten: HTTP → Celery →
+  Postgres/S3, Upload-Löschung im Objektspeicher geprüft, Idempotenz und
+  Cascade-Delete bestanden. Template ca. 0,25 s; fünfminütiger Take mit 60
+  Events ohne Medien ca. 0,23 s inklusive Queue/Polling. Lokaler Qwen-Pfad
+  separat ca. 17,3 s, gültige Claims ohne Fallback. Keine Latenzzusage.
+- Nach Integration der Team-Commits zusätzlich: synthetische deutsche Sprache
+  mit echtem lokalem Whisper transkribiert (13 Wörter), Quellen-Ingest über
+  bestehendes RAG, Fact-Check-Job, eine Frage, Quellenvergleich der getippten
+  Antwort und Template-Review vollständig über HTTP/Worker. Session und
+  Testquelle gelöscht. Keine Tatsachenbehauptung extrahiert, daher kein
+  Fact-Check-Urteil geprüft; Modellantwort ist kein menschliches Qualitätslabel.
+- API-Schema/TypeScript regeneriert und aktuell. Frontend-/Mobile-Code blieb
+  unberührt; Architekturdiagramme auf den neuen Backend-Vertrag abgestimmt.
+- Offen: **30 menschliche Labels** (synthetisches Paket vorbereitet, alle
+  Labels null), echte ASR-/Retrieval-/Fact-Check-Qualität, Mikrofon/Browser/
+  Geräte und Frontend-Integration. Kein periodischer Outbox-/Retention-Sweeper,
+  keine öffentliche Deployment-Abnahme. Abgebrochene Publikation braucht
+  denselben POST/Key oder Session-Löschung; harter Worker-Verlust verzögert
+  temporäres Audio-Cleanup bis zur erneuten Zustellung.
+
+## Adaptive Stimmreferenz und stiller Aufnahmestart (24.10.2026)
+
+- Nutzerauftrag: Referenz kontinuierlich nachführen und den Fall beheben, dass
+  am Anfang noch nicht gesprochen wird und danach ständig ein Lautstärkehinweis
+  erscheint. Browser und Backend sammeln zunächst 3 s erkannte stimmhafte Sprache.
+  Lautstärkereferenz und Vergleich nutzen nur Frames mit plausibler Tonhöhe und
+  Aktivität. Anfangsstille und Rauschen ohne erkannte Tonhöhe zählen nicht.
+- Umsetzung: qualifizierte, nicht überlappende 1-s-Blöcke mit mindestens 30 %
+  stimmhaften Messungen. Median gegen kurze Spitzen, exponentielle Nachführung
+  mit 30 s Halbwertszeit in stimmhafter Zeit, begrenzte Pegel-/Pitch-Kandidaten
+  (12 dB/Halbtöne) und Rhythmus-Kandidaten (Faktor 2). Diese Einstellungen wurden
+  im Change als konfigurierbare Prototyp-Heuristiken gewählt, nicht empirisch
+  validiert. Längere Änderungen erzeugen zunächst Feedback und werden danach
+  schrittweise zur Referenz. Keine absolute Bewertung der Sprechlautstärke.
+- Zustände: Pausen und unvoiced Rauschen frieren die Referenz ein. Mikrofonlücken
+  verwerfen unvollständige Messblöcke; eine bereits gelernte Referenz bleibt
+  erhalten. Eine neue Aufnahme kalibriert neu. Bei anfangs fehlenden Hüllkurven-
+  Peaks kann die Rhythmusreferenz später starten. Ungültige Tonhöhen und doppelte
+  oder ungültige Zeitstempel dürfen die Browser-Kalibrierung nicht vorantreiben.
+- Backend: Referenzaufbau chronologisch aus den Messframes; spätere Frames
+  trainieren keine früheren Referenzen. Live-Vorschau und Batch nutzen denselben
+  Ablauf. Volume-/Pace-Events speichern die verwendete Referenz je Messfenster;
+  bestehende skalare Felder und explizites `baseline_ms: null` bleiben lesbar.
+  Der Writer benennt die adaptive Referenz in Deutsch und Englisch. UI-Hinweise,
+  API-Beschreibung, Produkt-/Architekturdokumentation und `AGENTS.md` aktualisiert.
+- Geprüft: 190 Frontend-Tests, 188 Backend-Tests einschließlich lokalem Silero ONNX
+  auf synthetischer Sprache und 12 gezielte Chromium-Prüfungen in Desktop-/Mobile-
+  Viewports. Gemeinsame deterministische Fixture für beide Tracker, Anfangsstille,
+  Raumrauschen, lange Pausen, Ausreißer, verzögerter Sprachbeginn, Mikrofonlücken,
+  Referenz-Nachführung, Event-Evidenz und Vorschau-/Batch-Vertrag geprüft.
+  Die Browserprüfung nutzt den echten AudioWorklet mit synthetischem Rauschen und
+  Ton, keine Behauptung über Erkennungsgenauigkeit bei Menschen. Lint, Typecheck,
+  Produktionsbuild, API-Aktualitätscheck und Parsing aller 12 Architekturdiagramme
+  bestanden. 14 bestehende PostgreSQL-/pgvector-Prüfungen ohne laufende Datenbank
+  übersprungen; keine neue Infrastruktur-Abnahme.
+- Offen: physische Mikrofone, Safari/iOS und schwierige akustische Umgebungen.
+  Browser-Pitch/Aktivitätsheuristik ist kein validierter Sprachdetektor; periodische
+  Störgeräusche können weiterhin Sprachmessungen ähneln.

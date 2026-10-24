@@ -46,7 +46,7 @@ export function PerformanceGraph({
   return (
     <section
       className="review418-graph-panel"
-      aria-label="Performance im Zeitverlauf"
+      aria-label="Momente im Zeitverlauf"
     >
       <div className="review418-panel-title">
         <div>
@@ -54,7 +54,7 @@ export function PerformanceGraph({
           <p>
             {points.length
               ? "Gesamt-Performance · markierte Momente anklicken"
-              : "Events auf der Zeitachse · noch keine Performance-Werte"}
+              : "Markierte Momente auf der Zeitachse anklicken"}
           </p>
         </div>
         <span className="review418-time">{timestamp(positionMs)}</span>
@@ -83,8 +83,16 @@ export function PerformanceGraph({
           >
             <defs>
               <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.22" />
-                <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.015" />
+                <stop
+                  offset="0%"
+                  stopColor="var(--primary)"
+                  stopOpacity="0.22"
+                />
+                <stop
+                  offset="100%"
+                  stopColor="var(--primary)"
+                  stopOpacity="0.015"
+                />
               </linearGradient>
             </defs>
             <text x={left} y="13" className="review418-axis-title">
@@ -124,7 +132,9 @@ export function PerformanceGraph({
             )}
             {!points.length && (
               <text x="414" y="95" textAnchor="middle">
-                Für diese Aufnahme ist keine Bewertung hinterlegt.
+                {moments.length
+                  ? "Wähle einen markierten Moment."
+                  : "Keine Momente vorhanden."}
               </text>
             )}
             <line

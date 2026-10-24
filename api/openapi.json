@@ -36,6 +36,157 @@
         "title": "AcceptedSource",
         "type": "object"
       },
+      "AgentContext": {
+        "properties": {
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "source_count": {
+            "title": "Source Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "prompt",
+          "source_count",
+          "notices"
+        ],
+        "title": "AgentContext",
+        "type": "object"
+      },
+      "AgentJob": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "AgentJob",
+        "type": "object"
+      },
+      "AgentSession": {
+        "properties": {
+          "signed_url": {
+            "title": "Signed Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signed_url"
+        ],
+        "title": "AgentSession",
+        "type": "object"
+      },
+      "AgentSettings": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "AgentSettings",
+        "type": "object"
+      },
+      "Aggregate": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "count",
+              "ms",
+              "ratio",
+              "WPM",
+              "syllables/s"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "value",
+          "unit"
+        ],
+        "title": "Aggregate",
+        "type": "object"
+      },
       "AnalysisJob": {
         "properties": {
           "error": {
@@ -176,6 +327,17 @@
               "tutor"
             ],
             "title": "Persona",
+            "type": "string"
+          },
+          "presentation_mode": {
+            "default": "thesis",
+            "enum": [
+              "startup",
+              "thesis",
+              "school",
+              "nonprofit"
+            ],
+            "title": "Presentation Mode",
             "type": "string"
           },
           "question": {
@@ -451,7 +613,7 @@
                 "type": "null"
               }
             ],
-            "description": "AudioConfig JSON; first 3000 ms are calibration",
+            "description": "AudioConfig JSON; calibrates on voiced speech, then adapts gradually; silence does not train the reference",
             "title": "Config"
           },
           "live_transcript": {
@@ -489,6 +651,53 @@
           "recording"
         ],
         "title": "Body_analyze_speech_analyze_post",
+        "type": "object"
+      },
+      "Body_audio_takes__take_id__audio_post": {
+        "properties": {
+          "config": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Temporary audio or recording; deleted on success or failure",
+            "title": "File",
+            "type": "string"
+          },
+          "live_transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Transcript"
+          },
+          "local_only": {
+            "default": false,
+            "title": "Local Only",
+            "type": "boolean"
+          },
+          "transcribe": {
+            "default": true,
+            "title": "Transcribe",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_audio_takes__take_id__audio_post",
         "type": "object"
       },
       "Body_start_voice_answer_review_questions_answers_voice_post": {
@@ -532,6 +741,154 @@
           "file"
         ],
         "title": "Body_upload_source_sources_post",
+        "type": "object"
+      },
+      "BrowserEventInput": {
+        "additionalProperties": false,
+        "properties": {
+          "dedupeKey": {
+            "default": "",
+            "description": "Defaults to eventId when omitted",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Dedupekey",
+            "type": "string"
+          },
+          "durationMs": {
+            "maximum": 86400000.0,
+            "minimum": 0.0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "eventId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9:_.-]*$",
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/PosePayload"
+          },
+          "peakMs": {
+            "minimum": 0.0,
+            "title": "Peakms",
+            "type": "integer"
+          },
+          "ruleVersion": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruleversion"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "hint",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "const": "browser",
+            "title": "Source",
+            "type": "string"
+          },
+          "stage": {
+            "default": "final",
+            "enum": [
+              "live",
+              "final"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "tMs": {
+            "minimum": 0.0,
+            "title": "Tms",
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "posture",
+              "head",
+              "hands",
+              "framing",
+              "data-quality"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "tMs",
+          "peakMs",
+          "durationMs",
+          "type",
+          "severity",
+          "source",
+          "payload"
+        ],
+        "title": "BrowserEventInput",
+        "type": "object"
+      },
+      "Capture": {
+        "additionalProperties": false,
+        "properties": {
+          "audienceMode": {
+            "default": "camera",
+            "enum": [
+              "camera",
+              "room"
+            ],
+            "title": "Audiencemode",
+            "type": "string"
+          },
+          "fps": {
+            "default": 30,
+            "exclusiveMinimum": 0.0,
+            "maximum": 240.0,
+            "title": "Fps",
+            "type": "number"
+          },
+          "framingMode": {
+            "default": "upper-body",
+            "enum": [
+              "upper-body",
+              "full-body"
+            ],
+            "title": "Framingmode",
+            "type": "string"
+          },
+          "height": {
+            "default": 720,
+            "exclusiveMinimum": 0.0,
+            "maximum": 16384.0,
+            "title": "Height",
+            "type": "integer"
+          },
+          "mirrored": {
+            "default": true,
+            "title": "Mirrored",
+            "type": "boolean"
+          },
+          "width": {
+            "default": 1280,
+            "exclusiveMinimum": 0.0,
+            "maximum": 16384.0,
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "title": "Capture",
         "type": "object"
       },
       "ClaimResult": {
@@ -609,6 +966,216 @@
         "title": "ClaimResult",
         "type": "object"
       },
+      "Consent": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "granted": {
+            "const": true,
+            "title": "Granted",
+            "type": "boolean"
+          },
+          "scope": {
+            "enum": [
+              "local-analysis",
+              "local-and-cloud-analysis"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "granted",
+          "at",
+          "version",
+          "scope"
+        ],
+        "title": "Consent",
+        "type": "object"
+      },
+      "Coverage": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "evaluableMs": {
+            "title": "Evaluablems",
+            "type": "integer"
+          },
+          "notEvaluableMs": {
+            "title": "Notevaluablems",
+            "type": "integer"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Reasons",
+            "type": "object"
+          }
+        },
+        "required": [
+          "durationMs",
+          "evaluableMs",
+          "notEvaluableMs",
+          "reasons"
+        ],
+        "title": "Coverage",
+        "type": "object"
+      },
+      "CoverageInterval": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "minimum": 0.0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "evaluable": {
+            "title": "Evaluable",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "tMs": {
+            "minimum": 0.0,
+            "title": "Tms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tMs",
+          "durationMs",
+          "evaluable"
+        ],
+        "title": "CoverageInterval",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "requestId": {
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "Evaluation": {
+        "additionalProperties": false,
+        "properties": {
+          "failedJobs": {
+            "items": {
+              "$ref": "#/components/schemas/FailedJob"
+            },
+            "title": "Failedjobs",
+            "type": "array"
+          },
+          "humanLabeledClaims": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Humanlabeledclaims"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Verification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "verification",
+          "failedJobs",
+          "humanLabeledClaims",
+          "limitations"
+        ],
+        "title": "Evaluation",
+        "type": "object"
+      },
+      "EvaluationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "evaluation": {
+            "$ref": "#/components/schemas/Evaluation"
+          }
+        },
+        "required": [
+          "evaluation"
+        ],
+        "title": "EvaluationResponse",
+        "type": "object"
+      },
       "Event": {
         "properties": {
           "duration_ms": {
@@ -647,8 +1214,11 @@
           "type": {
             "enum": [
               "posture",
+              "head",
+              "hands",
+              "framing",
+              "data-quality",
               "gesture",
-              "gaze",
               "filler",
               "pause",
               "pace",
@@ -670,6 +1240,46 @@
           "payload"
         ],
         "title": "Event",
+        "type": "object"
+      },
+      "EventBatch": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/BrowserEventInput"
+            },
+            "maxItems": 500,
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "title": "EventBatch",
+        "type": "object"
+      },
+      "EventsAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "rejected": {
+            "items": {
+              "$ref": "#/components/schemas/RejectedEvent"
+            },
+            "title": "Rejected",
+            "type": "array"
+          }
+        },
+        "required": [
+          "accepted",
+          "rejected"
+        ],
+        "title": "EventsAccepted",
         "type": "object"
       },
       "Evidence": {
@@ -716,6 +1326,21 @@
             "description": "Verbatim passage, verified by string match",
             "title": "Quote",
             "type": "string"
+          },
+          "quote_verified": {
+            "anyOf": [
+              {
+                "enum": [
+                  "exact",
+                  "fuzzy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Verified"
           },
           "source_id": {
             "anyOf": [
@@ -981,6 +1606,345 @@
         "title": "FactCheckSettings",
         "type": "object"
       },
+      "FactcheckRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "useWeb": {
+            "default": false,
+            "title": "Useweb",
+            "type": "boolean"
+          }
+        },
+        "title": "FactcheckRequest",
+        "type": "object"
+      },
+      "FailedJob": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "additionalProperties": true,
+            "title": "Error",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "error"
+        ],
+        "title": "FailedJob",
+        "type": "object"
+      },
+      "Finding": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "posture",
+              "voice",
+              "content",
+              "coverage"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/FindingEvidence"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "interpretation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interpretation"
+          },
+          "nextAction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observation": {
+            "title": "Observation",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "title",
+          "observation",
+          "evidence"
+        ],
+        "title": "Finding",
+        "type": "object"
+      },
+      "FindingEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "endMs": {
+            "title": "Endms",
+            "type": "integer"
+          },
+          "eventIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Eventids",
+            "type": "array"
+          },
+          "evidenceGrade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidencegrade"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "peakMs": {
+            "title": "Peakms",
+            "type": "integer"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "quoteVerified": {
+            "anyOf": [
+              {
+                "enum": [
+                  "exact",
+                  "fuzzy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quoteverified"
+          },
+          "ruleId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruleid"
+          },
+          "sourceKind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "upload",
+                  "web"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcekind"
+          },
+          "startMs": {
+            "title": "Startms",
+            "type": "integer"
+          },
+          "thresholdsStatus": {
+            "anyOf": [
+              {
+                "const": "heuristic-unvalidated",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thresholdsstatus"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "validRatio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validratio"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "eventIds",
+          "startMs",
+          "peakMs",
+          "endMs"
+        ],
+        "title": "FindingEvidence",
+        "type": "object"
+      },
+      "Generator": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "template",
+              "llm"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "promptVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promptversion"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "Generator",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -992,6 +1956,102 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Job": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "jobId": {
+            "format": "uuid",
+            "title": "Jobid",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "audio_analyze",
+              "review_generate",
+              "factcheck",
+              "questions_generate",
+              "answer_review"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "progress": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress",
+            "type": "integer"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FactCheckResult"
+              },
+              {
+                "$ref": "#/components/schemas/QuestionResult"
+              },
+              {
+                "$ref": "#/components/schemas/AnswerReview"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewReference"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "takeId": {
+            "format": "uuid",
+            "title": "Takeid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "takeId",
+          "kind",
+          "status",
+          "progress"
+        ],
+        "title": "Job",
+        "type": "object"
+      },
+      "JobResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/Job"
+          }
+        },
+        "required": [
+          "job"
+        ],
+        "title": "JobResponse",
         "type": "object"
       },
       "Location": {
@@ -1022,6 +2082,307 @@
           "end"
         ],
         "title": "Location",
+        "type": "object"
+      },
+      "NextAction": {
+        "additionalProperties": false,
+        "properties": {
+          "suggestionId": {
+            "title": "Suggestionid",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "suggestionId",
+          "text"
+        ],
+        "title": "NextAction",
+        "type": "object"
+      },
+      "PoseEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "sampleCount": {
+            "minimum": 0.0,
+            "title": "Samplecount",
+            "type": "integer"
+          },
+          "validRatio": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Validratio",
+            "type": "number"
+          }
+        },
+        "required": [
+          "sampleCount",
+          "validRatio"
+        ],
+        "title": "PoseEvidence",
+        "type": "object"
+      },
+      "PoseMessage": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "maxProperties": 20,
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "PoseMessage",
+        "type": "object"
+      },
+      "PoseMetric": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "metricId": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Metricid",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "deg",
+              "ratio",
+              "count",
+              "perMin"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "valueAtPeak": {
+            "title": "Valueatpeak",
+            "type": "number"
+          }
+        },
+        "required": [
+          "metricId",
+          "valueAtPeak",
+          "baseline",
+          "delta",
+          "unit"
+        ],
+        "title": "PoseMetric",
+        "type": "object"
+      },
+      "PosePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "enum": [
+              "posture",
+              "head",
+              "hands",
+              "framing",
+              "data-quality"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/PoseEvidence"
+          },
+          "kind": {
+            "enum": [
+              "trunk-lateral",
+              "shoulder-tilt",
+              "head-lateral",
+              "arms-closed",
+              "self-touch",
+              "hand-hidden-near-torso",
+              "head-orientation",
+              "framing",
+              "data-quality"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "message": {
+            "$ref": "#/components/schemas/PoseMessage"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PoseMetric"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PoseRule"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "schema": {
+            "const": "pose.event.v1",
+            "title": "Schema",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema",
+          "category",
+          "kind",
+          "evidence",
+          "message"
+        ],
+        "title": "PosePayload",
+        "type": "object"
+      },
+      "PoseRule": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "type": "string"
+          },
+          "evidence": {
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "none"
+            ],
+            "title": "Evidence",
+            "type": "string"
+          },
+          "ruleId": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Ruleid",
+            "type": "string"
+          },
+          "thresholdsStatus": {
+            "const": "heuristic-unvalidated",
+            "title": "Thresholdsstatus",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ruleId",
+          "version",
+          "evidence",
+          "confidence",
+          "thresholdsStatus"
+        ],
+        "title": "PoseRule",
+        "type": "object"
+      },
+      "Provenance": {
+        "additionalProperties": false,
+        "properties": {
+          "catalogVersion": {
+            "title": "Catalogversion",
+            "type": "string"
+          },
+          "eventPackHash": {
+            "title": "Eventpackhash",
+            "type": "string"
+          },
+          "gitSha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gitsha"
+          },
+          "promptHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompthash"
+          }
+        },
+        "required": [
+          "eventPackHash",
+          "catalogVersion"
+        ],
+        "title": "Provenance",
         "type": "object"
       },
       "Question": {
@@ -1238,6 +2599,17 @@
             "title": "Persona",
             "type": "string"
           },
+          "presentation_mode": {
+            "default": "thesis",
+            "enum": [
+              "startup",
+              "thesis",
+              "school",
+              "nonprofit"
+            ],
+            "title": "Presentation Mode",
+            "type": "string"
+          },
           "words": {
             "description": "Word timestamps relative to recording start",
             "items": {
@@ -1287,6 +2659,17 @@
             "title": "Persona",
             "type": "string"
           },
+          "presentation_mode": {
+            "default": "thesis",
+            "enum": [
+              "startup",
+              "thesis",
+              "school",
+              "nonprofit"
+            ],
+            "title": "Presentation Mode",
+            "type": "string"
+          },
           "questions": {
             "items": {
               "$ref": "#/components/schemas/Question"
@@ -1308,6 +2691,42 @@
           "notices"
         ],
         "title": "QuestionResult",
+        "type": "object"
+      },
+      "QuestionsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "persona": {
+            "default": "tutor",
+            "enum": [
+              "student",
+              "tutor"
+            ],
+            "title": "Persona",
+            "type": "string"
+          }
+        },
+        "title": "QuestionsRequest",
+        "type": "object"
+      },
+      "QuestionsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "questions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuestionResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "questions"
+        ],
+        "title": "QuestionsResponse",
         "type": "object"
       },
       "RecordingAnalysis": {
@@ -1378,6 +2797,355 @@
         "title": "RecordingAnalysis",
         "type": "object"
       },
+      "RejectedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "eventId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventid"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "code",
+          "message"
+        ],
+        "title": "RejectedEvent",
+        "type": "object"
+      },
+      "ReviewCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "evaluableMs": {
+            "title": "Evaluablems",
+            "type": "integer"
+          },
+          "eventsMentioned": {
+            "title": "Eventsmentioned",
+            "type": "integer"
+          },
+          "eventsSelected": {
+            "title": "Eventsselected",
+            "type": "integer"
+          },
+          "eventsTotal": {
+            "title": "Eventstotal",
+            "type": "integer"
+          },
+          "notEvaluableMs": {
+            "title": "Notevaluablems",
+            "type": "integer"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Reasons",
+            "type": "object"
+          }
+        },
+        "required": [
+          "durationMs",
+          "evaluableMs",
+          "notEvaluableMs",
+          "reasons",
+          "eventsTotal",
+          "eventsSelected",
+          "eventsMentioned"
+        ],
+        "title": "ReviewCoverage",
+        "type": "object"
+      },
+      "ReviewEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "dedupeKey": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Dedupekey",
+            "type": "string"
+          },
+          "durationMs": {
+            "maximum": 86400000.0,
+            "minimum": 0.0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "eventId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9:_.-]*$",
+            "title": "Eventid",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "peakMs": {
+            "minimum": 0.0,
+            "title": "Peakms",
+            "type": "integer"
+          },
+          "ruleVersion": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruleversion"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "hint",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "browser",
+              "asr",
+              "speech",
+              "factcheck",
+              "agent"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "stage": {
+            "default": "final",
+            "enum": [
+              "live",
+              "final"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "tMs": {
+            "minimum": 0.0,
+            "title": "Tms",
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "posture",
+              "head",
+              "hands",
+              "framing",
+              "data-quality",
+              "gesture",
+              "filler",
+              "pause",
+              "pace",
+              "volume",
+              "pitch",
+              "fact",
+              "question"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "tMs",
+          "peakMs",
+          "durationMs",
+          "type",
+          "severity",
+          "source",
+          "payload",
+          "dedupeKey"
+        ],
+        "title": "ReviewEvent",
+        "type": "object"
+      },
+      "ReviewReference": {
+        "additionalProperties": false,
+        "properties": {
+          "reviewId": {
+            "format": "uuid",
+            "title": "Reviewid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reviewId"
+        ],
+        "title": "ReviewReference",
+        "type": "object"
+      },
+      "ReviewReport": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/ReviewCoverage"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "generatedAt": {
+            "format": "date-time",
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "generator": {
+            "$ref": "#/components/schemas/Generator"
+          },
+          "language": {
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "reviewId": {
+            "format": "uuid",
+            "title": "Reviewid",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "const": "review.v1",
+            "default": "review.v1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "sessionId": {
+            "format": "uuid",
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "strengths": {
+            "items": {
+              "$ref": "#/components/schemas/Strength"
+            },
+            "title": "Strengths",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "takeId": {
+            "format": "uuid",
+            "title": "Takeid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reviewId",
+          "sessionId",
+          "takeId",
+          "language",
+          "generatedAt",
+          "generator",
+          "coverage",
+          "summary",
+          "findings",
+          "limitations",
+          "provenance"
+        ],
+        "title": "ReviewReport",
+        "type": "object"
+      },
+      "ReviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "language": {
+            "default": "de",
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "mode": {
+            "default": "template",
+            "enum": [
+              "template",
+              "llm"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "title": "ReviewRequest",
+        "type": "object"
+      },
+      "ReviewResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "review": {
+            "$ref": "#/components/schemas/ReviewReport"
+          }
+        },
+        "required": [
+          "review"
+        ],
+        "title": "ReviewResponse",
+        "type": "object"
+      },
+      "ReviewReused": {
+        "additionalProperties": false,
+        "properties": {
+          "reviewId": {
+            "format": "uuid",
+            "title": "Reviewid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reviewId"
+        ],
+        "title": "ReviewReused",
+        "type": "object"
+      },
       "SearchRequest": {
         "properties": {
           "collection_id": {
@@ -1404,6 +3172,134 @@
           "query"
         ],
         "title": "SearchRequest",
+        "type": "object"
+      },
+      "Session": {
+        "additionalProperties": false,
+        "properties": {
+          "capture": {
+            "$ref": "#/components/schemas/Capture"
+          },
+          "collectionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collectionid"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/Consent"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "sessionId": {
+            "format": "uuid",
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "analyzing",
+              "review_ready",
+              "failed",
+              "deleted"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "consent",
+          "sessionId",
+          "status",
+          "createdAt"
+        ],
+        "title": "Session",
+        "type": "object"
+      },
+      "SessionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "capture": {
+            "$ref": "#/components/schemas/Capture"
+          },
+          "collectionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collectionid"
+          },
+          "consent": {
+            "$ref": "#/components/schemas/Consent"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "consent"
+        ],
+        "title": "SessionCreate",
+        "type": "object"
+      },
+      "SessionDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "takes": {
+            "items": {
+              "$ref": "#/components/schemas/Take"
+            },
+            "title": "Takes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "session",
+          "takes"
+        ],
+        "title": "SessionDetail",
+        "type": "object"
+      },
+      "SessionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "title": "SessionResponse",
         "type": "object"
       },
       "Source": {
@@ -1542,6 +3438,438 @@
         "title": "SourceHit",
         "type": "object"
       },
+      "Strength": {
+        "additionalProperties": false,
+        "properties": {
+          "eventIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Eventids",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "eventIds"
+        ],
+        "title": "Strength",
+        "type": "object"
+      },
+      "Summary": {
+        "additionalProperties": false,
+        "properties": {
+          "byCategory": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Bycategory",
+            "type": "object"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "byCategory"
+        ],
+        "title": "Summary",
+        "type": "object"
+      },
+      "Take": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis": {
+            "$ref": "#/components/schemas/TakeAnalysis"
+          },
+          "audioProbe": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audioprobe"
+          },
+          "coverage": {
+            "description": "Measured pose-coverage intervals. Omitted time is explicitly unknown, not evaluable.",
+            "items": {
+              "$ref": "#/components/schemas/CoverageInterval"
+            },
+            "maxItems": 10000,
+            "title": "Coverage",
+            "type": "array"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "durationMs": {
+            "maximum": 86400000.0,
+            "minimum": 0.0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "mimeType": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Mimetype",
+            "type": "string"
+          },
+          "sessionId": {
+            "format": "uuid",
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "created",
+              "audio_processing",
+              "events_ready",
+              "review_ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "takeId": {
+            "format": "uuid",
+            "title": "Takeid",
+            "type": "string"
+          },
+          "timebase": {
+            "$ref": "#/components/schemas/Timebase"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "durationMs",
+          "mimeType",
+          "timebase",
+          "takeId",
+          "sessionId",
+          "status",
+          "createdAt"
+        ],
+        "title": "Take",
+        "type": "object"
+      },
+      "TakeAnalysis": {
+        "additionalProperties": false,
+        "properties": {
+          "asrProvider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asrprovider"
+          },
+          "audioSummary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AudioSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "factcheck": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FactCheckResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "questions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuestionResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "syntheticDemo": {
+            "default": false,
+            "title": "Syntheticdemo",
+            "type": "boolean"
+          },
+          "wordSummary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WordSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "title": "TakeAnalysis",
+        "type": "object"
+      },
+      "TakeAnswerRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Answer",
+            "type": "string"
+          },
+          "persona": {
+            "default": "tutor",
+            "enum": [
+              "student",
+              "tutor"
+            ],
+            "title": "Persona",
+            "type": "string"
+          },
+          "questionId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Questionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "questionId",
+          "answer"
+        ],
+        "title": "TakeAnswerRequest",
+        "type": "object"
+      },
+      "TakeCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "description": "Measured pose-coverage intervals. Omitted time is explicitly unknown, not evaluable.",
+            "items": {
+              "$ref": "#/components/schemas/CoverageInterval"
+            },
+            "maxItems": 10000,
+            "title": "Coverage",
+            "type": "array"
+          },
+          "durationMs": {
+            "maximum": 86400000.0,
+            "minimum": 0.0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "mimeType": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Mimetype",
+            "type": "string"
+          },
+          "timebase": {
+            "$ref": "#/components/schemas/Timebase"
+          }
+        },
+        "required": [
+          "durationMs",
+          "mimeType",
+          "timebase"
+        ],
+        "title": "TakeCreate",
+        "type": "object"
+      },
+      "TakeJobAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "jobId": {
+            "format": "uuid",
+            "title": "Jobid",
+            "type": "string"
+          },
+          "statusUrl": {
+            "title": "Statusurl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "statusUrl"
+        ],
+        "title": "TakeJobAccepted",
+        "type": "object"
+      },
+      "TakeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "take": {
+            "$ref": "#/components/schemas/Take"
+          }
+        },
+        "required": [
+          "take"
+        ],
+        "title": "TakeResponse",
+        "type": "object"
+      },
+      "Timebase": {
+        "additionalProperties": false,
+        "properties": {
+          "audioStartMs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audiostartms"
+          },
+          "avOffsetMs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avoffsetms"
+          },
+          "containerDurationMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Containerdurationms"
+          },
+          "firstVideoPtsMs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstvideoptsms"
+          },
+          "onstartPerfMs": {
+            "minimum": 0.0,
+            "title": "Onstartperfms",
+            "type": "number"
+          },
+          "wallDurationMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walldurationms"
+          }
+        },
+        "required": [
+          "onstartPerfMs"
+        ],
+        "title": "Timebase",
+        "type": "object"
+      },
+      "Timeline": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregates": {
+            "items": {
+              "$ref": "#/components/schemas/Aggregate"
+            },
+            "title": "Aggregates",
+            "type": "array"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "session": {
+            "$ref": "#/components/schemas/Session"
+          },
+          "take": {
+            "$ref": "#/components/schemas/Take"
+          }
+        },
+        "required": [
+          "session",
+          "take",
+          "events",
+          "aggregates",
+          "coverage"
+        ],
+        "title": "Timeline",
+        "type": "object"
+      },
+      "TimelineResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "timeline": {
+            "$ref": "#/components/schemas/Timeline"
+          }
+        },
+        "required": [
+          "timeline"
+        ],
+        "title": "TimelineResponse",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1580,6 +3908,58 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "Verification": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "claimCount": {
+            "title": "Claimcount",
+            "type": "integer"
+          },
+          "degraded": {
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "eventPackHash": {
+            "title": "Eventpackhash",
+            "type": "string"
+          },
+          "failureCodes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Failurecodes",
+            "type": "object"
+          },
+          "fallbackCount": {
+            "title": "Fallbackcount",
+            "type": "integer"
+          },
+          "fallbackRate": {
+            "title": "Fallbackrate",
+            "type": "number"
+          },
+          "supportedClaimCount": {
+            "title": "Supportedclaimcount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "failureCodes",
+          "attempts",
+          "fallbackCount",
+          "fallbackRate",
+          "claimCount",
+          "supportedClaimCount",
+          "eventPackHash",
+          "degraded"
+        ],
+        "title": "Verification",
         "type": "object"
       },
       "Word": {
@@ -1906,6 +4286,109 @@
         ]
       }
     },
+    "/jobs/{job_id}": {
+      "get": {
+        "operationId": "job_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Job",
+        "tags": [
+          "review"
+        ]
+      }
+    },
     "/questions": {
       "post": {
         "description": "Generate follow-up questions from transcript, fact-check findings and uploads.\n\nSends transcript sentences, findings and upload passages to the configured\nOpenAI-compatible model (same as the fact-check). Questions with a spoken\npassage carry `t_ms` of the recording and appear as `question` events.",
@@ -1943,6 +4426,132 @@
           }
         },
         "summary": "Start Questions",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/agent": {
+      "post": {
+        "operationId": "start_agent_context_questions_agent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Agent Context",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/agent/jobs/{job_id}": {
+      "get": {
+        "operationId": "agent_context_status_questions_agent_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agent Context Status",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/agent/session": {
+      "post": {
+        "operationId": "start_agent_session_questions_agent_session_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSession"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Start Agent Session",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/agent/settings": {
+      "get": {
+        "operationId": "agent_settings_questions_agent_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentSettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Agent Settings",
         "tags": [
           "questions"
         ]
@@ -2115,6 +4724,441 @@
         "summary": "Question Status",
         "tags": [
           "questions"
+        ]
+      }
+    },
+    "/sessions": {
+      "post": {
+        "operationId": "create_session_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create Session",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/sessions/{session_id}": {
+      "delete": {
+        "operationId": "delete_session_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete Session",
+        "tags": [
+          "review"
+        ]
+      },
+      "get": {
+        "operationId": "session_detail_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Session Detail",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/sessions/{session_id}/takes": {
+      "post": {
+        "operationId": "create_take_sessions__session_id__takes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TakeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create Take",
+        "tags": [
+          "review"
         ]
       }
     },
@@ -2411,6 +5455,1292 @@
         "summary": "Job Status",
         "tags": [
           "speech"
+        ]
+      }
+    },
+    "/takes/{take_id}": {
+      "get": {
+        "operationId": "take_detail_takes__take_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Take Detail",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/takes/{take_id}/audio": {
+      "post": {
+        "operationId": "audio_takes__take_id__audio_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_audio_takes__take_id__audio_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeJobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Audio",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/takes/{take_id}/evaluation": {
+      "get": {
+        "operationId": "evaluation_takes__take_id__evaluation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Evaluation",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/takes/{take_id}/events": {
+      "post": {
+        "operationId": "events_takes__take_id__events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Events",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/takes/{take_id}/factcheck": {
+      "post": {
+        "operationId": "factcheck_takes__take_id__factcheck_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/FactcheckRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeJobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Factcheck",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/takes/{take_id}/questions": {
+      "get": {
+        "operationId": "get_questions_takes__take_id__questions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Questions",
+        "tags": [
+          "review"
+        ]
+      },
+      "post": {
+        "operationId": "questions_takes__take_id__questions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/QuestionsRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeJobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Questions",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/takes/{take_id}/questions/answers": {
+      "post": {
+        "operationId": "answer_takes__take_id__questions_answers_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TakeAnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeJobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Answer",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/takes/{take_id}/review": {
+      "get": {
+        "operationId": "review_takes__take_id__review_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Review",
+        "tags": [
+          "review"
+        ]
+      },
+      "post": {
+        "operationId": "start_review_takes__take_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ReviewRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewReused"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TakeJobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Start Review",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/takes/{take_id}/timeline": {
+      "get": {
+        "operationId": "timeline_takes__take_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "take_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Take Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Timeline",
+        "tags": [
+          "review"
         ]
       }
     },

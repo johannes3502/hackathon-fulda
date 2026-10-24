@@ -5,7 +5,7 @@ test("jury walkthrough runs the real rules with explicit synthetic labels, evide
 }, info) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
+  await page.goto("/live");
   await page
     .getByText("Gesture guide and calibration", { exact: true })
     .click();

@@ -89,6 +89,15 @@ Produktentscheidung.
   „Done“), Sprache außer Deutsch, Anzahl der Fragen.
 
 ### Daten und Datenschutz
+- Neuer Backend-Vertrag: `docs/06-backend-review-api.md`. Video bleibt im
+  Client; keine serverseitigen Clips, Snapshots oder Wiedergabe-URLs. Die
+  additive Session-/Take-API persistiert Timestamp-Events, Wörter, Metriken
+  und Review in Postgres. Audio oder Aufnahme wird nur optional zur Analyse
+  temporär hochgeladen und auch bei Analysefehlern gelöscht. Eine Session-
+  Löschung kaskadiert alle zugehörigen Backend-Daten und temporären Uploads;
+  die lokale Aufnahme und getrennte Quellen-Collection löscht sie nicht.
+  Coverage ohne gemeldete Messintervalle bleibt unbekannt. Frontend-Anbindung
+  dieser neuen API erfolgt separat.
 - Lokales Grundgerüst: PostgreSQL und S3-Dateispeicher mit persistenten
   Docker-Volumes, ausschließlich für synthetische Entwicklungsdaten.
   Expliziter Audio-Upload unter `/speech/analyze`, keine automatische Aufzeichnung.
@@ -100,8 +109,10 @@ Produktentscheidung.
 - Redis hält Hintergrundjobs und kleine Status-/Referenzwerte in einem
   persistenten Docker-Volume. Task-Ergebnisse verfallen nach einer Stunde;
   dies legt keine Aufbewahrungsdauer für Medien oder Transkripte fest.
-- Werden Audio, Video und Transkript gespeichert? Wie lange?
-- Einwilligung, Löschung, lokale Verarbeitung?
+- Offen: automatische Aufbewahrungsdauer für Sessions und abgeleitete Daten;
+  Wiederanlauf-/Cleanup-Regel für nie erneut zugestellte, verwaiste Jobs.
+- Neue Session-API verlangt Einwilligung; Cloud-Verarbeitung benötigt den
+  Scope `local-and-cloud-analysis`. Lokaler Template-Pfad ohne LLM bleibt verfügbar.
 - Keine echten personenbezogenen Daten in der Demo.
 
 ### Technik
@@ -115,7 +126,7 @@ Produktentscheidung.
   ebenfalls lokales faster-whisper); der Browser-Sender ist als optionale Vorschau im Web integriert. Deutsche
   Füllworterkennung ist ungeprüft; JSON-Demo explizit wählbar. Setup und
   Speicherverhalten: `backend/README.md`.
-- Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung erste 3 s.
+- Audio: Silero VAD v6.2 lokal (ONNX), RMS/YIN; Kalibrierung aus 3 s stimmhafter Sprache, danach langsam adaptive Referenz. Anfangsstille und unvoiced Rauschen zählen nicht.
 - Nutzerentscheidung: lokale Vorführung reicht; öffentliches Hosting ist
   derzeit nicht nötig. Nutzer bevorzugt freie/lokale Modelle statt OpenAI API:
   Qwen3.5 4B Q4_K_M läuft nativ über Ollama, Whisper `small` im Worker.
@@ -147,6 +158,7 @@ einbauen**:
 | Datum | Änderung | Grund |
 |---|---|---|
 | 24.10.2026 | Produkt angelegt | Thema auf Live-Präsentationstrainer festgelegt; fünf erste Features genannt. |
+| 24.10.2026 | Backend-Review-Vertrag umgesetzt | Nutzerauftrag: `06-backend-review-api.md` prüfen und umsetzen; Session-/Take-Persistenz, Timeline, Template-/LLM-Review und Fragen ohne Server-Clips. Frontend bleibt Teamaufgabe; menschlich gelabelte Evaluation steht aus. |
 | 24.10.2026 | Lokales Backend-Grundgerüst festgelegt | Nutzerauftrag für Docker Compose; Dateispeicher für synthetische Entwicklungsdaten ergänzt. Speicherung echter Aufnahmen bleibt offen. |
 | 24.10.2026 | Celery und Redis ergänzt | Nutzerauftrag: lange Arbeiten wie Transkription vom API-Prozess trennen. |
 | 24.10.2026 | ML-Audioanalyse und asynchrone Jobs | Nutzerauftrag: Silero VAD, Deepgram-Adapter, RMS/YIN, 3-s-Kalibrierung und Celery-Verarbeitung; kein Nachweis für deutsche Füllwortqualität. |
@@ -170,3 +182,27 @@ für Pause, Tempo, Füllwörter, Lautstärke und Tonhöhe einzeln schaltbar.
 „Live · in browser“ ist Standard und liefert lokale Mikrofonhinweise ohne Backend;
 der Backend-Modus nutzt den Signal-Stream. Füllwörter und Wort-Tempo kommen nach
 dem Stoppen. Die Haltungsreferenz benötigt keine stillgehaltenen Hände mehr.
+
+Stimmreferenz: Browser und Backend warten auf genügend stimmhafte Sprache, statt
+die ersten drei vergangenen Sekunden zu verwenden. Danach wird die Referenz nur
+mit ausreichender Sprache langsam nachgeführt (30 s Halbwertszeit in stimmhafter
+Zeit; Prototyp-Heuristik). Stille, unvoiced Rauschen und kurze Pegelspitzen dürfen
+die Referenz nicht absenken. Eine länger anhaltende Änderung wird zunächst
+angezeigt und danach schrittweise zur Referenz; das ist keine absolute Aussage
+über die geeignete Sprechlautstärke. Wortbasiertes Tempo bleibt separat.
+
+## Vereinfachter Review und kontextbezogene Fragen (24.10.2026)
+
+Nutzerauftrag: Review im Stil des Live-Monitorings; zwei Hauptschritte statt
+mehrerer gleichzeitiger Analyse-Panels. **Review moments** spielt markierte
+Abschnitte mit Kontext und zeitgenauen Anmerkungen; **Practice questions**
+führt einen Dialog mit einer Frage pro Schritt. Die Wiedergabe-Fenster nutzen
+das lokale Vollvideo; serverseitige Clip-Dateien sind gemäß aktuellem Backend-Vertrag nicht vorgesehen. Transkript und technische Details bleiben
+aufklappbar.
+
+Vor dem Take: Material zum Backend hochladen und Präsentationstyp wählen:
+Startup-Pitch, Bachelor-Verteidigung, Schulvortrag oder Nonprofit-Einladung.
+Der Typ verändert die Fragen und Kriterien, ohne Noten oder Scores. Der
+Nutzer hat ElevenLabs für den Sprachdialog beauftragt und konfiguriert den
+Agenten selbst nach der Implementierung. Getippte Fragen bleiben über das
+konfigurierte lokale Modell möglich. Einrichtung: `docs/07-review-and-agent.md`.

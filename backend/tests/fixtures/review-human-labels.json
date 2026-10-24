@@ -1,0 +1,315 @@
+{
+  "schemaVersion": "review.human-evaluation.v1",
+  "synthetic": true,
+  "status": "awaiting-human-labels",
+  "allowedLabels": [
+    "supported",
+    "unsupported",
+    "unclear"
+  ],
+  "instructions": "Human reviewers label claim support against only the referenced synthetic fixture. Null is not a label. These cases are not human-evaluated yet.",
+  "fixtures": {
+    "posture": {
+      "eventId": "pose:synthetic:R1",
+      "tMs": 1000,
+      "peakMs": 1500,
+      "durationMs": 2000,
+      "type": "posture",
+      "source": "browser",
+      "metric": {
+        "valueAtPeak": 14.2,
+        "baseline": 2.1,
+        "delta": 12.1,
+        "unit": "deg"
+      },
+      "validRatio": 0.96,
+      "thresholdsStatus": "heuristic-unvalidated"
+    },
+    "pause": {
+      "eventId": "asr:synthetic:pause",
+      "tMs": 4000,
+      "peakMs": 4000,
+      "durationMs": 2000,
+      "type": "pause",
+      "source": "asr",
+      "payload": {
+        "gap_ms": 2000,
+        "mid_sentence": true
+      },
+      "thresholdsStatus": "heuristic-unvalidated"
+    },
+    "volume": {
+      "eventId": "speech:synthetic:volume",
+      "tMs": 10000,
+      "peakMs": 10000,
+      "durationMs": 6000,
+      "type": "volume",
+      "source": "speech",
+      "payload": {
+        "window_delta_db": [
+          -7.1,
+          -7.4,
+          -8.0
+        ],
+        "baseline_level_db": -28.1
+      },
+      "thresholdsStatus": "heuristic-unvalidated"
+    },
+    "pace": {
+      "eventId": "asr:synthetic:pace",
+      "tMs": 20000,
+      "peakMs": 20000,
+      "durationMs": 6000,
+      "type": "pace",
+      "source": "asr",
+      "payload": {
+        "window_wpm": [
+          120,
+          140,
+          160
+        ],
+        "baseline_wpm": 110
+      },
+      "thresholdsStatus": "heuristic-unvalidated"
+    },
+    "fact": {
+      "eventId": "fact:synthetic",
+      "tMs": 30000,
+      "peakMs": 30000,
+      "durationMs": 3000,
+      "type": "fact",
+      "source": "factcheck",
+      "payload": {
+        "claim": "Die Anwendung hat 1300 aktive Nutzer.",
+        "verdict": "contradicts",
+        "checked": [
+          "upload"
+        ],
+        "evidence": {
+          "kind": "upload",
+          "filename": "synthetic.pdf",
+          "location": {
+            "kind": "page",
+            "start": 2,
+            "end": 2
+          },
+          "quote": "Die Anwendung hat 1200 aktive Nutzer.",
+          "passage": "Die Anwendung hat 1200 aktive Nutzer.",
+          "quote_verified": "exact"
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "human-01",
+      "fixtureId": "posture",
+      "claim": "Von 00:01 bis 00:03 betrug die Abweichung zur Ausgangshaltung 12,1 Grad. Heuristik, unvalidiert.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-02",
+      "fixtureId": "posture",
+      "claim": "Bei 00:01,5 liegt das gemeldete Sprungziel des Haltungsereignisses.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-03",
+      "fixtureId": "posture",
+      "claim": "Die Baseline betrug 2,1 Grad; der Wert am Peak war 14,2 Grad. Heuristik, unvalidiert.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-04",
+      "fixtureId": "posture",
+      "claim": "Du neigtest dich während der gesamten Aufnahme um 12,1 Grad.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-05",
+      "fixtureId": "posture",
+      "claim": "Deine Haltung zeigt Nervosität.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-06",
+      "fixtureId": "posture",
+      "claim": "Du hast bei Haltung einen Score von 96 Prozent.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-07",
+      "fixtureId": "pause",
+      "claim": "Bei 00:04 begann eine Pause von 2 Sekunden. Heuristik, unvalidiert.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-08",
+      "fixtureId": "pause",
+      "claim": "Das ASR-Pausenereignis endet bei 00:06.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-09",
+      "fixtureId": "pause",
+      "claim": "Der ASR-Payload markiert die Pause als mid_sentence; die Qualität der Zeichensetzung ist damit nicht validiert.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-10",
+      "fixtureId": "pause",
+      "claim": "Bei 00:04 gab es 4 Sekunden Pause.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-11",
+      "fixtureId": "pause",
+      "claim": "Die Pause beweist, dass du den Stoff nicht verstanden hast.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-12",
+      "fixtureId": "pause",
+      "claim": "Du hast in der gesamten Aufnahme zu viele Pausen gemacht.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-13",
+      "fixtureId": "volume",
+      "claim": "Von 00:10 bis 00:16 lag die mediane Pegelabweichung bei -7,4 dB. Heuristik, unvalidiert.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-14",
+      "fixtureId": "volume",
+      "claim": "Die gespeicherte Kalibrierungslautstärke beträgt -28,1 dB.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-15",
+      "fixtureId": "volume",
+      "claim": "Die Fensterabweichungen reichen in diesem Ereignis von -8 bis -7,1 dB. Heuristik, unvalidiert.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-16",
+      "fixtureId": "volume",
+      "claim": "Du warst 7,4 dB lauter als in der Kalibrierung.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-17",
+      "fixtureId": "volume",
+      "claim": "Das Publikum konnte dich nicht hören.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-18",
+      "fixtureId": "volume",
+      "claim": "Du bist eine unsichere Person.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-19",
+      "fixtureId": "pace",
+      "claim": "Von 00:20 bis 00:26 betrug das mediane Worttempo 140 WPM. Heuristik, unvalidiert.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-20",
+      "fixtureId": "pace",
+      "claim": "Die gespeicherte Worttempo-Baseline beträgt 110 WPM.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-21",
+      "fixtureId": "pace",
+      "claim": "Die gemeldeten Worttempo-Fenster liegen zwischen 120 und 160 WPM. Heuristik, unvalidiert.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-22",
+      "fixtureId": "pace",
+      "claim": "Dein Tempo betrug 140 Silben pro Sekunde.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-23",
+      "fixtureId": "pace",
+      "claim": "Du sprichst immer zu schnell.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-24",
+      "fixtureId": "pace",
+      "claim": "Das Publikum war von deinem Tempo überfordert.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-25",
+      "fixtureId": "fact",
+      "claim": "Die hochgeladene Quelle nennt auf Seite 2: Die Anwendung hat 1200 aktive Nutzer. Das Zitat ist geprüft.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-26",
+      "fixtureId": "fact",
+      "claim": "Das Fact-Check-Modell meldet zur Aussage bei 00:30 einen Widerspruch; die Zitatprüfung validiert das Modellurteil nicht.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-27",
+      "fixtureId": "fact",
+      "claim": "Die gespeicherte Aussage nennt 1300 Nutzer, die zitierte Quelle nennt 1200.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-28",
+      "fixtureId": "fact",
+      "claim": "synthetic.pdf nennt auf Seite 3 genau 1300 aktive Nutzer.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-29",
+      "fixtureId": "fact",
+      "claim": "Die Quelle beweist, dass du gelogen hast.",
+      "humanLabel": null,
+      "humanNotes": ""
+    },
+    {
+      "id": "human-30",
+      "fixtureId": "fact",
+      "claim": "Die Quelle wurde im Web gefunden und nennt 1200 Nutzer.",
+      "humanLabel": null,
+      "humanNotes": ""
+    }
+  ]
+}

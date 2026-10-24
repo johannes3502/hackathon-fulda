@@ -80,15 +80,16 @@ smoke command above to check the running containers.
 | Celery worker | Background jobs in separate Python processes | Internal; no host port |
 | Redis | Celery broker (DB 0) and temporary task results (DB 1) | Internal `redis:6379`; no host port |
 | MediaPipe | Pose/hand tracking in the browser and native app | Client-side; no Python package in the backend image |
-| PostgreSQL + pgvector | Source metadata, text chunks and embeddings; later transcripts and timestamps | `localhost:5432` |
-| SeaweedFS | S3-compatible object storage for audio/video and uploaded files | `http://localhost:8333` |
+| PostgreSQL + pgvector | Sessions, takes, events, reviews, jobs, word timestamps, source chunks and embeddings | `localhost:5432` |
+| SeaweedFS | Sources and temporary audio-analysis uploads; no review playback media | `http://localhost:8333` |
 | OpenAI-compatible LLM (external or local) | Fact-check: claim extraction and judgments; optional | `LLM_BASE_URL` in `.env` |
 | MediaRecorder | Browser API that produces audio/video blobs | Frontend; no container or Python dependency |
 | FFmpeg | Available for converting browser recording formats when needed | Backend and worker containers |
 
 File bytes belong in object storage; PostgreSQL can hold their object key,
-MIME type, size and relation to a presentation. Audio jobs persist uploads and analysis in S3. Product database tables
-and event clips are not implemented yet.
+MIME type, size and relation to a presentation. Legacy audio jobs persist analysis in S3.
+The take review API stores derived results in PostgreSQL and deletes temporary uploads.
+Video playback stays in the client; the backend has no clip or snapshot API.
 
 SeaweedFS `mini` runs the file store in one container and creates `S3_BUCKET`
 on startup. Credentials come from `.env`; the bucket is not public. Only the
@@ -102,6 +103,82 @@ from `.env`. Ports can be changed there. Keep S3 credentials in the backend.
 Future presigned URLs need an endpoint reachable by the browser; the internal
 `storage` hostname is not reachable from a browser.
 
+## Persistent session/take reviews
+
+The additive API in `app/review/` implements the backend contract in
+[`docs/06-backend-review-api.md`](../docs/06-backend-review-api.md).
+Existing `/speech`, `/factcheck` and `/questions` clients keep their routes.
+All new POST routes require `Idempotency-Key` (1–128 characters); reuse it
+when retrying the same operation. A changed body with the same key returns 409.
+Request/response names are camelCase; actual IDs are UUIDs.
+
+1. `POST /sessions` with a title and explicit consent (`granted`, zoned `at`,
+   `version`, `scope: "local-analysis"`). Capture settings and collection UUID
+   are optional. Cloud ASR/LLM/web use requires `local-and-cloud-analysis`.
+2. `POST /sessions/{id}/takes` with `durationMs`, `mimeType`, `timebase`.
+   Optional `coverage: [{tMs, durationMs, evaluable, reason?}]` describes measured
+   pose coverage. Unreported intervals remain unknown, never assumed valid.
+3. `POST /takes/{id}/events` with up to 500 browser pose events. `dedupeKey`
+   defaults to `eventId`; an explicit value must be nonempty. Each invalid
+   event is rejected separately. A conflicting event ID rejects the transaction.
+4. Optionally `POST /takes/{id}/audio`, multipart `file`, `transcribe`, `config`
+   (`AudioConfig` JSON), `local_only`, `live_transcript`. Upload limit: 128 MiB.
+   Poll the returned `/api/jobs/{jobId}` through the frontend proxy, or
+   `/jobs/{jobId}` on port 8000. The worker probes A/V starts, shifts timestamps,
+   stores word/speech summaries in `take.analysis`, and deletes the upload.
+5. `POST /takes/{id}/review` with `{mode: "template", language: "de"}` (defaults).
+   Poll the job, then `GET /takes/{id}/review` returns `{review: review.v1}`.
+   `GET /takes/{id}/timeline` returns events, aggregates and coverage. A ready
+   report with the same pack/options is reused with `200 {reviewId}`.
+6. Optional `POST /takes/{id}/factcheck` (`useWeb: false` by default), then
+   `POST /takes/{id}/questions` (`persona: "student" | "tutor"`). Both use the
+   stored transcript/collection. `GET /takes/{id}/questions` returns the result;
+   `POST /takes/{id}/questions/answers` accepts `questionId`, `answer`, `persona`
+   and compares against sources without a grade. Results are in `/jobs/{id}`.
+7. `DELETE /sessions/{id}` removes server-side takes, events, reviews, jobs,
+   idempotency entries and pending audio. Repeat deletion returns 204. Clients
+   delete their local recording separately. Sources remain in their collection.
+
+The schema is created idempotently on first access under a PostgreSQL advisory
+lock. No extra service or frontend implementation is needed for backend tests.
+`run_take_job` is a Celery task; queues contain only job UUIDs. Worker writes
+re-check the parent session so deletion cannot recreate derived data.
+Only one long-running job is accepted per take. Queued jobs survive a publish
+failure: retry the same POST/key to publish the same job. There is no periodic
+outbox sweeper; abandoned requests need retry or session deletion. Terminal
+jobs reuse results. Audio cleanup failures are retried and never reported as
+successful completion. A hard worker kill delays cleanup until redelivery.
+
+The review writer receives a bounded evidence-card pack, chooses at most three
+findings and builds counts/summary in code. `mode: "llm"` uses the configured
+model as a selector of approved placeholder-based wording; local Ollama uses
+native JSON-schema output. All providers pass the same schema/catalog checks.
+Unknown values, sources, advice or numerical literals cannot enter the report.
+After one retry, invalid claims use templates. Over 20% fallback marks the job
+failed (`E_REVIEW_VERIFICATION`), while the grounded fallback report remains
+available through GET. Machine verification is available at
+`GET /takes/{id}/evaluation`; `humanLabeledClaims: null` means no human evaluation.
+
+Synthetic verification, without touching the frontend:
+
+```sh
+# After changing app code, restart the worker (API reloads automatically).
+docker compose restart worker
+docker compose exec -T backend python < backend/scripts/smoke_review.py
+# Explicit optional local-LLM smoke (Ollama must be running):
+docker compose exec -T backend python - --llm < backend/scripts/smoke_review.py
+PYTHONPATH=backend backend/.venv/bin/python -m pytest backend/tests -q
+```
+
+The smoke exercises real HTTP/Celery/Postgres/S3, verifies deletion, and times
+a five-minute metadata-only take with 60 events. Database tests in
+`tests/test_review_db.py` additionally run when `POSTGRES_HOST`, `POSTGRES_PORT`,
+`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` point to a test database.
+Use a host-reachable PostgreSQL address outside Compose. These synthetic checks
+do not establish model accuracy, human claim support, browser seeking or device
+acceptance. Automatic session retention, authentication and public-host rate
+limits remain open; the confirmed deployment scope is localhost.
+
 ## Background jobs
 
 `app/celery_app.py` configures Celery; add background tasks in `app/tasks.py`.
@@ -109,13 +186,13 @@ API and worker share the image, source and PostgreSQL/S3 connection settings.
 The worker uses two processes by default; change `CELERY_WORKER_CONCURRENCY`
 in `.env` and run Compose again to adjust it.
 
-For a future transcription route, declare the processing function with
+For a new processing route, declare the processing function with
 `@celery_app.task`, then publish it from the async route using
 `task_id = await enqueue_task(transcribe, session_id, object_key)` from
 `app.jobs`. Return HTTP 202 with the task ID after successful publication.
 The helper puts Redis publishing in a thread so it does not block the API's
 event loop. Handle `QueueUnavailable` as HTTP 503; never wait on
-`AsyncResult.get()` inside a request. A future status route should also move
+`AsyncResult.get()` inside a request. A status route must also move
 synchronous Redis result lookups to a thread.
 
 Only pass IDs and S3 object keys through the queue. Workers fetch media from
@@ -162,8 +239,21 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
 - Pitch: spread of F0 in semitones per window; low spread → `monotone`.
   No statement about emotion.
 - Pace: syllable rate from the level envelope vs. baseline (`fast` / `slow`).
-- Baseline: the first 3000 ms by default; speak normally during calibration.
-  Explicit `baseline_ms: null` selects the whole recording. Adjacent windows with the same direction become one event.
+- Baseline: waits for 3000 ms of **voiced speech**, even after a silent start.
+  Volume calibration and comparison use voiced levels, not quiet room noise.
+  The reference then adapts in non-overlapping 1-second blocks with enough voiced
+  evidence (30% minimum). Median candidates reject short spikes; bounded exponential
+  updates have a 30-second half-life measured in voiced time. Silence/unpitched noise
+  freeze it. Level/pitch candidates are clipped to a 12 dB/semitone difference;
+  rhythm candidates to a factor of two. These are configurable prototype heuristics,
+  not validated speech-quality thresholds. Sustained changes are initially visible
+  and gradually become the reference; adaptation cannot judge absolute suitability.
+  Explicit `baseline_ms: null` preserves the whole-recording comparison.
+  `heuristics.baseline_ready` reports whether calibration completed.
+  Adjacent windows with the same direction become one event; volume/pace payloads
+  preserve `window_baseline_level_db` / `window_baseline_syllables_per_s` alongside
+  the corresponding measurements. The existing scalar baseline is the first window's
+  reference. Replay uses each timestamp's prior reference, never later audio.
 - Upload as multipart field `recording`, optional field `config` with
   `AudioConfig` JSON, and `transcribe` (default true).
 - `POST /speech/analyze` now returns **202** with `job_id` and `status_url`;
@@ -271,7 +361,8 @@ Every five seconds the server sends `{"type":"feedback","position_ms":5000,"even
 These are the existing calibrated volume, pitch, syllable-pace and pause rules;
 no Whisper or LLM is needed. Preview audio stays in RAM and is released when
 the socket ends. One signal session per API process, separately from captions.
-The prototype reanalyses the prefix, capped at five minutes (the studio's limit).
+The prototype reanalyses the prefix, capped at five minutes (the studio's limit),
+replaying the same causal adaptive reference as batch analysis.
 The browser aligns preview timestamps to recording start, shows one cue with a
 15-second per-type cooldown, and stops the preview if analysis falls over 15
 seconds behind. Hide live hints to suppress cues. Full batch review is unchanged.
@@ -647,3 +738,42 @@ recreation. Those fixtures were removed too.
 - [Celery with Redis](https://docs.celeryq.dev/en/stable/getting-started/backends-and-brokers/redis.html)
 - [Celery task and worker configuration](https://docs.celeryq.dev/en/stable/userguide/configuration.html)
 - [Redis Docker image](https://hub.docker.com/_/redis)
+
+### ElevenLabs question practice
+
+The web review supports a source-grounded ElevenLabs conversation and typed
+questions with four presentation contexts. Configure `ELEVENLABS_API_KEY` and
+`ELEVENLABS_AGENT_ID` server-side; enable the agent's System prompt override.
+`GET /questions/agent/settings` reports configuration presence. Context preparation
+is queued through `POST /questions/agent`, polled at `/questions/agent/jobs/{id}`.
+`POST /questions/agent/session` issues an uncached signed WebSocket URL. It does
+not require Ollama. Typed questions still use the configured local model.
+Setup, privacy, retention and verification limits: [Review and agent](../docs/07-review-and-agent.md).
+
+## Synthetischer Datenbank-Seed
+
+Drei feste Beispiel-Sessions mit je einem Take, vorberechneten Wort-Timestamps,
+daraus abgeleiteten ASR-Events und einer Template-Review einspielen:
+
+```sh
+docker compose up -d postgres
+docker compose run --rm --no-deps -v ./backend/scripts:/app/scripts:ro backend python -m scripts.seed_demo
+```
+
+Von der Repository-Wurzel ausführen; das lokale Backend-Image muss vorhanden sein
+(`docker compose build backend`). Alternativ aus `backend/` mit gesetzten
+`POSTGRES_*`-Variablen: `python -m scripts.seed_demo`.
+
+Der Seed schreibt in die bestehenden Tabellen `sessions`, `takes`, `events`,
+`reviews` und `jobs`. Er verwendet feste UUIDs, eine Transaktion und einen
+Advisory Lock. Erneute Aufrufe überspringen vorhandene Seed-Sessions vollständig;
+auch manuelle Änderungen daran bleiben erhalten. Andere Daten werden nicht
+verändert oder gelöscht. Die Ausgabe nennt Session-/Take-IDs und Review-Pfade.
+Es werden keine Medien hochgeladen, keine Modelle aufgerufen und keine Scores
+angelegt. Titel, `syntheticDemo` und Review-Hinweise kennzeichnen die Daten als
+synthetisch; nicht gemessene Pose-Coverage bleibt unbekannt.
+
+Lesbar über `GET /api/sessions/{sessionId}` und
+`GET /api/takes/{takeId}/timeline` bzw. `/review`. Das bestehende Web-Studio nutzt
+weiterhin den Browser-Arbeitsbereich und die ältere Audio-Job-API; der Seed
+legt deshalb keine lokalen Videos oder Frontend-Aufnahmen an.

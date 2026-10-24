@@ -1,32 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { DEMO_STATS, summarizeStats } from "./stats";
+import { summarizeRecordings } from "./stats";
 
-describe("stats summary", () => {
-  it("uses the equally weighted mean, rounded only after aggregation", () => {
-    expect(summarizeStats(DEMO_STATS)).toBe(82);
-    expect(
-      summarizeStats({ gesture: 1, knowledge: 2, flow: 3, structure: 100 }),
-    ).toBe(27);
+describe("recording overview", () => {
+  it("starts empty without synthetic history or scores", () => {
+    expect(summarizeRecordings([])).toEqual({
+      sessions: 0,
+      durationMs: 0,
+      moments: 0,
+      transcripts: 0,
+    });
   });
-  it("accepts the inclusive limits", () => {
-    expect(
-      summarizeStats({ gesture: 1, knowledge: 1, flow: 1, structure: 1 }),
-    ).toBe(1);
-    expect(
-      summarizeStats({
-        gesture: 100,
-        knowledge: 100,
-        flow: 100,
-        structure: 100,
-      }),
-    ).toBe(100);
+  it("counts only supplied recordings and available transcripts", () => {
+    const result = summarizeRecordings([
+      { durationMs: 60000, feedback: [], words: [] },
+      {
+        durationMs: 30000,
+        feedback: [],
+        words: [{ word: "Hallo", start_ms: 0, end_ms: 500 }],
+      },
+    ]);
+    expect(result).toEqual({
+      sessions: 2,
+      durationMs: 90000,
+      moments: 0,
+      transcripts: 1,
+    });
   });
-  it.each([0, -1, 101, NaN, Infinity, undefined])(
-    "does not fabricate an overall score for invalid input %s",
-    (value) => {
-      expect(
-        summarizeStats({ ...DEMO_STATS, gesture: value as number }),
-      ).toBeNull();
-    },
-  );
 });

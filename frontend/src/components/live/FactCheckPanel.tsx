@@ -37,7 +37,9 @@ export function FactCheckPanel({
   const endpoint = recording.config.endpoint;
   const [settings, setSettings] = useState<FactCheckSettings | null>(null);
   // Same browser collection as the /sources page; never rendered on the server.
-  const [collection] = useState(collectionId);
+  const [collection] = useState(
+    () => recording.config.sourceCollectionId ?? collectionId(),
+  );
   const [readySources, setReadySources] = useState<number | null>(null);
   const [useWeb, setUseWeb] = useState(false);
   const [busy, setBusy] = useState(false);

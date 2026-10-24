@@ -1,8 +1,8 @@
 import type { LiveFeedback } from "@/features/live/contracts";
 import type { ClaimResult } from "@/features/factcheck/api";
-import type { PresentationStats } from "@/components/stats/stats";
+import { STAT_LABELS } from "@/components/stats/stats";
 
-export type Criterion = keyof PresentationStats;
+export type Criterion = keyof typeof STAT_LABELS;
 export type ReviewMoment = {
   id: string;
   tMs: number;
@@ -23,7 +23,6 @@ export type ReviewData = {
   poster?: string;
   demo: boolean;
   notice?: string;
-  stats?: PresentationStats;
   performance: PerformancePoint[];
   moments: ReviewMoment[];
 };
@@ -112,29 +111,7 @@ export const DEMO_REVIEW: ReviewData = {
   videoUrl: "/review-demo/presentation.mp4",
   poster: "/review-demo/poster.png",
   demo: true,
-  stats: { gesture: 78, knowledge: 88, flow: 84, structure: 78 },
-  performance: [
-    [0, 64],
-    [5000, 70],
-    [8000, 81],
-    [13000, 76],
-    [18000, 92],
-    [23000, 83],
-    [27000, 61],
-    [31000, 38],
-    [35000, 63],
-    [39000, 72],
-    [43000, 46],
-    [48000, 66],
-    [53000, 77],
-    [58000, 87],
-    [63000, 80],
-    [68000, 83],
-    [72000, 93],
-    [77000, 85],
-    [83000, 94],
-    [90000, 88],
-  ].map(([tMs, value]) => ({ tMs, value })),
+  performance: [],
   moments: [
     {
       id: "opening",

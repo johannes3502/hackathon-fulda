@@ -1,19 +1,29 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Clock3, Download, MessageSquare } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  MessageSquare,
+  Play,
+} from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import type { LiveFeedback } from "@/features/live/contracts";
+import { needsPractice, reviewMoments } from "@/features/live/review";
+import { PRESENTATION_MODES } from "@/features/questions/presentation";
+import { clipRange } from "@/features/live/protocol";
+import { cueAppearance } from "@/features/live/cue-appearance";
 import { time } from "@/lib/utils";
 import { FactCheckPanel } from "./FactCheckPanel";
-import { FeedbackMoment, LiveNav, MissingRecording } from "./shared";
+import { MissingRecording } from "./shared";
 import { RecordedTranscript } from "./RecordedTranscript";
 import { PoseEvidence } from "./PoseEvidence";
 import { PoseEventDownload } from "./PoseEventDownload";
 import { PoseDownload } from "./PoseDownload";
-import { QuestionSimulator } from "./QuestionSimulator";
+import { QuestionPractice } from "./QuestionPractice";
 import { TranscriptAnalysis } from "./TranscriptAnalysis";
 import { VideoPlayback } from "./VideoPlayback";
 
@@ -21,44 +31,42 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
   const { recordings } = useLiveSessions();
   const recording = recordings[sessionId];
   const [selected, setSelected] = useState<LiveFeedback | null>(null);
+  const [view, setView] = useState<"moments" | "questions">("moments");
+  const [all, setAll] = useState(false);
   if (!recording) return <MissingRecording />;
+  const moments = reviewMoments(recording.feedback);
+  const practice = moments.filter(needsPractice);
+  const visible = all || !practice.length ? moments : practice;
+  const appearance = cueAppearance(selected, "ready");
+  const mode =
+    PRESENTATION_MODES[recording.config.presentationMode ?? "startup"];
   const jump = (item: LiveFeedback) => {
     setSelected({ ...item });
-    document
-      .querySelector(".playback-panel")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setView("moments");
   };
-  const groups = [
-    ...new Set(recording.feedback.map((item) => item.category)),
-  ].map((category) => ({
-    category,
-    count: recording.feedback.filter((item) => item.category === category)
-      .length,
-  }));
-  const next =
-    recording.feedback.find((item) => item.kind === "attention") ??
-    recording.feedback.find((item) => item.kind === "suggestion");
+
   return (
     <AppShell experience="live">
-      <div className="workspace live-review">
-        <LiveNav
-          sessionId={sessionId}
-          active="review"
-          mode={recording.config.mode}
-        />
+      <div className="workspace review-workspace">
+        <div className="workspace-back">
+          <Link href="/live">
+            <ArrowLeft size={15} /> Studio
+          </Link>
+        </div>
         <div className="workspace-heading">
           <div>
-            <h1>A closer look at your take.</h1>
+            <h1>Make your next take stronger.</h1>
             <p>
-              {recording.config.title} ·{" "}
-              {recording.completion === "complete"
-                ? "Recording complete"
-                : "Interrupted recording"}
+              {recording.config.title} · {mode.label} ·{" "}
+              {time(recording.durationMs)}
+              {recording.completion === "interrupted"
+                ? " · Interrupted recording"
+                : ""}
             </p>
           </div>
           <Button asChild variant="outline">
             <Link href="/live">
-              Record another take <ArrowRight size={16} />
+              Record again <ArrowRight size={16} />
             </Link>
           </Button>
         </div>
@@ -67,168 +75,201 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             {recording.notice}
           </p>
         )}
-        {recording.config.mode === "local" && (
-          <p className="live-demo-notice">
-            <strong>Local recording and observations.</strong> Markers come from
-            camera and enabled microphone heuristics. They are not a score or a
-            validated assessment of your presentation.
-          </p>
-        )}
-        <div className="recording-stats">
-          <div>
-            <Clock3 size={19} />
-            <strong>{time(recording.durationMs)}</strong>
-            <span>Recorded time</span>
-          </div>
-          <div>
-            <MessageSquare size={19} />
-            <strong>{recording.feedback.length}</strong>
-            <span>
-              {recording.config.mode === "local"
-                ? "Gesture observations"
-                : "Feedback moments"}
-            </span>
-          </div>
+        <div
+          className="review-view-switch"
+          role="group"
+          aria-label="Review steps"
+        >
+          <button
+            aria-pressed={view === "moments"}
+            onClick={() => setView("moments")}
+          >
+            <Play size={17} /> Review moments
+          </button>
+          <button
+            aria-pressed={view === "questions"}
+            onClick={() => setView("questions")}
+          >
+            <MessageSquare size={17} /> Practice questions
+          </button>
         </div>
-        <div className="live-review-grid">
-          <div>
-            <VideoPlayback
-              recording={recording}
-              selected={selected}
-              onSelect={(item) => setSelected({ ...item })}
-            />
-            <PoseDownload blob={recording.poseLog} />
-            <PoseEventDownload events={recording.poseEvents} />
-            <div className="recording-retention">
-              <Download size={16} />
-              <p>
-                Download this take before leaving the live workspace or
-                refreshing. The full recording is held in browser memory
-                {recording.config.mode === "backend"
-                  ? "; a copy was submitted for temporary backend analysis"
-                  : " and has not been uploaded"}
-                .
-              </p>
+        {view === "moments" ? (
+          <>
+            <div className="review-stage-grid">
+              <VideoPlayback
+                recording={recording}
+                selected={selected}
+                onSelect={jump}
+              />
+              <aside
+                className="panel review-coach"
+                aria-label="Feedback on this take"
+              >
+                <div className="panel-title-row">
+                  <h2>
+                    {selected
+                      ? "This moment, explained"
+                      : practice.length
+                        ? "Start with one adjustment"
+                        : "Watch with fresh eyes"}
+                  </h2>
+                  <span className="badge">{practice.length} to revisit</span>
+                </div>
+                {selected ? (
+                  <div className={`review-observation ${selected.kind}`}>
+                    <appearance.Icon
+                      className={`review-cue-icon ${appearance.tone}`}
+                      size={40}
+                      aria-hidden="true"
+                    />
+                    <span className={`feedback-kind ${selected.kind}`}>
+                      {selected.kind === "positive"
+                        ? "Keep doing this"
+                        : needsPractice(selected)
+                          ? "Try an adjustment"
+                          : "Observation"}{" "}
+                      · {time(selected.startMs)}
+                    </span>
+                    <h3>{selected.title}</h3>
+                    <p>{selected.detail}</p>
+                    {selected.action && (
+                      <div className="review-next-action">
+                        <Check size={20} />
+                        <div>
+                          <strong>For your next take</strong>
+                          <p>{selected.action}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selected.evidence && (
+                      <details>
+                        <summary>Why this was marked</summary>
+                        <PoseEvidence event={selected.evidence} />
+                      </details>
+                    )}
+                  </div>
+                ) : (
+                  <p className="review-intro">
+                    {practice.length
+                      ? "Choose a moment below. Watch what happened, then try the suggested adjustment."
+                      : "No adjustments were flagged. Watch the take and decide what you want to practice; missing feedback is not an assessment."}
+                  </p>
+                )}
+                <div className="panel-title-row review-list-heading">
+                  <h3>Clips to revisit</h3>
+                  {!!practice.length && (
+                    <button
+                      className="text-button"
+                      aria-pressed={all}
+                      onClick={() => setAll(!all)}
+                    >
+                      {all
+                        ? "Show adjustments"
+                        : `All observations (${moments.length})`}
+                    </button>
+                  )}
+                </div>
+                <ol className="review-clip-list">
+                  {visible.map((item) => {
+                    const range = clipRange(item, recording.durationMs);
+                    return (
+                      <li key={item.id}>
+                        <button
+                          className={`review-clip ${selected?.id === item.id ? "selected" : ""}`}
+                          aria-pressed={selected?.id === item.id}
+                          onClick={() => jump(item)}
+                        >
+                          <span className="review-clip-time">
+                            <Play size={15} />
+                            <span>{time(item.startMs)}</span>
+                          </span>
+                          <span>
+                            <strong>{item.title}</strong>
+                            <small>
+                              {item.category} · {time(range.start * 1000)}–
+                              {time(range.end * 1000)}
+                            </small>
+                          </span>
+                          <ArrowRight size={16} />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+                {!visible.length && (
+                  <p className="field-hint">
+                    {moments.length
+                      ? "Other observations are available above."
+                      : "No feedback moments were captured for this take."}
+                  </p>
+                )}
+                <p className="field-hint">
+                  Camera and voice observations use prototype heuristics. They
+                  are suggestions to review, not grades.
+                </p>
+              </aside>
             </div>
-            {selected && (
-              <section className="selected-feedback panel">
-                <span className={`feedback-kind ${selected.kind}`}>
-                  {selected.category} · {time(selected.startMs)}
-                </span>
-                <h2>{selected.title}</h2>
-                <p>{selected.detail}</p>
-                <strong>Try this</strong>
-                <p>{selected.action}</p>
-                <PoseEvidence event={selected.evidence} />
-              </section>
-            )}
-          </div>
-          <aside>
-            <section className="panel recording-breakdown">
-              <h2>What came up?</h2>
-              <p className="muted small">
-                Feedback frequency, not a performance score.
+            <div className="review-continue">
+              <div>
+                <h2>Now defend your ideas.</h2>
+                <p>
+                  Your {mode.listener.toLowerCase()} will ask about what you
+                  presented.
+                </p>
+              </div>
+              <Button onClick={() => setView("questions")}>
+                Practice questions <ArrowRight size={17} />
+              </Button>
+            </div>
+            <details className="review-details">
+              <summary>Transcript and source checks</summary>
+              <RecordedTranscript recording={recording} onSelect={jump} />
+              <FactCheckPanel recording={recording} onSelect={jump} />
+            </details>
+            <details className="review-details">
+              <summary>Recording details and exports</summary>
+              <p className="field-hint">
+                The video is held in this browser tab. Download it before
+                refreshing or leaving.{" "}
+                {recording.config.mode === "backend" ||
+                recording.analysisUploaded
+                  ? "The backend removes its original after processing; analysis results remain stored."
+                  : "The recording has not been uploaded for analysis."}
               </p>
-              {groups.length ? (
-                <div className="category-bars">
-                  {groups.map((group) => (
-                    <div key={group.category}>
-                      <div>
-                        <span>{group.category}</span>
-                        <strong>{group.count}</strong>
-                      </div>
-                      <div className="category-bar">
-                        <span
-                          style={{
-                            width: `${(group.count / Math.max(...groups.map((g) => g.count))) * 100}%`,
-                          }}
-                        />
-                      </div>
+              <PoseDownload blob={recording.poseLog} />
+              <PoseEventDownload events={recording.poseEvents} />
+              {!!recording.metrics.length && (
+                <dl className="backend-metrics">
+                  {recording.metrics.map((metric) => (
+                    <div key={metric.id}>
+                      <dt>{metric.label}</dt>
+                      <dd>
+                        {metric.value ?? "Not enough data"}{" "}
+                        {metric.value !== null && metric.unit}
+                      </dd>
                     </div>
                   ))}
-                </div>
-              ) : (
-                <p className="empty-findings">
-                  No feedback arrived. You can still watch your recording and
-                  reflect on it.
-                </p>
+                </dl>
               )}
-              {!!recording.metrics.length && (
-                <>
-                  <h3>Latest backend measurements</h3>
-                  <dl className="backend-metrics">
-                    {recording.metrics.map((metric) => (
-                      <div key={metric.id}>
-                        <dt>{metric.label}</dt>
-                        <dd>
-                          {metric.value ?? "Not enough data"}{" "}
-                          {metric.value !== null && metric.unit}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </>
-              )}
-              <p className="field-hint">
-                {recording.chunksSent} recording uploads/parts{" "}
-                {recording.config.mode === "local"
-                  ? "captured locally"
-                  : "sent to the backend"}
-                . {(recording.bytesSent / 1024 / 1024).toFixed(1)} MB{" "}
-                {recording.config.mode === "local" ? "kept local" : "sent"}.
-              </p>
-            </section>
-            <section className="next-review-step">
-              <h2>
-                {next ? "Start with one moment." : "Watch it with fresh eyes."}
-              </h2>
-              <p>
-                {next?.action ??
-                  "Notice what felt clear and choose one thing to practice in your next take."}
-              </p>
-              <Button asChild>
-                <Link href={`/live/${sessionId}/moments`}>
-                  Rewatch feedback sections <ArrowRight size={16} />
-                </Link>
-              </Button>
-            </section>
-          </aside>
-        </div>
-        <RecordedTranscript recording={recording} onSelect={jump} />
-        {recording.config.mode === "backend" && (
-          <>
-            <details className="transcript-import">
-              <summary>Import or replace word timestamps</summary>
-              <TranscriptAnalysis recording={recording} />
+              <details>
+                <summary>Replace transcript timestamps</summary>
+                <TranscriptAnalysis recording={recording} />
+              </details>
+              <Link
+                className="text-button"
+                href={`/live/${sessionId}/analysis`}
+              >
+                Detailed timeline
+              </Link>
             </details>
-            <FactCheckPanel recording={recording} onSelect={jump} />
-            <QuestionSimulator recording={recording} onSelect={jump} />
           </>
+        ) : (
+          <QuestionPractice recording={recording} onSelect={jump} />
         )}
-        <section className="review-moments">
-          <div className="panel-title-row">
-            <h2>Moments to revisit</h2>
-            <Link href={`/live/${sessionId}/moments`} className="text-button">
-              View all moments
-            </Link>
-          </div>
-          {recording.feedback.length ? (
-            <div className="moment-grid">
-              {recording.feedback.slice(0, 3).map((feedback) => (
-                <FeedbackMoment
-                  key={feedback.id}
-                  feedback={feedback}
-                  selected={selected?.id === feedback.id}
-                  onClick={() => setSelected({ ...feedback })}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="muted">
-              No feedback sections were marked during this take.
-            </p>
-          )}
-        </section>
+        <p className="review-retention field-hint">
+          Your video stays available in this tab. Download it in Review moments
+          before refreshing.
+        </p>
       </div>
     </AppShell>
   );

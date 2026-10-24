@@ -1,4 +1,6 @@
-import { LiveStudio } from "@/components/live/LiveStudio";
+import { StatsDashboard } from "@/components/stats/StatsCard";
+
 export default function Page() {
-  return <LiveStudio />;
+  return <StatsDashboard />;
 }
+

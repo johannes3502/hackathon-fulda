@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 from botocore.exceptions import BotoCoreError, ClientError
 import os
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Response
 from pydantic import BaseModel, ValidationError
 from starlette.concurrency import run_in_threadpool
 
@@ -11,9 +11,10 @@ from app.connections import s3_client
 from app.factcheck.llm import configured_llm
 from app.jobs import QueueUnavailable, enqueue_task
 from app.questions.models import AnswerJob, AnswerRequest, QuestionJob, QuestionRequest, VoiceAnswerRequest
+from app.questions import agent
 from app.speech import storage
 from app.speech.job_models import AcceptedJob
-from app.tasks import ANSWER_PREFIX, QUESTION_PREFIX, generate_questions, review_answer, review_voice_answer
+from app.tasks import AGENT_PREFIX, ANSWER_PREFIX, QUESTION_PREFIX, generate_questions, prepare_agent, review_answer, review_voice_answer
 from app.transcription.transcriber import configured_transcriber
 
 router = APIRouter(prefix="/questions", tags=["questions"])
@@ -27,9 +28,10 @@ def _store(job_id: str, request: BaseModel, prefix: str, job: BaseModel, recordi
 
 
 async def _accept(request: BaseModel, prefix: str, job_model, task, status_path: str,
-                  recording=None) -> AcceptedJob:
+                  recording=None, requires_llm=True) -> AcceptedJob:
     try:
-        configured_llm()
+        if requires_llm:
+            configured_llm()
     except ValueError as error:
         raise HTTPException(503, f"Question simulator is not configured: {error}") from error
     job_id = str(uuid4())
@@ -49,6 +51,31 @@ def _status(job_id: UUID, prefix: str, job_model):
     if value is None:
         raise HTTPException(404, "Unknown question job")
     return job_model.model_validate(value)
+
+
+@router.get("/agent/settings")
+def agent_settings() -> agent.AgentSettings:
+    return agent.settings()
+
+
+@router.post("/agent", status_code=202)
+async def start_agent_context(request: QuestionRequest) -> AcceptedJob:
+    if not agent.settings().available:
+        raise HTTPException(503, "ElevenLabs voice practice is not configured")
+    return await _accept(request, AGENT_PREFIX, agent.AgentJob, prepare_agent, "/questions/agent/jobs",
+                         requires_llm=False)
+
+
+@router.get("/agent/jobs/{job_id}")
+def agent_context_status(job_id: UUID, response: Response) -> agent.AgentJob:
+    response.headers["Cache-Control"] = "no-store"
+    return _status(job_id, AGENT_PREFIX, agent.AgentJob)
+
+
+@router.post("/agent/session")
+async def start_agent_session(response: Response) -> agent.AgentSession:
+    response.headers["Cache-Control"] = "no-store"
+    return await agent.signed_session()
 
 
 @router.post("", status_code=202)

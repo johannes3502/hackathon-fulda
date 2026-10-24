@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from threading import Event as ThreadEvent
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -138,9 +139,21 @@ def test_missing_key_is_reported_without_connecting(monkeypatch):
 
 def test_disconnect_releases_upstream_and_live_slot(monkeypatch):
     upstream, _ = setup(monkeypatch)
+    disconnected = ThreadEvent()
+    original = deepgram_live.stream_deepgram
+    async def observe_disconnect(*args, **kwargs):
+        try:
+            return await original(*args, **kwargs)
+        finally:
+            disconnected.set()
+    monkeypatch.setattr(deepgram_live, "stream_deepgram", observe_disconnect)
     with TestClient(app) as client:
         with client.websocket_connect("/speech/live") as ws:
             start(ws)
+            # Exercise protocol disconnect before TestClient cancels its app
+            # scope on __exit__; otherwise recent Starlette races cleanup.
+            ws.close()
+            assert disconnected.wait(timeout=2)
         assert upstream.closed
         with client.websocket_connect("/speech/live") as ws:
             start(ws)

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { StatsPreview } from "@/components/stats/StatsCard";
+import { StatsDashboard } from "@/components/stats/StatsCard";
 
-export const metadata: Metadata = { title: "418 — Deine Stats" };
+export const metadata: Metadata = { title: "418 — Deine Aufnahmen" };
 
 export default function StatsPreviewPage() {
-  return <StatsPreview />;
+  return <StatsDashboard />;
 }
