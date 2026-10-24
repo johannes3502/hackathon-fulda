@@ -441,7 +441,11 @@ export function LiveStudio() {
                 {pose.state?.count ?? 0} pose samples ·{" "}
                 {pose.state?.latest?.quality.legs_visible
                   ? "Legs visible"
-                  : "Legs not confirmed visible"}
+                  : pose.state?.latest?.quality.thighs_visible
+                    ? "Thighs visible"
+                    : pose.state?.latest?.quality.thighs_available
+                      ? "Thighs visible · lower legs estimated"
+                      : "Legs not confirmed visible"}
               </p>
               <p className="field-hint">
                 Turn the camera off to download preview JSONL. Starting a take

@@ -168,7 +168,8 @@ Pocket-Heuristik prüft den Abstand des Handgelenks zur eigenen Hüfte
 und Hand-Modell starten im Worker bevorzugt auf dem GPU-Delegate; bei fehlendem
 Hardware-WebGL2, Software-Renderer oder Fehlern in Erstellung, Warm-up oder
 Inferenz wechseln sie einmalig auf CPU. Das Dev-Statusfeld zeigt Delegate,
-Fallback-Grund und Renderer. T12 erkennt gekreuzte Unterschenkel.
+Fallback-Grund und Renderer. T12 erkennt gekreuzte Ober- oder Unterschenkel;
+Oberschenkel auch dann, wenn das Bild nur bis zu den Oberschenkeln reicht.
 Treffer bleiben Dev-only, ohne Event. Die finalen Pose-/Feedback-Regeln stehen
 in `docs/04-pose-tracking-requirements.md`; die Umsetzung ist noch offen
 (`frontend/DATA_POINTS.md` beschreibt das Roh-Logging).

@@ -148,29 +148,29 @@ export function crossedLegsCheck(
   const rightKnee = point(pose.right_knee);
   const leftAnkle = point(pose.left_ankle);
   const rightAnkle = point(pose.right_ankle);
-  if (!leftKnee || !rightKnee || !leftAnkle || !rightAnkle)
-    return {
-      crossed: null,
-      values: {
-        left_knee: !!leftKnee,
-        right_knee: !!rightKnee,
-        left_ankle: !!leftAnkle,
-        right_ankle: !!rightAnkle,
-      },
-    };
-  const crossed = segmentsIntersect(
-    leftKnee,
-    leftAnkle,
-    rightKnee,
-    rightAnkle,
-  );
+  const shinsCrossed =
+    leftKnee && rightKnee && leftAnkle && rightAnkle
+      ? segmentsIntersect(leftKnee, leftAnkle, rightKnee, rightAnkle)
+      : null;
+  const thighsCrossed = sample.derived.thighs_crossed;
+  const crossed =
+    thighsCrossed === true || shinsCrossed === true
+      ? true
+      : thighsCrossed === false || shinsCrossed === false
+        ? false
+        : null;
   return {
     crossed,
     values: {
-      left_knee_x: leftKnee.x,
-      right_knee_x: rightKnee.x,
-      left_ankle_x: leftAnkle.x,
-      right_ankle_x: rightAnkle.x,
+      left_knee_x: leftKnee?.x ?? null,
+      right_knee_x: rightKnee?.x ?? null,
+      left_ankle_x: leftAnkle?.x ?? null,
+      right_ankle_x: rightAnkle?.x ?? null,
+      thighs_crossed: thighsCrossed,
+      shins_crossed: shinsCrossed,
+      thigh_angle_deg: sample.derived.thigh_angle_deg,
+      thighs_estimated: sample.quality.thighs_estimated,
+      legs_visible: sample.quality.legs_visible,
       crossed,
     },
   };
@@ -245,9 +245,18 @@ function crossedLegsPoseCheck(sample: PoseSample | null): PoseCheck {
   const result = crossedLegsCheck(sample);
   if (result.crossed === null)
     return missing("legs not visible", ["legs"]);
+  const display =
+    result.crossed
+      ? result.values.thighs_crossed === true &&
+        result.values.shins_crossed !== true
+        ? result.values.thighs_estimated
+          ? "thighs crossed (estimated)"
+          : "thighs crossed"
+        : "legs crossed"
+      : "open";
   return check(
     result.crossed,
-    result.crossed ? "legs crossed" : "open",
+    display,
     result.values,
     result.crossed ? [] : ["legs crossed"],
   );
@@ -462,7 +471,8 @@ export const POSE_TESTS: PoseTestDefinition[] = [
   {
     id: "crossed-legs",
     label: "Crossed legs",
-    instruction: "Cross one leg over the other; keep both feet and hips in frame.",
+    instruction:
+      "Cross one leg over the other; keep both thighs and hips in frame.",
     kind: "alert",
     priority: 25,
     holdMs: 0,

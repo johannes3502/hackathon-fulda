@@ -334,13 +334,16 @@ Events, keine Scores und keine Backend-Aufrufe.
 | T09 | Hüften außerhalb | Schultern sichtbar, `trunkLean` nicht auswertbar | sofort |
 | T10 | Hände verdeckt | beide Handgelenkhöhen nicht messbar | sofort |
 | T11 | Hand in der Hosentasche | Handgelenk ≤ 0,45 Schulterbreiten zur Hüfte und keine erkannte Hand daran (FR-POSE-20) | sofort |
-| T12 | Beine gekreuzt | Unterschenkel schneiden sich (Knie + Knöchel sichtbar) | sofort |
+| T12 | Beine gekreuzt | Oberschenkel schneiden sich (Hüfte + Knie, Knie auch außerhalb des Bildes) oder Unterschenkel schneiden sich (Knie + Knöchel sichtbar) | sofort |
 
 **MUSS:** T10 ist ein **Sichtbarkeitstest**, kein Taschenbeweis. T07 ist ein
 **Kopforientierungs-Proxy**, kein Gaze. T11 ist eine Heuristik, kein Beweis
-für eine Hosentasche. T12 erkennt nur gekreuzte Unterschenkel, wenn Knie und
-Knöchel im Bild sind; es ist keine Aussage über Sitzhaltung. Die UI muss das
-so benennen.
+für eine Hosentasche. T12 prüft zuerst die projizierten Oberschenkel
+(Hüfte → Knie) und zusätzlich die Unterschenkel (Knie → Knöchel), wenn diese
+sichtbar sind. So funktioniert die Pose auch, wenn das Bild nur bis zu den
+Oberschenkeln reicht; Knie dürfen dafür bis 30 % außerhalb des Bildes liegen
+und werden als Schätzung markiert. Es ist keine Aussage über Sitzhaltung. Die
+UI muss das so benennen.
 
 **MUSS:** Der Dev mode ist nicht die Produkt-UI. Er dient nur zum Testen der
 Heuristiken und wird nicht als Event, Clip oder Backend-Payload gespeichert.
@@ -855,8 +858,10 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
     Event.
 12. **Datenschutz:** Ohne Consent startet keine Kamera; Video bleibt lokal;
     Löschung funktioniert.
-13. **Beine:** T12 erkennt gekreuzte Unterschenkel nur, wenn Knie und Knöchel
-    sichtbar sind; ohne Beine bleibt die Anzeige grau. Kein Event.
+13. **Beine:** T12 erkennt gekreuzte Ober- oder Unterschenkel; Oberschenkel
+    auch bei abgeschnittenen Unterschenkeln, wenn Hüften und Knie (ggf.
+    geschätzt) auswertbar sind. Ohne jede Bein-Geometrie bleibt die Anzeige
+    grau. Kein Event.
 
 ## 10. Offene Entscheidungen
 
@@ -928,3 +933,4 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 | 24.10.2026 | Hand-Landmarks sichtbar, 5 Hz, einheitliches Check-Muster, T12 | Hand-Modell lädt nachweislich mit Confidence 0,3; pinke Hand-Landmarks im Pose-Lab-Overlay; alle Posen liefern `values`/`failing`; T12 erkennt gekreuzte Unterschenkel. |
 | 24.10.2026 | Hassans Hand-Modell und Pocket-Logik übernommen | Hand-Modell läuft auf jedem Pose-Frame mit Confidence 0,5; Pocket = Handgelenk ≤ 0,45 Schulterbreiten zur eigenen Hüfte und keine erkannte Hand an diesem Handgelenk; Hand-Landmarks bleiben im Browser. |
 | 24.10.2026 | GPU-first mit CPU-Fallback im Pose-Worker | Modell-Assets und Settings unverändert von Hassan (Pose Lite, Hand, `IMAGE`, 0,5/0,5); WebGL2-/Software-Renderer-Probe, Warm-up und einmaliger Laufzeit-Fallback; Dev-Status zeigt Delegate, Renderer und Fallback-Grund. |
+| 24.10.2026 | T12 um Oberschenkel-Kreuzung erweitert | Oberschenkel (Hüfte → Knie) werden zusätzlich zu den Unterschenkeln geprüft; Knie dürfen bis 30 % außerhalb des Bildes liegen und werden als Schätzung markiert. So bleibt „Beine gekreuzt“ bei einem Bild bis zu den Oberschenkeln erkennbar. |

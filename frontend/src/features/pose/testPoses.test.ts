@@ -82,6 +82,31 @@ function crossedLegs(): Landmark[] {
   return p;
 }
 
+function crossedThighs(): Landmark[] {
+  const p = base();
+  Object.assign(p[25], { x: 0.65, y: 0.9 });
+  Object.assign(p[26], { x: 0.35, y: 0.9 });
+  p[27].visibility = 0;
+  p[28].visibility = 0;
+  return p;
+}
+
+function crossedThighsOutOfFrame(): Landmark[] {
+  const p = crossedThighs();
+  Object.assign(p[25], { y: 1.25 });
+  Object.assign(p[26], { y: 1.25 });
+  return p;
+}
+
+function openThighsOutOfFrame(): Landmark[] {
+  const p = base();
+  Object.assign(p[25], { y: 1.25 });
+  Object.assign(p[26], { y: 1.25 });
+  p[27].visibility = 0;
+  p[28].visibility = 0;
+  return p;
+}
+
 function crossed(): Landmark[] {
   const p = base();
   Object.assign(p[13], { x: 0.3, y: 0.55 });
@@ -175,12 +200,29 @@ it("evaluates each fixed test pose", () => {
   expect(evaluate("hands-hidden", handsHidden()).pass).toBe(true);
 });
 
-it("detects crossed legs from intersecting lower-leg segments", () => {
+it("detects crossed legs from intersecting shins or thighs", () => {
   expect(evaluate("crossed-legs", crossedLegs()).pass).toBe(true);
   expect(evaluate("crossed-legs").pass).toBe(false);
   const hidden = base();
   hidden[27].visibility = 0;
+  expect(evaluate("crossed-legs", hidden).pass).toBe(false);
+  for (const index of [25, 26, 27, 28]) hidden[index].visibility = 0;
   expect(evaluate("crossed-legs", hidden).pass).toBeNull();
+});
+
+it("uses thighs when the lower legs are cut off", () => {
+  const thigh = evaluate("crossed-legs", crossedThighs());
+  expect(thigh.pass).toBe(true);
+  expect(thigh.values.thighs_crossed).toBe(true);
+  expect(thigh.values.shins_crossed).toBeNull();
+  expect(thigh.values.thighs_estimated).toBe(false);
+  expect(thigh.values.thigh_angle_deg).toBeCloseTo(28.07, 1);
+
+  const estimated = evaluate("crossed-legs", crossedThighsOutOfFrame());
+  expect(estimated.pass).toBe(true);
+  expect(estimated.values.thighs_estimated).toBe(true);
+  expect(estimated.values.legs_visible).toBe(false);
+  expect(evaluate("crossed-legs", openThighsOutOfFrame()).pass).toBe(false);
 });
 
 it("reports which condition failed", () => {

@@ -95,9 +95,15 @@ Diese Werte werden aus den geloggten Punkten berechnet, nicht zusätzlich getrac
 | `left_wrist_cross`, `right_wrist_cross` | Handgelenk entlang der Schulterlinie, ab Körpermitte, in Schulterbreiten; positiv = über die Mitte auf die Gegenseite |
 | `left_forearm_deg`, `right_forearm_deg` | Unterarm ↔ Schulterlinie, 0–90°, 0 = parallel |
 | `left_wrist_hip_dist`, `right_wrist_hip_dist` | Handgelenk ↔ eigene Hüfte, 2D, in Schulterbreiten; das Handgelenk muss nur im Bild liegen |
+| `thigh_angle_deg` | spitzer Winkel zwischen den projizierten Oberschenkellinien Hüfte → Knie, 0–90°; 0 = parallel |
+| `thighs_crossed` | projizierte Oberschenkel schneiden sich im Bild (plus 10 % Rand); `null`, wenn Hüften oder Knie fehlen |
+| `thigh_cross_y` | normierte y-Position des Oberschenkel-Schnittpunkts; `null` ohne Schnittpunkt |
 | `left_hand_visibility`, `right_hand_visibility` | höchste Sichtbarkeit von Pinky/Zeigefinger/Daumen (17–22); `null`, wenn ein Punkt außerhalb des Bildes liegt |
 | `left_hand_found`, `right_hand_found` | Hand Landmarker hat eine Hand an diesem Handgelenk gefunden; `null` ohne Hand-Modell oder wenn die Hand außerhalb des Bildes liegt |
-| `legs_visible` | Knie und Knöchel ausreichend sichtbar |
+| `legs_visible` (unter `quality`) | Knie und Knöchel ausreichend sichtbar |
+| `thighs_visible` (unter `quality`) | Hüften und Knie ausreichend sichtbar |
+| `thighs_available` (unter `quality`) | Oberschenkel-Geometrie auswertbar, ggf. mit geschätzten Knien |
+| `thighs_estimated` (unter `quality`) | mindestens ein Knie liegt außerhalb des Bildes oder unter der strengen Sichtbarkeit |
 | `hips_visible` (unter `quality`) | beide Hüftpunkte nutzbar |
 
 ## Log-Schema
@@ -128,7 +134,10 @@ Ein JSON-Objekt pro Sample, JSONL:
   "quality": {
     "pose_present": true,
     "hips_visible": true,
-    "legs_visible": false
+    "legs_visible": false,
+    "thighs_visible": false,
+    "thighs_available": false,
+    "thighs_estimated": false
   }
 }
 ```
@@ -136,7 +145,9 @@ Ein JSON-Objekt pro Sample, JSONL:
 Regeln:
 
 - Nur Samples loggen, wenn `pose_present` true ist.
-- Nicht sichtbare Beine als `null` loggen, nicht interpolieren.
+- Nicht sichtbare Beine als `null` loggen, nicht interpolieren. Die abgeleitete
+  Oberschenkel-Geometrie nutzt zusätzlich vom Modell geschätzte Knie bis 30 %
+  außerhalb des Bildes; `thighs_estimated` kennzeichnet das.
 - Keine Glättung im Roh-Log; Glättung erst bei der Auswertung.
 - `t_ms` relativ zum ersten Pose-Sample; bei Aufnahme später an `MediaRecorder.onstart` ausrichten.
 
@@ -175,10 +186,19 @@ kein Backend-Payload.
 
 ## Crossed legs (Dev, live-only)
 
-`crossedLegsCheck` prüft, ob sich die Unterschenkel schneiden: linkes Knie →
-linker Knöchel und rechtes Knie → rechter Knöchel. Knie und Knöchel müssen
-sichtbar sein; sonst ist das Ergebnis `null` (grau). Kein Event, keine Aussage
-über Sitzhaltung.
+`crossedLegsCheck` prüft zuerst die Oberschenkel: linke Hüfte → linkes Knie
+und rechte Hüfte → rechtes Knie. Schneiden sich diese projizierten Strecken
+innerhalb des Bildes (mit 10 % Rand), gilt die Pose als erkannt. Dafür dürfen
+die Knie bis 30 % außerhalb des Bildes liegen oder eine niedrige Sichtbarkeit
+haben; `thighs_estimated` markiert diese Schätzung. Zusätzlich werden – wenn
+Knie und Knöchel sichtbar sind – die Unterschenkel geprüft. Ein Treffer in
+einem der beiden Paare reicht. Sind weder Oberschenkel noch Unterschenkel
+auswertbar, ist das Ergebnis `null` (grau). Kein Event, keine Aussage über
+Sitzhaltung.
+
+Die Erkennung ist eine 2D-Projektion: Tiefe und Perspektive können die
+Oberschenkel kreuzen lassen, obwohl sie es räumlich nicht tun. Deshalb bleibt
+sie eine Heuristik ohne Event und ohne Backend-Payload.
 
 ## Implementierter Frontend-Vertrag (24.10.2026)
 
@@ -210,8 +230,9 @@ Aufnahme-Logs ausgegeben.
   `[x,y,z,visibility,presence]`; fehlende Konfidenzwerte sind `null`, nicht erfunden.
   Ungültige Koordinaten sind `null`. Für Beine gelten zusätzlich die Sichtbarkeitsregeln.
 - `image: {width,height}` ergänzt das Schema für reproduzierbare Pixelgeometrie.
-  Alle Werte aus „Abgeleitete Werte“ liegen unter `derived`; `legs_visible` bleibt
-  unter `quality`. Fehlende oder degenerierte Geometrie ergibt `null`.
+  Alle Werte aus „Abgeleitete Werte“ liegen unter `derived`; `legs_visible`,
+  `thighs_visible`, `thighs_available` und `thighs_estimated` bleiben unter
+  `quality`. Fehlende oder degenerierte Geometrie ergibt `null`.
 - Die Namen im JSON bleiben `head.pitch_deg`, `head.roll_deg`, `head.eyes_forward`
   wie im Beispiel; nicht zusätzlich `head_pitch_deg` auf oberster Ebene.
 - Daten bleiben im Arbeitsspeicher und gehen beim Verlassen/Neuladen verloren.
@@ -222,8 +243,10 @@ Implementierung und Konstanten: `src/features/pose/sample.ts`. Modell-Detection
 und Presence verwenden 0,5 (MediaPipe-Standard). Ein Punkt gilt für Ableitungen
 als nutzbar, wenn er im Bild liegt, `visibility >= 0.5` und, falls geliefert,
 `presence >= 0.5` gilt. Die Sichtbarkeit eines Knie-/Knöchelpunkts wird einzeln
-geprüft; `legs_visible` ist nur wahr, wenn alle vier nutzbar sind. Diese Grenzwerte
-sind technische Prototyp-Konfiguration, keine validierte Genauigkeit.
+geprüft; `legs_visible` ist nur wahr, wenn alle vier nutzbar sind. Für die
+Oberschenkel dürfen Knie bis 30 % außerhalb des Bildes liegen; im Bild benötigen
+sie mindestens 0,2 Sichtbarkeit. Diese Grenzwerte sind technische
+Prototyp-Konfiguration, keine validierte Genauigkeit.
 
 - Pixelwerte: `X=x*width`, `Y=y*height`, `Z=z*width`. Das z bleibt eine
   Modellschätzung, keine metrische Tiefe. Rohwerte werden nicht geklemmt.
@@ -246,6 +269,10 @@ sind technische Prototyp-Konfiguration, keine validierte Genauigkeit.
 - Wrist-Hip-Distance: 2D-Abstand Handgelenk → eigene Hüfte in Pixeln, geteilt
   durch die Schulterbreite. Das Handgelenk muss nur im Bild liegen; seine
   `visibility` darf niedrig sein, weil eine Tasche es verdeckt.
+- Thigh-Cross: Schnitt der projizierten Strecken linke Hüfte → linkes Knie und
+  rechte Hüfte → rechtes Knie. Der Schnittpunkt muss im Bild (plus 10 % Rand)
+  liegen; Endpunkte zählen nicht. `thigh_angle_deg` ist der spitze Winkel
+  zwischen beiden Strecken, kein Beweis für eine Kreuzung.
 - Hand-Zuordnung: Hand-Punkt 0 (Handgelenk) wird dem näheren Pose-Handgelenk
   (15/16) zugeordnet, höchstens 0,5 Schulterbreiten entfernt; bei zwei Händen
   am selben Handgelenk gewinnt die nähere. `*_hand_found` ist `true`, wenn eine
