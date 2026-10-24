@@ -312,19 +312,12 @@ IndexedDB-Quota und WebM-Seekbarkeit prüfen.
 ### FR-POSE-19 — Dev mode „Pose Lab“
 
 **MUSS:** Im `/live`-Workspace gibt es einen „Pose lab“-Toggle. Bei aktiver
-Kamera zeigt er **eine von zwei umschaltbaren Darstellungen** derselben
-dominanten Pose, nie eine Liste:
-
-- **Coach:** Cockatoo-Avatar mit Sprechblase, die die Pose anspricht
-  (z. B. „Try uncrossing your arms!“). Das ist die Standardansicht.
-- **Status:** genau ein großes Statusfeld mit Pose und Messwert, grün bei
-  neutraler Haltung (`OK`), rot bei einer erkannten Abweichung, grau ohne
-  Auswertung (`—`).
-
-Der Umschalter („Coach view“ / „Status view“) ist nur bei aktivem Pose Lab
-sichtbar. Beide Darstellungen zeigen dieselbe Priorität; bei Rot pulsiert
-die Anzeige und die Videobühne erhält einen roten Rahmen, damit es aus der
-Ferne lesbar ist.
+Kamera zeigt er genau ein großes Statusfeld mit der dominanten Pose und
+ihrem Messwert, nie eine Liste: grün bei neutraler Haltung (`OK`), rot bei
+einer erkannten Abweichung, grau ohne Auswertung (`—`). Die frühere
+Coach-Ansicht (Cockatoo-Avatar mit Sprechblase) ist entfernt. Bei Rot
+pulsiert die Anzeige und die Videobühne erhält einen roten Rahmen, damit es
+aus der Ferne lesbar ist.
 
 **MUSS:** Bei mehreren erkannten Abweichungen gewinnt die höchste Priorität:
 Pocket > Arme verschränkt > Hände verdeckt > Hand im Gesicht > Rumpf-Neigung >
@@ -894,7 +887,7 @@ gültigen Frames: `not-evaluable`, kein Hinweis.
 |---|---|---|---|
 | OD-1 | Face Landmarker + Iris für echtes Gaze? | Nein im MVP; nur als separates Feature mit Consent, Kalibrierung und „Kamera-Blick“, nie „Eye Contact“ | offen |
 | OD-2 | `full-body` standardmäßig? | Nein, opt-in und experimentell | entschieden |
-| OD-3 | Hand Landmarker für Gesten? | Fingertracking separat schaltbar (Standard an), max. 5 Hz auch ohne Pose, Confidence 0,5; Pocket nur Dev | entschieden |
+| OD-3 | Hand Landmarker für Gesten? | Fingertracking separat schaltbar (Standard an), max. 5 Hz auch ohne Pose, Confidence 0,5; Pocket seit 24.10.2026 auch als Live-Hinweis und Review-Event (Pose-lab-Logik) | entschieden |
 | OD-4 | Live-Gestenhinweise? | Im integrierten Prototyp kalibrierte Pose-Hinweise aus `goal`, abschaltbar; keine Scores | Nutzerauftrag Integration |
 | OD-5 | Kalibrierungs-Set | 10–20 Personen, 0,5/1/2 m, Brille, Licht, Hauttöne; Precision/Recall berichten | offen |
 | OD-6 | Default `audienceMode` | Kein stiller Default; Demo `camera` | entschieden |

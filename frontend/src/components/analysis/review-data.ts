@@ -1,6 +1,7 @@
 import type { LiveFeedback } from "@/features/live/contracts";
 import type { ClaimResult } from "@/features/factcheck/api";
 import { STAT_LABELS } from "@/components/stats/stats";
+import { cueAppearance } from "@/features/live/cue-appearance";
 
 export type Criterion = keyof typeof STAT_LABELS;
 export type ReviewMoment = {
@@ -9,6 +10,7 @@ export type ReviewMoment = {
   durationMs: number;
   criterion: Criterion | null;
   kind: "positive" | "attention" | "note";
+  assessment?: "positive" | "attention" | "neutral";
   title: string;
   detail: string;
   action: string;
@@ -25,6 +27,7 @@ export type ReviewData = {
   notice?: string;
   performance: PerformancePoint[];
   moments: ReviewMoment[];
+  claims?: ClaimResult[];
 };
 
 export function timestamp(ms: number) {
@@ -87,6 +90,14 @@ export function feedbackToMoment(
       item.kind === "suggestion" || item.kind === "observation"
         ? "note"
         : item.kind,
+    assessment:
+      claim && (claim.verdict === "not_found" || claim.verdict === "unchecked")
+        ? "neutral"
+        : item.kind === "positive"
+          ? "positive"
+          : cueAppearance(item, "ready").tone === "attention"
+            ? "attention"
+            : "neutral",
     title: item.title,
     detail: claim?.explanation || item.detail,
     action: item.action,

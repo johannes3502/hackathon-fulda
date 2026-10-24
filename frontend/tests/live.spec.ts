@@ -154,7 +154,10 @@ async function noOverflow(page: Page) {
 }
 async function enable(page: Page) {
   await page.goto("/live");
-  await page.getByText("Recording options", { exact: true }).click();
+  await page
+    .getByRole("region", { name: "Studio options" })
+    .getByText("Recording options", { exact: true })
+    .click();
   await page.getByLabel("Create a transcript").uncheck();
   await page.getByRole("button", { name: "Enable camera" }).click();
   await expect(
@@ -770,6 +773,7 @@ test("REST analysis uploads recorded audio/video and merges word feedback into r
   ).toBeVisible();
   await expect(page.getByText("Transcript: filler count")).toBeVisible();
   // Both events begin at 100 ms: duration bars used to obscure each other.
+  await page.getByText("All 2 timestamped moments", { exact: true }).click();
   const timeline = page.getByRole("group", { name: "Feedback timeline" });
   const jumps = timeline.getByRole("button");
   await expect(jumps).toHaveCount(2);
@@ -1172,6 +1176,7 @@ test("sideways motion and crossed arms reach review while live hints can be mute
   });
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
+  await page.getByText("All 2 timestamped moments", { exact: true }).click();
   await expect(
     page.getByLabel("Feedback timeline").getByRole("button"),
   ).toHaveCount(2);

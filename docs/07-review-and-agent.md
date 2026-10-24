@@ -6,6 +6,15 @@ Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
 
 ## Ablauf
 
+Ergänzender Nutzerauftrag: Vier 0–100-Prototyp-Scores stehen über dem Video.
+`evidence-share-v1` bewertet positive / (positive + kritische) Zeitanteile,
+mit zeitlicher Vereinigung überlappender Hinweise derselben Art. Für Fachwissen
+hat der Anteil gestützter an entscheidbaren Quellenurteilen Vorrang. Offene
+Aussagen, neutrale Beobachtungen und unbekannte Zeit werden ausgeschlossen.
+Ohne Evidenz steht „–“. Datenabdeckung und Formel sind direkt im UI sichtbar.
+Der Graph ist eine durchgehende, ungefüllte kubische Linie. Zwischenwerte
+sind als interpoliert gekennzeichnet, der Wiedergabepunkt folgt dem Video.
+
 1. Im Studio **Presentation & material** öffnen, Präsentationstyp wählen und
    Material hochladen. PDF/PPTX/DOCX/TXT/MD, maximal 25 MB pro Datei. **Ready**
    abwarten; **Manage material** öffnet die bestehende Quellenverwaltung.
@@ -13,6 +22,13 @@ Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
    Der sichtbare Aufnahmehinweis erklärt Deepgram EU und lokalen Whisper-Fallback.
 3. Aufnehmen und **Finish & review**. **Review moments** verbindet Video,
    begrenzte Wiedergabe-Abschnitte und zeitgenaue Feedback-Anmerkungen.
+   Unter dem Video zeigt ein qualitativer Graph die Zeit auf der x-Achse und
+   den Saldo gleichzeitiger Hinweise um eine neutrale Mittellinie: positive
+   Momente oben, Anpassungshinweise unten. Größere Ausschläge bedeuten mehr
+   gleichzeitige Hinweise, keine gemessene Performance und keine Note.
+   Beobachtungen bleiben neutral; fehlende Hinweise sind keine positive Evidenz.
+   Klick im Graphen wählt den nächsten Moment; Zeitregler und aufklappbare
+   Zeitmarken erlauben präzise bzw. tastaturbedienbare Sprünge.
 4. **Practice questions**: sprechen oder tippen, eine Frage pro Schritt.
    Fehlt ein Transkript, kann **Transcribe this take** die Aufnahme nach explizitem
    Klick zur lokalen Whisper-Analyse hochladen. Das Originalvideo bleibt im Tab.

@@ -1,10 +1,12 @@
 # Long-Term-Fortschritt — Frontend Data Contract und Timeline-UI
 
-Status: **Entwurf / Vorschlag (24.10.2026)**. Dieses Dokument ist der
-Arbeitsvertrag für das Frontend-Team. Es beschreibt die API-Antwort
-`progress.v1`, die Bedeutung jedes Feldes, die Zustände und bewährte Muster für
-eine Timeline über viele Präsentationen. Design und konkrete Umsetzung bleiben
-beim Frontend-Team.
+Status: **In Arbeit — Johannes (24.10.2026).** Umsetzung auf dem Branch
+`feat/long-term-progress-ui`: Route `/progress` mit Profil-/Consent-Flow,
+Small Multiples, Detail-Chart, Change-Points, Qualitätstabelle und klar
+gekennzeichneten synthetischen Demo-Daten. Dieses Dokument bleibt der
+Arbeitsvertrag und beschreibt die API-Antwort `progress.v1`, die Bedeutung jedes
+Feldes, die Zustände und bewährte Muster für eine Timeline über viele
+Präsentationen.
 
 Die fachliche Datenspeicherung und Auswertung steht in
 [`12-long-term-progress-data-design.md`](12-long-term-progress-data-design.md).

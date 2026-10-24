@@ -1,11 +1,13 @@
 # Long-Term-Fortschritt — Data Design, Speicherung und Auswertung
 
-Status: **Backend implementiert (24.10.2026); Frontend-Anbindung offen.**
-Der Code liegt in `backend/app/progress/`, die additiven Spalten/Tabellen werden
-beim Start idempotent angelegt. Die 10 neuen Backend-Tests laufen zusammen mit
-der bestehenden Suite (290 passed, 1 skipped). Dieses Dokument beschreibt
-weiterhin die Zielarchitektur und die Gründe; Abweichungen zum ersten Entwurf
-sind in §2.3 ausdrücklich festgehalten. Der Frontend-Vertrag steht separat in
+Status: **In Arbeit — Johannes (24.10.2026).** Backend implementiert;
+Frontend-UI und Profil-Anbindung werden auf dem Branch
+`feat/long-term-progress-ui` umgesetzt. Der Code liegt in
+`backend/app/progress/`, die additiven Spalten/Tabellen werden beim Start
+idempotent angelegt. Die 10 neuen Backend-Tests laufen zusammen mit der
+bestehenden Suite (290 passed, 1 skipped). Dieses Dokument beschreibt weiterhin
+die Zielarchitektur und die Gründe; Abweichungen zum ersten Entwurf sind in §2.3
+ausdrücklich festgehalten. Der Frontend-Vertrag steht separat in
 [`13-long-term-progress-frontend-contract.md`](13-long-term-progress-frontend-contract.md).
 
 > **Leitplanken des Projekts bleiben gültig.** Es gibt keinen Gesamtscore,

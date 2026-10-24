@@ -16,6 +16,14 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 **Leitplanken:** nur diese fünf Features; keine erfundenen Scores, Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeits-/Notenbewertung; nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
 
+**Expliziter Nutzerauftrag (24.10.2026):** Im Review vier 0–100-Prototyp-Scores
+für Gestik, Fachwissen, Flow und Struktur statt bloßer Moment-Anzahlen anzeigen.
+Die Version `evidence-share-v1` bewertet die erfasste Evidenz: positive Zeitanteile
+gegen positive + kritische Zeitanteile; Fachwissen bevorzugt über entscheidbare
+Quellenurteile. Formel, Datenabdeckung und fehlende Daten bleiben sichtbar;
+ohne Evidenz kein Score. Keine Validierungs- oder Benotungsbehauptung. Der
+Zeitverlauf ist eine geglättete Linie mit ausdrücklich interpolierten Übergängen.
+
 ## 2. Ablauf
 
 1. **Vorbereitung:** Nutzer lädt Quellen hoch (PDF, PPTX, Text). Backend zerlegt sie in Chunks mit Quelle und Seite/Folie und legt sie für die Suche ab.
@@ -36,7 +44,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | Hintergrundjobs | Celery-Worker; Redis als Broker und temporäres Result-Backend (Docker Compose) |
 | Datenbank | Postgres mit `pgvector` (Docker Compose): Sessions, Events, Transkript, Quellen-Chunks + Embeddings |
 | Objektspeicher | SeaweedFS, S3-kompatibel (Docker Compose): Quellen und temporäre Analyse-Uploads; keine Review-Videos, Clips oder Snapshots |
-| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker und optionaler HandLandmarker für Fingertracking; Pocket nur Dev; FaceLandmarker (Iris) nicht MVP |
+| Pose / Gesten / Blick | `@mediapipe/tasks-vision` im Browser: PoseLandmarker und optionaler HandLandmarker für Fingertracking; FaceLandmarker (Iris) nicht MVP |
 | Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
 | Medien-Verarbeitung | `ffprobe` für Stream-Startzeiten/Dauer, `ffmpeg` nur für Audio-Dekodierung und ASR |
 | Transkription | Lokales Whisper (`faster-whisper`) hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}` + Text), Deepgram EU als wählbarer Live-Stream mit Wiederverwendung der finalen Wörter; Anbieter bleibt austauschbar |
@@ -64,7 +72,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 ```
 Browser (Next.js, TS)
- ├─ Kamera → MediaPipe Pose + Hand (Fingertracking, Pocket nur Dev) → Regeln → Events + Landmarks [live, lokal]
+ ├─ Kamera → MediaPipe Pose + Hand (Fingertracking) → Regeln → Events + Landmarks [live, lokal]
  ├─ Mikro  → AudioWorklet → Pegel, F0, Silbenrate → Regeln → Events + Live-Hinweis [live, lokal]
  └─ MediaRecorder → lokale Aufnahme (Client-Vertrag)
          └─ optionaler Audio-/Aufnahme-Upload ───────┐
@@ -221,19 +229,24 @@ Der integrierte Web-Worker startet standardmäßig mit Lite/VIDEO. Unter
 GPU-first mit CPU-Fallback bei Start- oder Laufzeitfehlern, kein Modellwechsel.
 JSONL/Event-Payload enthalten `runtime` (Modell, Modus, Delegate). VIDEO-Logs
 enthalten zeitlich geglättete Modell-Ausgaben; IMAGE-Logs unabhängige Frames.
-Pose Lab T1–T12 bleibt ein Dev-Werkzeug. Fingertracking ist separat unter
-„Track fingers“ schaltbar, standardmäßig an und auf höchstens 5 Hz begrenzt;
-es funktioniert auch ohne sichtbaren Torso. Es erzeugt keine Pocket-Events.
+Pose Lab T1–T12 läuft immer mit; das Panel bleibt ein Dev-Werkzeug. Die sechs
+Tests ohne kalibrierte Live-Regel (Hand in Tasche, Hände verdeckt, Hand am
+Gesicht, Beine gekreuzt, Schultertilt, Kopfneigung) erzeugen auf Nutzerwunsch
+mit derselben Logik Live-Hinweise und Review-Events (`features/pose/lab-events.ts`,
+2 s Halten, 5 s Cooldown; eine kalibrierte Regel hat beim Hinweis Vorrang).
+Fingertracking ist separat unter „Track fingers“ schaltbar, standardmäßig an und
+auf höchstens 5 Hz begrenzt; es funktioniert auch ohne sichtbaren Torso.
 Die Haltungsreferenz kalibriert ohne Hand-Stillhaltepflicht. Fehlende neutrale
 Handreferenzen bleiben im Payload `null`; Gesten nutzen dann Schultergeometrie.
 Alle Pose-Regeln halten einheitlich 2 s (`POSE_RULES.stabilizeHoldMs`); Arme
 verschränkt behalten 20 s Cooldown. Die Live-Hinweisblase (Pose und Stimme)
 zeigt jeden Hinweis mindestens 3 s und lässt danach 2 s Lücke
-(`minDisplayMs`/`minDisplayGapMs`). Pose-lab-Lob („Nice, open posture.“) erscheint
-nur nach 10 s ohne Korrekturhinweis einmalig (`praiseAfterMs`). Alle Werte sind unter `/admin`
+(`minDisplayMs`/`minDisplayGapMs`). `praiseAfterMs` wirkt seit Entfernen der
+Pose-lab-Coach-Ansicht nicht mehr sichtbar. Alle Werte sind unter `/admin`
 (Navbar, noch ohne Login) pro Browser in `localStorage` einstellbar. Dort lässt
 sich auch jede der 7 Pose-Regeln auf On (Hinweis + Review), Review only (nur
-Timeline) oder Off stellen und jeder der 12 Pose-lab-Tests abschalten.
+Timeline) oder Off stellen und jeder der 12 Pose-lab-Tests abschalten (bei den
+sechs Live-Tests auch Hinweis und Review-Event).
 Sprachfeedback ist insgesamt und für Pausen, Tempo, Füllwörter, Lautstärke und
 Tonhöhe einzeln schaltbar. Jede Web-Aufnahme nutzt auf Nutzerwunsch Live-Feedback
 und volle Backend-Analyse;

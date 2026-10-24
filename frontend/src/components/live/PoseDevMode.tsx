@@ -5,15 +5,7 @@ import {
   fallbackLabel,
   type PoseBackend,
 } from "@/features/pose/backend";
-import {
-  coachMessage,
-  poseFeedback,
-  type PoseTestResult,
-} from "@/features/pose/testPoses";
-import { usePacedCue } from "@/features/live/cue-pacing";
-import { CoachCue } from "./CoachCue";
-
-export type PoseView = "coach" | "status";
+import { poseFeedback, type PoseTestResult } from "@/features/pose/testPoses";
 
 export function PoseDevMode({
   results,
@@ -21,29 +13,14 @@ export function PoseDevMode({
   handError,
   hands,
   backend,
-  view,
 }: {
   results: PoseTestResult[];
   handModel: boolean | null;
   handError: string | null;
   hands: number;
   backend: PoseBackend | null;
-  view: PoseView;
 }) {
   const { state, id, label, detail, failing } = poseFeedback(results);
-  const feedback = poseFeedback(results, true);
-  // Coach alerts follow the admin display time and gap; status view stays raw.
-  const alert = usePacedCue(
-    feedback.state === "alert" && feedback.id
-      ? { ...feedback, id: feedback.id }
-      : null,
-    view === "coach",
-  );
-  const coach =
-    alert ??
-    (feedback.state === "alert"
-      ? { state: "idle" as const, id: null, detail: "" }
-      : feedback);
   const failingText = failing.join(", ");
   const fallback = fallbackLabel(backend);
   const acceleration = backendLabel(backend, handModel);
@@ -57,20 +34,6 @@ export function PoseDevMode({
       `[pose] ${state} ${label} (${detail}) failing=[${failingText}] hands=${hands}`,
     );
   }, [state, id, label, detail, failingText, hands]);
-  if (view === "coach")
-    // Nothing to say: no bubble, so the gap and quiet periods stay blank.
-    return coach.state === "idle" && coach.id === null ? null : (
-      <CoachCue
-        message={coachMessage(coach.id, coach.detail)}
-        detail={
-          handModel === false
-            ? `${acceleration}${handError ? `: ${handError}` : ""}`
-            : `${coach.detail} · ${hands} hands · ${acceleration}`
-        }
-        state={coach.state}
-        className="live-pose-cue-lab"
-      />
-    );
   return (
     <div
       className="live-pose-lab"

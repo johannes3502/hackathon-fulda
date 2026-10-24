@@ -13,6 +13,8 @@ import {
 import { AppShell } from "@/components/shared/AppShell";
 import { STAT_LABELS } from "@/components/stats/stats";
 import { PerformanceGraph } from "./PerformanceGraph";
+import { ReviewScores } from "@/components/live/ReviewScores";
+import { reviewScores } from "@/features/live/review-scores";
 import {
   boundedTime,
   timestamp,
@@ -21,6 +23,7 @@ import {
   type ReviewMoment,
 } from "./review-data";
 import "./review-analysis.css";
+import "../live/review-accessibility.css";
 
 const kindLabels = {
   positive: "Gelungen",
@@ -56,6 +59,7 @@ export function ReviewAnalysis({
   );
   const selected = moments.find((item) => item.id === selectedId);
   const selectedIndex = visible.findIndex((item) => item.id === selectedId);
+  const scores = reviewScores(moments, data.durationMs, data.claims);
 
   useEffect(() => {
     // Preloaded media can finish or fail before hydration attaches its handlers.
@@ -132,38 +136,18 @@ export function ReviewAnalysis({
               </span>
             </div>
           </div>
-          <div
-            className="review418-criteria"
-            aria-label="Kriterien und Filter für Momente"
-          >
-            {Object.entries(STAT_LABELS).map(([key, label]) => {
-              const count = moments.filter(
-                (moment) => moment.criterion === key,
-              ).length;
-              return (
-                <button
-                  type="button"
-                  key={key}
-                  className={`review418-criterion ${criterion === key ? "active" : ""}`}
-                  aria-pressed={criterion === key}
-                  onClick={() =>
-                    setCriterion(criterion === key ? null : (key as Criterion))
-                  }
-                >
-                  <span>{label}</span>
-                  <strong>
-                    {count} <small>Momente</small>
-                  </strong>
-                </button>
-              );
-            })}
-          </div>
+          <ReviewScores
+            scores={scores}
+            selected={criterion}
+            demo={data.demo}
+            onSelect={(key) => setCriterion(criterion === key ? null : key)}
+          />
           <div className="review418-context">
             <span>
               {data.notice ??
                 (data.demo
                   ? "Demo: Video und Anmerkungen sind synthetisch. Die Zeitachse zeigt die Beispiel-Momente."
-                  : "Zeitmarken stammen aus den vorhandenen Events. Die Anzahl der Hinweise ist keine Bewertung.")}
+                  : "Scores beziehen sich auf bewertete Evidenz. Zeitmarken führen zu den vorhandenen Events.")}
             </span>
             <button
               type="button"
@@ -244,7 +228,6 @@ export function ReviewAnalysis({
               </section>
               <PerformanceGraph
                 durationMs={data.durationMs}
-                points={data.performance}
                 moments={visible}
                 positionMs={positionMs}
                 selectedId={selectedId}
