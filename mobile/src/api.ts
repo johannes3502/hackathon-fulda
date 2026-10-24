@@ -31,11 +31,17 @@ export async function api(
       ...init,
       signal: pending.signal,
     });
-    if (!response.ok)
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const body = await response.json();
+        if (typeof body?.detail === "string") detail = `: ${body.detail}`;
+      } catch {}
       throw new Error(
-        `Analysis service returned HTTP ${response.status}. Your recording is still on this device.`,
+        `Backend ${path} failed (HTTP ${response.status})${detail}. Local files are still on this device.`,
       );
-    return await response.json();
+    }
+    return response.status === 204 ? undefined : await response.json();
   } finally {
     pending.dispose();
   }

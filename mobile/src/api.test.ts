@@ -28,15 +28,13 @@ describe("native analysis contract", () => {
       expect(() => endpoint(url)).toThrow();
   });
   it("uploads media without ASR, polls the returned job and maps real data", async () => {
-    fetch
-      .mockResolvedValueOnce(reply({ job_id: id }))
-      .mockResolvedValueOnce(
-        reply({
-          job_id: id,
-          status: "completed",
-          result: { audio: { summary: { duration_ms: 1000 } }, events: [] },
-        }),
-      );
+    fetch.mockResolvedValueOnce(reply({ job_id: id })).mockResolvedValueOnce(
+      reply({
+        job_id: id,
+        status: "completed",
+        result: { audio: { summary: { duration_ms: 1000 } }, events: [] },
+      }),
+    );
     const result = await analyzeTake(
       "https://example.test",
       "file:///take.mp4",
@@ -85,5 +83,56 @@ describe("native analysis contract", () => {
       ),
     ).rejects.toThrow();
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+it("uses the shared source endpoints with native multipart names and empty delete responses", async () => {
+  const { api } = await import("./api");
+  const { listSources, uploadSource, searchSources, deleteSource } =
+    await import("../../frontend/src/features/sources/api");
+  const request = <T>(
+    base: string,
+    path: string,
+    init?: RequestInit,
+  ): Promise<T> => api(base, path, new AbortController().signal, init);
+  fetch
+    .mockResolvedValueOnce(reply([]))
+    .mockResolvedValueOnce(reply({ source: { id, status: "queued" } }))
+    .mockResolvedValueOnce(reply([]))
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      json: vi.fn(() => {
+        throw new Error("empty body");
+      }),
+    });
+  await listSources("https://api.test", id, request);
+  await uploadSource(
+    "https://api.test",
+    id,
+    new File(["synthetic"], "cache-file"),
+    request,
+    "slides.PPTX",
+  );
+  await searchSources(
+    "https://api.test",
+    id,
+    "What is the evidence?",
+    5,
+    request,
+  );
+  await deleteSource("https://api.test", id, request);
+  expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+    `https://api.test/sources?collection_id=${id}`,
+    "https://api.test/sources",
+    "https://api.test/sources/search",
+    `https://api.test/sources/${id}`,
+  ]);
+  expect(fetch.mock.calls[1][1].body.get("file").name).toBe("slides.PPTX");
+  expect(fetch.mock.calls[1][1].body.get("collection_id")).toBe(id);
+  expect(JSON.parse(fetch.mock.calls[2][1].body)).toEqual({
+    collection_id: id,
+    query: "What is the evidence?",
+    k: 5,
   });
 });

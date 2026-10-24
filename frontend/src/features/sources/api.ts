@@ -7,7 +7,7 @@ type Location = components["schemas"]["Location"];
 export const ACCEPT = ".pdf,.pptx,.docx,.txt,.md";
 export const MAX_BYTES = 25 * 1024 * 1024;
 const STORAGE_KEY = "pitchcoach.sourceCollection";
-const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+export const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 let fallbackCollection: string | undefined;
 
 /** One collection per browser groups the sources of the next presentations. */
@@ -24,11 +24,21 @@ export function collectionId() {
   }
 }
 
+export function setCollectionId(id: string) {
+  const value = id.trim();
+  if (!UUID.test(value)) throw new Error("Enter a valid collection ID.");
+  fallbackCollection = value;
+  try {
+    localStorage.setItem(STORAGE_KEY, value);
+  } catch {}
+  return value;
+}
+
 export function isPending(source: Source) {
   return source.status === "queued" || source.status === "processing";
 }
 
-export function checkFile(file: File) {
+export function checkFile(file: Pick<File, "name" | "size">) {
   const suffix = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
   if (!ACCEPT.split(",").includes(suffix))
     return "Use PDF, PPTX, DOCX, TXT or MD files.";
@@ -48,6 +58,12 @@ export function locationLabel({ kind, start, end }: Location) {
   const [singular, plural] = LABELS[kind];
   return start === end ? `${singular} ${start}` : `${plural} ${start}–${end}`;
 }
+
+export type SourceRequest = <T>(
+  endpoint: string,
+  path: string,
+  init?: RequestInit,
+) => Promise<T>;
 
 async function call<T>(
   endpoint: string,
@@ -72,8 +88,12 @@ async function call<T>(
   return (response.status === 204 ? undefined : response.json()) as T;
 }
 
-export function listSources(endpoint: string, collection: string) {
-  return call<Source[]>(
+export function listSources(
+  endpoint: string,
+  collection: string,
+  request: SourceRequest = call,
+) {
+  return request<Source[]>(
     endpoint,
     `/sources?collection_id=${encodeURIComponent(collection)}`,
   );
@@ -82,20 +102,26 @@ export function listSources(endpoint: string, collection: string) {
 export async function uploadSource(
   endpoint: string,
   collection: string,
-  file: File,
+  file: Blob & { name: string },
+  request: SourceRequest = call,
+  filename = file.name,
 ) {
   const body = new FormData();
   body.append("collection_id", collection);
-  body.append("file", file, file.name);
-  const accepted = await call<{ source: Source }>(endpoint, "/sources", {
+  body.append("file", file, filename);
+  const accepted = await request<{ source: Source }>(endpoint, "/sources", {
     method: "POST",
     body,
   });
   return accepted.source;
 }
 
-export function deleteSource(endpoint: string, id: string) {
-  return call<void>(endpoint, `/sources/${encodeURIComponent(id)}`, {
+export function deleteSource(
+  endpoint: string,
+  id: string,
+  request: SourceRequest = call,
+) {
+  return request<void>(endpoint, `/sources/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
 }
@@ -105,8 +131,9 @@ export function searchSources(
   collection: string,
   query: string,
   k = 5,
+  request: SourceRequest = call,
 ) {
-  return call<SourceHit[]>(endpoint, "/sources/search", {
+  return request<SourceHit[]>(endpoint, "/sources/search", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ collection_id: collection, query, k }),

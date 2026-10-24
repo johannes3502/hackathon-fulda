@@ -17,6 +17,7 @@ import {
   ACCEPT,
   checkFile,
   collectionId,
+  setCollectionId,
   deleteSource,
   isPending,
   listSources,
@@ -77,6 +78,8 @@ function clientConfig(): Config {
 const subscribe = () => () => {};
 
 export function SourceLibrary() {
+  const [selectedCollection, setSelectedCollection] = useState<string>();
+  const [collectionDraft, setCollectionDraft] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
   const [uploading, setUploading] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +91,9 @@ export function SourceLibrary() {
   // Null on the server and during hydration; browser-only values afterwards.
   const config = useSyncExternalStore(subscribe, clientConfig, () => null);
   const api = config && "api" in config ? config.api : null;
-  const collection = config && "api" in config ? config.collection : null;
+  const collection =
+    selectedCollection ??
+    (config && "api" in config ? config.collection : null);
   const pending = sources.some(isPending);
   useEffect(() => {
     if (!api || !collection) return;
@@ -179,8 +184,9 @@ export function SourceLibrary() {
           <div>
             <h1>Your sources</h1>
             <p>
-              Upload your slides, papers or notes. Fact-check and the question
-              round compare what you say with these files.
+              Upload your slides, papers or notes and search the indexed
+              passages. Fact-check and generated questions are not connected
+              yet.
             </p>
           </div>
         </div>
@@ -193,6 +199,50 @@ export function SourceLibrary() {
           <p className="status-error" role="alert">
             {error}
           </p>
+        )}
+        {collection && (
+          <details className="context-disclosure">
+            <summary>Use this collection on another device</summary>
+            <p>
+              Enter this ID and the same server address in the native app. The
+              ID groups documents; it is not a login or access-control secret.
+            </p>
+            <Input
+              aria-label="Current collection ID"
+              readOnly
+              value={collection}
+            />
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                try {
+                  const id = setCollectionId(collectionDraft);
+                  if (id === collection) return;
+                  if (config && "api" in config)
+                    cachedConfig = { ...config, collection: id };
+                  setSources([]);
+                  setHits(null);
+                  setError(null);
+                  setSelectedCollection(id);
+                } catch (reason) {
+                  setError(String(reason));
+                }
+              }}
+            >
+              <Input
+                aria-label="Collection ID from another device"
+                placeholder="Collection ID"
+                value={collectionDraft}
+                onChange={(event) => setCollectionDraft(event.target.value)}
+              />
+              <Button
+                type="submit"
+                disabled={!!uploading || searching || !collectionDraft.trim()}
+              >
+                Open collection
+              </Button>
+            </form>
+          </details>
         )}
         <div className="sources-grid">
           <section

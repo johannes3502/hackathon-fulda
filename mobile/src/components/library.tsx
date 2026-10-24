@@ -5,6 +5,18 @@ export default function Library() {
   const { takes } = useSessions();
   return (
     <Page>
+      <Section title="Prepare">
+        <Action
+          secondary
+          label="Practice Setup"
+          onPress={() => router.push("/setup")}
+        />
+        <Action
+          secondary
+          label="Source Library"
+          onPress={() => router.push("/sources")}
+        />
+      </Section>
       <Action label="New recording" onPress={() => router.push("/studio")} />
       <Section
         title="Your recordings"

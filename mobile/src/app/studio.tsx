@@ -21,11 +21,13 @@ import {
   time,
   useColors,
 } from "../ui";
-import { useSessions, writePose, type Take } from "../session";
+import { useSessions, writePose, shareFile, type Take } from "../session";
 import { useNativePose } from "../useNativePose";
+import { PoseOverlay } from "../components/pose-overlay";
+import { PoseReadout } from "../components/pose-readout";
 import { api, endpoint } from "../api";
 export default function Studio() {
-  const { save, options } = useSessions();
+  const { save, options, practice } = useSessions();
   const { title, poseEnabled, backend, url } = options;
   const colors = useColors();
   const camera = useRef<Camera>(null);
@@ -212,7 +214,7 @@ export default function Studio() {
       timer.current = setInterval(() => {
         const ms = Date.now() - startTime.current;
         setElapsed(ms);
-        if (ms >= 180000) void stopRef.current();
+        if (ms >= practice.targetDurationMs) void stopRef.current();
       }, 100);
     } catch (e) {
       busy.current = false;
@@ -246,6 +248,7 @@ export default function Studio() {
                     device={device}
                     format={format}
                     fps={30}
+                    isMirrored
                     isActive={focused && foreground}
                     video
                     audio
@@ -269,7 +272,13 @@ export default function Studio() {
                     </Copy>
                   </View>
                 )}
+                {enabled && pose.latest && <PoseOverlay sample={pose.latest} />}
               </View>
+              {pose.crossed && (
+                <Copy accessibilityLiveRegion="polite">
+                  Arms crossed. Try an open stance. · Heuristic
+                </Copy>
+              )}
               <View style={{ alignItems: "center", gap: 8 }}>
                 <Copy
                   style={{
@@ -286,7 +295,7 @@ export default function Studio() {
                     ? "Recording"
                     : finishing
                       ? "Saving recording…"
-                      : "Up to 3 minutes"}
+                      : `Up to ${practice.targetDurationMs / 60000} minutes`}
                 </Copy>
               </View>
               {!enabled ? (
@@ -311,6 +320,17 @@ export default function Studio() {
                   recording
                   disabled={!ready || preparing}
                   onPress={() => void start()}
+                />
+              )}
+              {enabled && !recording && !finishing && !preparing && (
+                <Action
+                  secondary
+                  label="Turn Camera Off"
+                  icon="video.slash"
+                  onPress={() => {
+                    setEnabled(false);
+                    setReady(false);
+                  }}
                 />
               )}
               <Copy caption muted style={{ textAlign: "center" }}>
@@ -384,6 +404,26 @@ export default function Studio() {
                   </Copy>
                 )}
               </Section>
+              {pose.latest && (
+                <PoseReadout sample={pose.latest} active={pose.crossed} />
+              )}
+              {!enabled && pose.count > 0 && (
+                <Action
+                  secondary
+                  label="Share Preview Pose Log"
+                  icon="square.and.arrow.up"
+                  onPress={() =>
+                    void (async () => {
+                      try {
+                        const uri = writePose(randomUUID(), pose.log.text());
+                        if (uri) await shareFile(uri);
+                      } catch (e) {
+                        setError(String(e));
+                      }
+                    })()
+                  }
+                />
+              )}
             </>
           }
         />

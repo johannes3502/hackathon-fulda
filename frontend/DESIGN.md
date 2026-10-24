@@ -1,5 +1,24 @@
 # Pitch Coach design
 
+## 418 stats card (2026-10-24)
+
+Explicit user request: a simplified player-card layout with an overall circle
+above Gestik, Fachwissen, Flow and Struktur (1–100%). Reuse white, #42ff8c and
+Noto Serif Display. The aggregate is interpreted as an equally weighted mean,
+not a digit sum. Three.js draws the ring; HTML values and SVG provide a readable
+fallback. Count-up runs once on entering the viewport, pointer movement adds a
+subtle card tilt, and reduced motion uses the final static state.
+This is a design prototype with labeled synthetic values, not a validated
+assessment. Actual criterion scoring remains undefined.
+
+## 418 loading screen (2026-10-24)
+
+User-provided brand direction takes precedence for the loading screen: pure white,
+accent #42ff8c, black 418 typography in locally hosted Noto Serif Display.
+A slowly rotating flat Three.js disc echoes the supplied logo. The mark remains
+readable as HTML before JavaScript and without WebGL; reduced motion is static.
+Preview at `/loading-preview`. Other workspace styling is unchanged.
+
 The presenter is rehearsing at a laptop in a brightly lit hackathon hall, with limited time and attention. A light workspace provides readable controls; a dark stage separates the practice area from feedback.
 
 Restrained palette: neutral page, white surfaces, dark slate text and stage, blue primary action. The explicit plan palette takes precedence over generated color suggestions. One system sans family, 16px body, tabular timers, 12–16px panels, 44px main controls. Semantic warning/error colors only signal those states.

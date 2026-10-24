@@ -1,11 +1,24 @@
 import { Switch, View } from "react-native";
-import { Copy, Field, Page, Section } from "../ui";
+import { Action, Copy, Field, Page, Section } from "../ui";
 import { useSessions } from "../session";
 export default function CaptureOptions() {
-  const { options, setOptions } = useSessions();
+  const { options, setOptions, practice, setPractice } = useSessions();
   return (
     <Page>
       <Section title="Recording">
+        <Copy caption muted>
+          Duration
+        </Copy>
+        {[1, 3, 5].map((n) => (
+          <Action
+            key={n}
+            secondary={practice.targetDurationMs !== n * 60000}
+            label={`${n} minutes`}
+            onPress={() =>
+              setPractice({ ...practice, targetDurationMs: n * 60000 })
+            }
+          />
+        ))}
         <Field
           label="Recording name"
           value={options.title}

@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Check,
   ChevronRight,
-  Clock3,
   FileText,
   Lightbulb,
   MessageSquare,
@@ -20,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { getGateway } from "@/features/coach/gateway";
 import type { SessionConfig } from "@/features/coach/contracts";
+import { DemoStatsCard } from "@/components/stats/StatsCard";
 
 export function SessionSetupForm() {
   const router = useRouter();
@@ -301,31 +301,7 @@ export function SessionSetupForm() {
             </p>
           </section>
           <aside className="setup-aside">
-            <div className="preview-card">
-              <div className="preview-top">
-                <span>
-                  <span className="status-dot" /> YOUR PRACTICE SPACE
-                </span>
-                <span>
-                  <Clock3 size={13} /> {duration / 60000} min
-                </span>
-              </div>
-              <div className="preview-center">
-                <span className="preview-orb">
-                  <AudioGlyph />
-                </span>
-                <h2>Room to find your voice.</h2>
-                <p>
-                  No audience pressure.
-                  <br />
-                  Just you, your idea, and a next step.
-                </p>
-              </div>
-              <div className="preview-caption">
-                <Lightbulb size={17} />
-                <span>One useful cue. At the right moment.</span>
-              </div>
-            </div>
+            <DemoStatsCard />
             <div className="journey">
               <h3>A small rehearsal. A useful takeaway.</h3>
               {[
@@ -385,14 +361,5 @@ export function SessionSetupForm() {
         </div>
       </div>
     </AppShell>
-  );
-}
-function AudioGlyph() {
-  return (
-    <span className="audio-glyph" aria-hidden="true">
-      {[12, 24, 38, 28, 48, 32, 18].map((h, i) => (
-        <i key={i} style={{ height: h }} />
-      ))}
-    </span>
   );
 }

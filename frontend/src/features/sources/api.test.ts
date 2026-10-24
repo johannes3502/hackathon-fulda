@@ -74,3 +74,16 @@ it("uploads multipart, searches as JSON and surfaces backend errors", async () =
     "HTTP 404): Unknown source",
   );
 });
+it("opens a valid collection from mobile without replacing it with a new browser ID", async () => {
+  const { setCollectionId } = await import("./api");
+  const values = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => values.get(key),
+    setItem: (key: string, value: string) => values.set(key, value),
+  });
+  const id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+  setCollectionId(` ${id} `);
+  expect(collectionId()).toBe(id);
+  expect(() => setCollectionId("bad")).toThrow("valid collection");
+  expect(collectionId()).toBe(id);
+});

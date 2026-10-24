@@ -45,6 +45,12 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f8d8754e-6863-47ec-aa4d-5fae53415a5f"
+      }
+    },
+    "owner": "michaelmurr"
   }
 }

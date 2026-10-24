@@ -51,8 +51,8 @@ the sample controls and validate external input before dispatching events.
   without attributing it to a new user recording. Storage failure leaves the
   in-memory sample usable.
 
-Pose/gesture/gaze feedback rules, source ingest/fact-check, judge questions and
-answer evaluation still use sample data. Session persistence, presigned uploads
+The arms-crossed pose cue and source ingest/retrieval are implemented.
+Fact-check, generated judge questions and answer evaluation still use sample data. Session persistence, presigned uploads
 and event-clip retrieval are also pending. Keep these boundaries visible when
 connecting new services; no fabricated scores or model results.
 
@@ -65,3 +65,12 @@ questions and sample reports reuse `MockCoachGateway`. No backend implementation
 is added by this client. Native pose logs explicitly mark recording-request timing
 as approximate, and take files are temporary local cache data. See the mobile
 README for build commands, validation and remaining device checks.
+
+
+Native integration now covers custom setup, pause/finish/recovery, focused retries,
+comparison reports, and the source library. Both platforms reuse source request
+functions and contracts, pose visibility/geometry/cues, event mapping, the mock
+gateway and reducer. Native source collections persist per API address; the web
+Sources page exposes a collection ID that can be opened on native and vice versa.
+This shares server documents, not camera recordings or practice history. Missing
+session/clip/fact-check/question APIs remain explicit rather than being invented.

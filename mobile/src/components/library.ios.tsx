@@ -27,6 +27,18 @@ export default function Library() {
   return (
     <Host style={{ flex: 1 }}>
       <List modifiers={[listStyle("insetGrouped")]}>
+        <Section title="Prepare">
+          <Button
+            label="Practice Setup"
+            systemImage="slider.horizontal.3"
+            onPress={() => router.push("/setup")}
+          />
+          <Button
+            label="Source Library"
+            systemImage="doc.text"
+            onPress={() => router.push("/sources")}
+          />
+        </Section>
         <Section
           title="Your recordings"
           footer={

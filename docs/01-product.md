@@ -38,6 +38,15 @@ Produktentscheidung.
 
 ## 3. Offen — muss das Team entscheiden
 
+### UI-Entwurf Stats-Karte (Nutzerwunsch 24.10.2026)
+
+Auf der Startseite: vereinfachte Spielerkarte mit Gesamt-Kreisdiagramm und
+Gestik/Fachwissen/Flow/Struktur, jeweils 1–100 %. Für diesen ausdrücklich
+angefragten Designentwurf werden synthetische, als Demo markierte Werte gezeigt.
+„Quersumme“ wird als gleich gewichteter arithmetischer Durchschnitt interpretiert
+(auf ganze Prozent gerundet). Die Ableitung der vier Werte aus realen Analysen
+ist weiterhin offen; die Karte behauptet keine gemessene persönliche Bewertung.
+
 ### Zielgruppe und Setting
 - Wer präsentiert damit: Studierende, Schule, Ausbildung, Beruf?
 - Übungsraum oder echter Vortrag?
