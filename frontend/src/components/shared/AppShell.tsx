@@ -59,6 +59,12 @@ export function AppShell({
           >
             Sample demo
           </Link>
+          <Link
+            href="/admin"
+            aria-current={pathname === "/admin" ? "page" : undefined}
+          >
+            Admin
+          </Link>
         </nav>
         <Dialog
           title="How this practice works"
@@ -96,10 +102,10 @@ export function AppShell({
                 backend analysis captures video and microphone audio, sends
                 audio during recording for live feedback and uploads the
                 complete take after stopping. Live transcription additionally
-                streams audio to Deepgram’s EU endpoint when enabled in Recording
-                options; local Whisper is the fallback. Camera and voice
-                observations are prototype heuristics, not quality scores. The
-                synthetic walkthrough is separately labelled and needs no
+                streams audio to Deepgram’s EU endpoint when enabled in
+                Recording options; local Whisper is the fallback. Camera and
+                voice observations are prototype heuristics, not quality scores.
+                The synthetic walkthrough is separately labelled and needs no
                 camera.
               </p>
               <p>

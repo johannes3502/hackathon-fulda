@@ -175,7 +175,8 @@ für den Fact-Check. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
 Darauf laufen lokale, kalibrierte Gesten-/Haltungsheuristiken (Hand hoch,
-Hände zusammen, Arme verschränkt, seitliche Neigung/Position) mit
+Hände zusammen, Arme verschränkt, seitliche Neigung/Position, Kopf seitlich
+abgewandt/gesenkt als Kopforientierungs-Proxy) mit
 Live-Hinweis, Review-Markern und Evidenz-Export. `/gestures` zeigt denselben
 Regelablauf mit synthetischen Landmarks; keine Genauigkeitsvalidierung.
 Recherche und Regeln: `docs/04-gesture-evaluation.md`; Jury-Abnahme und
@@ -183,7 +184,7 @@ noch offene Geräte-Gates: `docs/05-jury-demo.md`. Nutzerentscheidung:
 lokale Vorführung reicht; kein öffentliches Deployment erforderlich.
 Eye Contact wird nicht aus Pose-/Iris-Punkten behauptet.
 Der integrierte Web-Worker startet standardmäßig mit Lite/VIDEO. Unter
-„Analysis features“ sind IMAGE/VIDEO sowie Lite/Heavy unabhängig auswählbar;
+„Analysis features“ in `/admin` sind IMAGE/VIDEO sowie Lite/Heavy unabhängig auswählbar;
 GPU-first mit CPU-Fallback bei Start- oder Laufzeitfehlern, kein Modellwechsel.
 JSONL/Event-Payload enthalten `runtime` (Modell, Modus, Delegate). VIDEO-Logs
 enthalten zeitlich geglättete Modell-Ausgaben; IMAGE-Logs unabhängige Frames.
@@ -192,14 +193,23 @@ Pose Lab T1–T12 bleibt ein Dev-Werkzeug. Fingertracking ist separat unter
 es funktioniert auch ohne sichtbaren Torso. Es erzeugt keine Pocket-Events.
 Die Haltungsreferenz kalibriert ohne Hand-Stillhaltepflicht. Fehlende neutrale
 Handreferenzen bleiben im Payload `null`; Gesten nutzen dann Schultergeometrie.
-Die tolerantere Arm-Geometrie verwendet weiter 2 s Hold / 20 s Cooldown.
+Alle Pose-Regeln halten einheitlich 2 s (`POSE_RULES.stabilizeHoldMs`); Arme
+verschränkt behalten 20 s Cooldown. Die Live-Hinweisblase (Pose und Stimme)
+zeigt jeden Hinweis mindestens 3 s und lässt danach 2 s Lücke
+(`minDisplayMs`/`minDisplayGapMs`). Pose-lab-Lob („Nice, open posture.“) erscheint
+nur nach 10 s ohne Korrekturhinweis einmalig (`praiseAfterMs`). Alle Werte sind unter `/admin`
+(Navbar, noch ohne Login) pro Browser in `localStorage` einstellbar. Dort lässt
+sich auch jede der 7 Pose-Regeln auf On (Hinweis + Review), Review only (nur
+Timeline) oder Off stellen und jeder der 12 Pose-lab-Tests abschalten.
 Sprachfeedback ist insgesamt und für Pausen, Tempo, Füllwörter, Lautstärke und
 Tonhöhe einzeln schaltbar. „Live · in browser“ ist Standard: Kamera/Mikro bleiben
 lokal, ein AudioWorklet liefert RMS/YIN und einen Energiehüllkurven-Tempo-Proxy.
 Pausen, Lautstärke, Tonhöhenvariation und Rhythmus erscheinen während der Aufnahme.
 „Off · gestures only“ schaltet das Mikro aus. Der Backend-Modus nutzt den separaten
 Signal-Stream unten; Füllwörter und Wort-Tempo bleiben nachgelagert. Live-Captions
-sind separat. Schalter werden pro Aufnahme gespeichert und sind währenddessen gesperrt.
+sind separat. Die Analysis-features-Schalter liegen in `/admin`, bleiben pro
+Browser in `localStorage` und werden mit jeder Aufnahme gespeichert; Änderungen gelten
+ab der nächsten Aufnahme. Speech analysis und Pose lab bleiben im Studio.
 Die ausführlichen Research-Ziele in `docs/04-pose-tracking-requirements.md`
 sind nicht vollständig implementiert und überschreiben diese Entscheidung nicht.
 Der Aufnahme-Pfad nutzt die Audio-Job-API

@@ -310,6 +310,75 @@ it("recognizes immediately and resets on release", () => {
   expect(at(base(), 400).state).toBe("off");
 });
 
+it("holds alerts for the admin stabilize time while baseline stays instant", () => {
+  const tracker = new PoseTestTracker({ alertHoldMs: 2000 });
+  const at = (points: Landmark[], t: number, id: PoseTestId = "torso-lean") =>
+    tracker.update(sample(points), t).find((r) => r.id === id)!;
+  expect(at(base(), 0, "neutral").state).toBe("recognized");
+  expect(at(lean(), 100)).toMatchObject({ state: "watching", holdMs: 2000 });
+  expect(at(lean(), 2000).state).toBe("watching");
+  expect(at(lean(), 2100).state).toBe("recognized");
+  tracker.reset({ alertHoldMs: 0 });
+  expect(at(lean(), 2200).state).toBe("recognized");
+});
+
+it("bridges briefly hidden wrists while crossed arms are held", () => {
+  const tracker = new PoseTestTracker({ alertHoldMs: 2000 });
+  const hidden = () => {
+    const p = crossed();
+    p[15].visibility = p[16].visibility = 0;
+    return p;
+  };
+  const at = (points: Landmark[], t: number) =>
+    tracker.update(sample(points), t).find((r) => r.id === "arms-crossed")!;
+  for (let t = 0; t < 2000; t += 100)
+    expect(at(t % 300 === 200 ? hidden() : crossed(), t).state).toBe(
+      "watching",
+    );
+  expect(at(crossed(), 2000).state).toBe("recognized");
+  tracker.reset();
+  at(crossed(), 0);
+  // Hidden longer than the grace period ends the pending hold.
+  expect(at(hidden(), 1600).state).toBe("not-evaluable");
+});
+
+it("reports admin-disabled lab tests as off without checking them", () => {
+  const tracker = new PoseTestTracker({ disabled: ["torso-lean", "neutral"] });
+  const results = tracker.update(sample(lean()), 0);
+  expect(results.find((r) => r.id === "torso-lean")).toMatchObject({
+    state: "off",
+    display: "disabled",
+  });
+  expect(
+    poseFeedback(tracker.update(sample(base()), 100), true).state,
+  ).not.toBe("ok");
+});
+
+it("praises neutral posture once per quiet period without corrections", () => {
+  const tracker = new PoseTestTracker({
+    praiseAfterMs: 10000,
+    praiseShowMs: 3000,
+  });
+  const detected = [hand(0.25, 0.75, 0.05), hand(0.75, 0.75, 0.05)];
+  const coach = (points: Landmark[], t: number, hands = detected) =>
+    poseFeedback(tracker.update(sample(points, hands), t, hands), true).state;
+  expect(coach(base(), 0)).toBe("idle");
+  expect(coach(base(), 9900)).toBe("idle");
+  expect(coach(base(), 10000)).toBe("ok");
+  expect(coach(base(), 12900)).toBe("ok");
+  expect(coach(base(), 13000)).toBe("idle");
+  // A correction restarts the quiet period.
+  expect(coach(lean(), 15000)).toBe("alert");
+  expect(coach(base(), 16000)).toBe("idle");
+  expect(coach(base(), 24900)).toBe("idle");
+  expect(coach(base(), 25000)).toBe("ok");
+  // The status view still reports neutral on every frame.
+  expect(
+    poseFeedback(tracker.update(sample(base(), detected), 30000, detected))
+      .state,
+  ).toBe("ok");
+});
+
 it("marks missing data as not evaluable after the unknown grace period", () => {
   const tracker = new PoseTestTracker();
   const at = (points: Landmark[], t: number) =>

@@ -343,7 +343,7 @@ flowchart TD
     SP["/stats-preview<br/>Stats-Karte mit Replay"] --> SC["StatsCard<br/>Three.js-Ring, vier Kriterien<br/>synthetische Demo-Werte"]
     SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
-    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE["/ und /live - gleiches Studio<br/>LiveStudio: Large View als Standard, Pose-Overlay,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
     LIVE --> DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
@@ -351,6 +351,7 @@ flowchart TD
     SRC -->|"Weiter zur Aufnahme"| LIVE
     LIVE --> WALK["/gestures: synthetischer 22-s-Rundgang<br/>gleiche Regeln, keine Genauigkeitsvalidierung"]
     WALK --> LIVE
+    ADMIN["/admin (Navbar, ohne Login)<br/>AdminPanel: Pose-Haltezeit,<br/>Hinweis-Mindestdauer + Lücke,<br/>Pose feedback: On/Review/Off je Regel,<br/>Analysis features: Modell/Modus/Feedback"] -->|"localStorage, ab nächster<br/>Kalibrierung/Aufnahme"| LIVE
 
     PRAC --> STATE{"Phasen"}
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]

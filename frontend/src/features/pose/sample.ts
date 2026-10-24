@@ -54,6 +54,9 @@ export const HEURISTICS = {
   // predicted point must also stay near the hips horizontally.
   thighCloseReach: 0.75,
   thighAimMargin: 0.5,
+  // A turned head occludes the far ear, so head direction accepts lower
+  // visibility than the body landmarks. The points must stay in the image.
+  headConfidence: 0.2,
 };
 type PointName = keyof typeof POINTS;
 type Vector = [number, number, number];
@@ -318,6 +321,34 @@ export function poseSample(
   }
   const head = get(0, 7, 8);
   const face = head ? sub(head[0], mid(head[1], head[2])) : null;
+  // 2D head direction proxy from nose and ears; says nothing about gaze.
+  const headPoints = [0, 7, 8].every(
+    (i) =>
+      inImage(points[i]) &&
+      (confidence(points[i].visibility) ?? 0) >= HEURISTICS.headConfidence,
+  )
+    ? [0, 7, 8].map((i) => [points[i].x * width, points[i].y * height])
+    : null;
+  // Nose position between the ears: 0 = centred, ±1 = at or past one ear.
+  const headYaw = (() => {
+    if (!headPoints) return null;
+    const [nose, left, right] = headPoints;
+    const toLeft = Math.abs(nose[0] - left[0]);
+    const toRight = Math.abs(nose[0] - right[0]);
+    return toLeft + toRight > 1e-8
+      ? (toLeft - toRight) / (toLeft + toRight)
+      : null;
+  })();
+  // Nose below the ear line in shoulder widths; grows when the head tips down.
+  const shoulderSpan = (() => {
+    const s = get(11, 12);
+    return s ? Math.hypot(s[0][0] - s[1][0], s[0][1] - s[1][1]) : 0;
+  })();
+  const headDrop =
+    headPoints && shoulderSpan > 1e-8
+      ? (headPoints[0][1] - (headPoints[1][1] + headPoints[2][1]) / 2) /
+        shoulderSpan
+      : null;
   const elbow = (s: number, e: number, w: number) => {
     const p = get(s, e, w)?.map(planar);
     return p ? angle(sub(p[0], p[1]), sub(p[2], p[1])) : null;
@@ -412,6 +443,8 @@ export function poseSample(
       pitch_deg:
         face && -face[2] > 1e-8 ? deg(Math.atan2(face[1], -face[2])) : null,
       roll_deg: eyes ? tilt(eyes[1], eyes[4]) : null,
+      yaw_ratio: headYaw,
+      drop_ratio: headDrop,
     },
     derived: {
       shoulder_tilt_deg: shoulders ? tilt(shoulders[0], shoulders[1]) : null,

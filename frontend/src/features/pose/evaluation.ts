@@ -5,7 +5,7 @@ import type { PoseRuntime } from "./options";
 // Engineering settings for a visible, reproducible prototype, NOT validated
 // presentation-quality cutoffs. Rationale and acceptance protocol: docs/04-gesture-evaluation.md.
 export const POSE_RULES = Object.freeze({
-  version: "pose-rules-v5",
+  version: "pose-rules-v7",
   calibrationMs: 3000,
   calibrationSamples: 15,
   maxGapMs: 350,
@@ -14,7 +14,6 @@ export const POSE_RULES = Object.freeze({
   baselineHandRange: 0.3,
   neutralRaisedMax: -0.15,
   neutralDistanceMin: 0.65,
-  cueDwellMs: 3000,
   staleFrameMs: 700,
   inferenceTimeoutMs: 5000,
   raisedEnter: 0.15,
@@ -26,24 +25,78 @@ export const POSE_RULES = Object.freeze({
   leanExitDeg: 8,
   shiftEnter: 0.35,
   shiftExit: 0.2,
-  shiftHoldMs: 800,
-  gestureHoldMs: 800,
-  togetherHoldMs: 1200,
-  leanHoldMs: 1500,
+  // Head direction relative to the calibrated neutral head, not gaze.
+  headTurnEnter: 0.5,
+  headTurnExit: 0.35,
+  headDownEnter: 0.1,
+  headDownExit: 0.06,
   cooldownMs: 5000,
+  // Live hint timing; defaults until an admin panel can override them.
+  // A pose must hold this long before it becomes an event and a hint.
+  stabilizeHoldMs: 2000,
+  // A shown hint, pose or voice, stays at least this long.
+  minDisplayMs: 3000,
+  // Blank bubble between two consecutive hints; 0 swaps back-to-back.
+  minDisplayGapMs: 2000,
+  // Pose lab praise needs this long without a correction.
+  praiseAfterMs: 10000,
 });
-export type PoseRule =
-  | "hand_raised"
-  | "hands_together"
-  | "torso_lean"
-  | "body_shift"
-  | "arms_crossed";
+export const POSE_RULE_IDS = [
+  "hand_raised",
+  "hands_together",
+  "arms_crossed",
+  "torso_lean",
+  "body_shift",
+  "head_turned",
+  "head_down",
+] as const;
+export type PoseRule = (typeof POSE_RULE_IDS)[number];
+// on: live hint and review; review: timeline only; off: not observed.
+export type PoseRuleMode = "on" | "review" | "off";
+// Title, detail and action per rule.
+export const RULE_COPY: Record<PoseRule, readonly [string, string, string]> = {
+  hand_raised: [
+    "Hand above shoulder",
+    "A wrist stayed above its shoulder in the camera image.",
+    "Replay this emphasis: did the movement support the point you were making?",
+  ],
+  hands_together: [
+    "Hands held together",
+    "Your wrists stayed close together in front of your torso.",
+    "Review whether this was intentional. Try opening your hands for the next explanation if comfortable.",
+  ],
+  torso_lean: [
+    "Sideways lean",
+    "Your torso angle changed sideways from your neutral position.",
+    "Check the moment in context. Return to your comfortable starting position if you want to compare.",
+  ],
+  body_shift: [
+    "Sideways position change",
+    "Your torso moved sideways in the camera image from its neutral position.",
+    "Was this move intentional? Replay it in context. Camera movement can also cause this observation.",
+  ],
+  arms_crossed: [
+    "Arms crossed in front of torso",
+    "A wrist crossed the body midline with a bent elbow; the other hand was crossed or tucked under the arm in the camera image.",
+    "Review this held position in context. Try another hand position if comfortable; no emotion or intent is inferred.",
+  ],
+  head_turned: [
+    "Head turned to the side",
+    "Your nose moved towards one ear compared with your neutral head position in the camera image.",
+    "Replay this moment: were you reading the slides? Turn back towards the audience when it fits. Eye contact is not measured.",
+  ],
+  head_down: [
+    "Head tilted down",
+    "Your nose dropped below your neutral head position relative to the ears in the camera image.",
+    "Replay this moment: were you reading notes? Lift your head towards the audience if comfortable. Eye contact is not measured.",
+  ],
+};
 export type PoseEvent = {
   session_id: string;
   id: string;
   t_ms: number;
   duration_ms: number;
-  type: "gesture" | "posture";
+  type: "gesture" | "posture" | "gaze";
   severity: "info" | "hint";
   source: "browser";
   payload: {
@@ -58,7 +111,7 @@ export type PoseEvent = {
     initial_measurement: number;
     baseline: number | null;
     threshold: number;
-    unit: "shoulder widths" | "degrees";
+    unit: "shoulder widths" | "degrees" | "ear-distance ratio";
     confirmed_at_ms: number;
     calibration: Baseline;
   };
@@ -70,6 +123,8 @@ type Features = {
   centerX: number;
   shoulderWidth: number;
   cross: number | null;
+  yaw: number | null;
+  drop: number | null;
   handsVisible: boolean;
 };
 type Baseline = {
@@ -79,6 +134,8 @@ type Baseline = {
   centerX: number;
   shoulderWidth: number;
   cross: number | null;
+  yaw: number | null;
+  drop: number | null;
 };
 export type PoseEvaluation = {
   phase: "framing" | "calibrating" | "ready";
@@ -88,7 +145,12 @@ export type PoseEvaluation = {
   handsVisible: boolean;
   cue: PoseEvent | null;
   events: PoseEvent[];
-  measurements: { leanDelta: number; shiftDelta: number } | null;
+  measurements: {
+    leanDelta: number;
+    shiftDelta: number;
+    yawDelta: number | null;
+    dropDelta: number | null;
+  } | null;
 };
 type Hold = { start: number; last: number; event: PoseEvent | null };
 const median = (values: number[]) => {
@@ -166,7 +228,11 @@ function features(sample: PoseSample | null): Features | null {
     centerX: (ls[0] + rs[0] + lh[0] + rh[0]) / 4,
     shoulderWidth: span / width,
     cross:
-      cross.crossed === null ? null : Math.min(...(cross.cross as number[])),
+      cross.crossed === null
+        ? null
+        : (cross.measure ?? Math.min(...(cross.cross as number[]))),
+    yaw: sample.head.yaw_ratio,
+    drop: sample.head.drop_ratio,
     handsVisible: hands,
   };
 }
@@ -180,7 +246,16 @@ export class PoseEvaluator {
   private events: PoseEvent[] = [];
   private lastCueId: string | null = null;
   private cueUntil = 0;
-  constructor(private sessionId = "preview") {}
+  constructor(
+    private sessionId = "preview",
+    // Admin-adjustable timing; defaults come from POSE_RULES.
+    private timing: {
+      stabilizeHoldMs: number;
+      minDisplayMs: number;
+    } = POSE_RULES,
+    // Admin switches per rule; missing rules are on.
+    private modes: Partial<Record<PoseRule, PoseRuleMode>> = {},
+  ) {}
 
   update(sample: PoseSample | null, t: number): PoseEvaluation {
     const state = (
@@ -269,6 +344,15 @@ export class PoseEvaluator {
           ? median(values)
           : null;
       };
+      // The head reference uses every calibration frame with a measurable head.
+      const headReference = (key: "yaw" | "drop") => {
+        const values = this.calibration
+          .map((s) => s.f[key])
+          .filter((v): v is number => v !== null);
+        return values.length >= POSE_RULES.calibrationSamples
+          ? median(values)
+          : null;
+      };
       this.baseline = {
         lean: median(lean),
         raised: handReference("raised"),
@@ -276,6 +360,8 @@ export class PoseEvaluator {
         centerX: median(this.calibration.map((s) => s.f.centerX)),
         shoulderWidth: median(this.calibration.map((s) => s.f.shoulderWidth)),
         cross: handReference("cross"),
+        yaw: headReference("yaw"),
+        drop: headReference("drop"),
       };
       this.calibration = [];
     }
@@ -314,7 +400,7 @@ export class PoseEvaluator {
           (this.holds.has("hand_raised")
             ? raisedThreshold - (POSE_RULES.raisedEnter - POSE_RULES.raisedExit)
             : raisedThreshold),
-      POSE_RULES.gestureHoldMs,
+      this.timing.stabilizeHoldMs,
       t,
     );
     this.rule(
@@ -323,7 +409,7 @@ export class PoseEvaluator {
       baseline.distance,
       togetherThreshold,
       crossed !== true && f.distance !== null && f.distance <= togetherLimit,
-      POSE_RULES.togetherHoldMs,
+      this.timing.stabilizeHoldMs,
       t,
     );
     this.rule(
@@ -332,8 +418,10 @@ export class PoseEvaluator {
       baseline.cross,
       CROSS_ARMS.minCross,
       crossed === true,
-      CROSS_ARMS.holdMs,
+      this.timing.stabilizeHoldMs,
       t,
+      // Crossed wrists hide each other; unknown frames do not end the hold.
+      crossed === null ? CROSS_ARMS.unknownReleaseMs : 0,
     );
     const leanDelta = Math.abs(f.lean - baseline.lean);
     this.rule(
@@ -345,7 +433,7 @@ export class PoseEvaluator {
         (this.holds.has("torso_lean")
           ? POSE_RULES.leanExitDeg
           : POSE_RULES.leanEnterDeg),
-      POSE_RULES.leanHoldMs,
+      this.timing.stabilizeHoldMs,
       t,
     );
     const shiftDelta =
@@ -360,17 +448,50 @@ export class PoseEvaluator {
           (this.holds.has("body_shift")
             ? POSE_RULES.shiftExit
             : POSE_RULES.shiftEnter),
-      POSE_RULES.shiftHoldMs,
+      this.timing.stabilizeHoldMs,
+      t,
+    );
+    // Without a head reference, a centred nose is the neutral turn.
+    const yawDelta =
+      f.yaw === null ? null : Math.abs(f.yaw - (baseline.yaw ?? 0));
+    this.rule(
+      "head_turned",
+      yawDelta,
+      baseline.yaw,
+      POSE_RULES.headTurnEnter,
+      yawDelta !== null &&
+        yawDelta >=
+          (this.holds.has("head_turned")
+            ? POSE_RULES.headTurnExit
+            : POSE_RULES.headTurnEnter),
+      this.timing.stabilizeHoldMs,
+      t,
+    );
+    // Only a downward change counts; looking down has no absolute reference.
+    const dropDelta =
+      f.drop === null || baseline.drop === null ? null : f.drop - baseline.drop;
+    this.rule(
+      "head_down",
+      dropDelta,
+      baseline.drop,
+      POSE_RULES.headDownEnter,
+      dropDelta !== null &&
+        dropDelta >=
+          (this.holds.has("head_down")
+            ? POSE_RULES.headDownExit
+            : POSE_RULES.headDownEnter),
+      this.timing.stabilizeHoldMs,
       t,
     );
     // One cue at a time; retain it while that observation is active, then allow the next.
     const active = [...this.holds.values()].flatMap((h) =>
-      h.event ? [h.event] : [],
+      h.event && this.modes[h.event.payload.rule] !== "review" ? [h.event] : [],
     );
     let cue = active.find((e) => e.id === this.lastCueId) ?? null;
     if (!cue || t >= this.cueUntil) {
       cue = active.at(-1) ?? null;
-      if (cue?.id !== this.lastCueId) this.cueUntil = t + POSE_RULES.cueDwellMs;
+      if (cue?.id !== this.lastCueId)
+        this.cueUntil = t + this.timing.minDisplayMs;
       this.lastCueId = cue?.id ?? null;
     }
     return {
@@ -383,7 +504,7 @@ export class PoseEvaluator {
         f.handsVisible,
         cue,
       ),
-      measurements: { leanDelta, shiftDelta },
+      measurements: { leanDelta, shiftDelta, yawDelta, dropDelta },
     };
   }
 
@@ -395,9 +516,15 @@ export class PoseEvaluator {
     matches: boolean,
     dwell: number,
     t: number,
+    unknownGraceMs = 0,
   ) {
+    if (this.modes[rule] === "off") {
+      this.holds.delete(rule);
+      return;
+    }
     if (!matches || value === null) {
       const previous = this.holds.get(rule);
+      if (previous && t - previous.last <= unknownGraceMs) return;
       if (previous?.event)
         this.cooldown.set(
           rule,
@@ -417,40 +544,18 @@ export class PoseEvaluator {
     }
     hold.last = t;
     if (t - hold.start < dwell) return;
-    const copy = {
-      hand_raised: [
-        "Hand above shoulder",
-        "A wrist stayed above its shoulder in the camera image.",
-        "Replay this emphasis: did the movement support the point you were making?",
-      ],
-      hands_together: [
-        "Hands held together",
-        "Your wrists stayed close together in front of your torso.",
-        "Review whether this was intentional. Try opening your hands for the next explanation if comfortable.",
-      ],
-      torso_lean: [
-        "Sideways lean",
-        "Your torso angle changed sideways from your neutral position.",
-        "Check the moment in context. Return to your comfortable starting position if you want to compare.",
-      ],
-      body_shift: [
-        "Sideways position change",
-        "Your torso moved sideways in the camera image from its neutral position.",
-        "Was this move intentional? Replay it in context. Camera movement can also cause this observation.",
-      ],
-      arms_crossed: [
-        "Arms crossed in front of torso",
-        "Both wrists crossed the body midline with bent elbows in the camera image.",
-        "Review this held position in context. Try another hand position if comfortable; no emotion or intent is inferred.",
-      ],
-    }[rule];
+    const copy = RULE_COPY[rule];
     const event: PoseEvent = {
       session_id: this.sessionId,
       id: hold.event?.id ?? `${this.sessionId}-${rule}-${hold.start}`,
       t_ms: Math.round(hold.start),
       duration_ms: Math.round(t - hold.start),
       type:
-        rule === "torso_lean" || rule === "body_shift" ? "posture" : "gesture",
+        rule === "torso_lean" || rule === "body_shift"
+          ? "posture"
+          : rule === "head_turned" || rule === "head_down"
+            ? "gaze"
+            : "gesture",
       severity: "info",
       source: "browser",
       payload: {
@@ -464,7 +569,12 @@ export class PoseEvaluator {
         initial_measurement: hold.event?.payload.initial_measurement ?? value,
         baseline,
         threshold,
-        unit: rule === "torso_lean" ? "degrees" : "shoulder widths",
+        unit:
+          rule === "torso_lean"
+            ? "degrees"
+            : rule === "head_turned"
+              ? "ear-distance ratio"
+              : "shoulder widths",
         confirmed_at_ms: hold.event?.payload.confirmed_at_ms ?? Math.round(t),
         calibration: { ...this.baseline! },
       },

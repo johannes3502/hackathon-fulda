@@ -10,7 +10,13 @@ import { POSE_RULES, type PoseEvaluation } from "@/features/pose/evaluation";
 import type { PoseTiming } from "@/features/pose/capture";
 
 const status = (check: CrossArmsCheck) =>
-  check.crossed === null ? "not visible" : check.crossed ? "crossed" : "open";
+  check.crossed === null
+    ? "not visible"
+    : check.crossed
+      ? check.tucked === null
+        ? "crossed"
+        : "crossed (one hand tucked)"
+      : "open";
 
 const rows = [
   ["cross", "Wrist to midline", `≥ ${CROSS_ARMS.minCross}`, 2],
@@ -92,8 +98,8 @@ export function PoseDebug({
         </tbody>
       </table>
       <small>
-        {CROSS_ARMS.holdMs
-          ? `Hint after ${CROSS_ARMS.holdMs / 1000} s crossed`
+        {POSE_RULES.stabilizeHoldMs
+          ? `Hint after ${POSE_RULES.stabilizeHoldMs / 1000} s crossed`
           : "Hint shows immediately"}{" "}
         · L/R = your left/right
       </small>
@@ -106,9 +112,17 @@ export function PoseDebug({
         Sideways shift: {evaluation?.measurements?.shiftDelta.toFixed(2) ?? "—"}{" "}
         / trigger {POSE_RULES.shiftEnter} shoulder widths
       </p>
+      <p>
+        Head turn: {evaluation?.measurements?.yawDelta?.toFixed(2) ?? "—"} /
+        trigger {POSE_RULES.headTurnEnter} ear-distance ratio
+      </p>
+      <p>
+        Head down: {evaluation?.measurements?.dropDelta?.toFixed(2) ?? "—"} /
+        trigger {POSE_RULES.headDownEnter} shoulder widths
+      </p>
       <small>
         {evaluation?.phase === "ready"
-          ? "Shift: hold 0.8 s · lean: hold 1.5 s · camera fixed"
+          ? `Every rule: hold ${POSE_RULES.stabilizeHoldMs / 1000} s · camera fixed`
           : "Needs a stable neutral baseline"}
       </small>
       <hr />

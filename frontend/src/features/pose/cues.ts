@@ -1,4 +1,4 @@
-import type { PoseSample } from "./sample";
+import { HEURISTICS, type PoseSample } from "./sample";
 // Prototype heuristics, not validated thresholds or assessments.
 export const CROSS_ARMS = {
   // Each wrist at, near or past the body midline, in shoulder widths.
@@ -11,12 +11,19 @@ export const CROSS_ARMS = {
   maxElbowDeg: 120,
   maxForearmDeg: 40,
   holdMs: 2000,
-  // Legacy native cue release behavior; web PoseEvaluator ends on missing data.
+  // Legacy native cue release behavior. The web PoseEvaluator only uses
+  // unknownReleaseMs, to bridge hidden wrists while arms stay crossed.
   releaseMs: 500,
   // Crossed wrists are often hidden under the other arm, so a missing
   // measurement ends an episode later than a clear "not crossed".
   unknownReleaseMs: 1500,
   cooldownMs: 20000,
+  // One-sided crossing: a hand tucked under the other arm is invisible, and
+  // MediaPipe guesses its wrist near its own elbow. Then one arm must cross
+  // the midline itself and the tucked wrist must stay apart from it, unlike
+  // hands held together.
+  tuckedMinCross: 0,
+  tuckedMinWristGap: 0.35,
 };
 type Timing = Pick<
   typeof CROSS_ARMS,
@@ -35,6 +42,10 @@ export type CrossArmsCheck = {
   height: Pair;
   elbow: Pair;
   forearm: Pair;
+  // Arm whose hand is tucked (0 = left, 1 = right); null for both crossed.
+  tucked: 0 | 1 | null;
+  // Crossing reported in events: the smaller of both, or the crossing arm.
+  measure: number | null;
 };
 export const passes = {
   cross: (v: number) => v >= CROSS_ARMS.minCross,
@@ -61,12 +72,70 @@ export function crossArmsCheck(sample: PoseSample | null): CrossArmsCheck {
     ] as Pair,
   };
   const entries = Object.entries(check) as [keyof typeof passes, Pair][];
-  const crossed = entries.some(([, pair]) => pair.includes(null))
+  const both = entries.some(([, pair]) => pair.includes(null))
     ? null
     : entries.every(([key, pair]) =>
         pair.every((v) => passes[key](v as number)),
       );
-  return { crossed, ...check };
+  if (both)
+    return {
+      crossed: true,
+      ...check,
+      tucked: null,
+      measure: Math.min(...(check.cross as number[])),
+    };
+  const crossing = (i: 0 | 1) =>
+    entries.every(([key, pair]) => {
+      const v = pair[i];
+      return v !== null && passes[key](v);
+    }) && check.cross[i]! >= CROSS_ARMS.tuckedMinCross;
+  // Bent at chest height, or hidden entirely under the other arm.
+  const tucked = (i: 0 | 1) => {
+    const [height, elbow] = [check.height[i], check.elbow[i]];
+    if (height === null && check.cross[i] === null) return true;
+    return (
+      height !== null &&
+      elbow !== null &&
+      passes.height(height) &&
+      passes.elbow(elbow)
+    );
+  };
+  const gap = wristGap(sample);
+  const arm = ([0, 1] as const).find(
+    (i) =>
+      crossing(i) &&
+      tucked(i === 0 ? 1 : 0) &&
+      (gap === null || gap >= CROSS_ARMS.tuckedMinWristGap),
+  );
+  if (arm !== undefined)
+    return {
+      crossed: true,
+      ...check,
+      tucked: arm === 0 ? 1 : 0,
+      measure: check.cross[arm],
+    };
+  return { crossed: both, ...check, tucked: null, measure: null };
+}
+
+/** Distance between both visible wrists in shoulder widths. */
+function wristGap(sample: PoseSample | null) {
+  if (!sample) return null;
+  const { pose: p, image } = sample;
+  const points = [
+    p.left_wrist,
+    p.right_wrist,
+    p.left_shoulder,
+    p.right_shoulder,
+  ];
+  if (
+    !points.every((point) => point && (point[3] ?? 0) >= HEURISTICS.confidence)
+  )
+    return null;
+  const [lw, rw, ls, rs] = points as NonNullable<(typeof points)[number]>[];
+  const dist = (a: typeof lw, b: typeof lw) =>
+    Math.hypot((a[0] - b[0]) * image.width, (a[1] - b[1]) * image.height);
+  const span = dist(ls, rs);
+  return span > 1e-8 ? dist(lw, rw) / span : null;
 }
 
 export const armsCrossed = (sample: PoseSample | null) =>

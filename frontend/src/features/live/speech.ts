@@ -5,6 +5,7 @@ import {
   type FeatureFlags,
 } from "./feature-flags";
 import { POSE_RULES } from "../pose/evaluation";
+import { loadLiveHintSettings } from "../admin/settings";
 
 // Prototype settings reused from backend/app/speech/config.py. Live activity
 // uses energy, not the backend's Silero VAD. No WPM or filler claims from audio.
@@ -72,6 +73,7 @@ export class SpeechEvaluator {
   constructor(
     private flags: FeatureFlags = DEFAULT_FEATURE_FLAGS,
     private sessionId = "preview",
+    private minDisplayMs: number = POSE_RULES.minDisplayMs,
   ) {}
   get events() {
     return [...this.observations];
@@ -301,7 +303,7 @@ export class SpeechEvaluator {
         this.visibleCue;
     } else {
       this.visibleCue = cue;
-      this.cueUntil = input.tMs + POSE_RULES.cueDwellMs;
+      this.cueUntil = input.tMs + this.minDisplayMs;
     }
     return state(
       "Live voice feedback ready. Listening locally.",
@@ -347,14 +349,22 @@ export class LiveSpeech {
     private flags: FeatureFlags,
     private update: (state: SpeechState) => void,
   ) {
-    this.engine = new SpeechEvaluator(flags);
+    this.engine = new SpeechEvaluator(
+      flags,
+      undefined,
+      loadLiveHintSettings().minDisplayMs,
+    );
   }
   get events() {
     return this.engine.events;
   }
   beginRecording(timestamp: number, sessionId: string) {
     this.origin = timestamp;
-    this.engine = new SpeechEvaluator(this.flags, sessionId);
+    this.engine = new SpeechEvaluator(
+      this.flags,
+      sessionId,
+      loadLiveHintSettings().minDisplayMs,
+    );
     this.lastPublish = -Infinity;
     this.update({
       phase: "calibrating",

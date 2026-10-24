@@ -145,7 +145,9 @@ test("recording consent stays visible while diagnostics and server details are o
   await expect(page.getByRole("dialog")).toContainText(
     "captures video and microphone audio",
   );
-  await expect(page.getByRole("dialog")).toContainText("Deepgram’s EU endpoint");
+  await expect(page.getByRole("dialog")).toContainText(
+    "Deepgram’s EU endpoint",
+  );
   await expect(page.getByRole("dialog")).not.toContainText(
     "No microphone is captured",
   );
@@ -238,6 +240,7 @@ test("shared navigation and help work with keyboard focus", async ({
   for (const [label, path] of [
     ["Sources", "/sources"],
     ["Sample demo", "/demo"],
+    ["Admin", "/admin"],
     ["Studio", "/live"],
   ]) {
     const link = navigation.getByRole("link", { name: label, exact: true });

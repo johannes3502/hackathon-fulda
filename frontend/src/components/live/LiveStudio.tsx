@@ -26,6 +26,7 @@ import { LiveCaptions } from "@/features/live/captions";
 import { speechCue } from "@/features/live/speech-feedback";
 import { feedbackEnabled } from "@/features/live/feature-flags";
 import { upsertFeedback } from "@/features/live/protocol";
+import { usePacedCue } from "@/features/live/cue-pacing";
 import {
   LiveSpeech,
   mergeSpeechFeedback,
@@ -49,7 +50,6 @@ import { poseFeedback as labFeedback } from "@/features/pose/testPoses";
 import { PoseDebug } from "./PoseDebug";
 import { PoseOverlay } from "./PoseOverlay";
 import { LiveBadge } from "./shared";
-import { FeatureOptions } from "./FeatureOptions";
 import { backendLabel, fallbackLabel } from "@/features/pose/backend";
 
 const cameraCopy = {
@@ -386,10 +386,12 @@ export function LiveStudio() {
           ? serverCue.event
           : null
         : speech?.cue;
-  const latest =
+  const latest = usePacedCue(
     voiceCue && (!poseCue || voiceCue.startMs >= poseCue.startMs)
       ? voiceCue
-      : poseCue;
+      : poseCue,
+    showCues,
+  );
   return (
     <AppShell experience="live">
       <div
@@ -735,12 +737,10 @@ export function LiveStudio() {
                 )}
               </fieldset>
             </details>
-            <FeatureOptions
-              flags={featureFlags}
-              change={setFeatureFlags}
-              disabled={!!progress}
-              speechEnabled={microphone}
-            />
+            <p className="field-hint">
+              Pose model, finger tracking and feedback types are set in{" "}
+              <Link href="/admin">Admin</Link>.
+            </p>
             <details className="live-settings gesture-settings">
               <summary>Gesture guide and calibration</summary>
               <GestureGuide evaluation={evaluation ?? null} />

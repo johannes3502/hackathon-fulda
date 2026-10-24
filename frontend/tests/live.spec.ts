@@ -461,7 +461,7 @@ async function backend(
   await page.waitForTimeout(1200);
 }
 
-test("feature options lock per take, filter speech markers and survive review navigation", async ({
+test("admin feature options persist, filter speech markers and lock the take", async ({
   page,
 }, info) => {
   await syntheticPose(page);
@@ -494,21 +494,18 @@ test("feature options lock per take, filter speech markers and survive review na
       },
     }),
   );
+  await page.goto("/admin");
+  await expect(page.getByLabel("Pose processing")).toHaveValue("VIDEO");
+  await expect(page.getByLabel("Pose model")).toHaveValue("lite");
+  await page.getByLabel("Pose processing").selectOption("IMAGE");
+  await page.getByLabel("Pose model").selectOption("heavy");
+  await page.getByLabel("Pauses", { exact: true }).uncheck();
   await backend(page, false, async () => {
-    await page.getByText("Analysis features", { exact: true }).click();
-    await expect(page.getByLabel("Pose processing")).toHaveValue("VIDEO");
-    await expect(page.getByLabel("Pose model")).toHaveValue("lite");
-    await page.getByLabel("Pose processing").selectOption("IMAGE");
-    await page.getByLabel("Pose model").selectOption("heavy");
-    await page.getByLabel("Pauses", { exact: true }).uncheck();
+    await expect(
+      page.getByRole("link", { name: "Admin" }).last(),
+    ).toBeVisible();
     await page.getByText("Camera diagnostics", { exact: true }).click();
   });
-  await expect(page.getByLabel("Pose processing")).toBeDisabled();
-  await expect(page.getByLabel("Pose model")).toBeDisabled();
-  await expect(
-    page.getByLabel("Speech feedback", { exact: true }),
-  ).toBeDisabled();
-  await expect(page.getByLabel("Pauses", { exact: true })).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "Pose lab", exact: true }),
   ).toBeDisabled();
@@ -536,8 +533,11 @@ test("feature options lock per take, filter speech markers and survive review na
     page.getByText("Transcript analysis added to this take."),
   ).toBeVisible();
   await expect(page.getByText("pause", { exact: true })).toHaveCount(0);
-  await page.getByRole("link", { name: "Record another take" }).click();
-  await page.getByText("Analysis features", { exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .getByRole("link", { name: "Admin", exact: true })
+    .click();
+  await page.reload();
   await expect(page.getByLabel("Pose processing")).toHaveValue("IMAGE");
   await expect(page.getByLabel("Pose model")).toHaveValue("heavy");
   await expect(page.getByLabel("Pauses", { exact: true })).not.toBeChecked();

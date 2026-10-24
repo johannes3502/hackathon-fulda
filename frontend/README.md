@@ -45,8 +45,9 @@ rebuild after changing dependencies or configuration.
   Completed stream words are reused in review; otherwise local Whisper runs
   after stopping. Turn transcription off for signal analysis only. The batch
   fallback uses `local_only=true` to prevent an unintended hosted ASR provider.
-- **Analysis features:** choose Lite/Heavy, VIDEO/IMAGE and individual speech
-  feedback types. **Track fingers** is independent of the diagnostic **Pose lab**.
+- **Analysis features** (under **Admin** in the navbar): choose Lite/Heavy,
+  VIDEO/IMAGE and individual speech feedback types; saved in this browser and
+  applied to the next recording. **Track fingers** is independent of the diagnostic **Pose lab**.
   Filler words and word-based pace require the transcript after stopping.
 - **Source review and questions:** upload sources under `/sources`, then in a
   recorded take choose **Check facts**. Local Ollama selects claims,
