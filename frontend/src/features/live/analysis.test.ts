@@ -251,3 +251,25 @@ it("validates destinations, imported words and backend responses", () => {
   ).toThrow();
   expect(analysisResult(result, "words", 500).feedback[0].endMs).toBe(500);
 });
+
+it.each([500, 503, "network"] as const)(
+  "reports a failed readiness check (%s) without claiming an uncaptured recording exists",
+  async (failure) => {
+    const fetcher =
+      failure === "network"
+        ? vi.fn().mockRejectedValue(new TypeError("Failed to fetch"))
+        : vi
+            .fn()
+            .mockResolvedValue(
+              new Response("Unavailable", { status: failure }),
+            );
+    vi.stubGlobal("fetch", fetcher);
+    const transport = new AnalysisTransport("http://localhost:8000");
+    const connection = transport.connect({ sessionId: "test" }, vi.fn());
+    await expect(connection).rejects.toThrow("Nothing has been recorded");
+    await expect(connection).rejects.toThrow("set Speech analysis to Off");
+    await expect(connection).rejects.not.toThrow("recording is preserved");
+    expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8000/health/ready");
+    transport.close();
+  },
+);

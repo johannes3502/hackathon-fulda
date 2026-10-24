@@ -112,8 +112,8 @@ flowchart TB
 flowchart LR
     subgraph Host["docker compose (localhost only)"]
         FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000"]
-        BE["backend<br/>uvicorn :8000<br/>--reload"]
-        WK["worker<br/>Celery, Concurrency 2"]
+        BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, --reload"]
+        WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Concurrency 2"]
         PG[("postgres<br/>pgvector :5432<br/>Volume: postgres_data")]
         RD[("redis :6379<br/>AOF, noeviction<br/>Volume: redis_data")]
         ST[("storage<br/>SeaweedFS :8333<br/>Volume: media_data")]
@@ -124,6 +124,7 @@ flowchart LR
     BE -->|"postgres healthy"| PG
     BE -->|"storage healthy"| ST
     BE -->|"redis healthy"| RD
+    WK -->|"backend healthy vor Start"| BE
     WK --> PG
     WK --> ST
     WK --> RD
@@ -144,6 +145,8 @@ sequenceDiagram
     participant ASR as Whisper lokal (optional)
 
     U->>FE: Präsentation aufnehmen (Kamera + Mikro)
+    FE->>BE: GET /health/ready (10-s-Startfrist)
+    BE-->>FE: Bereit, oder Abbruch vor Aufnahme mit Retry-Hinweis
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     opt Live captions aktiviert
         FE->>BE: WS /speech/live: start, PCM nach ready

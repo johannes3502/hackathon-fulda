@@ -9,7 +9,7 @@ class LocalOllamaChat:
     def __init__(self, *, endpoint: str | None = None, model: str | None = None, transport=None):
         self.endpoint = (endpoint or os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")).rstrip("/")
         url = urlsplit(self.endpoint)
-        if (url.scheme != "http" or url.hostname not in {"127.0.0.1", "localhost", "::1", "host.docker.internal", "ollama"}
+        if (url.scheme != "http" or url.hostname not in {"127.0.0.1", "localhost", "::1", "host.docker.internal", "host.lima.internal", "ollama"}
                 or url.username or url.password or url.query or url.fragment or url.path):
             raise ValueError("Use the local Ollama server URL")
         self.model = model or os.getenv("COACH_MODEL", "qwen3.5:4b-q4_K_M")

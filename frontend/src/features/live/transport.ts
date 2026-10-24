@@ -20,7 +20,19 @@ export class AnalysisTransport implements VideoTransport {
   ) {
     this.sessionId = session.sessionId;
     this.receive = receive;
-    await request(this.endpoint, "/health/live", this.controller.signal);
+    try {
+      await request(
+        this.endpoint,
+        "/health/ready",
+        AbortSignal.any([this.controller.signal, AbortSignal.timeout(10000)]),
+      );
+    } catch (error) {
+      this.controller.signal.throwIfAborted();
+      throw new Error(
+        "Speech analysis is unavailable. Nothing has been recorded. Start the backend or set Speech analysis to Off, then enable the camera and try again." +
+          (error instanceof Error ? ` (${error.message})` : ""),
+      );
+    }
   }
   async send() {} // Full MediaRecorder output is uploaded only after stopping.
   async finish(durationMs: number, recording?: Blob) {

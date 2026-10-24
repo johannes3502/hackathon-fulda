@@ -7,8 +7,8 @@ and `AnalysisTransport`; `contracts.ts` defines their shared interface.
 
 | Backend endpoint | Frontend use |
 | --- | --- |
-| `GET /health/ready` | Display dependency readiness |
-| `GET /health/live` | Check API availability before capture |
+| `GET /health/ready` | Display dependency readiness and check it before capture (10-second startup timeout) |
+| `GET /health/live` | Operational liveness probe; insufficient by itself to start analysis |
 | `POST /speech/analyze` | Upload the complete camera/microphone recording after stop, with the transcript checkbox (default on in speech mode) and `local_only=true`; returns 202 and a job ID |
 | `GET /speech/jobs/{job_id}` | Poll queued/running jobs until completed or failed; use returned audio measurements and timeline events |
 | `WS /speech/live` | Optional live-caption preview: 16 kHz mono Int16 PCM from AudioWorklet; connection failure leaves recording active |

@@ -494,3 +494,33 @@ Die vorstehenden Team-Einträge dokumentieren ihre damaligen Einzelprüfungen.
 - Lokaler Docker-Engine-Zugriff bleibt nicht verfügbar, auch nach Startversuch
   von Docker Desktop. Vollständiger Compose-/Whisper-/Ollama-Lauf sowie echtes
   Mikrofon und Safari wurden in dieser Integration nicht verifiziert.
+
+## Lokalen Backend-Start wiederherstellen (24.10.2026)
+
+- Beobachteter Fehler: `/api/health/live` lieferte HTTP 500, weil kein Dienst
+  auf Port 8000 lief. Docker Desktop 4.44.3 stürzte bereits bei `--help` in
+  `go-m1cpu` mit SIGSEGV ab; lokales `.env` fehlte. Vorhandenes Colima gestartet
+  (ohne den globalen Docker-Kontext zu wechseln), lokale Konfiguration aus
+  `.env.example` erstellt und Backend, Worker, Postgres, Redis und S3 gestartet.
+- Der erste Compose-Build scheiterte an parallelen Exporten desselben
+  `hackathon-fulda-backend`-Tags. Nur der Backend-Service baut das gemeinsame
+  Image; der Worker verwendet es ohne Pull und wartet auf Backend-Readiness.
+  `npm run test:compose` prüft eindeutige Builder und diese Startabhängigkeit.
+- Aufnahmebeginn prüft nun `/health/ready` mit 10-s-Frist. Bei Ausfall wird
+  korrekt „Nothing has been recorded“ samt lokaler Ausweichmöglichkeit angezeigt.
+  Der allgemeine HTTP-Helfer behauptet nicht mehr, dass vor Aufnahmebeginn
+  bereits eine Aufnahme gesichert sei. Drei Unit-Fälle (500, 503, Netzfehler)
+  und Browser-Retry von Backendfehler zu lokaler Aufnahme ergänzen die Regression.
+- Ollama lokal gestartet, konfiguriertes Qwen-Modell geladen. Für Colima nutzt
+  `.env` `host.lima.internal`; dieser konkrete lokale Host wurde im Adapter
+  zugelassen und mit Settings-/Host-Prüfung getestet. Kein Cloud-Fallback.
+- Verifiziert: fünf Backend-Dienste healthy; `/api/health/ready` HTTP 200 mit
+  Postgres/Redis/S3 ok; `/api/factcheck/settings` verfügbar. Reale synthetische
+  WAV über den Frontend-Proxy → Queue → Silero/Whisper → Ergebnis und Löschung
+  der Originaldatei bestanden. 97 Frontend-Unit-Tests, sechs Browserfälle,
+  Typecheck/Lint, zwei Compose-Tests und 14 Fact-Check-/Adapter-Tests bestanden.
+- Zusätzlicher echter Coaching-Smoke erreichte das lokale Modell und bestätigte
+  eine Aussage mit geprüftem Quellenzitat. Ein anderes Urteil enthielt ungültiges
+  JSON und wurde korrekt als `unchecked` ausgegeben; der strikte Drei-Urteile-
+  Smoke schlug deshalb fehl. Modellqualität und vollständige echte Fragerunde
+  bleiben ungeprüft; dies ist vom behobenen Verbindungs-/Startfehler getrennt.

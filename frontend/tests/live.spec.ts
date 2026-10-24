@@ -1038,3 +1038,50 @@ test("live captions send PCM only during recording and a disconnect keeps the ta
     .toBeGreaterThanOrEqual(2);
   expect(frames).toBe(3);
 });
+
+test("unavailable backend never starts recording and offers a working local retry", async ({
+  page,
+}) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  await page.route("**/api/health/ready", (route) =>
+    route.fulfill({ status: 500 }),
+  );
+  await page.goto("/");
+  await page.getByLabel("Speech analysis").selectOption("backend");
+  await page
+    .getByRole("button", { name: "Enable camera", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  await expect(page.locator(".status-error")).toContainText(
+    "Nothing has been recorded",
+  );
+  await expect(page.locator(".status-error")).not.toContainText(
+    "recording is preserved",
+  );
+  await expect(
+    page.getByRole("button", { name: "Finish & review" }),
+  ).toHaveCount(0);
+  await page.getByLabel("Speech analysis").selectOption("local");
+  await page
+    .getByRole("button", { name: "Enable camera", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Finish & review" }),
+  ).toBeVisible();
+  await page.waitForTimeout(700);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect
+    .poll(() =>
+      page
+        .getByLabel("Recorded pitch video")
+        .evaluate((video: HTMLVideoElement) => video.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+});

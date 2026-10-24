@@ -1,10 +1,6 @@
 name: hackathon-fulda
 
 x-backend: &backend
-  build:
-    context: ./backend
-    args:
-      WHISPER_MODEL: ${WHISPER_MODEL:-small}
   image: hackathon-fulda-backend
   init: true
   environment:
@@ -96,6 +92,10 @@ services:
 
   backend:
     <<: *backend
+    build:
+      context: ./backend
+      args:
+        WHISPER_MODEL: ${WHISPER_MODEL:-small}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
@@ -108,6 +108,11 @@ services:
 
   worker:
     <<: *backend
+    # Reuse the API image; two parallel exporters racing on one tag can fail.
+    pull_policy: never
+    depends_on:
+      backend:
+        condition: service_healthy
     command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=info", "--concurrency=${CELERY_WORKER_CONCURRENCY:-2}"]
     restart: unless-stopped
     stop_grace_period: 11m

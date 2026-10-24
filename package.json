@@ -12,6 +12,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:compose": "node --test scripts/compose.test.mjs",
     "test:e2e": "npm run test:e2e --workspace frontend",
     "api:export": "node scripts/export-openapi.mjs",
     "api:types": "openapi-typescript api/openapi.json -o api/schema.d.ts",

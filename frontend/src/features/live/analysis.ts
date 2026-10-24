@@ -43,7 +43,7 @@ export async function request(
         detail = ` ${body.detail.slice(0, 250)}`;
     } catch {}
     throw new Error(
-      `Backend ${path} failed (HTTP ${response.status}).${detail} Your local recording is preserved.`,
+      `Backend ${path} failed (HTTP ${response.status}).${detail}`,
     );
   }
   if (response.status === 204) return undefined;

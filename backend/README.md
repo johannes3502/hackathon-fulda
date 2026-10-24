@@ -21,6 +21,34 @@ Local tooling setup, generation commands and frontend usage are documented
 in the [API contract guide](../api/README.md). Regenerate and commit both
 artifacts whenever API routes or models change.
 
+## Frontend returns HTTP 500 for a health check
+
+Starting `npm run dev` starts only the frontend. If nothing listens on port 8000,
+the `/api` proxy returns HTTP 500 before any recording starts. Start the backend
+and its dependencies, then verify both routes:
+
+```sh
+# Preserve an existing .env; otherwise copy .env.example first.
+docker compose up --build -d --wait backend worker
+curl --fail http://localhost:8000/health/ready
+curl --fail http://localhost:3000/api/health/ready
+```
+
+The first build downloads local Whisper and embedding models. If Docker Desktop
+cannot start and Colima is already installed, the same stack can run there:
+
+```sh
+colima start --activate=false
+docker --context colima compose up --build -d --wait backend worker
+```
+
+For host Ollama with Colima, set `OLLAMA_URL=http://host.lima.internal:11434`
+in `.env` before starting the stack; keep Ollama bound to host loopback.
+Use that context for subsequent Compose commands. Existing Docker Desktop
+volumes and Colima volumes are separate. In the studio, unavailable analysis
+blocks capture with a retry message; **Speech analysis → Off** allows a local
+camera-only take. No recording exists if startup fails before capture.
+
 ## IntelliJ IDEA and VS Code
 
 Open the **repository root** in either IDE. Docker must be running and `.env`
