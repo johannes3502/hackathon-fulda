@@ -4,146 +4,50 @@ import type {
   VideoChunkMeta,
   VideoTransport,
 } from "./contracts";
-import { parseLiveMessage } from "./protocol";
+import { analysisResult, request } from "./analysis";
 
-export class WebSocketVideoTransport implements VideoTransport {
-  private socket: WebSocket | null = null;
+export class AnalysisTransport implements VideoTransport {
+  private controller = new AbortController();
+  private receive?: (message: LiveMessage) => void;
   private sessionId = "";
-  private lastSentMs = 0;
-  private closed = false;
-  private ready = false;
-  private rejectConnect?: (error: Error) => void;
-  private finishResolve?: () => void;
-  private finishReject?: (error: Error) => void;
   constructor(private endpoint: string) {}
-  connect(
-    session: { sessionId: string; title: string; mimeType: string },
+  async connect(
+    session: { sessionId: string },
     receive: (message: LiveMessage) => void,
   ) {
     this.sessionId = session.sessionId;
-    return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(
-          new Error(
-            "The backend did not acknowledge the session within 10 seconds.",
-          ),
-        );
-        this.close();
-      }, 10000);
-      this.rejectConnect = (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      };
-      const socket = (this.socket = new WebSocket(this.endpoint));
-      socket.onopen = () =>
-        socket.send(
-          JSON.stringify({
-            type: "session.start",
-            version: 1,
-            ...session,
-            audio: false,
-          }),
-        );
-      socket.onmessage = (event) => {
-        if (this.closed || typeof event.data !== "string") return;
-        const message = parseLiveMessage(
-          event.data,
-          this.sessionId,
-          this.lastSentMs,
-        );
-        if (!message) return;
-        if (message.type === "session.ready" && !this.ready) {
-          this.ready = true;
-          clearTimeout(timeout);
-          this.rejectConnect = undefined;
-          resolve();
-        }
-        if (message.type === "session.complete") this.finishResolve?.();
-        if (message.type === "error") {
-          if (!this.ready) this.rejectConnect?.(new Error(message.message));
-          this.finishReject?.(new Error(message.message));
-        }
-        receive(message);
-      };
-      socket.onerror = () => {
-        if (!this.ready)
-          this.rejectConnect?.(
-            new Error(
-              "Could not connect to the video backend. Check its URL and availability.",
-            ),
-          );
-      };
-      socket.onclose = () => {
-        if (this.closed) return;
-        const message =
-          "The backend connection closed. Your local recording is preserved; start a new session to reconnect.";
-        this.rejectConnect?.(new Error(message));
-        this.finishReject?.(new Error(message));
-        receive({ type: "error", sessionId: this.sessionId, message });
-      };
-    });
+    this.receive = receive;
+    await request(this.endpoint, "/health/live", this.controller.signal);
   }
-  async send(chunk: Blob, meta: VideoChunkMeta) {
-    const socket = this.socket;
-    if (!socket || socket.readyState !== WebSocket.OPEN || !this.ready)
-      throw new Error("The video connection is not ready.");
-    // Encoded chunks depend on earlier chunks. Stop on congestion instead of dropping part of the video stream.
-    if (socket.bufferedAmount + chunk.size > 4 * 1024 * 1024)
-      throw new Error(
-        "The backend is receiving video too slowly. Streaming stopped to keep the video sequence intact.",
-      );
-    const bytes = await chunk.arrayBuffer();
-    if (this.closed || socket.readyState !== WebSocket.OPEN)
-      throw new Error("The video connection closed before the chunk was sent.");
-    socket.send(JSON.stringify(meta));
-    socket.send(bytes);
-    this.lastSentMs = meta.endMs;
-  }
-  finish(durationMs: number) {
-    return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.finishResolve = undefined;
-        this.finishReject = undefined;
-        reject(
-          new Error(
-            "The backend did not finish in time. Available feedback and the local recording are still ready to review.",
-          ),
-        );
-      }, 10000);
-      this.finishResolve = () => {
-        clearTimeout(timer);
-        this.finishResolve = undefined;
-        this.finishReject = undefined;
-        resolve();
-      };
-      this.finishReject = (error) => {
-        clearTimeout(timer);
-        this.finishResolve = undefined;
-        this.finishReject = undefined;
-        reject(error);
-      };
-      if (this.socket?.readyState !== WebSocket.OPEN) {
-        this.finishReject(
-          new Error("The backend disconnected before final feedback arrived."),
-        );
-        return;
-      }
-      this.socket.send(
-        JSON.stringify({
-          type: "session.stop",
-          sessionId: this.sessionId,
-          durationMs,
-        }),
-      );
+  async send() {} // Full MediaRecorder output is uploaded only after stopping.
+  async finish(durationMs: number, recording?: Blob) {
+    if (!recording?.size) throw new Error("No recording was captured.");
+    const body = new FormData();
+    body.append(
+      "recording",
+      recording,
+      recording.type.includes("mp4") ? "take.mp4" : "take.webm",
+    );
+    const result = analysisResult(
+      await request(this.endpoint, "/speech/analyze", this.controller.signal, {
+        method: "POST",
+        body,
+      }),
+      "speech",
+      durationMs,
+    );
+    for (const feedback of result.feedback)
+      this.receive?.({ type: "feedback", sessionId: this.sessionId, feedback });
+    this.receive?.({
+      type: "metrics",
+      sessionId: this.sessionId,
+      atMs: durationMs,
+      metrics: result.metrics,
     });
   }
   close() {
-    this.closed = true;
-    this.rejectConnect?.(new Error("Connection cancelled."));
-    this.rejectConnect = undefined;
-    this.finishReject?.(new Error("Connection cancelled."));
-    this.socket?.close();
-    this.socket = null;
+    this.controller.abort();
+    this.receive = undefined;
   }
 }
 
@@ -218,5 +122,5 @@ export class DemoVideoTransport implements VideoTransport {
 export function createVideoTransport(config: LiveConfig): VideoTransport {
   return config.mode === "demo"
     ? new DemoVideoTransport()
-    : new WebSocketVideoTransport(config.endpoint);
+    : new AnalysisTransport(config.endpoint);
 }
