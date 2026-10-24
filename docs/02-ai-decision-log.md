@@ -18,8 +18,10 @@ Keine erfundenen menschlichen Freigaben oder Modellresultate.
 | 10 | Sprachanalyse-Pipeline (Feature 3, Backend) | Claude Code: `app/speech/` mit `Transcriber`-Interface, FFmpeg-Audioextraktion, Pausen-, Füllwort-, Wiederholungs- und Tempo-Events, `POST /speech/analyze` | Kein ASR-Anbieter gewählt, daher nur `JsonTranscriber` (vorberechnete Wörter); Schwellenwerte sind ungeprüfte Heuristik-Startwerte; Tempo nur relativ zum Session-Median, nicht absolut | Nutzerauftrag; Anbieter, Füllwortliste und Schwellenwerte bleiben Teamentscheidung | `backend/tests/test_speech.py`: 12 Tests mit synthetischen Daten bestanden (Python 3.12, lokal) |
 | 11 | Sprachanalyse auf das Audiosignal umstellen, Transkription trennen | Claude Code: `app/speech/` analysiert nur das Signal (Pegel, F0 per YIN, Sprachaktivität, Silbenspitzen als Zeitreihe; Events pause/volume/pitch/pace); wortbasierter Code nach `app/transcription/` (Events mit `source="asr"`); gemeinsames `Event`-Schema in `app/events.py` | Signalbasierte Silbenrate und Monotonie sind Näherungen; nur mit synthetischen Tönen geprüft, nicht mit echter Sprache. Testerwartung für Lautstärke korrigiert: Referenz ist der Median der ganzen Aufnahme inkl. leisem Abschnitt (≈ −10 dB statt theoretisch −15,6 dB) | Nutzerauftrag (Signal-Zeitreihe, Transkription als eigene Pipeline, alles mit Timestamp) | `backend/tests/`: 22 Tests bestanden (Python 3.12, lokal); 60 s synthetisches Audio in ≈ 0,7 s analysiert |
 | 12 | API-Vertrag für TypeScript generieren | Codex: OpenAPI-Export aus FastAPI, TypeScript-Typen und Aktualitätscheck ergänzt; Merge mit Celery/Redis zusammengeführt | Generierte Typen prüfen nur zur Compile-Zeit; freie Event-Payloads und JSON im Multipart-String bleiben untypisiert. Kein laufender Server für den Export nötig | Ausdrücklicher Nutzerauftrag für TypeScript-Generierung und Integration nach main | `api/`, `package.json`, zentrale `README.md`; Generierung, Aktualitätscheck und TypeScript-Kompilierung bestanden; 22 Backend-Tests nach der Konfliktlösung bestanden (Python 3.14, temporäre Testumgebung) |
-| 13 | ML-Audioanalyse mit Hintergrundjobs | Codex: Silero VAD v6.2 als gepinntes ONNX-Modell (SHA-256 geprüft), RMS/YIN beibehalten, 3-s-Kalibrierung; Deepgram Nova-3 (de, EU) hinter `Transcriber`; asynchroner Upload/Status und kombinierte Timeline, S3-Ergebnisse und Löschung der Originale | VAD nur an synthetischer Sprache/Rauschen geprüft; keine Genauigkeitsbehauptung. Deepgram-HTTP-Vertrag mit Mock geprüft, kein echter Anbieteraufruf ohne Schlüssel. Deutsche Füllworterhaltung laut Detaildokumentation nicht zugesichert; kein `filler_words=true`. Englische Feature-Unterstützung nicht auf Deutsch übertragen. JSON-Demo explizit markiert; kein stilles Ersetzen fehlgeschlagener ASR durch erfundene Wörter. S3-Ausfälle/abgebrochene Jobs können Cleanup verzögern; kein allgemeiner Retention-Job. Prozessabbruch zwischen bezahltem ASR-Aufruf und Speicherung kann diesen Aufruf wiederholen | Nutzer bestätigt vorgeschlagenes Vorgehen und eigenen Arbeitsbranch; Entscheidung für ersten austauschbaren ASR-Adapter innerhalb dieses Auftrags | `backend/tests/test_ml_audio.py`, `backend/tests/fixtures/`, `backend/scripts/smoke_audio.py`; Quellen und Prüfumfang unten |
-| 14 | Quellen-Upload und RAG-Retrieval (Feature 2, Vorbereitung für Fact-Check und Frage-Agent) | Claude Code: `app/sources/` mit Extraktion (PDF pro Seite, PPTX pro Folie inkl. Notizen/Tabellen, DOCX, TXT/MD), Chunking mit Seiten-/Folienangabe, lokalem Embedding-Modell hinter `Embedder`-Interface, pgvector + deutscher Volltextsuche mit Reciprocal Rank Fusion, Celery-Ingest, REST-API und Frontend-Seite `/sources`; Postgres-Image auf `pgvector/pgvector:0.8.6-pg18-trixie` umgestellt | Embedding-Anbieter war offen; lokales Modell gewählt, damit keine Dokumente an Dritte gehen (≈0,6 GB RAM pro Prozess). Erste Keyword-Suche zerlegte „260.000“ anders als PostgreSQL und fand die Zahl nicht; korrigiert, indem PostgreSQL die Suchanfrage selbst tokenisiert. Kein OCR. Suche liefert immer Top-k, auch wenn nichts passt. Retrieval-Qualität nur mit synthetischen Mini-Dokumenten geprüft, keine Genauigkeitsaussage | Nutzerauftrag (Quellen hochladen, später für Fact-Check/Fragerunde nutzen); Modell-, Chunking- und Ranking-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_sources.py` (inkl. DB-Roundtrip gegen pgvector), `backend/scripts/smoke_sources.py` im Compose-Stack bestanden; Frontend-Unit-Tests, Typecheck, Lint; Browser-Check Desktop/375 px ohne Konsolenfehler |
+| 13 | Frontend gemeinsam mit dem Backend starten | Eigener Next.js-Container, API-Proxy und gemeinsamer Compose-Start für beide IDEs; neue HTTP-Integration aus main übernommen | Browser können den Docker-Hostnamen `backend` nicht auflösen; `/api` wird auf derselben Origin an FastAPI weitergeleitet. Merge-Konflikt in `next.config.ts` gelöst, konfigurierbares Test-Build-Verzeichnis erhalten | Nutzerkorrektur: Frontend ebenfalls im Container statt lokalem npm-Run | `frontend/Dockerfile`, `compose.yaml`, `frontend/next.config.ts`; Prüfprotokoll unten |
+| 14 | ML-Audioanalyse mit Hintergrundjobs | Codex: Silero VAD v6.2 als gepinntes ONNX-Modell (SHA-256 geprüft), RMS/YIN beibehalten, 3-s-Kalibrierung; Deepgram Nova-3 (de, EU) hinter `Transcriber`; asynchroner Upload/Status und kombinierte Timeline, S3-Ergebnisse und Löschung der Originale | VAD nur an synthetischer Sprache/Rauschen geprüft; keine Genauigkeitsbehauptung. Deepgram-HTTP-Vertrag mit Mock geprüft, kein echter Anbieteraufruf ohne Schlüssel. Deutsche Füllworterhaltung laut Detaildokumentation nicht zugesichert; kein `filler_words=true`. Englische Feature-Unterstützung nicht auf Deutsch übertragen. JSON-Demo explizit markiert; kein stilles Ersetzen fehlgeschlagener ASR durch erfundene Wörter. S3-Ausfälle/abgebrochene Jobs können Cleanup verzögern; kein allgemeiner Retention-Job. Prozessabbruch zwischen bezahltem ASR-Aufruf und Speicherung kann diesen Aufruf wiederholen | Nutzer bestätigt vorgeschlagenes Vorgehen und eigenen Arbeitsbranch; Entscheidung für ersten austauschbaren ASR-Adapter innerhalb dieses Auftrags | `backend/tests/test_ml_audio.py`, `backend/tests/fixtures/`, `backend/scripts/smoke_audio.py`; Quellen und Prüfumfang unten |
+| 15 | README und Altbestand aufräumen | Haupt-README auf 17 Zeilen gekürzt; alten Frontend-Plan, doppelte Produktnotiz und überholte Video-WebSocket-Dokumentation entfernt; ungenutzte Validatoren und Handshake-Typen gestrichen | Referenzen vor dem Löschen geprüft; aktuelle HTTP-Upload-/Job-Grenze im Handoff dokumentiert, API-Tooling-Anleitung zentralisiert. Zwei Tests entfernten ausschließlich die gelöschten WebSocket-Helfer; Replay- und HTTP-Tests bleiben aktiv | Ausdrücklicher Nutzerauftrag für Vereinfachung und Cleanup | Compose-Start, Typecheck, Lint, 25 Frontend-Tests, Backend-Smoke-Test und lokale Markdown-Links bestanden |
+| 16 | Quellen-Upload und RAG-Retrieval (Feature 2, Vorbereitung für Fact-Check und Frage-Agent) | Claude Code: `app/sources/` mit Extraktion (PDF pro Seite, PPTX pro Folie inkl. Notizen/Tabellen, DOCX, TXT/MD), Chunking mit Seiten-/Folienangabe, lokalem Embedding-Modell hinter `Embedder`-Interface, pgvector + deutscher Volltextsuche mit Reciprocal Rank Fusion, Celery-Ingest, REST-API und Frontend-Seite `/sources`; Postgres-Image auf `pgvector/pgvector:0.8.6-pg18-trixie` umgestellt | Embedding-Anbieter war offen; lokales Modell gewählt, damit keine Dokumente an Dritte gehen (≈0,6 GB RAM pro Prozess). Erste Keyword-Suche zerlegte „260.000“ anders als PostgreSQL und fand die Zahl nicht; korrigiert, indem PostgreSQL die Suchanfrage selbst tokenisiert. Gemessener CPU-Durchsatz des Modells auf einem 12-Kern-Linux-Laptop nur ≈3 Abschnitte/s (1 MB Text ≈ 6 min); Test auf Mac M5 Pro steht aus, schnellere Alternativen gemessen (MiniLM-L12 ≈12/s, potion-multilingual ≈800/s). Next-Proxy puffert Uploads standardmäßig nur bis 10 MB; `proxyClientMaxBodySize` auf 100 MB gesetzt (betraf auch Aufnahmen). Kein OCR. Suche liefert immer Top-k, auch wenn nichts passt. Retrieval-Qualität nur mit synthetischen Mini-Dokumenten geprüft, keine Genauigkeitsaussage | Nutzerauftrag (Quellen hochladen, später für Fact-Check/Fragerunde nutzen); Modell-, Chunking- und Ranking-Wahl durch Claude Code, vom Team zu bestätigen | `backend/tests/test_sources.py` (inkl. DB-Roundtrip gegen pgvector), `backend/scripts/smoke_sources.py` im Compose-Stack bestanden; Frontend-Unit-Tests, Typecheck, Lint; Browser-Check Desktop/375 px ohne Konsolenfehler |
 
 ## Prüfprotokoll (24.10.2026)
 
@@ -90,6 +92,30 @@ Infrastrukturauftrags. Der lokale Stack bleibt gestartet.
 - Nur synthetische Testdaten; keine Transkription, externen Anbieter oder
   Aufnahme-/Job-Endpunkte implementiert. Der lokale Stack bleibt gestartet.
 
+## Frontend in Compose (24.10.2026)
+
+- `docker compose up --build -d --wait`: alle sechs Dienste gesund, nativ auf
+  ARM64. Node.js und npm-Abhängigkeiten liegen im Frontend-Image, Next.js-Cache
+  in einem Docker-Volume; lokale SDKs sind für den Start nicht erforderlich.
+- Frontend-Seiten erreichbar. `/api/health/ready` erreicht FastAPI;
+  synthetische Wort-Timestamps und eine stille WAV-Datei lassen sich über den
+  Frontend-Proxy analysieren. Backend-Fehlercodes 404/422 bleiben erhalten.
+- Temporäre Testseite unter `frontend/src/` angelegt, geändert und über HTTP
+  geprüft: beide Änderungen ohne Rebuild sichtbar. Testseite danach entfernt.
+- Nach Integration der Audio-Jobs: Upload der synthetischen Sprach-Fixture
+  über `/api/speech/analyze` mit `transcribe=false` liefert 202; Status-Polling
+  über den Frontend-Proxy liefert das Silero-Ergebnis. Original in S3 gelöscht,
+  Test-Metadaten anschließend entfernt; kein ASR-Anbieter aufgerufen.
+- Im Frontend-Container: Typecheck, Lint und 27 Unit-Tests bestanden,
+  einschließlich relativer `/api`-URL mit HTTPS und abweichendem Browser-Port.
+- 33 Backend-Tests einschließlich echtem Silero-Modell im temporären Container,
+  Backend-Smoke-Test mit PostgreSQL/S3/Celery sowie OpenAPI-/TypeScript-
+  Aktualitätschecks bestanden. Beide Team-Updates aus main erhalten.
+- IntelliJ enthält wieder nur die gemeinsame Docker-Compose-Konfiguration;
+  VS Code startet ebenfalls alle Dienste und bietet Frontend-Logs als Task.
+- Keine echte Kamera-/Mikrofonaufnahme, kein Smartphone- oder Deployment-Test
+  in diesem Durchlauf. Der lokale Stack bleibt gestartet.
+
 ## ML-Audioanalyse (24.10.2026)
 
 - Silero-Modell: [offizielles v6.2-Repository](https://github.com/snakers4/silero-vad/tree/v6.2),
@@ -134,3 +160,20 @@ oben dokumentierte fehlende Audio-UI-Anbindung für die lokale Signalanalyse beh
 Prüfung vor PR/Merge: 33 Backend-Tests (echtes Silero-Modell), 26 Frontend-Tests,
 sechs Browser-Tests mit synthetischer Kamera auf Desktop/schmalem Viewport,
 TypeScript, ESLint, Produktionsbuild und API-Aktualitätscheck bestanden.
+
+## Cleanup (24.10.2026)
+
+- Vier überflüssige Dateien entfernt; Next.js-Ignore-Muster im Root gebündelt.
+- Alle lokalen Markdown-Dateilinks geprüft; keine Referenzen auf gelöschte
+  Dokumente oder WebSocket-Validatoren im aktiven Bestand.
+- `docker compose up --build -d --wait`: alle sechs Dienste gesund.
+- Frontend-Typecheck, ESLint und 25 Unit-Tests bestanden; Backend-Smoke-Test
+  prüft PostgreSQL, S3, Queue und API-Antwort während eines Worker-Jobs.
+- Frontend-Seiten und `/api/health/ready` per HTTP geprüft. Keine neue
+  Kamera-/Mikrofon-, Smartphone-, Anbieter- oder Deployment-Prüfung.
+- Neue Pose-Capture-Arbeit aus main integriert; Konflikte in den kurzen
+  Frontend-/Handoff-Anleitungen und der verschobenen Ignore-Datei gelöst.
+  Generierte Pose-Runtime bleibt in Git und im Docker-Build-Kontext ignoriert.
+- Danach erneut Typecheck, ESLint und 34 Frontend-Tests bestanden; Pose-Worker,
+  JS-/WASM-Runtime und Modell über HTTP erreichbar, Modell-Prüfsumme stimmt
+  mit dem eingecheckten Asset überein.

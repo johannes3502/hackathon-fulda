@@ -1,6 +1,6 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Archiv (`archive/`) ist nicht Scope.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`.
 
 ## 1. Projekt
 
@@ -123,13 +123,13 @@ Event {
 
 ```
 AGENTS.md                          # Einstiegspunkt und Zielarchitektur
-compose.yaml                       # Backend + Celery + Redis + PostgreSQL + S3
+compose.yaml                       # Frontend + Backend + Celery + Redis + PostgreSQL + S3
 .env.example                       # lokale Konfiguration ohne echte Secrets
 backend/                           # FastAPI, MediaPipe, Setup und Smoke-Test
-frontend/                          # Next.js-Demo und Live-Kamera-Client; Backend-Anbindung teilweise offen
+frontend/                          # Next.js-App, eigener Entwicklungscontainer
 .run/                              # geteilte IntelliJ-Run-Konfigurationen
 .vscode/                           # geteilte VS-Code-Tasks für Docker Compose
-Challenge_HackathonFulda2026_de.pdf # offizielle Challenge
+specifications/                    # offizielle Challenge (deutsch/englisch)
 docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
   01-product.md                    # Features und offene Punkte
@@ -149,8 +149,11 @@ noch nicht umgesetzt. Quellen-Upload und Retrieval (RAG) sind umgesetzt
 Chunks mit Seite/Folie → lokale Embeddings (`jina-embeddings-v2-base-de`) →
 Hybrid-Suche (pgvector + deutsche Volltextsuche). Fact-Check und Frage-Agent
 nutzen `app.sources.retrieval` (`search`, `format_context`, `quote_in_text`);
-beide sind noch nicht implementiert. Das Next.js-Frontend ist als separater
-Demo-/Live-Kamera-Client vorhanden; der Aufnahme-Pfad nutzt die Audio-Job-API
+beide sind noch nicht implementiert. Das Next.js-Frontend läuft in einem
+eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
+Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
+Bewertungs-/Feedback-Regeln darauf sind noch offen (`frontend/DATA_POINTS.md`).
+Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
 jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte
 Analyse-Pipelines mit S3-Persistenz für kombinierte Jobs, beide mit `t_ms` ab Aufnahmestart im
@@ -164,7 +167,7 @@ ist eine separate Implementierungsaufgabe.
 Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
 sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
 Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`
-abgeglichen werden; dort ist noch das bisherige Grundgerüst dokumentiert.
+abgeglichen werden; dort stehen die Features und offenen Entscheidungen.
 
 ## 7. Git-Workflow
 

@@ -30,7 +30,6 @@ export type VideoChunkMeta = {
   byteLength: number;
 };
 export type LiveMessage =
-  | { type: "session.ready" | "session.complete"; sessionId: string }
   | { type: "feedback"; sessionId: string; feedback: LiveFeedback }
   | { type: "metrics"; sessionId: string; atMs: number; metrics: LiveMetric[] }
   | { type: "error"; sessionId: string; message: string };
@@ -44,6 +43,7 @@ export type LiveProgress = {
   notice: string | null;
 };
 export type LiveRecording = {
+  poseLog?: Blob;
   id: string;
   config: LiveConfig;
   createdAt: string;

@@ -9,34 +9,17 @@ docker compose exec backend python -m scripts.smoke
 ```
 
 Keep an existing `.env` instead of overwriting it. API docs:
-<http://localhost:8000/docs>. Edit `backend/app/` for automatic API reload;
+<http://localhost:8000/docs>; frontend: <http://localhost:3000>.
+Edit `backend/app/` for automatic API reload;
 restart the worker after task changes with `docker compose restart worker`.
 Changes to dependencies, scripts or the Dockerfile require a rebuild.
 
 ## OpenAPI and TypeScript
 
 FastAPI exposes the API contract at <http://localhost:8000/openapi.json>.
-To export it without running the server and generate TypeScript definitions,
-create a local Python environment and install the backend dependencies once
-(on Windows use `py -3.12` and `backend/.venv/Scripts/python.exe`):
-
-```sh
-python3.12 -m venv backend/.venv
-backend/.venv/bin/python -m pip install -r backend/requirements.txt
-```
-
-Then run from the repository root:
-
-```sh
-npm ci
-npm run api:generate
-npm run api:check
-```
-
-The commands use `backend/.venv` automatically, or the interpreter selected
-by `PYTHON`. Generated artifacts and frontend usage examples are documented
-in [`api/README.md`](../api/README.md). Regenerate and commit both artifacts
-whenever API routes or models change.
+Local tooling setup, generation commands and frontend usage are documented
+in the [API contract guide](../api/README.md). Regenerate and commit both
+artifacts whenever API routes or models change.
 
 ## IntelliJ IDEA and VS Code
 
@@ -46,16 +29,17 @@ VS Code configuration is in `.vscode/`. Personal `.idea/` state stays ignored.
 
 - **IntelliJ IDEA:** enable the **Docker** plugin, select **Docker Compose**
   in the run selector and click **Run**. It builds images and starts every
-  service in `compose.yaml`: backend, Celery worker, Redis, PostgreSQL and S3 storage. The
+  service in `compose.yaml`: frontend, backend, Celery worker, Redis, PostgreSQL and S3 storage. The
   configuration uses the local Docker connection named `Docker`; select your
   local connection in its **Server** field if it has a different name.
   View logs and stop containers in the **Services** tool window.
 - **VS Code:** run **Tasks: Run Build Task** (`Cmd+Shift+B` on macOS,
   `Ctrl+Shift+B` on Windows/Linux). The default **Compose: up** task builds
-  and starts the full stack, then waits for the health checks. **Tasks: Run
-  Task** also offers **Compose: stop** and **Compose: backend logs**.
+  and starts all six containers, then waits for their health checks. **Tasks:
+  Run Task** also offers **Compose: stop**, **Compose: frontend logs** and
+  **Compose: backend logs**.
 
-No local Python SDK or virtual environment is required to start the stack.
+No local Node.js, Python SDK or virtual environment is required to start the stack.
 FastAPI runs inside Docker and reloads when `backend/app/` changes. Run the
 smoke command above to check the running containers.
 
@@ -63,6 +47,7 @@ smoke command above to check the running containers.
 
 | Component | Role | Local address |
 |---|---|---|
+| Next.js frontend | Browser UI; `/api/...` forwards to FastAPI inside Compose | `http://localhost:3000` |
 | FastAPI + Uvicorn | API; connection helpers and health endpoints | `http://localhost:8000` |
 | Celery worker | Background jobs in separate Python processes | Internal; no host port |
 | Redis | Celery broker (DB 0) and temporary task results (DB 1) | Internal `redis:6379`; no host port |
@@ -73,8 +58,8 @@ smoke command above to check the running containers.
 | FFmpeg | Available for converting browser recording formats when needed | Backend and worker containers |
 
 File bytes belong in object storage; PostgreSQL can hold their object key,
-MIME type, size and relation to a presentation. Audio jobs persist uploads and analysis in S3. Product database tables,
-clips and a frontend are not implemented yet.
+MIME type, size and relation to a presentation. Audio jobs persist uploads and analysis in S3. Product database tables
+and event clips are not implemented yet.
 
 SeaweedFS `mini` runs the file store in one container and creates `S3_BUCKET`
 on startup. Credentials come from `.env`; the bucket is not public. Only the
@@ -292,8 +277,8 @@ database round trip that runs when `POSTGRES_HOST` is set.
 
 ## MediaRecorder integration
 
-The frontend will request camera/microphone access through `getUserMedia()`
-and pass that stream to `MediaRecorder`. Select formats using
+The frontend requests camera/microphone access through `getUserMedia()`
+and passes that stream to `MediaRecorder`. Select formats using
 `MediaRecorder.isTypeSupported()`; do not assume every browser records WebM.
 Preserve the actual `recorder.mimeType` with the blob. Collect `dataavailable`
 chunks and wait for the final `stop` event before assembling a complete file;
@@ -356,7 +341,7 @@ their contents are disposable.
   for the vertical slice. Dependency failures do not produce fake feedback.
 
 Verified locally on 24.10.2026 with Docker Desktop on ARM64: image build,
-`pip check`, all five service health checks and the extended smoke check passed.
+`pip check`, all six service health checks and the extended smoke check passed.
 The API responded while the synthetic worker job was running. Redis outage
 checks confirmed readiness 503, liveness 200 and prompt `QueueUnavailable`
 errors. A queued job survived Redis recreation and completed when the worker

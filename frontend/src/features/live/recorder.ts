@@ -48,6 +48,7 @@ export class LiveRecorder {
     private transport: VideoTransport,
     private onProgress: (state: LiveProgress) => void,
     private onComplete: (recording: LiveRecording) => void,
+    private onRecordingStart?: (timestamp: number) => void,
   ) {}
   private publish() {
     if (!this.disposed) this.onProgress({ ...this.progress });
@@ -164,6 +165,7 @@ export class LiveRecorder {
     recorder.onstart = () => {
       if (this.disposed) return;
       this.startedAt = performance.now();
+      this.onRecordingStart?.(this.startedAt);
       this.progress.phase = "recording";
       this.publish();
       this.timer = setInterval(() => {
