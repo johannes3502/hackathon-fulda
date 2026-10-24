@@ -1,6 +1,6 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Finale Pose-/Feedback-Anforderungen: `docs/04-pose-tracking-requirements.md`.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Grafische Architektur-Übersicht (Mermaid): `docs/03-architecture.md`. Finale Pose-/Feedback-Anforderungen: `docs/04-pose-tracking-requirements.md`.
 
 ## 1. Projekt
 
@@ -53,6 +53,8 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 **Offen:** LLM-Anbieter, Hosting, Live- vs. Post-Transkription, Schwellenwerte, Aufbewahrungsdauer, Füllwortliste, Fact-Check-Quellen im Web, Frage-Simulator-Modus (Text/Sprache, Antworten bewerten?), Produktname.
 
 ## 4. Architektur
+
+**Pflicht bei Architektur-Änderungen:** Die Mermaid-Diagramme in `docs/03-architecture.md` (Systemübersicht, Compose-Deployment, Sprech­analyse-Flow, RAG-Pipeline, Frontend-Routen, Mobile-Screens, Datenmodell, Event-Modell, API-Endpunkte) sind Teil dieser Datei und immer mitzupflegen. Sobald sich Services in `compose.yaml`, Endpunkte/Routen, Pipelines, Datenmodell oder das Event-Schema ändern, die betroffenen Diagramme im selben Change aktualisieren.
 
 ```
 Browser (Next.js, TS)
@@ -134,6 +136,7 @@ docs/
   00-requirements.md               # Hackathon-Regeln und Bewertung
   01-product.md                    # Features und offene Punkte
   02-ai-decision-log.md            # tatsächliche Entscheidungen und Prüfergebnisse
+  03-architecture.md               # Architektur als Mermaid-Diagramme; bei Architektur-Änderungen mittesten
   04-pose-tracking-requirements.md # finale Pose-, Event- und Feedback-Anforderungen
 templates/
   ai-decision-log.md               # Vorlage für die AI Reflection
@@ -152,10 +155,11 @@ Hybrid-Suche (pgvector + deutsche Volltextsuche). Fact-Check und Frage-Agent
 nutzen `app.sources.retrieval` (`search`, `format_context`, `quote_in_text`);
 beide sind noch nicht implementiert. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
-Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren.
-Die finalen Pose-/Feedback-Regeln stehen in
-`docs/04-pose-tracking-requirements.md`; die Umsetzung ist noch offen
-(`frontend/DATA_POINTS.md` beschreibt das Roh-Logging).
+Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
+erste Live-Regel „Arme verschränkt“ als Overlay-Hinweis. Die finalen
+Pose-/Feedback-Regeln stehen in `docs/04-pose-tracking-requirements.md`;
+die Umsetzung ist noch offen (`frontend/DATA_POINTS.md` beschreibt das
+Roh-Logging).
 Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. ASR ist über die API optional,
 jedoch noch nicht in die Oberfläche eingebunden. Umgesetzt sind zwei getrennte

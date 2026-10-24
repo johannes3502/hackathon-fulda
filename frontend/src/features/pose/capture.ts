@@ -1,12 +1,16 @@
+import { CrossArmsCue, armsCrossed } from "./cues";
 import { PoseLog, poseSample, type PoseSample } from "./sample";
 export type PoseState = {
   phase: "loading" | "running" | "stopped" | "error";
   count: number;
   message: string;
   latest: PoseSample | null;
+  armsCrossed: boolean;
 };
 export class PoseCapture {
   readonly log = new PoseLog();
+  private crossArms = new CrossArmsCue();
+  private armsCrossed = false;
   private worker: Worker | null = null;
   private frame = 0;
   private pending = false;
@@ -19,7 +23,13 @@ export class PoseCapture {
     private update: (state: PoseState) => void,
   ) {}
   private publish(phase: PoseState["phase"], message: string) {
-    this.update({ phase, message, count: this.log.count, latest: this.latest });
+    this.update({
+      phase,
+      message,
+      count: this.log.count,
+      latest: this.latest,
+      armsCrossed: this.armsCrossed,
+    });
   }
   start() {
     this.publish("loading", "Loading the local pose model…");
@@ -58,6 +68,11 @@ export class PoseCapture {
                 data.timestamp,
               );
           this.latest = sample;
+          // Uses the frame clock, so preview and recording share one episode.
+          this.armsCrossed = this.crossArms.update(
+            armsCrossed(sample),
+            data.timestamp,
+          );
           this.publish(
             "running",
             this.log.full
