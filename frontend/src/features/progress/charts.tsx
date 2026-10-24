@@ -117,65 +117,90 @@ export function Sparkline({ series }: { series: MetricSeries }) {
     series.baseline?.value != null
       ? valueY(series.baseline.value, range)
       : null;
+  const xFor = (sequence: number) =>
+    Math.max(
+      0,
+      Math.min(100, ((sequence - xRange.first) / xRange.span) * 100),
+    );
   const changeSequences = series.changePoints
     .filter((change) => change.sequence >= xRange.first)
-    .map((change) => ((change.sequence - xRange.first) / xRange.span) * 100);
+    .map((change) => xFor(change.sequence));
+  const excludedPoints = plotted.filter((point) => !point.eligible);
+  const missingPoints = points.filter((point) => point.value == null);
   return (
-    <svg
-      className="progress-sparkline"
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <defs>
-        <linearGradient id={`spark-${id}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {baseline != null && (
-        <line
-          x1="0"
-          x2="100"
-          y1={baseline}
-          y2={baseline}
-          className="progress-sparkline-baseline"
-          vectorEffect="non-scaling-stroke"
-        />
-      )}
-      {changeSequences.map((x, index) => (
-        <line
-          key={index}
-          x1={x}
-          x2={x}
-          y1="0"
-          y2="100"
-          className="progress-sparkline-change"
-          vectorEffect="non-scaling-stroke"
+    <span className="progress-sparkline-stack" aria-hidden="true">
+      <svg
+        className="progress-sparkline"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <defs>
+          <linearGradient id={`spark-${id}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {baseline != null && (
+          <line
+            x1="0"
+            x2="100"
+            y1={baseline}
+            y2={baseline}
+            className="progress-sparkline-baseline"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+        {changeSequences.map((x, index) => (
+          <line
+            key={index}
+            x1={x}
+            x2={x}
+            y1="0"
+            y2="100"
+            className="progress-sparkline-change"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+        {lineSegments.map((segment, index) => {
+          const path = toPath(segment);
+          const last = segment.at(-1);
+          return (
+            <g key={index}>
+              <path
+                d={`${path} L ${last?.x} 100 L ${segment[0].x} 100 Z`}
+                fill={`url(#spark-${id})`}
+                stroke="none"
+                opacity="0.55"
+              />
+              <path
+                d={path}
+                fill="none"
+                className="progress-sparkline-line"
+                vectorEffect="non-scaling-stroke"
+              />
+            </g>
+          );
+        })}
+      </svg>
+      {excludedPoints.map((point) => (
+        <span
+          key={point.takeId}
+          className="progress-sparkline-excluded"
+          style={{ left: `${point.x}%`, top: `${point.y}%` }}
         />
       ))}
-      {lineSegments.map((segment, index) => {
-        const path = toPath(segment);
-        const last = segment.at(-1);
-        return (
-          <g key={index}>
-            <path
-              d={`${path} L ${last?.x} 100 L ${segment[0].x} 100 Z`}
-              fill={`url(#spark-${id})`}
-              stroke="none"
-              opacity="0.55"
-            />
-            <path
-              d={path}
-              fill="none"
-              className="progress-sparkline-line"
-              vectorEffect="non-scaling-stroke"
-            />
-          </g>
-        );
-      })}
-    </svg>
+      {missingPoints.map((point) => (
+        <span
+          key={point.takeId}
+          className="progress-sparkline-gap"
+          style={{ left: `${xFor(point.sequence)}%` }}
+        >
+          ×
+        </span>
+      ))}
+    </span>
   );
 }
 
