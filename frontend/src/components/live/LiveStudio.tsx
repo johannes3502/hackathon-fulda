@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Eye,
   Mic,
-  MicOff,
   Radio,
   ShieldCheck,
   Square,
@@ -25,11 +24,7 @@ import { cueAppearance } from "@/features/live/cue-appearance";
 import { feedbackEnabled } from "@/features/live/feature-flags";
 import { upsertFeedback } from "@/features/live/protocol";
 import { usePacedCue } from "@/features/live/cue-pacing";
-import {
-  LiveSpeech,
-  mergeSpeechFeedback,
-  type SpeechState,
-} from "@/features/live/speech";
+import { mergeSpeechFeedback } from "@/features/live/speech";
 import { LiveRecorder } from "@/features/live/recorder";
 import { createVideoTransport } from "@/features/live/transport";
 import { apiEndpoint, request } from "@/features/live/analysis";
@@ -82,16 +77,6 @@ export function LiveStudio() {
   const [presentationMode, setPresentationMode] =
     useState<PresentationMode>("startup");
   const [targetMs, setTargetMs] = useState(180000);
-  const [mode, setMode] = useState<LiveConfig["mode"]>("local");
-  const microphone = mode === "backend" || featureFlags.liveSpeechFeedback;
-  const speechChoice =
-    mode === "backend"
-      ? "backend"
-      : featureFlags.liveSpeechFeedback
-        ? "live"
-        : "local";
-  const [speech, setSpeech] = useState<SpeechState | null>(null);
-  const voice = useRef<LiveSpeech | null>(null);
   const serverSpeech = useRef<LiveCaptions | null>(null);
   const serverEvents = useRef<LiveFeedback[]>([]);
   const [serverFeedback, setServerFeedback] = useState<LiveFeedback[]>([]);
@@ -100,7 +85,6 @@ export function LiveStudio() {
     event: LiveFeedback;
     untilMs: number;
   } | null>(null);
-  const voiceStream = cameraStatus === "active" ? getStream() : null;
   const [transcribe, setTranscribe] = useState(true);
   const [liveCaptions, setLiveCaptions] = useState(true);
   const [caption, setCaption] = useState({ text: "", status: "" });
@@ -129,29 +113,11 @@ export function LiveStudio() {
       startGeneration.current++;
       owner.current?.dispose();
       captions.current?.stop();
-      voice.current?.stop();
       serverSpeech.current?.stop();
     },
     [],
   );
   useEffect(() => {
-    if (
-      mode === "backend" ||
-      !voiceStream ||
-      !featureFlags.liveSpeechFeedback ||
-      !featureFlags.speechFeedback
-    )
-      return;
-    const capture = new LiveSpeech(featureFlags, setSpeech);
-    voice.current = capture;
-    void capture.start(voiceStream);
-    return () => {
-      capture.stop();
-      if (voice.current === capture) voice.current = null;
-    };
-  }, [voiceStream, featureFlags, mode]);
-  useEffect(() => {
-    if (mode !== "backend") return;
     const controller = new AbortController();
     let destination: string;
     try {
@@ -171,7 +137,7 @@ export function LiveStudio() {
           );
       });
     return () => controller.abort();
-  }, [mode, endpoint]);
+  }, [endpoint]);
   const start = async () => {
     if (busy.current) return;
     setError(null);
@@ -182,11 +148,10 @@ export function LiveStudio() {
     }
     let destination = endpoint;
     try {
-      if (mode === "backend")
-        destination = apiEndpoint(
-          endpoint,
-          window.location.protocol === "https:",
-        );
+      destination = apiEndpoint(
+        endpoint,
+        window.location.protocol === "https:",
+      );
     } catch (e) {
       setError((e as Error).message);
       return;
@@ -198,18 +163,18 @@ export function LiveStudio() {
     }
     busy.current = true;
     const generation = ++startGeneration.current;
-    const config = {
+    const config: LiveConfig = {
       presentationMode,
       sourceCollectionId: collectionId(),
       title: title.trim(),
       targetMs,
-      mode,
+      mode: "backend",
       endpoint: destination,
-      transcribe: mode === "backend" && transcribe,
-      featureFlags: { ...featureFlags },
+      transcribe,
+      featureFlags: { ...featureFlags, liveSpeechFeedback: true },
     };
     const liveTranscript =
-      mode === "backend" && transcribe && liveCaptions
+      transcribe && liveCaptions
         ? new LiveCaptions(
             (text, status) => setCaption({ text, status }),
             undefined,
@@ -246,7 +211,6 @@ export function LiveStudio() {
       (next) => {
         if (next.phase === "finishing") {
           pose.stop();
-          voice.current?.stop();
           serverSpeech.current?.stop();
         }
         setProgress(next);
@@ -267,10 +231,7 @@ export function LiveStudio() {
           poseLog: pose.recordingBlob(),
           poseEvents,
           feedback: [
-            ...mergeSpeechFeedback(recording.feedback, [
-              ...(voice.current?.events ?? []),
-              ...serverEvents.current,
-            ])
+            ...mergeSpeechFeedback(recording.feedback, serverEvents.current)
               .filter((item) => item.startMs < recording.durationMs)
               .map((item) => ({
                 ...item,
@@ -283,15 +244,10 @@ export function LiveStudio() {
       },
       (timestamp) => {
         pose.beginRecording(timestamp, recorder.id);
-        voice.current?.beginRecording(timestamp, recorder.id);
         serverEvents.current = [];
         setServerFeedback([]);
         setServerCue(null);
-        if (
-          mode === "backend" &&
-          featureFlags.speechFeedback &&
-          featureFlags.liveSpeechFeedback
-        ) {
+        if (featureFlags.speechFeedback) {
           const shown = new Map<string, number>();
           serverSpeech.current = new LiveCaptions(
             (_, status) => {
@@ -337,7 +293,6 @@ export function LiveStudio() {
     startGeneration.current++;
     owner.current?.dispose();
     captions.current?.stop();
-    voice.current?.stop();
     serverSpeech.current?.stop();
     owner.current = null;
     captions.current = null;
@@ -354,11 +309,7 @@ export function LiveStudio() {
       ? [
           ...mergeSpeechFeedback(
             progress.feedback,
-            !featureFlags.liveSpeechFeedback || !featureFlags.speechFeedback
-              ? []
-              : mode === "backend"
-                ? serverFeedback
-                : (speech?.events ?? []),
+            featureFlags.speechFeedback ? serverFeedback : [],
           ),
           ...(pose.state?.evaluation?.events ?? []).map(poseFeedback),
         ].sort((a, b) => a.startMs - b.startMs)
@@ -367,20 +318,16 @@ export function LiveStudio() {
     showCues && pose.state?.phase === "running" && evaluation?.cue
       ? poseFeedback(evaluation.cue)
       : null;
-  const speechEnabled =
-    microphone &&
-    featureFlags.liveSpeechFeedback &&
-    featureFlags.speechFeedback;
+  const speechEnabled = featureFlags.speechFeedback;
   const voiceCue =
-    !showCues || !speechEnabled || cameraStatus !== "active"
-      ? null
-      : mode === "backend"
-        ? progress?.phase === "recording" &&
-          serverCue &&
-          progress.elapsedMs < serverCue.untilMs
-          ? serverCue.event
-          : null
-        : speech?.cue;
+    showCues &&
+    speechEnabled &&
+    cameraStatus === "active" &&
+    progress?.phase === "recording" &&
+    serverCue &&
+    progress.elapsedMs < serverCue.untilMs
+      ? serverCue.event
+      : null;
   const latest = usePacedCue(
     voiceCue && (!poseCue || voiceCue.startMs >= poseCue.startMs)
       ? voiceCue
@@ -411,37 +358,9 @@ export function LiveStudio() {
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <div className="live-control-bar">
-              <fieldset className="live-analysis-choice" disabled={!!progress}>
-                <div className="field">
-                  <label htmlFor="live-source">Speech analysis</label>
-                  <NativeSelect
-                    id="live-source"
-                    value={speechChoice}
-                    onChange={(e) => {
-                      stopCamera();
-                      setMode(
-                        e.target.value === "backend" ? "backend" : "local",
-                      );
-                      setFeatureFlags({
-                        ...featureFlags,
-                        liveSpeechFeedback: e.target.value !== "local",
-                      });
-                    }}
-                  >
-                    <option value="local">Off · gestures only</option>
-                    <option value="live">Live · in browser</option>
-                    <option value="backend">
-                      Live + full backend analysis
-                    </option>
-                  </NativeSelect>
-                </div>
-              </fieldset>
               <p className="field-hint live-audio-hint">
-                {mode === "backend"
-                  ? "Microphone audio is sent to your server for live feedback. The full take is uploaded after stopping."
-                  : microphone
-                    ? "Camera and microphone stay in this browser. Voice hints work without a backend."
-                    : "Camera only. Choose Live · in browser to enable microphone feedback."}
+                Microphone audio is sent to your server for live feedback. The
+                full take is uploaded after stopping.
               </p>
               {!progress ? (
                 cameraStatus === "active" && (
@@ -496,15 +415,7 @@ export function LiveStudio() {
                         : "Preview only"}
                 </span>
                 <span className="stage-demo">
-                  {!microphone ? (
-                    <>
-                      <MicOff size={14} /> No audio
-                    </>
-                  ) : (
-                    <>
-                      <Mic size={14} /> Microphone audio
-                    </>
-                  )}
+                  <Mic size={14} /> Microphone audio
                 </span>
               </div>
               <video
@@ -579,7 +490,7 @@ export function LiveStudio() {
                   {!progress && (
                     <Button
                       disabled={cameraStatus === "pending"}
-                      onClick={() => void enable(microphone)}
+                      onClick={() => void enable(true)}
                     >
                       <Camera size={18} />
                       {cameraStatus === "pending"
@@ -592,7 +503,6 @@ export function LiveStudio() {
               )}
               {progress?.phase === "recording" &&
                 liveCaptions &&
-                mode === "backend" &&
                 transcribe && (
                   <div className="live-captions" aria-label="Live captions">
                     <small role="status">{caption.status}</small>
@@ -607,26 +517,20 @@ export function LiveStudio() {
                     : "Camera stays local until Start"}
                 </span>
                 <span>
-                  {mode === "local"
-                    ? microphone
-                      ? "Local gestures + live voice feedback"
-                      : "Local gesture observations"
-                    : progress?.phase === "recording"
-                      ? liveCaptions && transcribe
-                        ? "Live speech feedback + captions"
-                        : "Live speech feedback · audio sent to server"
-                      : "Backend mode"}
+                  {progress?.phase === "recording"
+                    ? liveCaptions && transcribe
+                      ? "Live speech feedback + captions"
+                      : "Live speech feedback · audio sent to server"
+                    : "Live + full backend analysis"}
                 </span>
               </div>
             </section>
             <p className="camera-message" role="status">
               {progress
                 ? (progress.notice ??
-                  (mode === "local"
-                    ? "Video and gesture observations stay in this browser. Start each take with 3 seconds in a neutral position."
-                    : `${serverStatus} Speak normally for the first 3 seconds. Full analysis follows after stopping.`))
+                  `${serverStatus} Speak normally for the first 3 seconds. Full analysis follows after stopping.`)
                 : cameraCopy[cameraStatus]}
-              {mode === "backend" && !progress && (
+              {!progress && (
                 <span className="recording-consent">
                   By starting, you agree to send your video and microphone audio
                   to <strong>{endpoint}</strong> after stopping. Microphone
@@ -702,31 +606,11 @@ export function LiveStudio() {
                           ? `Hands detected: ${pose.state.hands.length}`
                           : "Loading finger tracking…"}
                   </p>
-                  {speechEnabled && mode === "backend" && (
+                  {speechEnabled && (
                     <p role="status">
                       {serverStatus ||
                         "Live voice feedback starts with recording."}
                     </p>
-                  )}
-                  {speechEnabled && mode !== "backend" && (
-                    <>
-                      <p role="status">
-                        {speech?.message ?? "Starting local voice feedback…"}
-                      </p>
-                      {speech?.phase === "calibrating" && (
-                        <progress
-                          aria-label="Voice calibration"
-                          max={1}
-                          value={speech.calibrationProgress}
-                        />
-                      )}
-                      <meter
-                        aria-label="Microphone level"
-                        min={-100}
-                        max={0}
-                        value={speech?.levelDb ?? -100}
-                      />
-                    </>
                   )}
                 </div>
                 {latest && (
@@ -758,10 +642,9 @@ export function LiveStudio() {
             onMode={setPresentationMode}
             endpoint={endpoint}
             disabled={!!progress}
-            prepared={mode === "backend" && transcribe}
+            prepared={transcribe}
             onPrepare={() => {
               stopCamera();
-              setMode("backend");
               setTranscribe(true);
               setLiveCaptions(true);
             }}
@@ -795,48 +678,46 @@ export function LiveStudio() {
                   </div>
                 </div>
               </details>
-              {mode === "backend" && (
-                <div className="field">
-                  <details className="connection-settings">
-                    <summary>Server connection</summary>
-                    <label htmlFor="live-endpoint">Backend API URL</label>
-                    <Input
-                      id="live-endpoint"
-                      value={endpoint}
-                      placeholder="http://localhost:8000"
-                      onChange={(e) => setEndpoint(e.target.value)}
-                    />
-                  </details>
-                  {health && (
-                    <p className="field-hint" role="status">
-                      {health}
-                    </p>
-                  )}
+              <div className="field">
+                <details className="connection-settings">
+                  <summary>Server connection</summary>
+                  <label htmlFor="live-endpoint">Backend API URL</label>
+                  <Input
+                    id="live-endpoint"
+                    value={endpoint}
+                    placeholder="http://localhost:8000"
+                    onChange={(e) => setEndpoint(e.target.value)}
+                  />
+                </details>
+                {health && (
+                  <p className="field-hint" role="status">
+                    {health}
+                  </p>
+                )}
+                <label className="live-transcribe">
+                  <input
+                    type="checkbox"
+                    checked={transcribe}
+                    onChange={(e) => setTranscribe(e.target.checked)}
+                  />
+                  Create a transcript
+                </label>
+                {transcribe && (
                   <label className="live-transcribe">
                     <input
                       type="checkbox"
-                      checked={transcribe}
-                      onChange={(e) => setTranscribe(e.target.checked)}
+                      checked={liveCaptions}
+                      onChange={(e) => setLiveCaptions(e.target.checked)}
                     />
-                    Create a transcript
+                    Stream transcription with Deepgram (EU)
                   </label>
-                  {transcribe && (
-                    <label className="live-transcribe">
-                      <input
-                        type="checkbox"
-                        checked={liveCaptions}
-                        onChange={(e) => setLiveCaptions(e.target.checked)}
-                      />
-                      Stream transcription with Deepgram (EU)
-                    </label>
-                  )}
-                  <p className="field-hint">
-                    {transcribe
-                      ? "A completed live transcript is reused in your review. Local Whisper is the fallback. Review recognition errors before checking claims against your sources."
-                      : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
-                  </p>
-                </div>
-              )}
+                )}
+                <p className="field-hint">
+                  {transcribe
+                    ? "A completed live transcript is reused in your review. Local Whisper is the fallback. Review recognition errors before checking claims against your sources."
+                    : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
+                </p>
+              </div>
             </fieldset>
           </details>
           <p className="field-hint">
@@ -949,10 +830,8 @@ export function LiveStudio() {
             </p>
             <div className="stream-summary">
               <span>
-                {progress?.chunksSent ?? 0} recording parts{" "}
-                {mode === "local"
-                  ? "handled locally"
-                  : "uploaded after stopping"}
+                {progress?.chunksSent ?? 0} recording parts uploaded after
+                stopping
               </span>
               <span>
                 {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
@@ -1011,10 +890,8 @@ export function LiveStudio() {
             )}
             <div className="stream-summary">
               <span>
-                {progress?.chunksSent ?? 0} recording parts{" "}
-                {mode === "local"
-                  ? "handled locally"
-                  : "uploaded after stopping"}
+                {progress?.chunksSent ?? 0} recording parts uploaded after
+                stopping
               </span>
               <span>
                 {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB

@@ -211,14 +211,15 @@ nur nach 10 s ohne Korrekturhinweis einmalig (`praiseAfterMs`). Alle Werte sind 
 sich auch jede der 7 Pose-Regeln auf On (Hinweis + Review), Review only (nur
 Timeline) oder Off stellen und jeder der 12 Pose-lab-Tests abschalten.
 Sprachfeedback ist insgesamt und für Pausen, Tempo, Füllwörter, Lautstärke und
-Tonhöhe einzeln schaltbar. „Live · in browser“ ist Standard: Kamera/Mikro bleiben
-lokal, ein AudioWorklet liefert RMS/YIN und einen Energiehüllkurven-Tempo-Proxy.
-Pausen, Lautstärke, Tonhöhenvariation und Rhythmus erscheinen während der Aufnahme.
-„Off · gestures only“ schaltet das Mikro aus. Der Backend-Modus nutzt den separaten
-Signal-Stream unten; Füllwörter und Wort-Tempo bleiben nachgelagert. Live-Captions
+Tonhöhe einzeln schaltbar. Jede Web-Aufnahme nutzt auf Nutzerwunsch Live-Feedback
+und volle Backend-Analyse;
+der Modus-Schalter entfällt. Kamera und Mikrofon sind immer aktiv, Audio geht
+während der Aufnahme an den separaten Signal-Stream unten und die vollständige
+Aufnahme wird nach dem Stoppen hochgeladen; Füllwörter und Wort-Tempo bleiben
+nachgelagert. Live-Captions
 sind separat. Die Analysis-features-Schalter liegen in `/admin`, bleiben pro
 Browser in `localStorage` und werden mit jeder Aufnahme gespeichert; Änderungen gelten
-ab der nächsten Aufnahme. Speech analysis und Pose lab bleiben im Studio.
+ab der nächsten Aufnahme. Transkript-Optionen und Pose lab bleiben im Studio.
 Die ausführlichen Research-Ziele in `docs/04-pose-tracking-requirements.md`
 sind nicht vollständig implementiert und überschreiben diese Entscheidung nicht.
 Der Aufnahme-Pfad nutzt die Audio-Job-API

@@ -188,8 +188,9 @@ Pose Lab und T12 bleiben Dev-only; Fingertracking läuft separat schaltbar
 standardmäßig im normalen Overlay, bis 5 Hz auch ohne Torso. Produktions-Evaluator,
 Zeitachse und Review aus `goal` bleiben aktiv. Sprachfeedback ist insgesamt und
 für Pause, Tempo, Füllwörter, Lautstärke und Tonhöhe einzeln schaltbar.
-„Live · in browser“ ist Standard und liefert lokale Mikrofonhinweise ohne Backend;
-der Backend-Modus nutzt den Signal-Stream. Füllwörter und Wort-Tempo kommen nach
+Jede Web-Aufnahme nutzt Live-Feedback über den Backend-Signal-Stream und die
+vollständige Analyse nach dem Stoppen. Die Auswahl zwischen Gesten-only,
+lokalem Browser-Modus und Backend-Modus entfällt auf Nutzerwunsch. Füllwörter und Wort-Tempo kommen nach
 dem Stoppen. Die Haltungsreferenz benötigt keine stillgehaltenen Hände mehr.
 
 Stimmreferenz: Browser und Backend warten auf genügend stimmhafte Sprache, statt

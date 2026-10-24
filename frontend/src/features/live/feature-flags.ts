@@ -10,7 +10,7 @@ export type FeatureFlags = PoseOptions & {
   pitchFeedback: boolean;
 };
 
-// Speech analysis itself remains opt-in. These flags select its feedback types.
+// These flags select feedback markers; the studio always uses backend analysis.
 export const DEFAULT_FEATURE_FLAGS: Readonly<FeatureFlags> = Object.freeze({
   ...DEFAULT_POSE_OPTIONS,
   liveSpeechFeedback: true,
@@ -46,8 +46,7 @@ export function feedbackEnabled(
   return !flag || (flags.speechFeedback && flags[flag]);
 }
 
-// Admin-managed options persist per browser. Studio-only switches (speech
-// source, Pose lab) stay in memory and reset on reload.
+// Admin-managed options persist per browser; Pose lab resets on reload.
 const STORAGE_KEY = "pitchcoach.featureFlags";
 const ALLOWED: {
   [K in keyof FeatureFlags]?: readonly FeatureFlags[K][];
