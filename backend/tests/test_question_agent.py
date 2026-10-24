@@ -1,6 +1,7 @@
-"""Synthetic ElevenLabs protocol, grounding and mode checks; no paid calls."""
+"""Synthetic protocol checks and an opt-in live configuration check; no paid calls."""
 
 import json
+import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
@@ -77,6 +78,22 @@ def test_teacher_moves_on_after_limited_follow_ups_even_if_the_answer_is_wrong()
     assert "continue to the next main question even if the answer is still wrong" in prompt
     assert "Move on sooner if the student does not know or asks to skip" in prompt
     assert "Never repeat a question until they get it right" in prompt
+
+
+@pytest.mark.skipif(os.getenv("RUN_CLOUD_SMOKE") != "1", reason="Opt-in read of the configured ElevenLabs agent")
+def test_live_agent_has_no_saved_greeting_and_allows_context_overrides():
+    response = httpx.get(
+        f"https://api.elevenlabs.io/v1/convai/agents/{os.environ['ELEVENLABS_AGENT_ID']}",
+        headers={"xi-api-key": os.environ["ELEVENLABS_API_KEY"]},
+        timeout=15,
+    )
+    assert response.status_code == 200, f"Agent configuration returned HTTP {response.status_code}"
+    config = response.json()
+    # The saved first message bypasses the LLM, so prompt-only tests cannot catch this regression.
+    assert config["conversation_config"]["agent"]["first_message"] == ""
+    overrides = config["platform_settings"]["overrides"]["conversation_config_override"]["agent"]
+    assert overrides["first_message"] is True
+    assert overrides["prompt"]["prompt"] is True
 
 
 def test_agent_api_queues_context_without_needing_the_local_llm(monkeypatch):
