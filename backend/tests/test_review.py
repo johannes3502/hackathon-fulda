@@ -131,6 +131,16 @@ def test_pace_units_and_medians_stay_separate():
     assert card["display"]["rate"] == 200 and "window_wpm" not in json.dumps(card["display"])
 
 
+@pytest.mark.parametrize("language,wording", [("en", "adapting voice reference"), ("de", "nachgeführten Stimmreferenz")])
+def test_adaptive_volume_review_uses_window_references_instead_of_initial_calibration(language, wording):
+    event = speech_event("volume", "volume", window_delta_db=[8, 7, 6], baseline_level_db=-30,
+                         window_baseline_level_db=[-30, -29, -28], baseline_mode="adaptive")
+    card = card_for(event, language)
+    assert card["display"]["baseline"] == -29
+    assert card["display"]["delta"] == 7
+    assert wording in card["allowedTexts"][0]
+
+
 def test_coverage_unknown_and_overlapping_reasons_are_not_double_counted():
     take = take_fixture(intervals=[CoverageInterval(t_ms=0, duration_ms=8000, evaluable=True),
         CoverageInterval(t_ms=1000, duration_ms=2000, evaluable=False, reason="hips-not-visible"),

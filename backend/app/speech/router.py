@@ -31,7 +31,7 @@ def _remove_job(job_id: str):
 @router.post("/analyze", status_code=202)
 async def analyze(
     recording: UploadFile = File(description="Synthetic audio/video recording (WebM, MP4, WAV, ...)"),
-    config: str | None = Form(default=None, description="AudioConfig JSON; first 3000 ms are calibration"),
+    config: str | None = Form(default=None, description="AudioConfig JSON; calibrates on voiced speech, then adapts gradually; silence does not train the reference"),
     local_only: bool = Form(default=False, description="Require local Whisper; reject hosted or synthetic ASR before storing the recording"),
     live_transcript: str | None = Form(default=None, description="Final Deepgram live transcript JSON with recording-relative word timestamps; skips repeat ASR"),
     transcribe: bool = Form(default=True, description="Run configured ASR (default: local Whisper). false = local signal analysis only"),

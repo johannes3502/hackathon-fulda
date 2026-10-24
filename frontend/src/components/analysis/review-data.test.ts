@@ -91,16 +91,9 @@ describe("review timeline", () => {
     ).toBe("gesture");
     expect(feedbackToMoment(feedback)).not.toHaveProperty("score");
   });
-  it("keeps the synthetic series ordered and its source quote verifiable", () => {
+  it("keeps example annotations bounded and source quotes verifiable without synthetic scores", () => {
     const { performance, moments, durationMs } = DEMO_REVIEW;
-    performance.forEach((point, index) => {
-      expect(point.tMs).toBeGreaterThanOrEqual(
-        index ? performance[index - 1].tMs : 0,
-      );
-      expect(point.tMs).toBeLessThanOrEqual(durationMs);
-      expect(point.value).toBeGreaterThanOrEqual(0);
-      expect(point.value).toBeLessThanOrEqual(100);
-    });
+    expect(performance).toEqual([]);
     expect(
       moments.every((moment) => moment.tMs + moment.durationMs <= durationMs),
     ).toBe(true);

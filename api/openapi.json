@@ -613,7 +613,7 @@
                 "type": "null"
               }
             ],
-            "description": "AudioConfig JSON; first 3000 ms are calibration",
+            "description": "AudioConfig JSON; calibrates on voiced speech, then adapts gradually; silence does not train the reference",
             "title": "Config"
           },
           "live_transcript": {

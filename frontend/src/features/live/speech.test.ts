@@ -31,6 +31,36 @@ it("does not calibrate on silence or label initial silence as a pause", () => {
   expect(feed(engine, 0, 10000, -100, null).calibrationProgress).toBe(0);
   expect(engine.events).toEqual([]);
 });
+it("waits through startup room noise and does not call normal speech too loud", () => {
+  const engine = new SpeechEvaluator();
+  expect(feed(engine, 0, 10000, -45, null).calibrationProgress).toBe(0);
+  expect(engine.events).toEqual([]);
+  expect(feed(engine, 10040, 14040, -25, 200).phase).toBe("ready");
+  expect(
+    feed(engine, 14080, 25000, -25, 200).events.filter(
+      (e) => e.category === "volume",
+    ),
+  ).toEqual([]);
+});
+it("does not retain a false volume finding after adapting to sustained speech", () => {
+  const engine = ready();
+  const initial = feed(engine, 3040, 10000, -13);
+  expect(initial.events.some((e) => e.category === "volume")).toBe(true);
+  const later = feed(engine, 10040, 100000, -13);
+  const volume = later.events.filter((e) => e.category === "volume");
+  expect(volume).toHaveLength(1);
+  expect(volume[0].endMs).toBeLessThan(50000);
+});
+it("does not advance calibration from duplicate, invalid, or interrupted microphone measurements", () => {
+  const engine = new SpeechEvaluator();
+  feed(engine, 0, 1000);
+  for (let i = 0; i < 100; i++)
+    engine.update({ tMs: 1000, levelDb: -25, f0Hz: 200 });
+  engine.update({ tMs: Infinity, levelDb: -25, f0Hz: 200 });
+  engine.update({ tMs: 1040, levelDb: NaN, f0Hz: 200 });
+  expect(feed(engine, 5000, 7000).phase).toBe("calibrating");
+  expect(feed(engine, 7040, 8040).phase).toBe("ready");
+});
 it("confirms a live pause after two seconds, grows one marker and respects flags", () => {
   const e = ready();
   expect(feed(e, 3040, 4960, -100, null).events).toEqual([]);
@@ -77,7 +107,7 @@ it("detects a sustained faster envelope rhythm relative to calibration", () => {
     state = e.update({
       tMs,
       levelDb: tMs % (tMs <= 3000 ? 400 : 120) < 40 ? -20 : -35,
-      f0Hz: null,
+      f0Hz: 220,
     });
   expect(state.events.some((e) => e.category === "pace")).toBe(true);
 });
@@ -89,7 +119,7 @@ it("anchors microphone measurements to the recording and closes its own audio gr
   const port = {
     onmessage: null as
       | ((event: {
-          data: { tMs: number; levelDb: number; f0Hz: null };
+          data: { tMs: number; levelDb: number; f0Hz: number | null };
         }) => void)
       | null,
   };
@@ -123,7 +153,7 @@ it("anchors microphone measurements to the recording and closes its own audio gr
     port.onmessage?.({ data: { tMs: 1460, levelDb: -25, f0Hz: null } });
     expect(updates).toHaveBeenCalledTimes(2); // loading + reset, no late preview block
     for (let tMs = 1500; tMs <= 4600; tMs += 40)
-      port.onmessage?.({ data: { tMs, levelDb: -25, f0Hz: null } });
+      port.onmessage?.({ data: { tMs, levelDb: -25, f0Hz: 220 } });
     expect(updates.mock.lastCall![0].phase).toBe("ready");
     voice.stop();
     expect(close).toHaveBeenCalledOnce();

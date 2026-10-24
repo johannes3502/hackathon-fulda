@@ -1,4 +1,5 @@
 import "./loading-screen.css";
+import { BrandLogo } from "@/components/shared/BrandLogo";
 
 /** Indeterminate loading: mount while work is pending, unmount when complete. */
 export function LoadingScreen({
@@ -9,9 +10,7 @@ export function LoadingScreen({
   return (
     <section className="loading418-screen" aria-label="Wird geladen" lang="de">
       <div className="loading418-center">
-        <span className="brand-mark" aria-hidden="true">
-          418
-        </span>
+        <BrandLogo />
         <p className="loading418-status" role="status">
           <span className="loading418-dot" aria-hidden="true" />
           {label}

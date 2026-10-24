@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { BrandLogo } from "./BrandLogo";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
@@ -58,8 +59,8 @@ export function DrawerTriggerButton() {
 export const NAV_ITEMS = [
   {
     href: "/",
-    label: "Start & Stats",
-    description: "Aktuelle Stats-Karte, Monatsfortschritt & Diagramme",
+    label: "Start & Aufnahmen",
+    description: "Aufgenommene Takes, Dauer und Hinweise im Arbeitsbereich",
     icon: BarChart3,
   },
   {
@@ -76,8 +77,8 @@ export const NAV_ITEMS = [
   },
   {
     href: "/review-preview",
-    label: "Analyse-Review",
-    description: "Zeitachsen-Analyse & Video-Momente im Detail",
+    label: "Analyse-Beispiel",
+    description: "Synthetische Video-Momente auf einer Zeitachse",
     icon: LineChart,
   },
   {
@@ -145,7 +146,7 @@ export function AppShell({
             <span className="drawer-trigger-label">Menü</span>
           </Button>
           <Link href="/" className="brand" aria-label="418 home">
-            <span className="brand-mark">418</span>
+            <BrandLogo />
             <span className="brand-caption">Presentation studio</span>
           </Link>
         </div>
@@ -261,7 +262,7 @@ export function AppShell({
           >
             <div className="nav-drawer-header">
               <div className="brand">
-                <span className="brand-mark">418</span>
+                <BrandLogo />
                 <div>
                   <strong className="nav-drawer-title">Navigation</strong>
                   <span className="nav-drawer-subtitle">

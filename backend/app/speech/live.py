@@ -71,7 +71,8 @@ async def live_feedback(ws: WebSocket) -> None:
         config = AudioConfig()
         minimum = {"volume": config.volume_window_ms, "pitch": config.pitch_window_ms,
                    "pace": config.pace_window_ms, "pause": config.pause_min_ms}
-        # shortcut: reanalyse the prefix to preserve batch calibration; use incremental DSP beyond five minutes.
+        # Replay the causal adaptive reference for preview/batch consistency.
+        # Use incremental DSP beyond five minutes.
         limit = 300 * SAMPLE_RATE * 2
         while len(pcm) < limit:
             raw = await _receive(ws)

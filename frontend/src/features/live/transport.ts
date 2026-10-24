@@ -7,6 +7,7 @@ import type {
 import type { FeatureFlags } from "./feature-flags";
 import {
   analysisResult,
+  BACKEND_TIMESTAMP_TOLERANCE_MS,
   parseTranscript,
   request,
   waitForAudioJob,
@@ -81,31 +82,45 @@ export class AnalysisTransport implements VideoTransport {
       accepted,
       this.controller.signal,
     );
-    const result = analysisResult(raw, "speech", durationMs, this.flags);
-    if (this.transcribe) {
-      const transcript = parseTranscript(raw, durationMs);
-      this.receive?.({
-        type: "transcript",
-        sessionId: this.sessionId,
-        transcript,
-      });
-      if (raw.transcription && typeof raw.transcription === "object") {
-        const wordMetrics = analysisResult(
-          { ...raw.transcription, events: [] },
-          "words",
-          durationMs,
-        );
-        result.metrics.push(...wordMetrics.metrics);
+    const result = analysisResult(
+      raw,
+      "speech",
+      durationMs,
+      this.flags,
+      BACKEND_TIMESTAMP_TOLERANCE_MS,
+    );
+    try {
+      if (this.transcribe) {
+        const transcript = parseTranscript(raw, durationMs);
+        this.receive?.({
+          type: "transcript",
+          sessionId: this.sessionId,
+          transcript,
+        });
+        if (raw.transcription && typeof raw.transcription === "object") {
+          const wordMetrics = analysisResult(
+            { ...raw.transcription, events: [] },
+            "words",
+            durationMs,
+          );
+          result.metrics.push(...wordMetrics.metrics);
+        }
       }
+    } finally {
+      // A malformed transcript must not discard successful signal analysis.
+      for (const feedback of result.feedback)
+        this.receive?.({
+          type: "feedback",
+          sessionId: this.sessionId,
+          feedback,
+        });
+      this.receive?.({
+        type: "metrics",
+        sessionId: this.sessionId,
+        atMs: durationMs,
+        metrics: result.metrics,
+      });
     }
-    for (const feedback of result.feedback)
-      this.receive?.({ type: "feedback", sessionId: this.sessionId, feedback });
-    this.receive?.({
-      type: "metrics",
-      sessionId: this.sessionId,
-      atMs: durationMs,
-      metrics: result.metrics,
-    });
   }
   close() {
     this.controller.abort();

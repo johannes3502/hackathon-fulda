@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function syntheticCamera(page: Page) {
-  await page.addInitScript(() => {
+async function syntheticCamera(page: Page, startWithNoise = false) {
+  await page.addInitScript((startWithNoise) => {
     const state = window as unknown as {
       stoppedTracks: number;
       mediaConstraints: MediaStreamConstraints | undefined;
       speechGain: GainNode;
+      noiseGain?: GainNode;
     };
     state.stoppedTracks = 0;
     navigator.mediaDevices.getUserMedia = async (constraints) => {
@@ -32,12 +33,35 @@ async function syntheticCamera(page: Page) {
       if (constraints?.audio) {
         const audio = new AudioContext();
         const oscillator = audio.createOscillator();
+        oscillator.frequency.value = 200;
         const gain = audio.createGain();
-        gain.gain.value = 0.05;
+        gain.gain.value = startWithNoise ? 0 : 0.05;
         state.speechGain = gain;
         const destination = audio.createMediaStreamDestination();
         oscillator.connect(gain);
         gain.connect(destination);
+        if (startWithNoise) {
+          const buffer = audio.createBuffer(
+            1,
+            audio.sampleRate * 2,
+            audio.sampleRate,
+          );
+          const samples = buffer.getChannelData(0);
+          let seed = 42;
+          for (let i = 0; i < samples.length; i++) {
+            seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+            samples[i] = seed / 0x80000000 - 1;
+          }
+          const noise = audio.createBufferSource();
+          noise.buffer = buffer;
+          noise.loop = true;
+          const noiseGain = audio.createGain();
+          noiseGain.gain.value = 0.02;
+          state.noiseGain = noiseGain;
+          noise.connect(noiseGain);
+          noiseGain.connect(destination);
+          noise.start();
+        }
         oscillator.start();
         const track = destination.stream.getAudioTracks()[0];
         track.addEventListener("ended", () => void audio.close());
@@ -53,7 +77,7 @@ async function syntheticCamera(page: Page) {
       }
       return stream;
     };
-  });
+  }, startWithNoise);
 }
 // Controlled landmarks exercise the real evaluator, recording and UI, not model accuracy.
 async function syntheticPose(page: Page) {
@@ -108,11 +132,19 @@ async function startPoseSequence(page: Page, kind = "raised") {
   );
 }
 async function noOverflow(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+  const layout = await page.evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    viewport: innerWidth,
+    overflowing: [...document.querySelectorAll("body *")]
+      .filter(
+        (element) => element.getBoundingClientRect().right > innerWidth + 1,
+      )
+      .slice(0, 8)
+      .map((element) => `${element.tagName}.${element.getAttribute("class")}`),
+  }));
+  expect(layout.width, JSON.stringify(layout)).toBeLessThanOrEqual(
+    layout.viewport,
+  );
 }
 async function enable(page: Page) {
   await page.goto("/live");
@@ -122,6 +154,47 @@ async function enable(page: Page) {
     page.getByRole("button", { name: "Turn camera off" }),
   ).toBeVisible();
 }
+test("startup room noise waits for speech and normal speech never becomes a loudness warning", async ({
+  page,
+}) => {
+  await syntheticCamera(page, true);
+  await syntheticPose(page);
+  await page.goto("/live");
+  await page
+    .getByRole("button", { name: "Enable camera", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  // Feed the real AudioWorklet room noise longer than the old calibration.
+  await page.waitForTimeout(4500);
+  await expect(page.getByLabel("Voice calibration")).toBeVisible();
+  await expect(page.getByLabel("Voice calibration")).toHaveAttribute(
+    "value",
+    "0",
+  );
+  await expect(page.locator(".cue-message")).not.toHaveText(
+    "Voice louder than your baseline",
+  );
+  await page.evaluate(() => {
+    const audio = window as unknown as {
+      speechGain: GainNode;
+      noiseGain: GainNode;
+    };
+    audio.noiseGain.gain.value = 0;
+    audio.speechGain.gain.value = 0.05;
+  });
+  await expect(page.getByLabel("Tracking status")).toContainText(
+    "Live voice feedback ready",
+    { timeout: 10000 },
+  );
+  await page.waitForTimeout(3500);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(page.locator(".review-clip-list")).not.toContainText(
+    "Voice louder than your baseline",
+  );
+});
 test("local microphone feedback emits live volume/pause markers and preserves them in review without an analysis upload", async ({
   page,
 }, info) => {
@@ -187,6 +260,22 @@ test("local microphone feedback emits live volume/pause markers and preserves th
     "Voice louder than your baseline",
   );
   expect(uploads).toBe(0);
+  const reviewUrl = page.url();
+  await page.getByRole("link", { name: "418 home" }).click();
+  await expect(
+    page
+      .locator(".stats418-kpi")
+      .filter({ hasText: "Aufnahmen" })
+      .locator("dd"),
+  ).toHaveText("1");
+  await expect(
+    page.getByRole("article", { name: "Aufnahmeübersicht" }),
+  ).toContainText("My pitch rehearsal");
+  await expect(page.locator("main")).not.toContainText("%");
+  await page
+    .getByRole("link", { name: "Aufnahme ansehen", exact: true })
+    .click();
+  await expect(page).toHaveURL(reviewUrl);
 });
 
 test("normal preview displays all finger points without enabling the lab, including a hand-only frame", async ({
@@ -1425,7 +1514,7 @@ test("signal feedback appears during recording without captions and failure pres
     { timeout: 15000 },
   );
   await expect(page.locator(".live-cue-detail")).toHaveText(
-    "Try speaking at your starting volume.",
+    "Check your speaking volume and microphone distance.",
   );
   disconnect();
   await expect(page.locator(".camera-message")).toContainText(

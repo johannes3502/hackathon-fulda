@@ -35,7 +35,7 @@ flowchart TB
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
-        SIG["Signal-Analyse<br/>FFmpeg, RMS, YIN-Pitch,<br/>Silero VAD (ONNX, lokal)"]
+        SIG["Signal-Analyse<br/>FFmpeg, RMS, YIN-Pitch, Silero VAD<br/>3 s stimmhafte Sprache, adaptive Referenz"]
         WORDS["Wort-Analyse<br/>Füller, Pausen, Tempo"]
         INGEST["RAG-Ingest<br/>Extrakt, Chunk, Embed"]
         EMB["Lokale Embeddings<br/>jina-embeddings-v2-base-de<br/>FastEmbed/ONNX"]
@@ -63,14 +63,14 @@ flowchart TB
     MP_W -. "Track fingers, bis 5 Hz" .-> HAND["Hand Landmarker: 21 Punkte pro Hand<br/>auch ohne Torso, kein Upload"]
     HAND -. "Pose Lab" .-> LAB["T1–T12, Pocket<br/>lokale Diagnose, keine Events"]
     WEB --> DSP["AudioWorklet lokal: RMS/YIN<br/>Energiehüllkurven-Tempo-Proxy"]
-    DSP --> LOCAL_SPEECH["SpeechEvaluator: 3 s normales Sprechen<br/>Pausen, Pegel, Pitch, Rhythmus<br/>ein Live-Hinweis + Review-Marker"]
+    DSP --> LOCAL_SPEECH["SpeechEvaluator: 3 s stimmhafte Sprache<br/>Referenz langsam nachführen, Stille zählt nicht<br/>Pausen, Pegel, Pitch, Rhythmus + Review-Marker"]
     LOCAL_SPEECH --> WEB
 
     SP -- "finale Wörter + Text; vorher vorläufiger Text" --> WEB
     SP -- "nur bei provider=deepgram; PCM, serverseitiger Schlüssel" --> DG["Deepgram EU Nova-3<br/>Deutsch, live + Wort-Timestamps"]
     DG -- "vorläufig/final, CloseStream-Abschluss" --> SP
     PCM -- "WS /api/speech/feedback: PCM" --> SP
-    SP --> LIVE_SIG["API-Thread: gleiche Signalregeln alle 5 s<br/>3-s-Baseline, maximal 5 min, ein Live-Slot<br/>PCM nur im RAM; unabhängig von Whisper"]
+    SP --> LIVE_SIG["API-Thread: gleiche Signalregeln alle 5 s<br/>Adaptive Referenz ab stimmhafter Sprache<br/>max. 5 min, ein Slot; PCM nur im RAM"]
     LIVE_SIG -- "feedback: position_ms + Events<br/>ein Hinweis, 15-s-Cooldown pro Typ" --> WEB
     MP_W --> RULES["PoseEvaluator: Neutralstellung, Geometrie, Mindestdauer<br/>posture/gesture-Events; lokale Evidenz"]
     MOB -- "Kamera" --> MP_M
@@ -185,7 +185,7 @@ sequenceDiagram
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>BE: WS /speech/feedback: start, PCM nach ready
     loop alle 5 Sekunden, maximal 5 Minuten
-        BE->>BE: Signalregeln auf bisherigem Audio, feste Anfangskalibrierung
+        BE->>BE: Auf Sprache warten, danach kausale adaptive Referenz aus bisherigem Audio
         BE-->>FE: feedback: position_ms, aktuelle Events (Heuristik)
         FE->>FE: Zeitoffset zu MediaRecorder.onstart, ein Hinweis, Cooldown
     end
@@ -217,6 +217,8 @@ sequenceDiagram
     W->>S3: Datei laden
     W->>W: FFmpeg -> 16kHz mono, Frames 40ms/10ms
     W->>W: RMS-Pegel, YIN-Pitch, Silero VAD, Silben-Peaks
+    W->>W: 3 s stimmhafte Sprache sammeln, Referenz nur bei Sprache langsam nachführen
+    Note over BE,W: Gleicher kausaler Referenzablauf<br/>Pausen/Rauschen trainieren nicht, Referenz je Event-Fenster speichern
     opt transcribe=true
         alt Vollständiges live_transcript vorhanden
             W->>W: Finale Wörter prüfen und wiederverwenden, keine erneute ASR
@@ -416,22 +418,23 @@ kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
 
 ```mermaid
 flowchart TD
-    DRAWER["AppShell Navigations-Drawer (Menü)<br/>Open Sans + #3803bf, verbindet /, /live,<br/>/sources, /review-preview, /gestures, /demo"]
-    LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>Three.js, statischer Fallback"]
+    DRAWER["AppShell Navigations-Drawer (außer Live-Studio)<br/>Open Sans + #3803bf, verbindet /, /live,<br/>/sources, /review-preview, /gestures, /demo"]
+    LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>PNG-Logo, CSS-Animation, Reduced-Motion"]
     LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
-    SP["/ und /stats-preview<br/>Startseite: StatsCard als Start +<br/>Monatsfortschritt, Kriterienvergleich & Sessions"] --> SC["StatsCard + Monatsdiagramme<br/>Three.js-Ring, vier Kriterien,<br/>6-Monats-Verlauf (synthetisch)"]
+    SP["/ und /stats-preview<br/>Aufnahmeübersicht im Browser-Arbeitsbereich"] --> SC["StatsDashboard<br/>Anzahl, Dauer, Hinweise und Transkripte<br/>aus aufgenommenen Takes, sonst Leerzustand"]
     DRAWER --> SP
     DRAWER --> LIVE
     DRAWER --> SRC
     DRAWER --> RP
     DRAWER --> WALK
     DRAWER --> DEMOPAGE
-    SC --> RP["/review-preview<br/>Synthetisches Video + Demo-Verlauf"]
+    RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ohne Scores und Performance-Kurve"]
+    SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
     LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
-    LIVE["/live - LiveStudio<br/>LiveStudio: Normalansicht, Large View optional,<br/>Vortragstyp + Material vor der Aufnahme, Pose-Overlay,<br/>Analysis features: Modell/Modus/Feedback,<br/>Kamera aktivieren -> Aufnahme starten"]
+    LIVE["/live - LiveStudio<br/>Vollbild-Layout ohne Menü, Pose-Overlay,<br/>Options: Vortragstyp, Material und Analyse,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider<br/>Aufnahmen bleiben beim Wechsel<br/>von / zur Review erhalten"] -.-> LIVE
-    LIVE --> DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
+    DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
     LIVE --> SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]
     SRC -->|"Weiter zur Aufnahme"| LIVE
@@ -442,7 +445,7 @@ flowchart TD
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]
     P1 --> PREV["/practice/sessionId/review<br/>ReviewWorkspace: Findings, Retry,<br/>Evidenz-Sprung"]
 
-    LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video und Feedback nebeneinander,<br/>Transkript, Quellencheck und Exporte als Details"]
+    LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video und Feedback nebeneinander,<br/>lesbare, farbige Zeitstempel zum Springen,<br/>Transkript, Quellencheck und Exporte als Details"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>sourceCollectionId des aufgenommenen Takes"]
     LREV -->|"POST /questions/agent + /agent/session<br/>oder /questions + /answers"| QAPI["ElevenLabs-Dialog oder getippte Fragen<br/>Startup, Thesis, Schule, Nonprofit<br/>eine Frage pro Schritt"]
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
@@ -604,7 +607,7 @@ flowchart LR
     subgraph Quellen
         B["browser<br/>posture, gesture, lokale Sprachmarker<br/>(kalibrierte Heuristiken, kein Pocket/Gaze/T12)"]
         A["asr<br/>Füller, Wort-Timestamps"]
-        S["speech<br/>pause, pace, volume, pitch"]
+        S["speech<br/>pause, pace, volume, pitch<br/>volume/pace: adaptive Referenz je Fenster"]
         F["factcheck<br/>fact: stützt (info), nicht gefunden (hint),<br/>widerspricht (warning)"]
         G["agent<br/>question: Widerspruch (warning),<br/>nicht belegt (hint), sonst info;<br/>nur Fragen mit gesprochener Stelle"]
     end

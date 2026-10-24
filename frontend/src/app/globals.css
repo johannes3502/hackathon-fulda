@@ -385,10 +385,21 @@ small {
   gap: 12px;
   flex-shrink: 0;
 }
-.brand-mark {
-  color: var(--foreground);
-  font: 700 1.75rem/1 var(--font-sans);
-  letter-spacing: -0.035em;
+.brand-logo {
+  display: inline-flex;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: white;
+}
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Trim the PNG's outer whitespace visually while retaining the original. */
+  transform: scale(1.6) translateY(2%);
 }
 .brand-caption {
   font-size: 0.9375rem;

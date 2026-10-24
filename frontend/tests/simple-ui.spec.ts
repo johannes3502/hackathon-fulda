@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("home opens current stats with monthly charts, drawer navigation and Open Sans #3803bf styling", async ({
+test("home shows an empty recording overview without demo statistics and keeps navigation and styling", async ({
   page,
 }, info) => {
   await page.route("**/sources?collection_id=*", (route) =>
@@ -16,36 +16,26 @@ test("home opens current stats with monthly charts, drawer navigation and Open S
   ).toBeGreaterThan(0);
 
   await expect(
-    page.getByRole("article", {
-      name: "Deine Stats – Demo mit synthetischen Werten",
-    }),
-  ).toBeVisible();
+    page.getByRole("article", { name: "Aufnahmeübersicht" }),
+  ).toContainText("Noch keine Aufnahmen");
   await expect(
     page.getByRole("heading", {
-      name: "Deine Präsentations-Stats im Überblick.",
+      name: "Deine Aufnahmen im Überblick.",
       exact: true,
     }),
   ).toHaveCSS("font-family", /^"Open Sans Variable",/);
-  await expect(
-    page.getByRole("region", { name: "Fortschritt über Monate" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "Kriterien im Monatsvergleich" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "Übungsaktivität pro Monat" }),
-  ).toBeVisible();
-
-  await page.getByRole("button", { name: "Flow 84%" }).click();
-  await expect(page.getByText("+19 % seit Mai")).toBeVisible();
-  await page.getByRole("button", { name: "Mai 65%" }).click();
-  await expect(page.getByText("Mai 2026", { exact: true })).toBeVisible();
+  await expect(page.locator(".stats418-kpi-grid")).toContainText("0:00");
+  await expect(page.locator("main")).not.toContainText("%");
+  await expect(page.locator("main")).not.toContainText("Mai 2026");
+  await expect(page.getByRole("status")).toContainText(
+    "Hier erscheinen deine aufgenommenen Präsentationen.",
+  );
 
   await page.getByRole("button", { name: "Menü", exact: true }).click();
   const drawer = page.getByRole("navigation", { name: "App-Navigation" });
   await expect(drawer).toBeVisible();
   await expect(
-    drawer.getByRole("link", { name: /Start & Stats/i }),
+    drawer.getByRole("link", { name: /Start & Aufnahmen/i }),
   ).toHaveAttribute("aria-current", "page");
   await drawer.getByRole("link", { name: /Live-Studio/i }).click();
   await expect(page).toHaveURL(/\/live$/);
@@ -262,7 +252,7 @@ test("shared navigation and help work with keyboard focus", async ({
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "Deine Präsentations-Stats im Überblick.",
+      name: "Deine Aufnahmen im Überblick.",
       exact: true,
     }),
   ).toBeVisible();
