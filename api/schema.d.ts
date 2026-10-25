@@ -873,6 +873,43 @@ export interface components {
              */
             status: "queued" | "running" | "completed" | "failed";
         };
+        /** AgentRequest */
+        AgentRequest: {
+            /**
+             * Claims
+             * @description Fact-check findings of the same transcript
+             */
+            claims?: components["schemas"]["ClaimResult"][];
+            /**
+             * Collection Id
+             * @description Uploaded sources for gaps and answer reviews
+             */
+            collection_id?: string | null;
+            config?: components["schemas"]["QuestionConfig"];
+            /**
+             * Persona
+             * @description Who asks: curious student or professor/tutor
+             * @default tutor
+             * @enum {string}
+             */
+            persona: "student" | "tutor";
+            /**
+             * Presentation Mode
+             * @default thesis
+             * @enum {string}
+             */
+            presentation_mode: "startup" | "thesis" | "school" | "nonprofit";
+            /**
+             * Voice Role
+             * @description Optional questioner role; null keeps the presentation's default role. Voice identity is unchanged.
+             */
+            voice_role?: ("student" | "professor" | "teacher") | null;
+            /**
+             * Words
+             * @description Word timestamps relative to recording start
+             */
+            words: components["schemas"]["Word"][];
+        };
         /** AgentSession */
         AgentSession: {
             /** Signed Url */
@@ -4846,7 +4883,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["QuestionRequest"];
+                "application/json": components["schemas"]["AgentRequest"];
             };
         };
         responses: {

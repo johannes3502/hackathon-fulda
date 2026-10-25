@@ -88,7 +88,7 @@ def pitch_context(response: Response) -> pitch.PitchContext:
 
 
 @router.post("/agent", status_code=202)
-async def start_agent_context(request: QuestionRequest) -> AcceptedJob:
+async def start_agent_context(request: agent.AgentRequest) -> AcceptedJob:
     if not agent.settings().available:
         raise HTTPException(503, "ElevenLabs voice practice is not configured")
     return await _accept(request, AGENT_PREFIX, agent.AgentJob, prepare_agent, "/questions/agent/jobs",

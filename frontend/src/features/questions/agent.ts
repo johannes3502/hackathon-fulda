@@ -1,6 +1,7 @@
 import type { components } from "../../../../api/schema";
 import { callBackend, isObject, runBackendJob } from "@/lib/backend-job";
 import type { LiveRecording } from "../live/contracts";
+import type { VoiceRole } from "./roles";
 import { AnalysisTransport } from "../live/transport";
 import { upsertFeedback } from "../live/protocol";
 
@@ -28,6 +29,7 @@ export function prepareAgent(
   recording: LiveRecording,
   collection: string,
   signal: AbortSignal,
+  voiceRole: VoiceRole | null = null,
   pollMs = 1500,
 ) {
   return runBackendJob<AgentContext>(
@@ -41,6 +43,7 @@ export function prepareAgent(
         claims: recording.factCheck?.claims ?? [],
         collection_id: collection,
         presentation_mode: recording.config.presentationMode ?? "school",
+        voice_role: voiceRole,
       },
       valid: (value): value is AgentContext =>
         isObject(value) &&

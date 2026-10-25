@@ -422,8 +422,12 @@ Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
 Auf `/sources` wird `presentationMode` (school/thesis) neben dem Upload
 gewählt und im Browser gespeichert. Vor der Aufnahme werden Modus und
 `sourceCollectionId` im Take eingefroren. Im Web-Sprachdialog und der
-Fragen-API steuert derselbe Modus Rolle und fachliche Schwerpunkte:
+Fragen-API steuert derselbe Modus die fachlichen Schwerpunkte und die automatische Rolle:
 Schul- oder Hochschullehrkraft; ohne Noten für gesprochene Antworten.
+Im Web-Sprachdialog ist zusätzlich `voice_role` wählbar: Student, Professor
+oder Lehrkraft ersetzen nur die Rolle, nicht den Präsentationskontext.
+`null` erhält die automatische Rolle. `conversationRole` bleibt mit dem
+Gespräch lokal in IndexedDB gespeichert; kein neues Postgres-Feld.
 `startup` und `nonprofit` bleiben für alte Aufnahmen kompatibel, sind aber
 nicht mehr auswählbar. Nach der
 beendeten Sprachrunde zeigt der Client zusätzlich eine
@@ -450,11 +454,13 @@ sequenceDiagram
     end
     FE->>BE: GET /questions/agent/settings
     opt Start voice questions, explizit starten
-        FE->>BE: POST /questions/agent (Wörter, Collection, Modus, Funde)
+        U->>FE: Gesprächspartner wählen (Automatisch / Student / Professor / Lehrkraft)
+        FE->>BE: POST /questions/agent (Wörter, Collection, Modus, Funde, voice_role)
         BE->>S3: agent-context-jobs/id/request.json
         BE-->>FE: 202 Job-ID
         W->>PG: Fokussierte Hybrid-Queries in der Collection des Takes (Default 4)
         W->>W: RRF-Fusion, höchstens 8 Auszüge, auch Vortragsende berücksichtigen
+        W->>W: Gewählte Rolle oder Modus-Standard + unveränderter fachlicher Fokus
         W->>S3: status.json mit begrenztem Kontext, request.json löschen
         FE->>BE: GET /questions/agent/jobs/id (Polling)
         FE->>BE: POST /questions/agent/session
@@ -572,7 +578,7 @@ flowchart TD
 
     LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video, Stärken und nächste Übungsschritte<br/>Feste Erklärungen aus Messdaten ohne LLM<br/>Transkript, Quellencheck und Exporte als Details"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>sourceCollectionId des aufgenommenen Takes"]
-    LREV -->|"POST /questions/agent + /agent/session"| QAPI["ElevenLabs-Sprachdialog<br/>Startup, Thesis, Schule<br/>Nonprofit nur für bestehende Takes<br/>eine Frage pro Schritt"]
+    LREV -->|"POST /questions/agent + /agent/session"| QAPI["ElevenLabs-Sprachdialog<br/>Rolle: Automatisch / Student / Professor / Lehrkraft<br/>Fachkontext aus dem Take<br/>eine Frage pro Schritt"]
     QAPI -->|"Sprachdialog beenden"| FINALSTATS["PerformanceEvaluation: Your take at a glance<br/>bestehende Messdaten, Heuristik und Grenzen"]
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
@@ -943,7 +949,7 @@ flowchart LR
         Q4["GET /questions/answers/{job_id}"]
         Q5["POST /questions/answers/voice<br/>round_id + question_id"]
         Q6["GET /questions/agent/settings"]
-        Q7["POST /questions/agent (202)"]
+        Q7["POST /questions/agent (202)<br/>AgentRequest mit optionaler voice_role"]
         Q8["GET /questions/agent/jobs/{job_id}"]
         Q9["POST /questions/agent/session"]
         Q10["GET /questions/pitch<br/>feste Jury-Frage + Agent-Kontext<br/>ohne LLM, Redis oder Provider"]

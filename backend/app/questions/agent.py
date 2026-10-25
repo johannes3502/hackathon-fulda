@@ -6,14 +6,19 @@ from urllib.parse import urlparse
 
 import httpx
 from fastapi import HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.factcheck.transcript import sentences
 from app.prompt_safety import untrusted_json_block
 from app.questions.models import QuestionRequest
 from app.questions.retrieval import source_queries
-from app.questions.styles import PRESENTATION_STYLES
+from app.questions.styles import PRESENTATION_FOCUS, PRESENTATION_STYLES, VOICE_ROLE_STYLES, VoiceRole
 from app.sources import db, retrieval
+
+
+class AgentRequest(QuestionRequest):
+    voice_role: VoiceRole | None = Field(
+        default=None, description="Optional questioner role; null keeps the presentation's default role. Voice identity is unchanged.")
 
 
 class AgentSettings(BaseModel):
@@ -44,7 +49,7 @@ def settings() -> AgentSettings:
                          "Voice practice is not configured yet. Check the ElevenLabs configuration and retry.")
 
 
-def prepare_context(request: QuestionRequest) -> AgentContext:
+def prepare_context(request: AgentRequest) -> AgentContext:
     transcript = " ".join(word.word for word in request.words)
     notices = []
     if len(transcript) > 24000:
@@ -72,7 +77,8 @@ def prepare_context(request: QuestionRequest) -> AgentContext:
         "Do not substitute your own knowledge, a plausible explanation, or an 'I have not checked this' disclaimer "
         "for the tool call. Do not call an answer correct, incorrect, plausible or well established before checking. "
         "Only report a search failure after an actual failed tool call, or if the tool is genuinely not available.",
-        PRESENTATION_STYLES[request.presentation_mode],
+        (PRESENTATION_STYLES[request.presentation_mode] if request.voice_role is None else
+         VOICE_ROLE_STYLES[request.voice_role] + "\nPresentation focus: " + PRESENTATION_FOCUS[request.presentation_mode]),
         "This is an AI rehearsal about a completed presentation, not an actual examination. "
         "Anchor every question in the presentation or supplied material; "
         "do not turn the conversation into unrelated trivia.",

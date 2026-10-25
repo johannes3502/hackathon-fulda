@@ -123,6 +123,10 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   removed from the web flow; unavailable voice services offer a retry. The
   presentation mode and material collection are fixed when a take starts.
   ElevenLabs only starts on an explicit click after its data-sharing notice;
+  a labelled selector offers Automatic (the presentation's audience), Student,
+  University professor and School teacher before starting. Lock it during the
+  conversation; keep the selected role with the saved conversation. Role changes
+  affect the question style and leave the configured voice and take context intact.
   leaving the question view disconnects the agent. Missing configuration,
   unavailable services and missing transcripts have visible recovery paths.
 - **Sources:** show a full-width document library with supported formats, upload

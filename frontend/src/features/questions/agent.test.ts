@@ -45,6 +45,7 @@ it.each(["school", "thesis", "startup", "nonprofit", undefined] as const)(
         { ...take, config: { ...take.config, presentationMode: mode } },
         take.config.sourceCollectionId!,
         signal(),
+        null,
         0,
       ),
     ).toEqual(result);
@@ -52,6 +53,30 @@ it.each(["school", "thesis", "startup", "nonprofit", undefined] as const)(
       presentation_mode: mode ?? "school",
       collection_id: collection,
       words: take.words,
+      voice_role: null,
+    });
+  },
+);
+
+it.each(["student", "professor", "teacher"] as const)(
+  "sends the selected %s role without changing the take's presentation context",
+  async (role) => {
+    const result = {
+      prompt: "Synthetic role context",
+      source_count: 0,
+      notices: [],
+    };
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ job_id: collection }))
+      .mockResolvedValueOnce(
+        Response.json({ job_id: collection, status: "completed", result }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    await prepareAgent(take, collection, signal(), role, 0);
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({
+      presentation_mode: "nonprofit",
+      voice_role: role,
     });
   },
 );

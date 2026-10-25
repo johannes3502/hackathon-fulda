@@ -3,6 +3,7 @@ import type { FeatureFlags } from "./feature-flags";
 import type { QuestionAnswer, QuestionResult } from "../questions/contracts";
 import type { components } from "../../../../api/schema";
 import type { PresentationMode } from "../questions/presentation";
+import type { VoiceRole } from "../questions/roles";
 export type Word = components["schemas"]["Word"];
 export type FactCheckResult = components["schemas"]["FactCheckResult"];
 export type TranscriptWord = components["schemas"]["Word"];
@@ -67,6 +68,7 @@ export type LiveProgress = {
   notice: string | null;
 };
 export type LiveRecording = {
+  conversationRole?: VoiceRole | null;
   analysisUploaded?: boolean;
   conversation?: { role: "user" | "agent"; text: string }[];
   words?: Word[];
