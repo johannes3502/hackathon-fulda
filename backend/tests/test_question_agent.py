@@ -70,7 +70,9 @@ def test_questioner_receives_the_spoken_content_and_waits_for_readiness(mode):
     assert context["transcript"] == " ".join(word.word for word in TRANSCRIPT)
     assert "Do not greet" in result.prompt
     assert PRESENTATION_STYLES[mode] in result.prompt
-    assert "The first message is 'Ich habe noch ein paar Fragen. Bist du bereit?'" in result.prompt
+    assert "The first message is '[rushed] Ich habe noch ein paar Fragen. Bist du bereit?'" in result.prompt
+    assert "Prefix every spoken message with the audio tag [rushed]" in result.prompt
+    assert "never rush the presenter" in result.prompt
     assert "Wait for the presenter to confirm they are ready before asking any presentation question" in result.prompt
     assert "If they are not ready, give them time and do not start the questions" in result.prompt
     assert "without repeating the opening" in result.prompt
@@ -172,6 +174,7 @@ def test_agent_api_queues_context_without_needing_the_local_llm(monkeypatch):
     client = TestClient(app)
     monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
     assert client.get("/questions/agent/settings").json()["available"] is False
+    assert "typing" not in client.get("/questions/agent/settings").json()["reason"]
     assert client.post("/questions/agent/session").status_code == 503
     monkeypatch.setenv("ELEVENLABS_API_KEY", "synthetic-secret")
     monkeypatch.setenv("ELEVENLABS_AGENT_ID", "agent_synthetic")

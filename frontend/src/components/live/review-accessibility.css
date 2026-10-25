@@ -1,3 +1,7 @@
+.review-workspace .workspace-back a {
+  min-height: 48px;
+  font-size: 1rem;
+}
 .review-workspace .button,
 .review-workspace .review-view-switch button {
   min-height: 48px;

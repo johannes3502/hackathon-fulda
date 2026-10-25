@@ -262,8 +262,10 @@ Die Auswahl bleibt über Navigation und Reload erhalten und wird beim
 Aufnahmestart im Take festgehalten. In Sprachdialog und getippter Fragerunde
 verändert derselbe Typ Rolle und Frageschwerpunkte, ohne Noten oder Scores. Der
 Nutzer hat ElevenLabs für den Sprachdialog beauftragt und konfiguriert den
-Agenten selbst nach der Implementierung. Getippte Fragen nutzen das
-konfigurierte Gemini-Modell (Cloud). Einrichtung: `docs/07-review-and-agent.md`.
+Agenten selbst nach der Implementierung. Im Web ist die getippte Fragerunde
+auf Nutzerwunsch entfernt; die bestehende API bleibt kompatibel.
+Schnelleres Sprechen beim aktuellen Eleven v4 Turbo über Audio-Pacing-Tags,
+ohne festen Geschwindigkeitsfaktor. Einrichtung: `docs/07-review-and-agent.md`.
 
 ### Auswertung nach der Fragerunde (24.10.2026)
 

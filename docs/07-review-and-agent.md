@@ -48,7 +48,9 @@ den nativen Videosteuerungen synchronisiert; Tastatursprünge bleiben möglich.
    Beobachtungen bleiben neutral; fehlende Hinweise sind keine positive Evidenz.
    Klick im Graphen wählt den nächsten Moment; Zeitregler und aufklappbare
    Zeitmarken erlauben präzise bzw. tastaturbedienbare Sprünge.
-4. **Practice questions**: sprechen oder tippen, eine Frage pro Schritt.
+4. **Practice questions**: Sprachdialog, eine Frage pro Schritt. Die Auswahl
+   **Practice by typing** ist auf Nutzerwunsch entfernt. Ohne verfügbare
+   ElevenLabs-Verbindung bleibt eine sichtbare Retry-Möglichkeit.
    Fehlt ein Transkript, kann **Transcribe this take** die Aufnahme nach explizitem
    Klick zur lokalen Whisper-Analyse hochladen. Das Originalvideo bleibt im Tab.
 5. Abgeschlossene Aufnahmen, Analyse und Gesprächstext bleiben in IndexedDB
@@ -121,7 +123,15 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
   (`convai_write`). **Read** kann den Agenten laden, aber keine Signed URL
   ausstellen; dieser Aufruf scheitert dann mit HTTP 401 `missing_permissions`.
 - Sprache und Stimme passend zur Vorführung konfigurieren. Die App übergibt
-  „Ich habe noch ein paar Fragen. Bist du bereit?“ als `firstMessage`-Override.
+  „[rushed] Ich habe noch ein paar Fragen. Bist du bereit?“ als `firstMessage`-Override.
+  Der Prompt fordert dieselbe schnellere, klare Sprechweise für alle Antworten.
+  Beim aktuell konfigurierten Eleven v4 Turbo ist kein numerischer Speed-Regler
+  verfügbar; das unterstützte Audio-Tag `[rushed]` steuert das Tempo.
+  `stripAudioTags: true` hält diese Regieanweisungen aus dem sichtbaren Transkript.
+  Das ist eine Modellvorgabe, kein garantierter Geschwindigkeitsfaktor.
+  Live-Stichprobe am 25.10.2026 über zwei authentifizierte Agent-Verbindungen:
+  derselbe synthetische deutsche Text mit derselben Stimme dauerte ohne Tag
+  8,72 s, mit `[rushed]` 7,36 s (rund 16 % kürzer). Kein allgemeiner Benchmark.
   Nach diesem festen deutschen Einstieg wartet der Agent auf eine Bestätigung.
   Erst dann stellt er die erste konkrete Frage zum bereits übergebenen Transkript
   in dessen Sprache. Wer noch nicht bereit ist, bekommt Zeit.
@@ -174,9 +184,8 @@ an und verändert sie nicht. Das Suchtool wird einmalig wie oben im Konto konfig
 
 ## Auswertung nach der Fragerunde (24.10.2026)
 
-Sobald jede Frage der getippten Runde beantwortet ist, zeigt der Web-Review
-unterhalb der Fragerunde eine Auswertung („Your take at a glance“) mit
-Score 0–100. Der Sprachdialog öffnet dasselbe Panel nach **End conversation**
+Der Web-Review zeigt nach dem Sprachdialog eine Auswertung
+(„Your take at a glance“) mit Score 0–100. Der Sprachdialog öffnet das Panel nach **End conversation**
 oder einem regulären Gesprächsende durch den Agenten und setzt den Tastaturfokus
 auf die Überschrift. **Back to questions** führt zurück zur Fragerunde;
 Abbrechen beim Verbindungsaufbau und Verbindungsfehler öffnen keine Auswertung.
