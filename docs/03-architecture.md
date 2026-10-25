@@ -305,19 +305,19 @@ flowchart TB
     UP["Upload /sources<br/>PDF, PPTX, DOCX, TXT, MD<br/>max 25 MB, kein OCR"] --> API["Sources-Router"]
     API --> S3A[("S3: sources/id/original")]
     API --> Q["Celery: ingest_source<br/>(idempotent, Redis-Lock)"]
-    Q --> EX["extract.py<br/>PDF je Seite - PPTX je Folie<br/>DOCX je Absatz - TXT/MD je Block"]
+    Q --> EX["extract.py<br/>PDF je Seite - PPTX je Folie<br/>DOCX je Absatz/Tabelle (iter_inner_content, LocationKind table)<br/>TXT/MD je Block"]
     EX --> CH["chunking.py<br/>~1200 Zeichen, Satzgrenzen,<br/>~200 Overlap"]
     CH --> EM["embeddings.py<br/>jina-embeddings-v2-base-de<br/>768 dim, lokal ONNX"]
     EM --> PGDB[("Postgres + pgvector<br/>sources, source_chunks<br/>+ tsvector (deutsch, GIN)")]
 
     SEARCH["POST /sources/search"] --> RET["retrieval.py<br/>Hybrid: pgvector-Kosinus<br/>+ Volltextsuche<br/>Reciprocal Rank Fusion"]
     PGDB --> RET
-    RET --> HITS["Top-k SourceHits<br/>mit Zitat-Ort: page/slide/<br/>paragraph/line"]
+    RET --> HITS["Top-k SourceHits<br/>Ort: page/slide/paragraph/table/line<br/>retrieval_score, similarity, matched_by, weak<br/>(Signale, nicht kalibriert)"]
     FCQ["Fact-Check je Aussage<br/>(app/factcheck/pipeline.py)"] -- "Suchanfrage" --> RET
-    HITS --> JUDGE["LLM-Urteil mit Zitat<br/>exakt oder konservativ fuzzy; Fundort bindend<br/>Zahlen/Negation bleiben gleich<br/>ungültiges Zitat: unchecked"]
+    HITS --> JUDGE["LLM-Urteil mit Zitat<br/>Originalspan, exakt oder konservativ fuzzy; Fundort bindend<br/>keine Teilzahlen oder geänderte Negation/Kontraste<br/>kurze Exact-Zitate auf Satzkontext erweitert<br/>numeric_gate: Supports braucht Behauptungszahlen<br/>identischer Widerspruch: unchecked<br/>Web-Pfad kann separat urteilen"]
     JUDGE -. "keine geprüfte Evidenz<br/>(nicht belegt oder unchecked)" .-> WEBQ["Websuche als Zweitquelle<br/>(Wikipedia / Tavily)"]
     JUDGE --> EVT["fact-Events auf der Timeline"]
-    HITS --> QA["Frage-Simulator<br/>(app/questions/pipeline.py)<br/>Lücken-Fragen + Antwort-Abgleich"]
+    HITS --> QA["Frage-Simulator<br/>(app/questions/pipeline.py)<br/>queries aus questions/retrieval.py + fuse per RRF<br/>Default 4, konfigurierbar 1–8 Queries<br/>Zahlen-Gates für Fragen, Gründe, Feedback, Nachfragen"]
     EVT --> QA
     QA --> QEVT["question-Events (source: agent)"]
 ```
@@ -361,6 +361,12 @@ sequenceDiagram
     FE->>FE: fact-Momente in der Timeline, Klick spielt die Stelle ab
 ```
 
+`FactCheckPanel` und der kompatible API-Fragen-Client nutzen denselben
+`evidenceHint` für `quote_verified`, `similarity` und `weak`. Er benennt auch
+ungeprüfte Alt-Zitate und möglichen Kontext bei Kurz-Zitaten. Diese Angaben sind
+keine Konfidenz- oder Wahrscheinlichkeitsanzeige; `retrieval_score` bleibt ein
+Ordnungssignal. Der Web-Fragepfad bleibt der ElevenLabs-Sprachdialog.
+
 ## 5b. Datenfluss: Frage-Simulator und Voice-Agent
 
 Der Web-Review hat zwei Ansichten: **Review moments** (begrenzte Wiedergabe-
@@ -398,7 +404,8 @@ sequenceDiagram
         FE->>BE: POST /questions/agent (Wörter, Collection, Modus, Funde)
         BE->>S3: agent-context-jobs/id/request.json
         BE-->>FE: 202 Job-ID
-        W->>PG: Hybrid-Suche in der Collection des Takes
+        W->>PG: Fokussierte Hybrid-Queries in der Collection des Takes (Default 4)
+        W->>W: RRF-Fusion, höchstens 8 Auszüge; auch Vortragsende berücksichtigen
         W->>S3: status.json mit begrenztem Kontext, request.json löschen
         FE->>BE: GET /questions/agent/jobs/id (Polling)
         FE->>BE: POST /questions/agent/session
@@ -706,7 +713,7 @@ erDiagram
         uuid source_id FK
         uuid collection_id
         int ordinal
-        string location_kind "page, slide, paragraph, line"
+        string location_kind "page, slide, paragraph, table, line"
         int location_start
         int location_end
         text text
@@ -723,6 +730,8 @@ Zusätzlich gelten Constraints: `events.peak_ms` liegt innerhalb
 Die Embedding-Spalte ist bewusst dimensionsfrei, damit das Modell
 ausgetauscht werden kann; Abfragen vergleichen nur Vektoren desselben
 `embedding_model`.
+
+`source_chunks.location_kind` ist `text NOT NULL` ohne CHECK-Constraint; der neue Wert `table` braucht deshalb keine Migration. Bestehende DOCX-Chunks behalten ihre alte Numerierung und sollten für konsistente Orte neu ingestiert werden.
 
 Zusätzlich (außerhalb Postgres):
 

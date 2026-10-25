@@ -1330,12 +1330,23 @@
               }
             ]
           },
+          "matched_by": {
+            "items": {
+              "enum": [
+                "vector",
+                "keyword"
+              ],
+              "type": "string"
+            },
+            "title": "Matched By",
+            "type": "array"
+          },
           "passage": {
             "title": "Passage",
             "type": "string"
           },
           "quote": {
-            "description": "Verbatim passage, verified by string match",
+            "description": "Source wording from the cited passage; short exact anchors may include surrounding context",
             "title": "Quote",
             "type": "string"
           },
@@ -1353,6 +1364,30 @@
               }
             ],
             "title": "Quote Verified"
+          },
+          "retrieval_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fused reciprocal-rank score; unitless, not a probability",
+            "title": "Retrieval Score"
+          },
+          "similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cosine similarity of the best vector match; null for keyword-only",
+            "title": "Similarity"
           },
           "source_id": {
             "anyOf": [
@@ -1376,6 +1411,12 @@
               }
             ],
             "title": "Url"
+          },
+          "weak": {
+            "default": false,
+            "description": "Heuristic: vector-only match below the configured similarity threshold",
+            "title": "Weak",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1399,7 +1440,7 @@
           },
           "min_quote_chars": {
             "default": 12,
-            "description": "Shorter quotes are not accepted as evidence",
+            "description": "Minimum verified quote length after optional short-anchor expansion",
             "minimum": 1.0,
             "title": "Min Quote Chars",
             "type": "integer"
@@ -2237,6 +2278,7 @@
               "page",
               "slide",
               "paragraph",
+              "table",
               "line"
             ],
             "title": "Kind",
@@ -4264,7 +4306,7 @@
           },
           "min_quote_chars": {
             "default": 12,
-            "description": "Shorter quotes are not accepted as evidence",
+            "description": "Minimum verified quote length after optional short-anchor expansion",
             "minimum": 1.0,
             "title": "Min Quote Chars",
             "type": "integer"
@@ -4275,6 +4317,14 @@
             "maximum": 12.0,
             "minimum": 0.0,
             "title": "Source Passages",
+            "type": "integer"
+          },
+          "source_queries": {
+            "default": 4,
+            "description": "Maximum focused source queries fused for questions and voice context",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Source Queries",
             "type": "integer"
           },
           "top_k": {
@@ -5304,6 +5354,18 @@
             "title": "Matched By",
             "type": "array"
           },
+          "retrieval_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fused reciprocal-rank score; unitless, not a probability",
+            "title": "Retrieval Score"
+          },
           "similarity": {
             "anyOf": [
               {
@@ -5324,6 +5386,12 @@
           "text": {
             "title": "Text",
             "type": "string"
+          },
+          "weak": {
+            "default": false,
+            "description": "Heuristic: vector-only match below SOURCE_WEAK_SIMILARITY; not a truth judgment",
+            "title": "Weak",
+            "type": "boolean"
           }
         },
         "required": [

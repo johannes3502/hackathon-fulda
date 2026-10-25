@@ -13,6 +13,7 @@ import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { PerformanceEvaluation } from "./PerformanceEvaluation";
 import {
   factCheckSettings,
+  evidenceHint,
   factFeedback,
   runFactCheck,
 } from "@/features/factcheck/api";
@@ -47,6 +48,9 @@ function Source({ evidence }: { evidence: Evidence }) {
           evidence.label
         )}
       </cite>
+      <small className="field-hint">
+        {evidenceHint(evidence)}
+      </small>
     </blockquote>
   );
 }

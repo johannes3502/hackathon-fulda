@@ -7,6 +7,7 @@ const evidence = {
   quote: "A verified source passage.",
   passage: "A verified source passage.",
   quote_verified: "exact" as const,
+  weak: false,
 };
 
 const moment = (

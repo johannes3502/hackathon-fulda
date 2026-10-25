@@ -1327,19 +1327,37 @@ export interface components {
              */
             label: string;
             location?: components["schemas"]["Location"] | null;
+            /** Matched By */
+            matched_by?: ("vector" | "keyword")[];
             /** Passage */
             passage: string;
             /**
              * Quote
-             * @description Verbatim passage, verified by string match
+             * @description Source wording from the cited passage; short exact anchors may include surrounding context
              */
             quote: string;
             /** Quote Verified */
             quote_verified?: ("exact" | "fuzzy") | null;
+            /**
+             * Retrieval Score
+             * @description Fused reciprocal-rank score; unitless, not a probability
+             */
+            retrieval_score?: number | null;
+            /**
+             * Similarity
+             * @description Cosine similarity of the best vector match; null for keyword-only
+             */
+            similarity?: number | null;
             /** Source Id */
             source_id?: string | null;
             /** Url */
             url?: string | null;
+            /**
+             * Weak
+             * @description Heuristic: vector-only match below the configured similarity threshold
+             * @default false
+             */
+            weak: boolean;
         };
         /**
          * FactCheckConfig
@@ -1353,7 +1371,7 @@ export interface components {
             max_claims: number;
             /**
              * Min Quote Chars
-             * @description Shorter quotes are not accepted as evidence
+             * @description Minimum verified quote length after optional short-anchor expansion
              * @default 12
              */
             min_quote_chars: number;
@@ -1625,7 +1643,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "page" | "slide" | "paragraph" | "line";
+            kind: "page" | "slide" | "paragraph" | "table" | "line";
             /** Start */
             start: number;
         };
@@ -2355,7 +2373,7 @@ export interface components {
             max_questions: number;
             /**
              * Min Quote Chars
-             * @description Shorter quotes are not accepted as evidence
+             * @description Minimum verified quote length after optional short-anchor expansion
              * @default 12
              */
             min_quote_chars: number;
@@ -2365,6 +2383,12 @@ export interface components {
              * @default 6
              */
             source_passages: number;
+            /**
+             * Source Queries
+             * @description Maximum focused source queries fused for questions and voice context
+             * @default 4
+             */
+            source_queries: number;
             /**
              * Top K
              * @description Upload passages per answer review
@@ -2774,6 +2798,11 @@ export interface components {
             /** Matched By */
             matched_by: ("vector" | "keyword")[];
             /**
+             * Retrieval Score
+             * @description Fused reciprocal-rank score; unitless, not a probability
+             */
+            retrieval_score?: number | null;
+            /**
              * Similarity
              * @description Cosine similarity to the query embedding; null if matched by keywords only
              */
@@ -2785,6 +2814,12 @@ export interface components {
             source_id: string;
             /** Text */
             text: string;
+            /**
+             * Weak
+             * @description Heuristic: vector-only match below SOURCE_WEAK_SIMILARITY; not a truth judgment
+             * @default false
+             */
+            weak: boolean;
         };
         /** Strength */
         Strength: {

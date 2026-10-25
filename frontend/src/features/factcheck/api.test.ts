@@ -1,5 +1,10 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { factFeedback, runFactCheck, type FactCheckResult } from "./api";
+import {
+  evidenceHint,
+  factFeedback,
+  runFactCheck,
+  type FactCheckResult,
+} from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -20,6 +25,7 @@ const result: FactCheckResult = {
         quote: "rund 9.500 Studierende",
         passage: "Die Hochschule hat rund 9.500 Studierende.",
         quote_verified: "exact",
+        weak: false,
         filename: "folien.pdf",
         location: { kind: "page", start: 2, end: 2 },
       },
@@ -43,6 +49,24 @@ const result: FactCheckResult = {
   config: { max_claims: 12, min_quote_chars: 12, top_k: 5, web_results: 4 },
   notices: ["synthetic"],
 };
+
+it("distinguishes verified, approximate and unverified evidence with retrieval signals", () => {
+  const evidence = result.claims[0].evidence!;
+  expect(evidenceHint(evidence)).toMatch(
+    /found in the cited source.*surrounding context/,
+  );
+  expect(
+    evidenceHint({
+      ...evidence,
+      quote_verified: "fuzzy",
+      similarity: 0.2,
+      weak: true,
+    }),
+  ).toMatch(/Approximate match.*0.20 \(uncalibrated signal\).*Weak retrieval/);
+  expect(evidenceHint({ ...evidence, kind: "web", quote_verified: null })).toBe(
+    "This source quote has not been verified.",
+  );
+});
 
 it("posts the transcript, polls the job and returns the result", async () => {
   const fetcher = vi

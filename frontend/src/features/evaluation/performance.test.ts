@@ -57,6 +57,7 @@ const questionResult = (questions: Question[]): QuestionResult => ({
     max_questions: 3,
     min_quote_chars: 12,
     source_passages: 6,
+    source_queries: 4,
     top_k: 5,
   },
   events: [],

@@ -212,9 +212,20 @@ Hybrid-Suche (pgvector + deutsche Volltextsuche). Der Fact-Check ist umgesetzt
 (`backend/app/factcheck/`, `POST /factcheck`, Review-Panel in `/live/[id]/review`):
 LLM extrahiert Aussagen mit Satznummern, Timestamps kommen aus den Wörtern;
 pro Aussage zuerst Retrieval in den hochgeladenen Quellen, danach optional
-Websuche (Wikipedia/Tavily); Zitate werden per `quote_in_text` geprüft,
+Websuche (Wikipedia/Tavily); Zitate werden über `verified_quote` passage-lokal geprüft,
 Ergebnisse sind `fact`-Events. LLM standardmäßig Gemini (Cloud), konfigurierbar
 über `LLM_BASE_URL`/`LLM_MODEL`; kein lokales Ollama mehr im Projekt.
+DOCX wird in Dokumentreihenfolge gelesen; Tabellen erhalten einen eigenen Ort `table`.
+Geprüfte Zitate behalten den Originalspan, schneiden keine Zahlen ab und schützen
+bei Fuzzy-Matches Negation/Kontraste. Kurze Exact-Anker dürfen Satzkontext erhalten.
+`numeric_gate` verwirft `supports` ohne Behauptungszahlen im Zitat und identische
+Widersprüche. Ein verworfenes Upload-Urteil wird `unchecked`; der optionale Web-Pfad
+kann separat urteilen. Beide Fragepfade nutzen fokussierte Queries mit RRF-Fusion
+(Default 4, konfigurierbar 1–8, je höchstens 500 Zeichen, inklusive Vortragsende).
+API-Fragen/Begründungen, Antwortfeedback und Nachfragen erhalten Zahlen-Gates;
+ElevenLabs-Sprachreaktionen bleiben davon ausdrücklich ausgenommen.
+`retrieval_score`, `similarity`, `matched_by` und `weak` sind Signale, keine Konfidenz.
+Details und Grenzen stehen in `docs/15-grounding-hardening.md`.
 Der Frage-Simulator ist umgesetzt (`backend/app/questions/`, `POST /questions`,
 `POST /questions/answers`, Panel in `/live/[id]/review`): Fragen aus
 Fact-Check-Funden (Widerspruch, nicht belegt), Lücken gegenüber den Quellen und

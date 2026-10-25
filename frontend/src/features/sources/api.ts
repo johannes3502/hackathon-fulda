@@ -51,6 +51,7 @@ const LABELS: Record<Location["kind"], [string, string]> = {
   page: ["Page", "Pages"],
   slide: ["Slide", "Slides"],
   paragraph: ["Paragraph", "Paragraphs"],
+  table: ["Table", "Tables"],
   line: ["Line", "Lines"],
 };
 

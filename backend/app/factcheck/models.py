@@ -24,7 +24,7 @@ class FactCheckConfig(BaseModel):
     max_claims: int = Field(default=6, ge=1, le=30)
     top_k: int = Field(default=5, ge=1, le=10, description="Uploaded passages per claim")
     web_results: int = Field(default=4, ge=1, le=8, description="Web passages per claim")
-    min_quote_chars: int = Field(default=12, ge=1, description="Shorter quotes are not accepted as evidence")
+    min_quote_chars: int = Field(default=12, ge=1, description="Minimum verified quote length after optional short-anchor expansion")
 
 
 class FactCheckRequest(BaseModel):
@@ -37,13 +37,20 @@ class FactCheckRequest(BaseModel):
 class Evidence(BaseModel):
     kind: EvidenceKind
     label: str = Field(description="e.g. `folien.pdf, Seite 3` or the web page title")
-    quote: str = Field(description="Verbatim passage, verified by string match")
+    quote: str = Field(description="Source wording from the cited passage; short exact anchors may include surrounding context")
     passage: str
     filename: str | None = None
     source_id: UUID | None = None
     location: Location | None = None
     url: str | None = None
     quote_verified: Literal["exact", "fuzzy"] | None = None
+    retrieval_score: float | None = Field(
+        default=None, description="Fused reciprocal-rank score; unitless, not a probability")
+    similarity: float | None = Field(
+        default=None, description="Cosine similarity of the best vector match; null for keyword-only")
+    matched_by: list[Literal["vector", "keyword"]] = Field(default_factory=list)
+    weak: bool = Field(
+        default=False, description="Heuristic: vector-only match below the configured similarity threshold")
 
 
 class ClaimResult(BaseModel):

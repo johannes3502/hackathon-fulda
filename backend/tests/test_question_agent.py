@@ -63,6 +63,20 @@ def test_missing_or_processing_sources_are_not_presented_as_ready(monkeypatch):
         agent.prepare_context(QuestionRequest(words=TRANSCRIPT, collection_id=uuid4()))
 
 
+def test_voice_retrieval_samples_the_end_of_long_talks(monkeypatch):
+    from app.transcription.models import Word
+
+    monkeypatch.setattr(agent.db, "list_sources", lambda _: [SimpleNamespace(status="ready")])
+    retrieve = Mock(return_value=[])
+    monkeypatch.setattr(agent.retrieval, "search", retrieve)
+    words = [Word(word=f"Thema{index}.", start_ms=index * 1000, end_ms=index * 1000 + 900)
+             for index in range(400)]
+    agent.prepare_context(QuestionRequest(words=words, collection_id=uuid4()))
+    queries = [call.args[1] for call in retrieve.call_args_list]
+    assert 1 < len(queries) <= 4 and all(len(query) <= 500 for query in queries)
+    assert any("Thema399." in query for query in queries)
+
+
 @pytest.mark.parametrize("mode", PRESENTATION_STYLES)
 def test_questioner_receives_the_spoken_content_and_waits_for_readiness(mode):
     result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode))

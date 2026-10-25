@@ -9,7 +9,9 @@ import httpx
 from fastapi import HTTPException
 from pydantic import BaseModel
 
+from app.factcheck.transcript import sentences
 from app.questions.models import QuestionRequest
+from app.questions.retrieval import source_queries
 from app.questions.styles import PRESENTATION_STYLES
 from app.sources import db, retrieval
 
@@ -53,7 +55,8 @@ def prepare_context(request: QuestionRequest) -> AgentContext:
         if any(s.status in ("queued", "processing") for s in sources):
             raise ValueError("Wait for your materials to finish processing before starting questions.")
         if any(s.status == "ready" for s in sources):
-            hits = retrieval.search(request.collection_id, transcript[:2000], 8)
+            queries = source_queries(sentences(request.words), request.claims, request.config.source_queries)
+            hits = retrieval.search_many(request.collection_id, queries, 8)
     if not hits:
         notices.append("No matching material was available. Questions use your transcript; factual gaps use web search.")
     context = {

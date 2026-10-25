@@ -1489,6 +1489,8 @@ test("transcribed take is fact-checked against sources and links back to the vid
                   "Die Hochschule hat rund 9.500 Studierende in acht Fachbereichen.",
                 filename: "folien.pdf",
                 quote_verified: "exact",
+                similarity: 0.2,
+                weak: true,
                 location: { kind: "page", start: 2, end: 2 },
               },
               checked: ["upload"],
@@ -1530,6 +1532,12 @@ test("transcribed take is fact-checked against sources and links back to the vid
   );
   await expect(page.locator(".fact-claim blockquote")).toContainText(
     "“rund 9.500 Studierende in acht Fachbereichen”folien.pdf, Page 2",
+  );
+  await expect(page.locator(".fact-claim blockquote")).toContainText(
+    "Quoted text found in the cited source; short quotes may include surrounding context.",
+  );
+  await expect(page.locator(".fact-claim blockquote")).toContainText(
+    "Retrieval similarity 0.20 (uncalibrated signal). Weak retrieval match: check the passage.",
   );
   expect(request).toMatchObject({ words, use_web: false });
   expect(request!.collection_id).toMatch(/^[0-9a-f-]{36}$/);

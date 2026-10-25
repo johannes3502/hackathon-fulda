@@ -8,6 +8,7 @@ import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import {
   factCheckSettings,
   evidenceVerdict,
+  evidenceHint,
   factFeedback,
   runFactCheck,
   VERDICT_LABELS,
@@ -183,7 +184,7 @@ export function FactCheckPanel({
           {web
             ? ` and short search queries to ${providerName(settings.web_provider)}`
             : ""}
-          . Only quotes found verbatim in a source count as evidence.
+          . Only quotes found in a source count as evidence; fuzzy matches are marked.
         </p>
       )}
       <Button onClick={() => void check()} disabled={!canRun}>
@@ -251,6 +252,9 @@ export function FactCheckPanel({
                         claim.evidence.label
                       )}
                     </cite>
+                    <small className="field-hint">
+                      {evidenceHint(claim.evidence)}
+                    </small>
                   </blockquote>
                 )}
                 {claim.explanation && <p>{claim.explanation}</p>}

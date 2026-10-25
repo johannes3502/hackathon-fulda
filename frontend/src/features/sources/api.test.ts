@@ -38,11 +38,12 @@ it("rejects unsupported, empty and oversized files before upload", () => {
   expect(checkFile(big)).toMatch(/25 MB/);
 });
 
-it("labels page, slide and merged paragraph locations", () => {
+it("labels page, slide, table and merged paragraph locations", () => {
   expect(locationLabel({ kind: "slide", start: 2, end: 2 })).toBe("Slide 2");
   expect(locationLabel({ kind: "paragraph", start: 1, end: 4 })).toBe(
     "Paragraphs 1–4",
   );
+  expect(locationLabel({ kind: "table", start: 1, end: 1 })).toBe("Table 1");
 });
 
 it("uploads multipart, searches as JSON and surfaces backend errors", async () => {

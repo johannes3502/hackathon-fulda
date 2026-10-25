@@ -43,6 +43,7 @@ const result: QuestionResult = {
   config: {
     max_questions: 5,
     source_passages: 6,
+    source_queries: 4,
     top_k: 5,
     min_quote_chars: 12,
   },
