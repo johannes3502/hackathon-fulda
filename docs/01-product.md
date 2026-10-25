@@ -1,9 +1,10 @@
 # Produkt — Live-Präsentationstrainer
 
-**Status:** Thema fix (24.10.2026).
+**Status:** Thema fix (24.10.2026). Offene TODOs: [14-open-todos.md](14-open-todos.md).
 **Grundlage:** Erste Feature-Beschreibungen des Teams. Es gibt noch kein
 vollständiges Fein-Konzept. Gesten-/Haltungsbeobachtungen sind inzwischen
-als explizite Prototyp-Heuristiken umgesetzt (keine Scores):
+als explizite Prototyp-Heuristiken umgesetzt (keine Scores auf Regel-Ebene; die
+Review-Scores aggregieren nur erfasste Evidenz, siehe unten):
 [Recherche und Auswertung](04-gesture-evaluation.md),
 [Jury-Ablauf und offene Abnahme](05-jury-demo.md). Das lokale technische
 Grundgerüst ist festgelegt (Abschnitt 3, Technik).
@@ -46,19 +47,30 @@ ohne eigene Aufnahme ist das Review-Ziel ausdrücklich ein Beispiel. Die
 Darstellung Hell/Dunkel/System wird lokal gespeichert. Daraus entstehen keine
 neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.md`.
 
+Aufnahme-Vollbild (25.10.2026, Nutzerauftrag): Optional über „Fullscreen“ im
+Kamerabild, auch während einer laufenden Aufnahme. Hinweise erscheinen als
+kompakte farbige Kennzeichen mit zum Ereignis passendem Symbol und Kurztitel am
+rechten Rand. Zeit, Hinweise ein/aus, Aufnahme starten/beenden und Ausstieg
+bleiben erreichbar. Vorhandene Hinweisregeln und Anzeigezeiten gelten weiter;
+grüner Trackingstatus ist kein Lob für den Vortrag. Ohne native Vollbild-API
+wird die Browserfläche ausgefüllt; Escape oder der Ausstiegsknopf führen zurück.
+
 ---
 
 ## 3. Offen — muss das Team entscheiden
 
-Ergänzender Nutzerauftrag (24.10.2026): Vier 0–100-Scores über dem Review-Video
+Ergänzender Nutzerauftrag (aktualisiert 25.10.2026): Drei 0–100-Scores für
+Gestik, Fachwissen und Flow über dem Review-Video
 statt Moment-Anzahlen. `evidence-share-v1` nutzt bewertete positive bzw. kritische
 Zeitanteile (Überlappungen derselben Art vereinigt); Fachwissen nutzt bevorzugt
 gestützte / (gestützte + widersprochene) Aussagen. Nicht gefunden, ungeprüft,
 neutrale Beobachtungen und unbeobachtete Zeit erzeugen keine Benotung. Kein
 Score ohne bewertbare Evidenz; Zeitabdeckung und Formel stehen im UI.
-Die Graph-Darstellung ist jetzt eine durchgehende kubische Linie ohne
+Die Graph-Darstellung ist eine durchgehende Linie aus geraden Segmenten ohne
 Säulenflächen, mit beweglichem Wiedergabepunkt. Zwischenwerte sind als
 Interpolation gekennzeichnet, nicht als zusätzliche Messungen.
+Struktur ist auf Nutzerwunsch aus den Kriterien und der Berechnung entfernt.
+Vorhandene Struktur-Momente bleiben allgemeine Anmerkungen ohne eigenen Score.
 
 Review-Graph (24.10.2026, Nutzerauftrag): Timestamp-Momente als qualitativer
 Verlauf unter dem Video. Nach Nutzerkorrektur positive Momente oberhalb,
@@ -74,7 +86,8 @@ und besser lesbarer Schrift.
 
 ### Analyse
 - Gesten: sichtbare Geometrie relativ zur Neutralstellung, Mindestdauer,
-  Hysterese und Cooldown sind als Prototyp-Heuristiken umgesetzt; keine Scores.
+  Hysterese und Cooldown sind als Prototyp-Heuristiken umgesetzt; keine Scores
+  auf Regel-Ebene. Die Review-Scores aggregieren nur die erfasste Evidenz.
   Systematische Genauigkeits-/Geräteprüfung bleibt offen.
 - Live-Sprechfeedback (24.10.2026, Nutzerauftrag): Im Backend-Modus laufen
   dieselben kalibrierten Signalregeln für Lautstärke, Tonhöhe, Silben-Tempo
@@ -210,6 +223,7 @@ einbauen**:
 | 24.10.2026 | Pose-/Feedback-Anforderungen festgelegt | Deep Research zu Haltung, Kopforientierung, Händen, Füßen und Gesten; Research-Ziele in `docs/04-pose-tracking-requirements.md`; aktueller Integrationsstand dort separat markiert. |
 | 24.10.2026 | Gemini statt lokalem Ollama | Nutzerauftrag: Gemini-Key aus dem Image-Skill in die lokale `.env`, Ollama aus dem Projekt entfernen, schwache Gemini-Modelle testen. Die frühere Local-only-Zusage ist hinfällig; nur synthetische Demo-Daten oder Vertex AI mit EU-Region. |
 | 24.10.2026 | Long-Term-Progress-Backend | Nutzerauftrag: Frontend-Plan auf `main`, Backend-Plan validieren und implementieren. Pseudonymes Profil, versionierte Metriken, robuste Trends, Change-Points, optionale Ziele, Export/Löschung; kein Gesamtscore. Frontend-Anbindung bleibt offen. |
+| 25.10.2026 | Pitch/Doku an Scores und offene Punkte angepasst | Keine „keine Scores“-Aussage mehr im Pitch; Test-/API-Zahlen aktualisiert; Graph-Doku auf gerade Segmente korrigiert; offene TODOs in `docs/14-open-todos.md` festgehalten. Struktur bleibt im Live-Pfad ohne Evidenzquelle. |
 
 ## Integrierte Analyse-Schalter (24.10.2026)
 
@@ -258,7 +272,11 @@ Wissen, Gewicht 0,5 — Anteil quellengestützter Aussagen und Antwort-Urteile),
 evidenzbasierte Stärken, Übungsvorschläge und ein aufklappbarer
 Methoden-/Grenzen-Hinweis. Der Score ist eine transparente Client-Heuristik aus
 bereits gemessenen Events (`evidence-count-heuristic.v1`), keine Note und keine
-Personenbewertung; Details: `docs/07-review-and-agent.md`.
+Personenbewertung; Details: `docs/07-review-and-agent.md`. Diese Auswertung ist
+**getrennt** von den drei Review-Scores (`evidence-share-v1`): andere Formel,
+andere Bezugsgröße, kein gemeinsamer Gesamtscore. Die UI soll die beiden
+Ergebnisse entsprechend benennen; eine Vereinheitlichung ist offen
+(`docs/14-open-todos.md`).
 
 ## Deep Research (24.10.2026)
 

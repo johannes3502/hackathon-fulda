@@ -16,7 +16,7 @@ Medien außer dem Marken-Logo und der lokal gebündelten Open-Sans-Variable.
 | 47–56 s | Outro | Logo, „Übe den Vortrag, nicht die Folien.", localhost:3000, Hackathon-Badge, Fade zu Schwarz |
 
 Alle Mocks zeigen den echten Produktumfang (7 Pose-Regeln, Zitat-Check,
-„Heuristik · kein Score", ±2-s-Sprung, Quelle mit Seite/Folie) — keine
+„Heuristik · Evidenz", ±2-s-Sprung, Quelle mit Seite/Folie) — keine
 erfundenen Scores oder Genauigkeiten.
 
 ## Befehle

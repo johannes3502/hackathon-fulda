@@ -81,7 +81,6 @@ export function feedbackToMoment(
     volume: "flow",
     pitch: "flow",
     flow: "flow",
-    structure: "structure",
   };
   return {
     id: item.id,
@@ -153,7 +152,7 @@ export const DEMO_REVIEW: ReviewData = {
       id: "opening",
       tMs: 8000,
       durationMs: 4000,
-      criterion: "structure",
+      criterion: null,
       kind: "positive",
       title: "Ein Einstieg, der Orientierung gibt",
       detail:
@@ -209,7 +208,7 @@ export const DEMO_REVIEW: ReviewData = {
       id: "transition",
       tMs: 58000,
       durationMs: 4000,
-      criterion: "structure",
+      criterion: null,
       kind: "positive",
       title: "Klarer Übergang zum nächsten Schritt",
       detail:

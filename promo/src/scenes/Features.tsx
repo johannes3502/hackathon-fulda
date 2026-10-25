@@ -88,7 +88,7 @@ const PoseMock: React.FC = () => {
           Baseline kalibriert
         </Chip>
         <Chip tone="neutral" delay={66}>
-          Heuristik · kein Score
+          Heuristik · Evidenz
         </Chip>
       </div>
     </Card>

@@ -165,7 +165,7 @@ describe("review timeline", () => {
     });
     expect(scores.knowledge).toMatchObject({ value: 0, contradicted: 1 });
     expect(scores.gesture.value).toBeNull();
-    expect(scores.structure.value).toBeNull();
+    expect(Object.keys(scores)).toEqual(["gesture", "knowledge", "flow"]);
     // Source checks added or rerun after recording change the current evidence.
     const updated = recordingReviewData({
       ...take,
@@ -229,6 +229,13 @@ describe("review timeline", () => {
     expect(
       feedbackToMoment({ ...feedback, category: "Gestures" }).criterion,
     ).toBe("gesture");
+    expect(
+      feedbackToMoment({ ...feedback, category: "structure" }),
+    ).toMatchObject({
+      criterion: null,
+      tMs: feedback.startMs,
+      title: feedback.title,
+    });
     expect(feedbackToMoment(feedback)).not.toHaveProperty("score");
   });
   it("keeps example annotations bounded and source quotes verifiable without synthetic scores", () => {

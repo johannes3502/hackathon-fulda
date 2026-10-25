@@ -50,20 +50,33 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
 
 - **Studio:** camera setup shares the sources page's content width and heading
   layout, with the global header and workflow steps hidden. “Back to sources” returns directly to the
-  upload library, retaining the selected collection and its documents. Starting
-  a take switches to the full-size camera and feedback layout. The
+  upload library, retaining the selected collection and its documents. Enabling
+  the camera switches immediately to the full-size camera and feedback layout;
+  the back link stays in its toolbar until recording starts. The
   camera fills the available width before feedback exists; during preview and
   recording it sits beside an equally wide feedback panel. Below 1001px they
   stack. Shared controls, speech choice and recording timer sit
   above the camera. Options links to setup, recording options and diagnostics
   below the studio. The live toolbar has no navigation menu.
+  Camera setup and recording share readable controls: 52px buttons and inputs,
+  17px control text, 16px instructions and consent, and 15px secondary status
+  labels. Options and checkbox labels have at least 48px targets. Controls and
+  camera overlays wrap on narrow screens; enlarged text can grow the page.
   Live cues use large text, contextual SVG icons, a clear panel tint and a lighter
   tint across the live workspace. Red means an adjustment to
   consider; green means explicit positive feedback or labelled tracking readiness.
   Ordinary gestures, pauses, calibration and hidden hints remain neutral. Color
   always has a text label; tracking readiness is not a performance assessment.
+  Optional recording fullscreen expands the existing camera stage without
+  remounting the video or recorder. A compact badge at the right edge combines
+  the current cue's contextual SVG symbol, color and short title, using the same
+  pacing and hint visibility as the normal panel. Green readiness is explicitly
+  labelled tracking status. Timer, hint toggle, start/finish and exit remain
+  reachable. Browser fullscreen is preferred; a viewport fallback supports
+  Escape, contained keyboard focus and scroll locking. The camera and skeleton
+  keep the same contain projection in both views; overlays stay out of the video.
 - **Review:** two primary views, Review moments and Practice questions.
-  Four `ReviewScores` cards above playback show 0–100 prototype ratings on the
+  Three `ReviewScores` cards (Gestik, Fachwissen, Flow) above playback show 0–100 prototype ratings on the
   user's explicit request (`evidence-share-v1`). Formula: positive assessed
   time / (positive + critical assessed time) × 100; same-kind overlaps count once.
   Neutral observations and unknown time are excluded; assessed seconds and

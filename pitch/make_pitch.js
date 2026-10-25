@@ -6,9 +6,8 @@ const sharp = require("sharp");
 const pptxgen = require("pptxgenjs");
 const Fi = require("react-icons/fi");
 
-const SKILL = "/home/patrice/.claude/skills/synced/d25733ab-7669-4269-bde1-73f28c9026ff_cdc2b755-b66b-446a-8acf-b490fc18fcb5/pptx";
-const { applyTheme } = require(path.join(SKILL, "scripts", "apply_theme.js"));
-
+// The deck uses explicit fonts and colors on every slide. Theme metadata is
+// optional, so the generator stays self-contained (no external skill path).
 const OUT = path.join(__dirname, "PitchPractice-Pitch.pptx");
 const LOGO = path.join(__dirname, "..", "frontend", "public", "brand", "418-pitch-practice.png");
 
@@ -198,7 +197,7 @@ async function main() {
     txt(s, "30–60 Sekunden Aufnahme — dann springen wir direkt ins Review.", { x: 0.62, y: 1.75, w: 12.1, h: 0.5, fontSize: 19, color: MUTED, align: "center" });
     const steps = [
       { icon: "FiMic", h: "Aufnahme", d: "Kamera und Mikro — dezente Live-Hinweise während des Vortrags" },
-      { icon: "FiCpu", h: "Analyse", d: "Haltung, Stimme, Transkript und Fact-Check laufen automatisch" },
+      { icon: "FiCpu", h: "Analyse", d: "Haltung, Stimme und Transkript laufen automatisch; Fact-Check auf Klick" },
       { icon: "FiPlay", h: "Review", d: "Momente auf der Timeline — ein Klick springt zur Stelle" },
     ];
     const W = 3.6, H = 2.5, G = 0.55, X0 = (13.333 - (3 * W + 2 * G)) / 2, Y = 3.1;
@@ -243,7 +242,7 @@ async function main() {
     const s = pres.addSlide({ masterName: "LIGHT", sectionTitle: "Features" });
     s.addText("Transkript & zitiergenauer Fact-Check", { placeholder: "title" });
     iconCircle(s, ic("FiMic"), 0.62, 1.62, 0.46, TINT2);
-    txt(s, "Lokales faster-whisper: Deutsch, Wort-Timestamps — das Audio bleibt auf dem Gerät.", { x: 1.22, y: 1.68, w: 11.4, h: 0.36, fontSize: 13.5, color: INK });
+    txt(s, "Lokales faster-whisper: Deutsch, Wort-Timestamps — das Audio wird nach der Analyse gelöscht.", { x: 1.22, y: 1.68, w: 11.4, h: 0.36, fontSize: 13.5, color: INK });
     const steps = [
       { n: "1", h: "Aussagen erkennen", d: "Das LLM extrahiert prüfbare Aussagen — Timestamps kommen aus den Wörtern." },
       { n: "2", h: "Quellen durchsuchen", d: "Hybrid-Retrieval: pgvector + deutsche Volltextsuche in PDF, PPTX, DOCX." },
@@ -259,7 +258,7 @@ async function main() {
       txt(s, c.d, { x: x + 0.3, y: Y + 1.42, w: W - 0.58, h: 1.2, fontSize: 12.5, color: MUTED, valign: "top" });
     });
     txt(s, "„Nicht gefunden“ ist nicht „falsch“.", { x: 0.62, y: 5.55, w: 12.1, h: 0.45, fontSize: 17, bold: true, color: BRAND, align: "center" });
-    s.addNotes("Die Transkription läuft lokal mit faster-whisper, mit Wort-Timestamps; das Audio bleibt auf dem Gerät. Der Fact-Check läuft in vier Schritten: Aussagen extrahieren, Quellen per Hybrid-Suche durchsuchen, Urteil mit wörtlichem Zitat — und der Code prüft per String-Match, dass das Zitat wirklich in der Quelle steht. Und wichtig: „Nicht gefunden“ ist nicht „falsch“.");
+    s.addNotes("Die Transkription läuft lokal mit faster-whisper, mit Wort-Timestamps. Das Audio verlässt den Browser nur zum lokalen Server und wird nach der Analyse gelöscht. Der Fact-Check läuft in vier Schritten: Aussagen extrahieren, Quellen per Hybrid-Suche durchsuchen, Urteil mit wörtlichem Zitat — und der Code prüft per String-Match, dass das Zitat wirklich in der Quelle steht. Und wichtig: „Nicht gefunden“ ist nicht „falsch“.");
   }
 
   // ============================================================
@@ -317,7 +316,8 @@ async function main() {
       iconCircle(s, ic(r.icon), 0.62, y, 0.5, TINT2);
       txt(s, r.d, { x: 1.32, y: y + 0.05, w: 11.2, h: 0.4, fontSize: 14.5, color: INK });
     });
-    s.addNotes("Das Herzstück für den Wert in unter drei Minuten: eine gemeinsame Timeline. Ein Klick auf einen Marker springt per Peak-Zeitstempel zur Stelle im lokalen Video, plus minus zwei Sekunden. Es gibt bewusst keinen serverseitigen Clip — das Video bleibt beim Nutzer.");
+    txt(s, "Dazu: evidenzbasierte Kriterien-Scores, Formel und Abdeckung sichtbar. Optional Fortschritt über mehrere Takes — Messreihe mit Lücken, kein Gesamtscore.", { x: 0.62, y: 6.25, w: 12.1, h: 0.38, fontSize: 11.5, color: MUTED, align: "center" });
+    s.addNotes("Das Herzstück für den Wert in unter drei Minuten: eine gemeinsame Timeline. Ein Klick auf einen Marker springt per Peak-Zeitstempel zur Stelle im lokalen Video, plus minus zwei Sekunden. Es gibt bewusst keinen serverseitigen Clip — das Video bleibt beim Nutzer. Dazu kommen evidenzbasierte Kriterien-Scores; Formel und Datenabdeckung stehen direkt im UI. Optional zeigt der Fortschritt eine Messreihe über mehrere Takes, ohne Gesamtscore.");
   }
 
   // ============================================================
@@ -343,8 +343,8 @@ async function main() {
     roles.forEach((t, i) => {
       s.addText(t, { shape: pres.ShapeType.roundRect, rectRadius: 0.28, fill: { color: WHITE }, line: { color: BRAND, width: 1.25 }, x: 0.62 + i * 3.6, y: 5.3, w: 3.35, h: 0.56, fontSize: 13.5, bold: true, color: BRAND, align: "center", fontFace: FONT, margin: 0 });
     });
-    txt(s, "Keine Punkte, keine Noten.", { x: 8.2, y: 5.42, w: 4.5, h: 0.35, fontSize: 14.5, bold: true, color: INK });
-    s.addNotes("Nach dem Vortrag übernimmt der Frage-Agent. Er fragt gezielt nach Widersprüchen und Lücken aus dem Fact-Check, Antworten können getippt oder gesprochen werden, und jede Antwort wird mit Zitat-Prüfung gegen die Quellen verglichen. Zwei Rollen sind wählbar: neugieriges Erstsemester oder kritischer Professor. Punkte und Noten gibt es bewusst keine.");
+    txt(s, "Prototyp-Score, keine Note.", { x: 8.2, y: 5.42, w: 4.5, h: 0.35, fontSize: 14.5, bold: true, color: INK });
+    s.addNotes("Nach dem Vortrag übernimmt der Frage-Agent. Er fragt gezielt nach Widersprüchen und Lücken aus dem Fact-Check, Antworten können getippt oder gesprochen werden, und jede Antwort wird mit Zitat-Prüfung gegen die Quellen verglichen. Zwei Rollen sind wählbar: neugieriges Erstsemester oder kritischer Professor. Die Auswertung nach der getippten Runde ist ein transparenter Prototyp-Score aus gemessenen Urteilen, keine Note.");
   }
 
   // ============================================================
@@ -374,14 +374,14 @@ async function main() {
       "Gemini flash-lite — Fact-Check & Frage-Agent",
       "Optional: Deepgram (EU) — Live-Transkript",
       "Optional: ElevenLabs — Voice-Agent-Stimme",
-      "Ohne Schlüssel bleibt alles auf dem lokalen Pfad",
+      "Ohne Cloud-Schlüssel entfallen Quellencheck und Frage-Agent",
     ], { x: RX + 0.38, y: Y + 1.05, w: CW - 0.75, h: CH - 1.35, fontSize: 13, paraSpaceAfter: 10 });
     // Terminal
     s.addText([
       { text: "$ ", options: { color: LIGHTV } },
       { text: "docker compose up --build -d --wait", options: { color: WHITE } },
     ], { shape: pres.ShapeType.roundRect, rectRadius: 0.12, fill: { color: INK }, line: { type: "none" }, x: 2.67, y: 5.55, w: 8.0, h: 0.66, fontSize: 15, fontFace: MONO, align: "center", margin: 0 });
-    s.addNotes("Technisch: Next.js vorne, FastAPI mit Celery und Redis hinten, Postgres mit pgvector, SeaweedFS als S3-Speicher. Der lokale Stack deckt Pose, VAD, Whisper und Embeddings ab; Cloud-Dienste wie Gemini, Deepgram oder ElevenLabs sind nur mit Einwilligung zugeschaltet. Der ganze Stack startet mit einem einzigen Compose-Befehl.");
+    s.addNotes("Technisch: Next.js vorne, FastAPI mit Celery und Redis hinten, Postgres mit pgvector, SeaweedFS als S3-Speicher. Der lokale Stack deckt Pose, VAD, Whisper und Embeddings ab; Cloud-Dienste wie Gemini, Deepgram oder ElevenLabs sind nur mit Einwilligung zugeschaltet. Ohne Cloud-Schlüssel bleiben Audio-, Pose- und Signalanalyse lokal; Quellencheck und Frage-Agent sind dann nicht verfügbar. Der ganze Stack startet mit einem einzigen Compose-Befehl.");
   }
 
   // ============================================================
@@ -395,7 +395,7 @@ async function main() {
       { icon: "FiTrash2", h: "Audio wird gelöscht", d: "Original nach der Analyse — auch bei Fehlern" },
       { icon: "FiShield", h: "Keine Pose-Frames zu Anbietern", d: "Landmarks bleiben im Browser" },
       { icon: "FiCheckCircle", h: "Cloud nur mit Einwilligung", d: "Anbieter werden vorab benannt" },
-      { icon: "FiDatabase", h: "Nur synthetische Demo-Daten", d: "keine echten personenbezogenen Daten" },
+      { icon: "FiDatabase", h: "Synthetische Demo-Daten", d: "Live-Aufnahmen nur mit Einwilligung" },
       { icon: "FiEyeOff", h: "Heuristiken offen markiert", d: "„unvalidiert“ statt glaub behauptet" },
     ];
     const W = 3.9, H = 1.98, GX = 0.29, GY = 0.24, X0 = 0.53, Y0 = 1.7;
@@ -406,8 +406,8 @@ async function main() {
       txt(s, c.h, { x: x + 0.95, y: y + 0.32, w: W - 1.2, h: 0.45, fontSize: 13.5, bold: true });
       txt(s, c.d, { x: x + 0.95, y: y + 0.85, w: W - 1.2, h: 0.9, fontSize: 12, color: MUTED, valign: "top" });
     });
-    txt(s, "Keine Scores, keine Noten, keine Emotionsanalyse — Feedback statt Benotung.", { x: 0.62, y: 6.2, w: 12.1, h: 0.42, fontSize: 16, bold: true, color: BRAND, align: "center" });
-    s.addNotes("Datenschutz war für uns ein Feature, kein Anhängsel. Das Video verlässt den Client nie, das Original-Audio wird nach der Analyse gelöscht — auch bei Fehlern —, Pose-Frames gehen zu keinem Anbieter. Heuristiken kennzeichnen wir offen als unvalidiert, und es gibt keine Scores, keine Noten und keine Emotionsanalyse.");
+    txt(s, "Evidenzbasierte Prototyp-Scores, keine Noten, keine Emotionsanalyse.", { x: 0.62, y: 6.2, w: 12.1, h: 0.42, fontSize: 16, bold: true, color: BRAND, align: "center" });
+    s.addNotes("Datenschutz war für uns ein Feature, kein Anhängsel. Das Video verlässt den Client nie, das Original-Audio wird nach der Analyse gelöscht — auch bei Fehlern —, Pose-Frames gehen zu keinem Anbieter. Heuristiken kennzeichnen wir offen als unvalidiert. Die Auswertung zeigt evidenzbasierte Prototyp-Scores, aber keine Noten und keine Emotionsanalyse.");
   }
 
   // ============================================================
@@ -422,9 +422,9 @@ async function main() {
       { n: "0,35 s", d: "Signal-Analyse für 60 s Audio" },
       { n: "3,4 s", d: "Fact-Check (Gemini flash-lite, synthetisch)" },
       { n: "4,8 s", d: "Whisper small für 6,8 s Audio" },
-      { n: "33", d: "API-Pfade im Backend" },
-      { n: "281", d: "Backend-Tests" },
-      { n: "232", d: "Web-Unit-Tests" },
+      { n: "44", d: "API-Pfade im Backend" },
+      { n: "333", d: "Backend-Tests" },
+      { n: "261", d: "Web-Unit-Tests" },
     ];
     const W = 2.9, H = 1.9, GX = 0.25, GY = 0.22, X0 = (13.333 - (4 * W + 3 * GX)) / 2, Y0 = 1.7;
     stats.forEach((c, i) => {
@@ -476,25 +476,14 @@ async function main() {
     const s = pres.addSlide({ masterName: "DARK", sectionTitle: "Reflection & Abschluss" });
     logoCard(s, 6.667, 0.8, 1.8);
     txt(s, "Übe den Vortrag, nicht die Folien.", { x: 0.5, y: 3.05, w: 12.333, h: 0.95, fontSize: 40, bold: true, color: WHITE, align: "center" });
-    txt(s, "Prototyp läuft lokal: localhost:3000 — kein Login, keine Cloud-Pflicht.", { x: 0.5, y: 4.15, w: 12.333, h: 0.5, fontSize: 18, color: LIGHTV, align: "center" });
+    txt(s, "Prototyp läuft lokal: localhost:3000 — kein Login; Cloud nur für Quellencheck und Fragen.", { x: 0.5, y: 4.15, w: 12.333, h: 0.5, fontSize: 18, color: LIGHTV, align: "center" });
     txt(s, "Produktreview willkommen — zeigen Sie uns drei Minuten Ihrer Zeit, wir zeigen Ihnen jeden Moment zurück.", { x: 0.5, y: 4.85, w: 12.333, h: 0.45, fontSize: 14, color: DIM, align: "center" });
     txt(s, "Team 418 · 8. Hackathon Fulda · Future Education 2026", { x: 0.5, y: 6.4, w: 12.333, h: 0.35, fontSize: 13, color: DIM, align: "center" });
-    s.addNotes("Zum Schluss: Übe den Vortrag, nicht die Folien. Der Prototyp läuft lokal auf localhost 3000, ohne Login — wir laden herzlich zum Produktreview ein. Danke.");
+    s.addNotes("Zum Schluss: Übe den Vortrag, nicht die Folien. Der Prototyp läuft lokal auf localhost 3000, ohne Login; Quellencheck und Fragen nutzen optional Gemini. Wir laden herzlich zum Produktreview ein. Danke.");
   }
 
   // ---------- Write ----------
   await pres.writeFile({ fileName: OUT });
-  await applyTheme(OUT, {
-    name: "418 Pitch Practice",
-    headFontFace: FONT,
-    bodyFontFace: FONT,
-    colors: {
-      dk1: INK, lt1: WHITE, dk2: MUTED, lt2: TINT,
-      accent1: BRAND, accent2: "6C3CE0", accent3: LIGHTV,
-      accent4: DARK_BG, accent5: TINT2, accent6: DIM,
-      hlink: BRAND, folHlink: BRAND,
-    },
-  });
   console.log("geschrieben:", OUT);
 
 }

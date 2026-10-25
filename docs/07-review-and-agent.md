@@ -6,7 +6,8 @@ Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
 
 ## Ablauf
 
-Ergänzender Nutzerauftrag: Vier 0–100-Prototyp-Scores stehen über dem Video.
+Ergänzender Nutzerauftrag (aktualisiert 25.10.2026): Drei 0–100-Prototyp-Scores
+für Gestik, Fachwissen und Flow stehen über dem Video.
 `evidence-share-v1` bewertet positive / (positive + kritische) Zeitanteile,
 mit zeitlicher Vereinigung überlappender Hinweise derselben Art. Für Fachwissen
 hat der Anteil gestützter an entscheidbaren Quellenurteilen mit geprüftem
@@ -20,8 +21,8 @@ aus dem aktuellen Check abgeleitet, damit alte Marker nach einem erneuten Check
 keine abweichenden Scores ergeben. `evidenceVerdict` hält Urteile ohne geprüftes
 Zitat auch im Score offen. Die Score-Karten benennen den Titel der Aufnahme;
 der synthetische Pfad `/review-preview` bleibt ausdrücklich ein Beispiel.
-Für Struktur gibt es derzeit keine automatische Messregel; ohne entsprechende
-Evidenz bleibt dieses Kriterium daher offen.
+Struktur ist auf Nutzerwunsch aus Kriterien und Berechnung entfernt;
+vorhandene Anmerkungen bleiben ohne eigenes Kriterium erhalten.
 Der Graph ist eine durchgehende, ungefüllte Linie mit geraden, zackigen Segmenten. Zwischenwerte
 sind als interpoliert gekennzeichnet, der Wiedergabepunkt folgt dem Video.
 Darunter teilt eine Wiedergabeleiste dieselbe Zeitachse und die Grün-/Rot-/Neutralbereiche
@@ -180,7 +181,9 @@ Die Auswertung ist rein clientseitig und deterministisch
 kein LLM, Eingaben sind nur Daten, die der Browser ohnehin hat
 (Fact-Check-Urteile, Antwort-Urteile, Wörter, Feedback-Events, Pose-Events).
 
-Formel `evidence-count-heuristic.v1`:
+Formel `evidence-count-heuristic.v1` — **separat** von den drei Review-Scores
+oben. Die Werte sind nicht vergleichbar und werden nicht zu einem Gesamtscore
+verrechnet; „Inhalt“ ist nicht dasselbe wie „Fachwissen“ im Review:
 
 - **Inhalt** (Gewicht 0,5): Jede Fact-Check-Aussage und jede beantwortete Frage
   zählt nach Urteil — `supports` = 1, `contradicts` = 0, `not_found`/

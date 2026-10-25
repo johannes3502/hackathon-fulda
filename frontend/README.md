@@ -26,7 +26,8 @@ opens the missing-recording state; it does not create a take or access a recordi
   The matching `/live/[sessionId]/analysis` view and the main review use one
   adapter for the selected recording's video, duration, feedback and latest
   source checks. Knowledge scores require a verified source quote; missing
-  measurements stay empty (including structure, which has no automatic rule).
+  measurements stay empty. The three criteria are Gestik, Fachwissen and Flow;
+  structure is no longer scored.
   Click a marker or the timeline to seek; the slider supports keyboard seeking.
   Selected sections play with
   ±2 seconds of context and optional looping. Criterion buttons filter moments.
@@ -40,7 +41,7 @@ opens the missing-recording state; it does not create a take or access a recordi
 
 - **Sample demo** (`/demo`): deterministic rehearsal, sample transcript, judge questions
   and review. Works without camera, microphone or backend credentials.
-- **Monitoring studio** (`/` and `/live`): navigation and settings are visible by default; **Large view** is optional. Choose **Enable camera**, then **Start recording**. Local gesture observations replace scripted markers; hold a neutral position for 3 seconds first.
+- **Monitoring studio** (`/live`): navigation and settings are visible by default; **Large view** is optional. Choose **Enable camera**, then **Start recording**. Local gesture observations replace scripted markers; hold a neutral position for 3 seconds first.
 - **See gestures in 22 seconds** (`/gestures`): synthetic walkthrough using the real observation rules.
 - **Speech analysis:** every recording uses live backend feedback and full
   analysis after stopping. The microphone is always enabled and the complete

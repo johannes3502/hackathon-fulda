@@ -164,6 +164,97 @@ async function enable(page: Page) {
     page.getByRole("button", { name: "Turn camera off" }),
   ).toBeVisible();
 }
+
+for (const mode of ["native", "viewport"] as const) {
+  test(`${mode} recording fullscreen keeps the take running and shows compact edge hints`, async ({
+    page,
+  }, info) => {
+    await syntheticCamera(page);
+    await syntheticPose(page);
+    if (mode === "viewport") {
+      await page.addInitScript(() => {
+        Element.prototype.requestFullscreen = async () => {
+          throw new DOMException("Fullscreen unavailable", "NotAllowedError");
+        };
+      });
+    }
+    await enable(page);
+    const video = page.getByLabel("Your local camera feed");
+    const stage = page.getByRole("region", { name: "Live camera preview" });
+    const cue = page.locator(".fullscreen-cue");
+    await video.evaluate((element) =>
+      element.setAttribute("data-original-preview", "true"),
+    );
+    await page.getByRole("button", { name: "Enter fullscreen" }).click();
+    await expect(stage).toHaveClass(/recording-fullscreen/);
+    expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(
+      mode === "native",
+    );
+    await expect(page.locator(".fullscreen-consent")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Start recording", exact: true }),
+    ).toBeInViewport();
+    await page
+      .getByRole("button", { name: "Start recording", exact: true })
+      .click();
+    await startPoseSequence(page, "crossed");
+    await expect(cue.locator("strong")).toHaveText(
+      "Arms crossed in front of torso",
+      { timeout: 15000 },
+    );
+    await expect(cue).toHaveAttribute("data-feedback", "attention");
+    await expect(cue.locator(".lucide-unfold-horizontal")).toBeVisible();
+    await expect(page.locator(".fullscreen-time")).not.toHaveText("0:00");
+    await noOverflow(page);
+    const bounds = (await stage.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    expect(bounds.x).toBe(0);
+    expect(bounds.y).toBe(0);
+    expect(bounds.width).toBe(viewport.width);
+    expect(bounds.height).toBe(viewport.height);
+    await page.screenshot({ path: info.outputPath(`fullscreen-${mode}.png`) });
+    await page.getByRole("button", { name: "Hide hints", exact: true }).click();
+    await expect(cue).toContainText("Hints hidden");
+    await expect(cue).toHaveAttribute("data-feedback", "neutral");
+    await page.getByRole("button", { name: "Show hints", exact: true }).click();
+    await expect(cue).not.toContainText("Hints hidden");
+
+    // Both the browser's exit and the viewport fallback must restore the normal studio.
+    if (mode === "viewport") await page.keyboard.press("Escape");
+    else await page.evaluate(() => document.exitFullscreen());
+    await expect(stage).not.toHaveClass(/recording-fullscreen/);
+    await expect(
+      page.getByRole("button", { name: "Finish & review", exact: true }),
+    ).toBeVisible();
+    await expect(video).toHaveAttribute("data-original-preview", "true");
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+      ),
+    ).toBe(0);
+    await page.getByRole("button", { name: "Enter fullscreen" }).click();
+    await page.getByRole("button", { name: "Exit fullscreen" }).click();
+    await expect(stage).not.toHaveClass(/recording-fullscreen/);
+    await page.getByRole("button", { name: "Enter fullscreen" }).click();
+    await expect(stage).toHaveClass(/recording-fullscreen/);
+    await page
+      .getByRole("region", { name: "Live camera preview" })
+      .getByRole("button", { name: "Finish & review", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/review$/);
+    await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
+    await expect(
+      page
+        .locator(".review-clip-list button")
+        .filter({ hasText: "Arms crossed in front of torso" }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => document.body.style.overflow)).not.toBe(
+      "hidden",
+    );
+    expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+  });
+}
+
 test("normal preview displays all finger points without enabling the lab, including a hand-only frame", async ({
   page,
 }) => {
@@ -256,6 +347,7 @@ test("camera setup hides global navigation and full-size recording preserves the
   await syntheticCamera(page);
   await syntheticPose(page);
   await enable(page);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(page.getByRole("banner")).toBeHidden();
   await expect(
     page.getByRole("navigation", { name: "Presentation workflow" }),
@@ -263,8 +355,33 @@ test("camera setup hides global navigation and full-size recording preserves the
   await expect(
     page.getByRole("link", { name: "Back to sources", exact: true }),
   ).toHaveAttribute("href", "/sources");
+  const previewWorkspace = (await page.locator(".live-workspace").boundingBox())!;
+  expect(previewWorkspace.width).toBeGreaterThanOrEqual(
+    page.viewportSize()!.width - 40,
+  );
+  const previewCamera = (await page.locator(".live-camera-stage").boundingBox())!;
+  if (info.project.name === "desktop") {
+    expect(previewCamera.height).toBeGreaterThan(480);
+    await expect(
+      page.getByRole("button", { name: "Start recording", exact: true }),
+    ).toBeInViewport();
+  } else {
+    expect(previewCamera.height).toBeGreaterThanOrEqual(
+      page.viewportSize()!.height / 2,
+    );
+  }
+  await page.screenshot({
+    path: info.outputPath("enabled-camera-preview.png"),
+    fullPage: true,
+  });
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
+  const startButton = page.getByRole("button", {
+    name: "Start recording",
+    exact: true,
+  });
+  await expect(startButton).toHaveCSS("font-size", "17px");
+  expect((await startButton.boundingBox())!.height).toBeGreaterThanOrEqual(52);
   await page
     .getByRole("button", { name: "Start recording", exact: true })
     .click();
@@ -276,6 +393,12 @@ test("camera setup hides global navigation and full-size recording preserves the
     page.getByRole("link", { name: "Back to sources", exact: true }),
   ).toHaveCount(0);
   const cue = page.locator(".cue-message");
+  const finishButton = page.getByRole("button", {
+    name: "Finish & review",
+    exact: true,
+  });
+  await expect(finishButton).toHaveCSS("font-size", "17px");
+  expect((await finishButton.boundingBox())!.height).toBeGreaterThanOrEqual(52);
   await expect(
     page.getByRole("button", { name: /^(Large|Standard) view$/ }),
   ).toHaveCount(0);
@@ -2224,10 +2347,10 @@ test("review scores and statistics follow each recorded take across views and re
   await expect(page).toHaveURL(/\/review$/);
   const firstReview = page.url();
   const scores = page.getByRole("region", {
-    name: "Bewertung der vier Kriterien",
+    name: "Bewertung der drei Kriterien",
   });
   const values = scores.locator(".review-score-value");
-  await expect(values).toHaveText(["–", "–", "75/100", "–"]);
+  await expect(values).toHaveText(["–", "–", "75/100"]);
   await expect(scores.locator(".review-score-origin")).toContainText(
     "First recorded take",
   );
@@ -2242,7 +2365,7 @@ test("review scores and statistics follow each recorded take across views and re
 
   await page.getByText("Transcript and source checks", { exact: true }).click();
   await page.getByRole("button", { name: "Check facts", exact: true }).click();
-  const expected = ["–", "50/100", "75/100", "–"];
+  const expected = ["–", "50/100", "75/100"];
   await expect(values).toHaveText(expected);
   await expect(scores).toContainText("1 von 2 Aussagen gestützt");
   await expect(scores).toContainText("2 Aussagen offen");
@@ -2282,7 +2405,7 @@ test("review scores and statistics follow each recorded take across views and re
   const secondReview = page.url();
   expect(secondReview).not.toBe(firstReview);
   expect(uploads).toBe(2);
-  await expect(values).toHaveText(["–", "–", "0/100", "–"]);
+  await expect(values).toHaveText(["–", "–", "0/100"]);
   await expect(scores.locator(".review-score-origin")).toContainText(
     "Second recorded take",
   );

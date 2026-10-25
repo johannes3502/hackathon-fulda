@@ -1,10 +1,10 @@
 # AGENTS.md — Hackathon Fulda 2026
 
-Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Grafische Architektur-Übersicht (Mermaid): `docs/03-architecture.md`. Pose-Research-Ziele und Integrationsstand: `docs/04-pose-tracking-requirements.md`.
+Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertung: `docs/00-requirements.md`. Features und offene Punkte: `docs/01-product.md`. Offene TODOs: `docs/14-open-todos.md`. Grafische Architektur-Übersicht (Mermaid): `docs/03-architecture.md`. Pose-Research-Ziele und Integrationsstand: `docs/04-pose-tracking-requirements.md`.
 
 ## 1. Projekt
 
-**Live-Präsentationstrainer** (8. Hackathon Fulda, 24.–25.10.2026, Thema Future Education): analysiert Auftritt und Sprache, macht Feedback timestamp-genau zurückspulbar und fragt danach gezielt nach. Web-App für Laptop und Smartphone, öffentliche URL, kein Login.
+**418 Pitch Practice** — Live-Präsentationstrainer (8. Hackathon Fulda, 24.–25.10.2026, Thema Future Education): analysiert Auftritt und Sprache, macht Feedback timestamp-genau zurückspulbar und fragt danach gezielt nach. Web-App für Laptop; die Jury-Demo läuft lokal und ohne Login. Smartphone und öffentliche URL sind nicht Teil des aktuellen Demo-Pfads.
 
 | # | Feature | Inhalt |
 |---|---|---|
@@ -16,19 +16,22 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 **Leitplanken:** nur diese fünf Features; Scores nur als transparente, evidenzbasierte Aggregation bereits gemessener Events (Auswertung nach der Fragerunde), keine erfundenen Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeitsbewertung; nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
 
-**Expliziter Nutzerauftrag (24.10.2026):** Im Review vier 0–100-Prototyp-Scores
-für Gestik, Fachwissen, Flow und Struktur statt bloßer Moment-Anzahlen anzeigen.
+**Expliziter Nutzerauftrag (aktualisiert 25.10.2026):** Im Review drei 0–100-Prototyp-Scores
+für Gestik, Fachwissen und Flow statt bloßer Moment-Anzahlen anzeigen. Struktur
+ist auf Nutzerwunsch aus den Kriterien und der Score-Berechnung entfernt.
 Die Version `evidence-share-v1` bewertet die erfasste Evidenz: positive Zeitanteile
 gegen positive + kritische Zeitanteile; Fachwissen bevorzugt über entscheidbare
 Quellenurteile. Formel, Datenabdeckung und fehlende Daten bleiben sichtbar;
 ohne Evidenz kein Score. Keine Validierungs- oder Benotungsbehauptung. Der
-Zeitverlauf ist eine geglättete Linie mit ausdrücklich interpolierten Übergängen.
+Zeitverlauf ist eine Linie aus geraden Segmenten; Zwischenwerte sind
+ausdrücklich interpoliert. Ältere Struktur-Momente bleiben allgemeine
+Anmerkungen ohne eigenes Kriterium oder Score.
 
 Review-Verdrahtung (25.10.2026): Beide Web-Review-Ansichten nutzen denselben
 Adapter für die gewählte, lokal gespeicherte Aufnahme. Quellen-Marker kommen
 aus dem aktuellen Fact-Check; nur Urteile mit geprüftem Quellenzitat fließen
 in den Fachwissen-Score ein. `/review-preview` bleibt ein markiertes Beispiel.
-Für Struktur existiert noch keine automatische Messregel; ohne Evidenz kein Score.
+Ohne ausreichende Evidenz bleibt der jeweilige Score offen.
 
 ## 2. Ablauf
 
@@ -70,7 +73,10 @@ Für Struktur existiert noch keine automatische Messregel; ohne Evidenz kein Sco
 - **Hosting:** Nutzer bestätigt lokale Vorführung auf `localhost`; kein öffentliches Deployment nötig. Für andere Geräte/öffentliche Hosts bleibt HTTPS für `getUserMedia` erforderlich.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
-**Offen:** belastbare Schwellenwerte, automatische Aufbewahrungsdauer/Cleanup, Füllwortqualität, Fact-Check-Quellen im Web, automatisches Antwortende per Stille-Erkennung, Produktname. Umgesetzt: Post-Transkription lokal und Text-Fragerunde mit Quellenvergleich ohne Noten.
+**Offen:** offene Punkte und TODOs stehen in `docs/14-open-todos.md`
+(Retention/Cleanup, Persistenz-/Progress-Anbindung,
+Prompt-Safety-Grenzen, Demo-Härtung). Umgesetzt: Post-Transkription lokal und
+Text-Fragerunde mit Quellenvergleich ohne Noten.
 
 ## 4. Architektur
 
@@ -168,6 +174,7 @@ docs/
   04-pose-tracking-requirements.md # Pose-Research-Ziele und Integrationsstand
   12-long-term-progress-data-design.md # Backend-Data-Design, Research, DDL, API
   13-long-term-progress-frontend-contract.md # progress.v1 und UI-Vertrag
+  14-open-todos.md                 # Offene TODOs, Priorität und Abnahmekriterien
 templates/
   ai-decision-log.md               # Vorlage für die AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
