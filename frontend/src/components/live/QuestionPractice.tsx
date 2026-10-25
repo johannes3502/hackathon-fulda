@@ -161,7 +161,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
           agent: {
             prompt: { prompt: context.prompt },
             firstMessage:
-              "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?",
+              "Ich habe noch ein paar Fragen. Bist du bereit?",
           },
         },
         onConversationCreated: (created) => {

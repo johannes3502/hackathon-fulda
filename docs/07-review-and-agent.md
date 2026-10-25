@@ -144,15 +144,11 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
   (`convai_write`). **Read** kann den Agenten laden, aber keine Signed URL
   ausstellen; dieser Aufruf scheitert dann mit HTTP 401 `missing_permissions`.
 - Sprache und Stimme passend zur Vorführung konfigurieren. Die App übergibt
-  „[rushed] Ich habe noch ein paar Fragen. Bist du bereit?“ als `firstMessage`-Override.
-  Der Prompt fordert dieselbe schnellere, klare Sprechweise für alle Antworten.
-  Beim aktuell konfigurierten Eleven v4 Turbo ist kein numerischer Speed-Regler
-  verfügbar; das unterstützte Audio-Tag `[rushed]` steuert das Tempo.
-  `stripAudioTags: true` hält diese Regieanweisungen aus dem sichtbaren Transkript.
-  Das ist eine Modellvorgabe, kein garantierter Geschwindigkeitsfaktor.
-  Live-Stichprobe am 25.10.2026 über zwei authentifizierte Agent-Verbindungen:
-  derselbe synthetische deutsche Text mit derselben Stimme dauerte ohne Tag
-  8,72 s, mit `[rushed]` 7,36 s (rund 16 % kürzer). Kein allgemeiner Benchmark.
+  „Ich habe noch ein paar Fragen. Bist du bereit?“ als `firstMessage`-Override.
+  Es gibt keine Vorgabe für schnelleres Sprechen und kein `[rushed]`-Tag.
+  Die Fragen zielen vor allem auf Gründe, Entscheidungen, Funktionsweise,
+  Annahmen, Abwägungen und alternative Erklärungen. Der Agent fragt nicht nach
+  Quellen, Dateien oder Seiten; er nutzt diese selbst zur Faktenprüfung.
   Nach diesem festen deutschen Einstieg wartet der Agent auf eine Bestätigung.
   Erst dann stellt er die erste konkrete Frage zum bereits übergebenen Transkript
   in dessen Sprache. Wer noch nicht bereit ist, bekommt Zeit.

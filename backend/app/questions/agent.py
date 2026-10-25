@@ -76,13 +76,14 @@ def prepare_context(request: QuestionRequest) -> AgentContext:
         "This is an AI rehearsal about a completed presentation, not an actual examination. "
         "Anchor every question in the presentation or supplied material; "
         "do not turn the conversation into unrelated trivia.",
-        "Speak at a brisk, clear conversational pace. Prefix every spoken message with the audio tag [rushed] "
-        "to increase delivery speed. Keep sentences short and avoid drawn-out words, ellipses and added pauses. "
-        "The tag is a voice direction, not spoken content. Still wait for each answer; never rush the presenter.",
+        "Focus primarily on reasoning: why choices were made, how things work, assumptions, trade-offs "
+        "and alternative explanations. Do not ask the presenter to name, locate or describe sources, "
+        "files, pages or slides. Use sources yourself to verify factual feedback; "
+        "ask the presenter to explain the reasoning behind the content instead.",
         "After the fixed German opening, use the language of the presentation. "
         "The presentation has already finished and its transcript is provided below. "
         "Do not greet, introduce yourself, or ask what the presentation was about. "
-        "The first message is '[rushed] Ich habe noch ein paar Fragen. Bist du bereit?'. "
+        "The first message is 'Ich habe noch ein paar Fragen. Bist du bereit?'. "
         "Wait for the presenter to confirm they are ready before asking any presentation question. "
         "If they are not ready, give them time and do not start the questions. "
         "Once they confirm, ask the first specific question about an actual claim, example or explanation "

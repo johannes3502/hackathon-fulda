@@ -13,6 +13,7 @@ import {
   Maximize2,
   Minimize2,
   Mic,
+  PersonStanding,
   Radio,
   Square,
   Video,
@@ -149,6 +150,8 @@ export function LiveStudio({
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCues, setShowCues] = useState(true);
+  // Only hides the drawn overlay; tracking and pose feedback keep running.
+  const [showLandmarks, setShowLandmarks] = useState(true);
   const [poseDebug, setPoseDebug] = useState(false);
   const poseLab = featureFlags.devMode;
   const setPoseLab = (devMode: boolean) =>
@@ -496,14 +499,18 @@ export function LiveStudio({
         : poseCue),
     showCues,
   );
-  const appearance = cueAppearance(
-    latest,
-    !showCues
-      ? "hidden"
-      : pose.state?.phase === "error"
-        ? "unavailable"
-        : (evaluation?.phase ?? "framing"),
-  );
+  const cueState = !showCues
+    ? "hidden"
+    : pose.state?.phase === "error"
+      ? "unavailable"
+      : (evaluation?.phase ?? "framing");
+  const appearance = cueAppearance(latest, cueState);
+  // Admin can switch off the idle "Check framing" / "Tracking ready" statuses.
+  const idleCueOff =
+    !latest &&
+    ((cueState === "framing" && !featureFlags.framingCue) ||
+      (cueState === "ready" && !featureFlags.readyCue));
+  const cueTone = idleCueOff ? "neutral" : appearance.tone;
   const FeedbackIcon = appearance.Icon;
   const largeView = cameraStatus === "active" || !!progress;
   const startLabel = stage ? "Demo starten" : "Start recording";
@@ -512,7 +519,7 @@ export function LiveStudio({
     <AppShell experience="live">
       <div
         className={`workspace live-workspace${largeView ? " live-workspace-large" : ""}${stage ? " stage-live" : ""}`}
-        data-feedback={appearance.tone}
+        data-feedback={cueTone}
         data-stage={stage ? "true" : undefined}
       >
         {stage && (
@@ -668,6 +675,17 @@ export function LiveStudio({
                   <span className="stage-demo">
                     <Mic size={14} /> Microphone audio
                   </span>
+                  {cameraStatus === "active" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-pressed={showLandmarks}
+                      onClick={() => setShowLandmarks(!showLandmarks)}
+                    >
+                      <PersonStanding size={18} />
+                      {showLandmarks ? "Hide landmarks" : "Show landmarks"}
+                    </Button>
+                  )}
                   {(cameraStatus === "active" || fullscreen) && (
                     <Button
                       ref={toggleRef}
@@ -702,6 +720,7 @@ export function LiveStudio({
                 aria-label="Your local camera feed"
               />
               {cameraStatus === "active" &&
+                showLandmarks &&
                 pose.state?.phase === "running" &&
                 (pose.state.latest || pose.state.hands.length > 0) && (
                   <PoseOverlay
@@ -712,7 +731,7 @@ export function LiveStudio({
                     showHands={featureFlags.handTracking}
                   />
                 )}
-              {cameraStatus === "active" && (
+              {cameraStatus === "active" && showLandmarks && (
                 <span className="live-pose-status">
                   {pose.state?.phase === "error"
                     ? "Landmarks unavailable"
@@ -779,7 +798,7 @@ export function LiveStudio({
                     {caption.text && <p>{caption.text.slice(-500)}</p>}
                   </div>
                 )}
-              {fullscreen && (
+              {fullscreen && !idleCueOff && (
                 <div className="fullscreen-cue-rail">
                   <div
                     className="fullscreen-cue"
@@ -940,7 +959,7 @@ export function LiveStudio({
           </div>
           {(cameraStatus === "active" || progress) && (
             <aside className="coaching-column" aria-hidden={fullscreen}>
-              <section className="cue-panel" data-feedback={appearance.tone}>
+              <section className="cue-panel" data-feedback={cueTone}>
                 <div className="panel-title-row">
                   <h2>
                     <Eye size={18} /> Live feedback
@@ -948,14 +967,16 @@ export function LiveStudio({
                   <span>Heuristic</span>
                 </div>
                 <div aria-live="polite" aria-atomic="true">
-                  <div className="live-cue-status">
-                    <FeedbackIcon
-                      className="live-cue-icon"
-                      aria-hidden="true"
-                      strokeWidth={1.5}
-                    />
-                    <span className="live-cue-label">{appearance.label}</span>
-                  </div>
+                  {!idleCueOff && (
+                    <div className="live-cue-status">
+                      <FeedbackIcon
+                        className="live-cue-icon"
+                        aria-hidden="true"
+                        strokeWidth={1.5}
+                      />
+                      <span className="live-cue-label">{appearance.label}</span>
+                    </div>
+                  )}
                   {/* Ready without a hint stays quiet; the status label is enough. */}
                   {(!showCues ||
                     latest ||
