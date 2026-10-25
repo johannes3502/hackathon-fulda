@@ -7,28 +7,16 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("Home returns to the overview from the header or navigation drawer", async ({
+test("Home returns to the overview from the simplified header", async ({
   page,
-}, info) => {
+}) => {
   await page.goto("/sources");
-  const navigation =
-    info.project.name === "mobile"
-      ? page.getByRole("navigation", { name: "App-Navigation" })
-      : page.getByRole("navigation", { name: "Main navigation" });
-  if (info.project.name === "mobile") {
-    await page.getByRole("button", { name: "Menü", exact: true }).click();
-  }
-  const home = navigation.getByRole("link", { name: /^Home/ });
+  const navigation = page.getByRole("navigation", { name: "Main navigation" });
+  const home = navigation.getByRole("link", { name: "Home", exact: true });
   await expect(home).toHaveAttribute("href", "/");
   await home.click();
   await expect(page).toHaveURL(/\/$/);
-  if (info.project.name === "mobile") {
-    await page.getByRole("button", { name: "Menü", exact: true }).click();
-  }
-  await expect(navigation.getByRole("link", { name: /^Home/ })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(home).toHaveAttribute("aria-current", "page");
 });
 
 test("presentation introduction leads into preparation and recording", async ({
@@ -187,23 +175,35 @@ test("saved appearance overrides the system across routes and reloads", async ({
   await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
 });
 
-test("navigation drawer contains keyboard focus and restores its trigger", async ({
+test("header only shows the logo, Home, Admin and utility controls", async ({
   page,
-}) => {
-  await page.goto("/");
-  const trigger = page.getByRole("button", { name: "Menü", exact: true });
-  await trigger.click();
-  const drawer = page.getByRole("dialog", { name: "Navigation", exact: true });
-  await expect(drawer).toBeVisible();
-  for (let index = 0; index < 12; index++) {
-    await page.keyboard.press("Tab");
-    expect(
-      await drawer.evaluate((element) =>
-        element.contains(document.activeElement),
-      ),
-    ).toBe(true);
-  }
-  await page.keyboard.press("Escape");
-  await expect(drawer).toBeHidden();
-  await expect(trigger).toBeFocused();
+}, info) => {
+  await page.goto("/sources");
+  const header = page.getByRole("banner");
+  await expect(header.getByRole("link", { name: "418 home" })).toBeVisible();
+  await expect(
+    header.getByRole("button", { name: "Menü", exact: true }),
+  ).toHaveCount(0);
+  await expect(header).not.toContainText("Presentation studio");
+  const navigation = header.getByRole("navigation", {
+    name: "Main navigation",
+  });
+  await expect(navigation.getByRole("link")).toHaveText(["Home", "Admin"]);
+  const admin = navigation.getByRole("link", { name: "Admin", exact: true });
+  await admin.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(admin).toHaveAttribute("aria-current", "page");
+  await expect(
+    header.getByRole("combobox", { name: "Appearance" }),
+  ).toBeVisible();
+  await expect(
+    header.getByRole("button", { name: "How it works" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await header.screenshot({ path: info.outputPath("simplified-header.png") });
 });

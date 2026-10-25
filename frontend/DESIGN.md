@@ -37,10 +37,8 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   Below, `StatsDashboard` shows counts, durations and observations from actual
   recordings in the current workspace, with an empty state before the first take.
   No synthetic percentages, monthly histories or performance scores appear.
-  `AppShell` provides both the header navigation (`Main navigation`) and a
-  slide-over navigation drawer (`Menü`) outside the record screen. The active destination
-  is identified visually and with `aria-current`. The drawer is a modal Radix
-  dialog with focus containment, Escape dismissal and focus restoration. A shared
+  `AppShell` provides the logo, Home and Admin links, appearance and help controls
+  outside the record screen. Active links use `aria-current`. A shared
   Prepare / Record / Review strip connects sources, studio and reviews; its Review
   link uses the current or latest take, or explicitly offers an example when no
   take exists. The record screen hides this strip during both camera setup and
