@@ -40,7 +40,8 @@ import {
   remainingSeconds,
   voiceSessionExpired,
 } from "@/features/questions/voice";
-import { collectionId } from "@/features/sources/api";
+import { collectionId, listSources } from "@/features/sources/api";
+import { factFeedback, runFactCheck } from "@/features/factcheck/api";
 import { PerformanceEvaluation } from "./PerformanceEvaluation";
 
 export function QuestionPractice({ recording }: { recording: LiveRecording }) {
@@ -59,7 +60,9 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     () => false,
   );
   const [microphone] = useState(() => new VoiceMicrophone());
-  const [finished, setFinished] = useState(false);
+  const [finished, setFinished] = useState(
+    recording.conversationFinished === true,
+  );
   const [error, setError] = useState("");
   const [notices, setNotices] = useState<string[]>([]);
   const [transcribing, setTranscribing] = useState(false);
@@ -119,6 +122,11 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     microphone.setProtectAgentSpeech(protectAgentSpeech);
   }, [microphone, protectAgentSpeech]);
 
+  const finish = useCallback(() => {
+    setFinished(true);
+    update(recording.id, (take) => ({ ...take, conversationFinished: true }));
+  }, [recording.id, update]);
+
   const endForLimit = useCallback(() => {
     setLimitReached(true);
     setError(
@@ -132,8 +140,9 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     setPhase("idle");
     setMuted(true);
     setStartedAt(null);
+    finish();
     void endSessionIfActive(current).catch(() => {});
-  }, [microphone, releaseTalk]);
+  }, [microphone, releaseTalk, finish]);
 
   useEffect(() => {
     if (!active) return;
@@ -190,9 +199,9 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     setPhase("idle");
     setMuted(true);
     setStartedAt(null);
+    if (showStats) finish();
     try {
       await endSessionIfActive(current);
-      if (showStats && controller.current === pending) setFinished(true);
     } catch {
       if (controller.current === pending)
         setError("The connection ended unexpectedly. You can start again.");
@@ -212,6 +221,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
       ...take,
       conversation: [],
       conversationRole: voiceRole,
+      conversationFinished: false,
     }));
     const began = Date.now();
     turnCount.current = 0;
@@ -219,8 +229,55 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     setNow(began);
     setPhase("preparing");
     try {
+      let prepared = recording;
+      const preparationNotices: string[] = [];
+      if (!recording.factCheck && recording.words?.length) {
+        try {
+          const sources = await listSources(
+            recording.config.endpoint,
+            collection,
+          );
+          pending.signal.throwIfAborted();
+          if (sources.some((source) => source.status === "ready")) {
+            const checked = await runFactCheck(
+              recording.config.endpoint,
+              {
+                words: recording.words,
+                collectionId: collection,
+                useWeb: false,
+              },
+              pending.signal,
+            );
+            pending.signal.throwIfAborted();
+            prepared = { ...recording, factCheck: checked };
+            update(recording.id, (take) =>
+              take.words !== recording.words
+                ? take
+                : {
+                    ...take,
+                    factCheck: checked,
+                    feedback: [
+                      ...take.feedback.filter(
+                        (item) => !item.id.startsWith("fact-"),
+                      ),
+                      ...factFeedback(checked, take.durationMs),
+                    ].sort((a, b) => a.startMs - b.startMs),
+                  },
+            );
+          } else {
+            preparationNotices.push(
+              "No ready sources were available for the content score. Upload material and wait for it to finish processing, then start again.",
+            );
+          }
+        } catch {
+          pending.signal.throwIfAborted();
+          preparationNotices.push(
+            "The source check failed. Voice practice can continue, but the content score is unavailable. Retry the source check in Review moments.",
+          );
+        }
+      }
       const context = await prepareAgent(
-        recording,
+        prepared,
         collection,
         pending.signal,
         voiceRole,
@@ -230,7 +287,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
         pending.signal,
       );
       pending.signal.throwIfAborted();
-      setNotices(context.notices);
+      setNotices([...preparationNotices, ...context.notices]);
       setPhase("connecting");
       const { Conversation } = await import("@elevenlabs/client");
       pending.signal.throwIfAborted();
@@ -287,7 +344,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
             setPhase("idle");
             setMuted(true);
             setStartedAt(null);
-            if (reason === "agent") setFinished(true);
+            if (reason === "agent") finish();
           }
         },
         onError: () => {
@@ -367,13 +424,31 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     setFinished(false);
     setError("");
     setPhase("idle");
-    update(recording.id, (take) => ({ ...take, conversation: [] }));
+    update(recording.id, (take) => ({
+      ...take,
+      conversation: [],
+      conversationFinished: false,
+    }));
   }
 
   if (finished)
     return (
       <div className="question-practice">
         <PerformanceEvaluation input={recording} />
+        {error && (
+          <p role="alert" className="status-error">
+            {error}
+          </p>
+        )}
+        <p className="field-hint">
+          Content uses source-checked presentation statements and reviewed typed
+          answers. Spoken conversation answers are not scored.
+        </p>
+        {notices.map((notice) => (
+          <p className="field-hint" key={notice}>
+            {notice}
+          </p>
+        ))}
         <div className="question-actions">
           <Button asChild>
             <Link href="/live">
@@ -480,7 +555,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
               <div className="question-actions">
                 <Button variant="outline" onClick={() => void stop(connected)}>
                   <Square size={16} />{" "}
-                  {connected ? "End conversation" : "Cancel"}
+                  {connected ? "Skip to results" : "Cancel"}
                 </Button>
                 {connected && (
                   <Button
@@ -582,12 +657,13 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
           <p className="field-hint">
             This browser ends the session after 10 minutes or{" "}
             {MAX_VOICE_USER_TURNS} spoken answers. Starting shares your
-            transcript and matching material with ElevenLabs. Microphone audio
-            is shared while you hold the talk button. When materials are
-            insufficient, the agent sends focused search queries to Tavily to
-            check public web sources. Spoken feedback is an AI suggestion; use
-            source checks to verify factual claims. You can end the conversation
-            at any time.
+            transcript and matching material with the backend language model
+            (Google Gemini by default) for a source check, and your transcript,
+            matching material with ElevenLabs. Microphone audio is shared while
+            you hold the talk button. When materials are insufficient, the agent
+            sends focused search queries to Tavily to check public web sources.
+            Spoken feedback is an AI suggestion; use source checks to verify
+            factual claims. You can end the conversation at any time.
           </p>
           {notices.map((notice) => (
             <p className="field-hint" key={notice}>

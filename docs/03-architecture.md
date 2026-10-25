@@ -384,7 +384,9 @@ sequenceDiagram
     participant WS as Wikipedia / Tavily
 
     FE->>BE: GET /factcheck/settings (Modell, LLM-Host, Web-Anbieter)
-    U->>FE: Check facts (Wörter aus ASR oder Import, collection_id, use_web)
+    FE->>BE: GET /sources (Collection der Aufnahme)
+    Note over FE: Normaler Review startet fehlenden Check automatisch bei Transkript,<br/>bereiten Quellen und verfügbarem Modell; Stage bleibt explizit
+    U->>FE: Optional: Check facts / Check again (Wörter, collection_id, use_web)
     FE->>BE: POST /factcheck
     BE->>BE: URL, Schlüssel und Optionen prüfen (sonst 503 vor Speicherung)
     BE->>S3: factcheck-jobs/id/request.json
@@ -455,6 +457,15 @@ sequenceDiagram
     FE->>BE: GET /questions/agent/settings
     opt Start voice questions, explizit starten
         U->>FE: Gesprächspartner wählen (Automatisch / Student / Professor / Lehrkraft)
+        opt Noch kein Fact-Check gespeichert
+            FE->>BE: GET /sources (eingefrorene Collection des Takes)
+            opt Mindestens eine Quelle bereit
+                FE->>BE: POST /factcheck (Wörter, Collection, use_web=false)
+                FE->>BE: GET /factcheck/jobs/id (Polling)
+                FE->>FE: Fact-Check und Timeline-Marker im Take speichern
+            end
+            Note over FE: Ohne Quellen oder bei Fehler Hinweis; Sprachdialog bleibt verfügbar
+        end
         FE->>BE: POST /questions/agent (Wörter, Collection, Modus, Funde, voice_role)
         BE->>S3: agent-context-jobs/id/request.json
         BE-->>FE: 202 Job-ID
@@ -487,8 +498,8 @@ sequenceDiagram
         Note over FE: Browser: 600 s ab Start oder 12 Nutzerbeiträge,<br/>auch Vorbereitung abbrechen, späte SDK-Verbindung schließen
         alt End conversation, Browserlimit oder reguläres Agent-Ende
             U->>FE: Gespräch beenden
-            FE->>E: Verbindung schließen, Mikrofon freigeben
-            FE->>FE: PerformanceEvaluation anzeigen, Fokus auf Statistik-Überschrift
+            FE->>FE: conversationFinished im lokalen Take speichern<br/>PerformanceEvaluation sofort anzeigen, Fokus auf Statistik-Überschrift
+            FE->>E: Mikrofon freigeben, Verbindung asynchron schließen<br/>Cleanup blockiert die Auswertung nicht
             Note over FE: Vorhandene Messdaten,<br/>keine neuen Urteile über gesprochene Antworten
         else Ansicht verlassen / Verbindung abbrechen
             FE->>E: Verbindung schließen, keine Auswertung öffnen
@@ -561,6 +572,8 @@ flowchart TD
     LIVE -.-> STAGEMODE
     STORE["Root-Layout: LiveSessionProvider + IndexedDB<br/>Video, Analyse und Fragen je Aufnahme<br/>Wiederherstellung nach Reload"] -.-> LIVE
     STORE --> EVIDENCE["recordingReviewData + recordingFeedback<br/>Video, Dauer und Events der gewählten Aufnahme<br/>Quellen-Marker aus aktuellem Fact-Check<br/>Fragen zählen nicht als Präsentationsevidenz"]
+    LIVE --> POSITIVE["PositiveFeedback: gemessene Referenzbereiche<br/>stabiler Torso + stimmhafter Mikrofonpegel<br/>mindestens 2 s, ohne Kalibrierung oder Messlücken<br/>Review-Momente, keine zusätzlichen Live-Hinweise"]
+    POSITIVE --> STORE
     EVIDENCE --> LREV
     EVIDENCE --> LA
     DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]

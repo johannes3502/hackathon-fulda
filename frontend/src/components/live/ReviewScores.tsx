@@ -57,7 +57,9 @@ export function ReviewScores({
                   {score.value === null
                     ? score.source === "claims"
                       ? "Keine entscheidbaren Aussagen"
-                      : "Noch keine bewertbaren Daten"
+                      : key === "knowledge"
+                        ? "Quellencheck mit geprüftem Zitat erforderlich"
+                        : "Noch keine bewertbaren Daten"
                     : score.source === "claims"
                       ? `${score.supported} von ${score.supported + score.contradicted} Aussagen gestützt`
                       : `${(score.assessedMs / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })} s bewertet · ${Math.round(score.coverage * 100)} % der Aufnahme`}
@@ -66,6 +68,11 @@ export function ReviewScores({
                   <span className="review-score-unknown">
                     {score.unassessed} Aussagen offen · nicht als falsch
                     gewertet
+                  </span>
+                )}
+                {score.source === "time" && score.value === 0 && (
+                  <span className="review-score-unknown">
+                    Nur kritische Evidenz erfasst · kein Gesamturteil
                   </span>
                 )}
               </>
@@ -105,6 +112,14 @@ export function ReviewScores({
           gestützter Aussagen an allen gestützten oder widersprochenen Aussagen
           mit geprüftem Quellenzitat. „Nicht gefunden“ und ungeprüfte Aussagen
           bleiben offen. Ohne Quellencheck gelten die bewerteten Zeitanteile.
+        </p>
+        <p>
+          Positive Kamera-Evidenz: gemessener stabiler Oberkörper nahe der
+          kalibrierten Referenz. Positive Sprach-Evidenz: gemessener Stimmpegel
+          im Referenzbereich während erkannter stimmhafter Sprache. Beide
+          brauchen mindestens 2 s zusammenhängende Messungen. Kalibrierung,
+          Stille und Messlücken zählen nicht als positive Evidenz. Ältere
+          Aufnahmen enthalten diese Messabschnitte möglicherweise noch nicht.
         </p>
         <p>
           Der Score bewertet die erfasste Evidenz dieses Takes. Er ist eine

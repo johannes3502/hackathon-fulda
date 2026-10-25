@@ -2,6 +2,7 @@ import { HEURISTICS, type PoseSample } from "./sample";
 import { CROSS_ARMS, crossArmsCheck } from "./cues";
 import type { PoseRuntime } from "./options";
 import type { LabRule } from "./lab-events";
+import { PositiveFeedback } from "../live/positive-feedback";
 
 // Engineering settings for a visible, reproducible prototype, NOT validated
 // presentation-quality cutoffs. Rationale and acceptance protocol: docs/04-gesture-evaluation.md.
@@ -239,6 +240,22 @@ function features(sample: PoseSample | null): Features | null {
 }
 
 export class PoseEvaluator {
+  private positive = new PositiveFeedback(
+    {
+      id: `${this.sessionId}-steady-posture`,
+      category: "Posture",
+      title: "Torso steady near your reference",
+      detail:
+        "Measured sideways torso angle and position stayed within the calibrated reference ranges. Prototype heuristic; this does not assess the meaning of a gesture.",
+      action:
+        "Replay this stable position and compare it with a flagged passage.",
+    },
+    POSE_RULES.maxGapMs,
+    POSE_RULES.stabilizeHoldMs,
+  );
+  get positiveFeedback() {
+    return this.positive.feedback;
+  }
   private baseline: Baseline | null = null;
   private calibration: { t: number; f: Features }[] = [];
   private previous = -Infinity;
@@ -285,6 +302,7 @@ export class PoseEvaluator {
     const gap = t - this.previous > POSE_RULES.maxGapMs;
     this.previous = t;
     const f = features(sample);
+    if (gap || !f) this.positive.update(t, false);
     if (gap || !f) {
       for (const [rule, hold] of this.holds) {
         if (hold.event)
@@ -443,6 +461,13 @@ export class PoseEvaluator {
     );
     const shiftDelta =
       Math.abs(f.centerX - baseline.centerX) / baseline.shoulderWidth;
+    this.positive.update(
+      t,
+      this.modes.torso_lean !== "off" &&
+        this.modes.body_shift !== "off" &&
+        leanDelta < POSE_RULES.leanExitDeg &&
+        shiftDelta < POSE_RULES.shiftExit,
+    );
     this.rule(
       "body_shift",
       shiftDelta,

@@ -48,15 +48,16 @@ export type PerformanceInput = {
  *   by verdict: supports = 1, contradicts = 0, not_found/unchecked = 0.5.
  *   score = round(100 * points / items); null without claims and answers.
  * Voice (weight 0.25)
- *   events = feedback items with category pace/volume/pitch/filler/pause
+ *   events = non-positive feedback items with category pace/volume/pitch/filler/pause
  *   (case-insensitive). eventsPerMin = events / max(0.5, durationMs / 60000).
  *   score = round(max(40, 100 - eventsPerMin * 15)).
- *   Null when there are no words and no such events.
+ *   Null without words, adjustment events or measured positive intervals.
  * Gesture (weight 0.25)
  *   events = feedback items with category posture/gesture/gaze (case-
  *   insensitive, browser labels "Posture"/"Gestures"/"Head" included);
  *   poseEvents are counted only when feedback has no pose category — one
- *   source consistently. Same formula as voice; null without any pose events.
+ *   source consistently. Same formula as voice; positive intervals establish
+ *   coverage without deductions. Null without any pose evidence.
  * Overall
  *   Weighted mean over non-null categories with weights renormalized
  *   (content + voice only -> 2/3 and 1/3); null when all categories are null.
@@ -195,20 +196,39 @@ export function evaluatePerformance(
   input: PerformanceInput,
 ): PerformanceEvaluation {
   const durationMs = Number.isFinite(input.durationMs) ? input.durationMs : 0;
-  const feedback = input.feedback ?? [];
+  const feedback = (input.feedback ?? []).filter(
+    (item) => item.kind !== "positive",
+  );
   const content = contentStats(input);
 
   const voice = feedback.filter((item) =>
     VOICE_CATEGORIES.includes(categoryKey(item.category)),
   );
   const hasWords = (input.words ?? []).length > 0;
+  const positive = (input.feedback ?? []).filter(
+    (item) =>
+      item.kind === "positive" &&
+      Number.isFinite(item.startMs) &&
+      Number.isFinite(item.endMs) &&
+      item.startMs >= 0 &&
+      Math.min(item.endMs, durationMs) > item.startMs,
+  );
+  const positiveVoice = positive.filter((item) =>
+    VOICE_CATEGORIES.includes(categoryKey(item.category)),
+  );
+  const positivePose = positive.filter(
+    (item) => GESTURE_KINDS[categoryKey(item.category)],
+  );
   const voiceScore =
-    hasWords || voice.length ? deductionScore(voice.length, durationMs) : null;
+    hasWords || voice.length || positiveVoice.length
+      ? deductionScore(voice.length, durationMs)
+      : null;
 
   const poseKinds = poseKindsFrom(feedback, input.poseEvents ?? []);
-  const gestureScore = poseKinds.length
-    ? deductionScore(poseKinds.length, durationMs)
-    : null;
+  const gestureScore =
+    poseKinds.length || positivePose.length
+      ? deductionScore(poseKinds.length, durationMs)
+      : null;
 
   const settled = content.claimSupports + content.answerSupports;
   const differs = content.claimContradicts + content.answerContradicts;
@@ -246,6 +266,8 @@ export function evaluatePerformance(
     ADJUSTMENT_LABELS,
     "marker",
   );
+  voiceEvidence.push(...[...new Set(positiveVoice.map((item) => item.title))]);
+  gestureEvidence.push(...[...new Set(positivePose.map((item) => item.title))]);
 
   const categories: PerformanceCategory[] = [
     {

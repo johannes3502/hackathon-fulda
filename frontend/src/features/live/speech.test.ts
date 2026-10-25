@@ -28,6 +28,30 @@ function ready(flags = DEFAULT_FEATURE_FLAGS) {
   expect(feed(engine, 0, 3000).phase).toBe("ready");
   return engine;
 }
+it("saves positive volume evidence across a minute of voiced speech, excluding silence, gaps and disabled analysis", () => {
+  const engine = ready();
+  expect(engine.positiveFeedback).toEqual([]);
+  feed(engine, 3040, 60000);
+  expect(engine.positiveFeedback).toEqual([
+    expect.objectContaining({
+      kind: "positive",
+      category: "volume",
+      endMs: 60000,
+    }),
+  ]);
+  const start = engine.positiveFeedback[0].startMs;
+  expect(start).toBeGreaterThanOrEqual(3000);
+  feed(engine, 60040, 65000, -100, null);
+  expect(engine.positiveFeedback.at(-1)?.endMs).toBe(60000);
+  feed(engine, 70000, 75000);
+  expect(engine.positiveFeedback.at(-1)?.startMs).toBeGreaterThanOrEqual(70000);
+  const disabled = ready({ ...DEFAULT_FEATURE_FLAGS, volumeFeedback: false });
+  feed(disabled, 3040, 10000);
+  expect(disabled.positiveFeedback).toEqual([]);
+  const unvoiced = new SpeechEvaluator();
+  feed(unvoiced, 0, 60000, -25, null);
+  expect(unvoiced.positiveFeedback).toEqual([]);
+});
 it("does not calibrate on silence or label initial silence as a pause", () => {
   const engine = new SpeechEvaluator();
   expect(feed(engine, 0, 10000, -100, null).calibrationProgress).toBe(0);

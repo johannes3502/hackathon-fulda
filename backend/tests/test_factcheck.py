@@ -313,3 +313,33 @@ def test_task_is_idempotent_and_deletes_the_stored_transcript(monkeypatch):
     monkeypatch.setattr(llm, "configured_llm", Mock(side_effect=ValueError("not configured")))
     tasks.fact_check.run("job-2")
     assert store["status.json"]["status"] == "failed" and "request.json" not in store
+
+
+def test_task_reports_pipeline_import_failure_instead_of_leaving_job_queued(monkeypatch):
+    import builtins
+    from app import tasks
+
+    store = {"request.json": FactCheckRequest(words=TRANSCRIPT, use_web=False).model_dump(mode="json")}
+    monkeypatch.setattr(tasks.storage, "read_json", lambda job, name, prefix: store.get(name))
+    monkeypatch.setattr(tasks.storage, "write_json", lambda job, name, value, prefix: store.__setitem__(name, value))
+    s3 = Mock()
+    s3.delete_object.side_effect = lambda Bucket, Key: store.pop(Key.rsplit("/", 1)[1], None)
+    monkeypatch.setattr(tasks, "s3_client", lambda: s3)
+    monkeypatch.setenv("S3_BUCKET", "test")
+    redis = Mock()
+    redis.lock.return_value.acquire.return_value = True
+    monkeypatch.setattr("app.connections.redis_client", lambda: redis)
+    original_import = builtins.__import__
+
+    def broken_pipeline(name, *args, **kwargs):
+        if name == "app.factcheck.pipeline":
+            raise ImportError("synthetic import failure with private details")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", broken_pipeline)
+    tasks.fact_check.run("job-import-failure")
+
+    assert store["status.json"]["status"] == "failed"
+    assert "private details" not in store["status.json"]["error"]
+    assert "request.json" not in store
+    redis.lock.return_value.release.assert_called_once()

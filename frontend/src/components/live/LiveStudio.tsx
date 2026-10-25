@@ -231,6 +231,8 @@ export function LiveStudio({
             endMs: Math.min(item.endMs, recording.durationMs),
           })),
         ...poseEvents.map(poseFeedback),
+        ...pose.recordingPositiveFeedback(),
+        ...(pauseRate.current?.positiveFeedback ?? []),
         ...(pauseRate.current?.events ?? [])
           .filter(
             (item) => isPauseRate(item) && item.startMs < recording.durationMs,
@@ -239,7 +241,13 @@ export function LiveStudio({
             ...item,
             endMs: Math.min(item.endMs, recording.durationMs),
           })),
-      ].sort((a, b) => a.startMs - b.startMs),
+      ]
+        .filter((item) => item.startMs < recording.durationMs)
+        .map((item) => ({
+          ...item,
+          endMs: Math.min(item.endMs, recording.durationMs),
+        }))
+        .sort((a, b) => a.startMs - b.startMs),
     };
   }
   function openCapturedReview() {
@@ -380,7 +388,7 @@ export function LiveStudio({
         setPauseRateEvents([]);
         setPauseMonitor(null);
         browserPauses.current = feedbackEnabled("pause", featureFlags);
-        if (browserPauses.current) {
+        if (browserPauses.current || feedbackEnabled("volume", featureFlags)) {
           const speech = new LiveSpeech(
             featureFlags,
             (state) => {

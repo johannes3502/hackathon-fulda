@@ -184,7 +184,7 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
       .getByRole("button", { name: "Start voice questions", exact: true })
       .click();
     await expect(
-      page.getByRole("button", { name: "End conversation", exact: true }),
+      page.getByRole("button", { name: "Skip to results", exact: true }),
     ).toBeVisible({ timeout: 45_000 });
     await expect
       .poll(() => audioChunks, { timeout: 30_000 })
@@ -208,7 +208,7 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
       fullPage: true,
     });
     await page
-      .getByRole("button", { name: "End conversation", exact: true })
+      .getByRole("button", { name: "Skip to results", exact: true })
       .click();
     await expect.poll(() => socketClosed).toBe(true);
     await expect(
@@ -216,7 +216,7 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
     ).toBeVisible();
   } finally {
     await page
-      .getByRole("button", { name: "End conversation", exact: true })
+      .getByRole("button", { name: "Skip to results", exact: true })
       .click({ timeout: 1000 })
       .catch(() => {});
     if (sourceId)

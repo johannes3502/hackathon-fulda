@@ -26,6 +26,26 @@ function ready() {
   return engine;
 }
 describe("observable gesture rules", () => {
+  it("records measured stable torso intervals for review without praising calibration, missing frames or disabled rules", () => {
+    const engine = ready();
+    expect(engine.positiveFeedback).toEqual([]);
+    feed(engine, "neutral", 3100, 6000);
+    expect(engine.positiveFeedback).toEqual([
+      expect.objectContaining({ startMs: 3000, endMs: 6000, kind: "positive" }),
+    ]);
+    feed(engine, "lean", 6100, 9000);
+    engine.update(null, 9100);
+    feed(engine, "neutral", 15000, 18000);
+    expect(
+      engine.positiveFeedback.map(({ startMs, endMs }) => [startMs, endMs]),
+    ).toEqual([
+      [3000, 6000],
+      [15000, 18000],
+    ]);
+    engine.setModes({ torso_lean: "off" });
+    feed(engine, "neutral", 18100, 22000);
+    expect(engine.positiveFeedback.at(-1)?.endMs).toBe(18000);
+  });
   it("calibrates a smaller, confidently detected torso while the hands move", () => {
     const engine = new PoseEvaluator();
     let state!: PoseEvaluation;

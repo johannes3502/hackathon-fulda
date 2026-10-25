@@ -179,12 +179,14 @@ def _model_job(task, job_id: str, prefix: str, job_model, run, error: str,
 @celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
 def fact_check(self, job_id: str) -> dict[str, str]:
     """Reuse terminal results on redelivery; delete the stored transcript afterwards."""
-    from app.factcheck.llm import configured_llm
     from app.factcheck.models import FactCheckJob, FactCheckRequest
-    from app.factcheck.pipeline import run_fact_check
-    from app.factcheck.web import configured_web_searcher
 
     def run(request: dict):
+        # Load the pipeline inside the job's error handler so import failures become terminal.
+        from app.factcheck.llm import configured_llm
+        from app.factcheck.pipeline import run_fact_check
+        from app.factcheck.web import configured_web_searcher
+
         parsed = FactCheckRequest.model_validate(request)
         return run_fact_check(parsed, configured_llm(), configured_web_searcher() if parsed.use_web else None,
                               workers=int(os.getenv("LLM_CONCURRENCY", "4")))

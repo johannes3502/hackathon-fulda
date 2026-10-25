@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, FileSearch, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,9 +31,13 @@ const providerName = (id: string | null | undefined) =>
 export function FactCheckPanel({
   recording,
   onSelect,
+  autoCheck = false,
+  onStatus,
 }: {
   recording: LiveRecording;
   onSelect: (feedback: LiveFeedback) => void;
+  autoCheck?: boolean;
+  onStatus?: (status: string) => void;
 }) {
   const { update } = useLiveSessions();
   const endpoint = recording.config.endpoint;
@@ -47,7 +51,14 @@ export function FactCheckPanel({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
-  useEffect(() => () => controller.current?.abort(), []);
+  const autoAttempt = useRef<LiveRecording["words"]>(undefined);
+  useEffect(
+    () => () => {
+      controller.current?.abort();
+      autoAttempt.current = undefined;
+    },
+    [],
+  );
   useEffect(() => {
     const active = new AbortController();
     factCheckSettings(endpoint, active.signal)
@@ -69,60 +80,108 @@ export function FactCheckPanel({
     return () => active.abort();
   }, [endpoint, collection]);
 
-  const words = recording.words ?? [];
+  const words = useMemo(() => recording.words ?? [], [recording.words]);
   const result = recording.factCheck;
   const feedback = result ? factFeedback(result, recording.durationMs) : [];
   const web = useWeb && !!settings?.web_provider;
   const canRun = !busy && !!settings?.available && words.length > 0;
 
-  async function check() {
-    const active = new AbortController();
-    controller.current?.abort();
-    controller.current = active;
-    setBusy(true);
-    setNotice(null);
-    try {
-      const checked = await runFactCheck(
-        endpoint,
-        {
-          words,
-          collectionId: collection,
-          useWeb: web,
-        },
-        active.signal,
-      );
-      if (active.signal.aborted) return;
-      update(recording.id, (current) =>
-        current.words !== words
-          ? current
-          : {
-              ...current,
-              factCheck: checked,
-              questions: undefined,
-              answers: undefined,
-              feedback: [
-                ...current.feedback.filter(
-                  (f) =>
-                    !f.id.startsWith("fact-") && !f.id.startsWith("question-"),
-                ),
-                ...factFeedback(checked, recording.durationMs),
-              ].sort((a, b) => a.startMs - b.startMs),
-            },
-      );
-      setNotice(
-        checked.claims.length
-          ? `${checked.claims.length} ${checked.claims.length === 1 ? "statement" : "statements"} checked and added to your feedback moments.`
-          : "No checkable factual statements were found in this transcript.",
-      );
-    } catch (error) {
-      if (!active.signal.aborted)
-        setNotice(
-          error instanceof Error ? error.message : "The fact-check failed.",
+  const check = useCallback(
+    async (resetQuestions = true) => {
+      const active = new AbortController();
+      controller.current?.abort();
+      controller.current = active;
+      setBusy(true);
+      setNotice(null);
+      try {
+        const checked = await runFactCheck(
+          endpoint,
+          {
+            words,
+            collectionId: collection,
+            useWeb: web,
+          },
+          active.signal,
         );
-    } finally {
-      if (!active.signal.aborted) setBusy(false);
-    }
-  }
+        if (active.signal.aborted) return;
+        update(recording.id, (current) =>
+          current.words !== words
+            ? current
+            : {
+                ...current,
+                factCheck: checked,
+                ...(resetQuestions
+                  ? { questions: undefined, answers: undefined }
+                  : {}),
+                feedback: [
+                  ...current.feedback.filter(
+                    (f) =>
+                      !f.id.startsWith("fact-") &&
+                      (!resetQuestions || !f.id.startsWith("question-")),
+                  ),
+                  ...factFeedback(checked, recording.durationMs),
+                ].sort((a, b) => a.startMs - b.startMs),
+              },
+        );
+        setNotice(
+          checked.claims.length
+            ? `${checked.claims.length} ${checked.claims.length === 1 ? "statement" : "statements"} checked and added to your feedback moments.`
+            : "No checkable factual statements were found in this transcript.",
+        );
+      } catch (error) {
+        if (!active.signal.aborted)
+          setNotice(
+            error instanceof Error ? error.message : "The fact-check failed.",
+          );
+      } finally {
+        if (!active.signal.aborted) setBusy(false);
+      }
+    },
+    [
+      endpoint,
+      words,
+      collection,
+      web,
+      recording.id,
+      recording.durationMs,
+      update,
+    ],
+  );
+
+  useEffect(() => {
+    if (
+      !autoCheck ||
+      result ||
+      !settings?.available ||
+      !readySources ||
+      !words.length ||
+      autoAttempt.current === words
+    )
+      return;
+    autoAttempt.current = words;
+    void check(false);
+  }, [autoCheck, result, settings, readySources, words, check]);
+
+  const status = busy
+    ? "Fachwissen: Quellencheck läuft …"
+    : result
+      ? result.claims.length
+        ? "Der Quellencheck enthält noch keine entscheidbaren Aussagen mit geprüftem Zitat. Details unter „Transcript and source checks“."
+        : "Im Transkript wurden keine prüfbaren Fakten gefunden."
+      : notice
+        ? `Fachwissen: ${notice}`
+        : !words.length
+          ? "Fachwissen benötigt ein Transkript. Nutze „Practice questions“ → „Transcribe this take“."
+          : !settings || readySources === null
+            ? "Fachwissen: Verfügbarkeit von Quellen und Modell wird geprüft …"
+            : !settings.available
+              ? "Fachwissen: Das Modell für den Quellencheck ist nicht verfügbar."
+              : !readySources
+                ? "Fachwissen benötigt fertig verarbeitete Quellen. Lade dein Material unter „Prepare“ hoch und aktualisiere den Quellenstatus."
+                : "Fachwissen: Quellencheck wird vorbereitet …";
+  useEffect(() => {
+    onStatus?.(status);
+  }, [onStatus, status]);
 
   return (
     <section className="panel fact-check" aria-labelledby="fact-check-title">
@@ -184,7 +243,8 @@ export function FactCheckPanel({
           {web
             ? ` and short search queries to ${providerName(settings.web_provider)}`
             : ""}
-          . Only quotes found in a source count as evidence; fuzzy matches are marked.
+          . Only quotes found in a source count as evidence; fuzzy matches are
+          marked.
         </p>
       )}
       <Button onClick={() => void check()} disabled={!canRun}>

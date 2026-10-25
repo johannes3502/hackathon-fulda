@@ -348,6 +348,9 @@ export class PoseCapture {
   get events() {
     return this.evaluation?.events ?? [];
   }
+  get positiveFeedback() {
+    return this.evaluator.positiveFeedback;
+  }
   private fail(message: string) {
     this.dispose();
     this.latest = null;

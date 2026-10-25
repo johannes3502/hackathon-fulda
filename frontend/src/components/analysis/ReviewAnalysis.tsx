@@ -144,6 +144,13 @@ export function ReviewAnalysis({
             recordingTitle={data.demo ? undefined : data.title}
             onSelect={(key) => setCriterion(criterion === key ? null : key)}
           />
+          {!data.demo && scores.knowledge.value === null && (
+            <p className="field-hint" role="status">
+              Fachwissen benötigt entscheidbare Aussagen mit geprüftem
+              Quellenzitat.{" "}
+              <Link href={backHref}>Quellencheck in der Aufnahmeübersicht</Link>
+            </p>
+          )}
           <div className="review418-context">
             <span>
               {data.notice ??

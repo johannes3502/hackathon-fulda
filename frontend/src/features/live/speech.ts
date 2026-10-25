@@ -12,6 +12,7 @@ import {
   type SpeechReference,
 } from "./speech-baseline";
 import { loadLiveHintSettings } from "../admin/settings";
+import { PositiveFeedback } from "./positive-feedback";
 
 // Prototype settings reused from backend/app/speech/config.py. Live activity
 // uses energy, not the backend's Silero VAD. No WPM or filler claims from audio.
@@ -82,6 +83,22 @@ const rate = (frames: SignalFrame[]) => {
 };
 
 export class SpeechEvaluator {
+  private positive = new PositiveFeedback(
+    {
+      id: `${this.sessionId}-steady-volume`,
+      category: "volume",
+      title: "Voice level near your reference",
+      detail:
+        "Voiced microphone level stayed within the existing volume range of your calibrated reference. Local audio heuristic; this does not establish clarity or an appropriate speaking pace.",
+      action:
+        "Listen to this passage and compare its volume with a flagged passage.",
+    },
+    LIVE_SPEECH.maxGapMs,
+    POSE_RULES.stabilizeHoldMs,
+  );
+  get positiveFeedback() {
+    return this.positive.feedback;
+  }
   private baseline: SpeechReference | null = null;
   private reference = new AdaptiveSpeechBaseline();
   private frames: SignalFrame[] = [];
@@ -187,6 +204,25 @@ export class SpeechEvaluator {
     }
     this.frames = this.frames.filter(
       (frame) => input.tMs - frame.tMs <= LIVE_SPEECH.paceWindowMs,
+    );
+    const volumeWindow = this.frames.filter(
+      (frame) => frame.tMs > input.tMs - LIVE_SPEECH.volumeWindowMs,
+    );
+    const volumeSpeech = volumeWindow.filter(voiced);
+    this.positive.update(
+      input.tMs,
+      feedbackEnabled("volume", this.flags) &&
+        this.baseline !== null &&
+        voiced(f) &&
+        volumeWindow.length * LIVE_SPEECH.frameMs >=
+          LIVE_SPEECH.volumeWindowMs &&
+        volumeSpeech.length / volumeWindow.length >=
+          LIVE_SPEECH.minimumActiveRatio &&
+        Math.abs(
+          median(volumeSpeech.map((frame) => frame.levelDb)) -
+            this.baseline.level,
+        ) < LIVE_SPEECH.volumeDeltaDb &&
+        Math.abs(f.levelDb - this.baseline.level) < LIVE_SPEECH.volumeDeltaDb,
     );
     const matches = new Set<string>();
     const observe = (
@@ -457,6 +493,9 @@ export class LiveSpeech {
   }
   get events() {
     return this.engine.events;
+  }
+  get positiveFeedback() {
+    return this.engine.positiveFeedback;
   }
   beginRecording(timestamp: number, sessionId: string) {
     this.origin = timestamp;

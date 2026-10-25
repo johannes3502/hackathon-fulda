@@ -75,6 +75,8 @@ export function usePoseCapture(
     recalibrate: () => owner.current?.recalibrate(),
     recordingEvents: () =>
       recording.current ? (owner.current?.events ?? []) : [],
+    recordingPositiveFeedback: () =>
+      recording.current ? (owner.current?.positiveFeedback ?? []) : [],
     stop: () => owner.current?.stop(),
     recordingBlob: () =>
       recording.current ? owner.current?.log.blob() : undefined,

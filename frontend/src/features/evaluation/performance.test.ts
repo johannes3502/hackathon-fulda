@@ -82,6 +82,51 @@ const feedback = (id: string, category: string): LiveFeedback => ({
   detail: "Synthetic",
   action: "Replay",
 });
+it("does not deduct points for measured positive review intervals", () => {
+  const input = {
+    durationMs: 60000,
+    feedback: [feedback("warning", "volume"), feedback("lean", "Posture")],
+  };
+  expect(
+    evaluatePerformance({
+      ...input,
+      feedback: [
+        ...input.feedback,
+        { ...feedback("stable-volume", "volume"), kind: "positive" },
+        { ...feedback("stable-torso", "Posture"), kind: "positive" },
+      ],
+    }).categories.map((category) => category.score),
+  ).toEqual(
+    evaluatePerformance(input).categories.map((category) => category.score),
+  );
+});
+it("shows final scores for measured positive intervals without requiring warnings or a transcript", () => {
+  const evaluation = evaluatePerformance({
+    durationMs: 60000,
+    feedback: [
+      { ...feedback("Stable voice", "volume"), kind: "positive", endMs: 5000 },
+      { ...feedback("Stable torso", "Posture"), kind: "positive", endMs: 5000 },
+    ],
+  });
+  expect(evaluation.categories.map((category) => category.score)).toEqual([
+    null,
+    100,
+    100,
+  ]);
+  expect(evaluation.score).toBe(100);
+  expect(evaluation.categories[1].evidence).toEqual(["Stable voice"]);
+  expect(evaluation.categories[2].evidence).toEqual(["Stable torso"]);
+  for (const endMs of [0, -1, NaN]) {
+    expect(
+      evaluatePerformance({
+        durationMs: 60000,
+        feedback: [
+          { ...feedback("Invalid", "volume"), kind: "positive", endMs },
+        ],
+      }).score,
+    ).toBeNull();
+  }
+});
 const poseEvent = (id: string, type: PoseEvent["type"]): PoseEvent => ({
   session_id: "test",
   id,

@@ -76,6 +76,14 @@ Zeitanteile (Überlappungen derselben Art vereinigt); Fachwissen nutzt bevorzugt
 gestützte / (gestützte + widersprochene) Aussagen. Nicht gefunden, ungeprüft,
 neutrale Beobachtungen und unbeobachtete Zeit erzeugen keine Benotung. Kein
 Score ohne bewertbare Evidenz; Zeitabdeckung und Formel stehen im UI.
+Neue Takes speichern auch gemessene positive Abschnitte für den Review:
+Oberkörperwinkel und seitliche Position innerhalb der kalibrierten
+Referenzbereiche sowie stimmhafter Mikrofonpegel innerhalb der bestehenden
+Lautstärkegrenzen. Je mindestens 2 s zusammenhängende Messungen; Kalibrierung,
+Messlücken und beim Audio Stille bleiben außen vor. Positive Abschnitte sind
+Review-Momente, keine zusätzlichen Live-Hinweise. Das beurteilt weder die
+Bedeutung einer Geste noch Verständlichkeit oder Tempo. Ältere Takes werden
+ohne diese Messungen nicht nachträglich mit positiver Evidenz aufgefüllt.
 Die Graph-Darstellung ist eine durchgehende Linie aus geraden Segmenten ohne
 Säulenflächen, mit beweglichem Wiedergabepunkt. Zwischenwerte sind als
 Interpolation gekennzeichnet, nicht als zusätzliche Messungen.
@@ -295,6 +303,13 @@ Personenbewertung; Details: `docs/07-review-and-agent.md`. Diese Auswertung ist
 andere Bezugsgröße, kein gemeinsamer Gesamtscore. Die UI soll die beiden
 Ergebnisse entsprechend benennen; eine Vereinheitlichung ist offen
 (`docs/14-open-todos.md`).
+Im Sprachdialog erscheint die Auswertung beim manuellen Ende, regulären
+Agent-Ende oder Browserlimit sofort, unabhängig vom Provider-Cleanup.
+`conversationFinished` bleibt im lokal gespeicherten Take erhalten, sodass
+die Auswertung nach Ansichtswechsel und Reload wieder erscheint. Eine neue
+Runde setzt den Abschluss zurück. Gemessene positive Stimm-/Pose-Abschnitte
+zählen als Datenabdeckung, aber nie als Abzugsmarker; ohne Messdaten bleibt
+der jeweilige Score offen. Gesprochene Antworten werden weiterhin nicht benotet.
 
 ## Deep Research (24.10.2026)
 

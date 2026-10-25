@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowRight, FileText, MessageSquare, Play, Video } from "lucide-react";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
+import { ArrowRight, FileText, MessageSquare, Play, Video } from "lucide-react";
+import Link from "next/link";
 
 export function PresentationIntro() {
   const { recordings } = useLiveSessions();
