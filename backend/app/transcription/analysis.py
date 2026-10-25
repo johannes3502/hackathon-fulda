@@ -8,16 +8,22 @@ from app.transcription.config import WordConfig
 from app.transcription.models import WordAnalysis, WordSummary, Word
 
 _PUNCTUATION = re.compile(r"[^\w]+", re.UNICODE)
+_REPEATS = re.compile(r"(\w)\1+", re.UNICODE)
 
 
 def normalize(token: str) -> str:
     return _PUNCTUATION.sub("", token.casefold())
 
 
+def _squeeze(token: str) -> str:
+    """Collapse repeated letters so "ähhhm" and "ähm" compare equal."""
+    return _REPEATS.sub(r"\1", token)
+
+
 def analyze_words(words: list[Word], config: WordConfig | None = None) -> WordAnalysis:
     config = config or WordConfig()
     words = sorted(words, key=lambda w: (w.start_ms, w.end_ms))
-    fillers = {normalize(f) for f in config.fillers}
+    fillers = {_squeeze(normalize(f)) for f in config.fillers}
 
     pauses = _pauses(words, config)
     filler_events, repetition_events = _fillers_and_repetitions(words, fillers, config)
@@ -73,7 +79,7 @@ def _fillers_and_repetitions(
         token = normalize(word.word)
         if not token:
             continue
-        if token in fillers:
+        if _squeeze(token) in fillers:
             filler_events.append(
                 Event(
                     t_ms=word.start_ms,

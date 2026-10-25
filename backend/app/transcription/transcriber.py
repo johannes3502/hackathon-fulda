@@ -17,6 +17,17 @@ import httpx
 from app.transcription.models import Word
 
 DEFAULT_WHISPER_MODEL = "small"
+# Whisper imitates the style of its prompt. German hesitations in the prompt
+# keep "äh"/"ähm" in the transcript instead of a cleaned-up text. Only for
+# German; WHISPER_INITIAL_PROMPT overrides it and "none" disables it.
+DEFAULT_GERMAN_PROMPT = "Ähm, also, äh, ich wollte sagen, hm, dass wir das, ähm, so machen."
+
+
+def whisper_prompt(language: str | None) -> str | None:
+    value = os.getenv("WHISPER_INITIAL_PROMPT", "").strip()
+    if value.lower() == "none":
+        return None
+    return value or (DEFAULT_GERMAN_PROMPT if language == "de" else None)
 
 
 class Transcriber(Protocol):
@@ -119,7 +130,7 @@ class WhisperTranscriber:
         model_dir = os.getenv("WHISPER_MODEL_DIR", "").strip() or None
         model_path = os.getenv("WHISPER_MODEL_PATH", "").strip() or None
         language = os.getenv("WHISPER_LANGUAGE", "de").strip() or None
-        initial_prompt = os.getenv("WHISPER_INITIAL_PROMPT", "").strip() or None
+        initial_prompt = whisper_prompt(language)
         return cls(
             model or DEFAULT_WHISPER_MODEL,
             device=os.getenv("WHISPER_DEVICE", "cpu").strip() or "cpu",
