@@ -60,7 +60,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
       <div className="workspace review-workspace">
         <div className="workspace-back">
           <Link href="/live">
-            <ArrowLeft size={15} /> Studio
+            <ArrowLeft size={15} aria-hidden="true" /> Record again
           </Link>
         </div>
         <div className="workspace-heading">
@@ -74,10 +74,9 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 : ""}
             </p>
           </div>
-          <Button asChild variant="outline">
-            <Link href="/live">
-              Record again <ArrowRight size={16} />
-            </Link>
+          <Button onClick={() => setView("questions")}>
+            <MessageSquare size={17} aria-hidden="true" /> Practice questions
+            <ArrowRight size={16} aria-hidden="true" />
           </Button>
         </div>
         {recording.notice && (

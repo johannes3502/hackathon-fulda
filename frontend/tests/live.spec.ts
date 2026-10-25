@@ -742,6 +742,62 @@ async function backend(
   await page.waitForTimeout(1200);
 }
 
+test("review promotes practice questions and keeps record again as a back link", async ({
+  page,
+}, info) => {
+  const jobId = "12345678-1234-1234-1234-123456789abc";
+  await syntheticPose(page);
+  await page.route("**/api/sources?*", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/speech/analyze", (route) =>
+    route.fulfill({ status: 202, json: { job_id: jobId } }),
+  );
+  await page.route("**/api/speech/jobs/*", (route) =>
+    route.fulfill({
+      json: {
+        job_id: jobId,
+        status: "completed",
+        result: { audio: { summary: {} }, events: [], notices: [] },
+      },
+    }),
+  );
+  await page.route("**/api/questions/agent/settings", (route) =>
+    route.fulfill({ json: { available: false, reason: "Synthetic UI test" } }),
+  );
+  await backend(page);
+  await page.getByRole("button", { name: "Finish & review" }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  const heading = page.locator(".review-workspace .workspace-heading");
+  const questions = heading.getByRole("button", {
+    name: "Practice questions",
+    exact: true,
+  });
+  await expect(questions).toHaveClass(/button-primary/);
+  await expect(questions).toBeInViewport();
+  const back = page
+    .locator(".review-workspace .workspace-back")
+    .getByRole("link", { name: "Record again", exact: true });
+  await expect(back).toHaveAttribute("href", "/live");
+  await expect(back).not.toHaveClass(/button/);
+  await expect(back).toHaveCSS("min-height", "48px");
+  await expect(back.locator("svg")).toHaveClass(/lucide-arrow-left/);
+  expect((await back.boundingBox())!.y).toBeLessThan(
+    (await heading.boundingBox())!.y,
+  );
+  await noOverflow(page);
+  await page.screenshot({ path: info.outputPath("review-top-actions.png") });
+  await questions.click();
+  await expect(
+    page
+      .getByRole("group", { name: "Review steps" })
+      .getByRole("button", { name: "Practice questions", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("region", { name: "Practice questions", exact: true }),
+  ).toBeVisible();
+  await back.click();
+  await expect(page).toHaveURL(/\/live$/);
+});
+
 test("admin feature options persist, filter speech markers and lock the take", async ({
   page,
 }, info) => {
