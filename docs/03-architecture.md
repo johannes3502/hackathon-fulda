@@ -455,6 +455,15 @@ sequenceDiagram
     FE->>BE: GET /questions/agent/settings
     opt Start voice questions, explizit starten
         U->>FE: Gesprächspartner wählen (Automatisch / Student / Professor / Lehrkraft)
+        opt Noch kein Fact-Check gespeichert
+            FE->>BE: GET /sources (eingefrorene Collection des Takes)
+            opt Mindestens eine Quelle bereit
+                FE->>BE: POST /factcheck (Wörter, Collection, use_web=false)
+                FE->>BE: GET /factcheck/jobs/id (Polling)
+                FE->>FE: Fact-Check und Timeline-Marker im Take speichern
+            end
+            Note over FE: Ohne Quellen oder bei Fehler Hinweis; Sprachdialog bleibt verfügbar
+        end
         FE->>BE: POST /questions/agent (Wörter, Collection, Modus, Funde, voice_role)
         BE->>S3: agent-context-jobs/id/request.json
         BE-->>FE: 202 Job-ID

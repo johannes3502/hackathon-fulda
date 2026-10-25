@@ -1767,445 +1767,542 @@ test("Deepgram streaming waits for the last word and reuses the final transcript
   ).toBeVisible();
 });
 
-test("ElevenLabs receives the presentation, asks for readiness and opens final stats when ended", async ({
-  page,
-}, info) => {
-  const jobId = "12345678-1234-1234-1234-123456789abc";
-  const sourceId = "87654321-4321-4321-4321-cba987654321";
-  let material: Record<string, unknown> | null = null;
-  let savedCollection = "";
-  let expectedVoiceRole: "student" | "professor" | null = "student";
-  await page.route("**/api/sources?*", (route) =>
-    route.fulfill({ json: material ? [material] : [] }),
-  );
-  await page.route("**/api/sources", async (route) => {
-    expect(route.request().postData()).toContain("Synthetic thesis notes");
-    savedCollection = /name="collection_id"\r\n\r\n([^\r]+)/.exec(
-      route.request().postData()!,
-    )![1];
-    material = {
-      id: sourceId,
-      collection_id: savedCollection,
-      filename: "thesis.txt",
-      status: "ready",
-      chunk_count: 1,
-      size_bytes: 22,
-      content_type: "text/plain",
-      created_at: "2026-10-24T12:00:00Z",
-    };
-    await route.fulfill({ status: 202, json: { source: material } });
-  });
-  await page.route("**/api/speech/analyze", (route) =>
-    route.fulfill({ status: 202, json: { job_id: jobId } }),
-  );
-  await page.route("**/api/speech/jobs/*", (route) =>
-    route.fulfill({
-      json: {
-        job_id: jobId,
-        status: "completed",
-        result: {
-          audio: { summary: {} },
-          events: [],
-          words: [
-            { word: "Synthetic thesis result.", start_ms: 0, end_ms: 500 },
-          ],
-          asr_provider: "whisper",
-          synthetic_demo: true,
-          notices: [],
+for (const sourceCheck of ["ready", "failure", "no sources"] as const) {
+  test(`ElevenLabs receives the presentation and opens final stats: ${sourceCheck}`, async ({
+    page,
+  }, info) => {
+    const jobId = "12345678-1234-1234-1234-123456789abc";
+    const sourceId = "87654321-4321-4321-4321-cba987654321";
+    let material: Record<string, unknown> | null = null;
+    let savedCollection = "";
+    let expectedVoiceRole: "student" | "professor" | null = "student";
+    let checks = 0;
+    const claims = [
+      {
+        claim: "Synthetic thesis result.",
+        transcript: "Synthetic thesis result.",
+        t_ms: 0,
+        duration_ms: 500,
+        verdict: "supports",
+        explanation: "The uploaded source supports the statement.",
+        checked: ["upload"],
+        evidence: {
+          kind: "upload",
+          label: "thesis.txt",
+          quote: "Synthetic thesis result.",
+          quote_verified: "exact",
         },
       },
-    }),
-  );
-  await page.route("**/api/questions/agent/settings", (route) =>
-    route.fulfill({ json: { available: true } }),
-  );
-  await page.route("**/api/questions/agent", async (route) => {
-    expect(route.request().postDataJSON()).toMatchObject({
-      presentation_mode: "thesis",
-      voice_role: expectedVoiceRole,
-      collection_id: savedCollection,
-      words: [{ word: "Synthetic thesis result.", start_ms: 0, end_ms: 500 }],
+    ];
+    await page.route("**/api/factcheck", async (route) => {
+      checks++;
+      expect(route.request().postDataJSON()).toMatchObject({
+        collection_id: savedCollection,
+        words: [{ word: "Synthetic thesis result.", start_ms: 0, end_ms: 500 }],
+        use_web: false,
+      });
+      await route.fulfill(
+        sourceCheck === "failure"
+          ? { status: 503, json: { detail: "Synthetic source-check failure" } }
+          : { status: 202, json: { job_id: jobId } },
+      );
     });
-    await route.fulfill({ status: 202, json: { job_id: jobId } });
-  });
-  await page.route("**/api/questions/agent/jobs/*", (route) =>
-    route.fulfill({
-      json: {
-        job_id: jobId,
-        status: "completed",
-        result: {
-          prompt: "Synthetic thesis context with source notes",
-          source_count: 1,
-          notices: [],
+    await page.route("**/api/factcheck/jobs/*", (route) =>
+      route.fulfill({
+        json: {
+          job_id: jobId,
+          status: "completed",
+          result: {
+            claims,
+            events: [],
+            notices: [],
+            sources_checked: true,
+            model: "test",
+            web_provider: null,
+            config: {
+              max_claims: 6,
+              min_quote_chars: 12,
+              top_k: 5,
+              web_results: 4,
+            },
+          },
         },
-      },
-    }),
-  );
-  await page.route("**/api/questions/agent/session", (route) =>
-    route.fulfill({
-      json: {
-        signed_url:
-          "wss://api.elevenlabs.io/v1/convai/conversation?agent_id=synthetic",
-      },
-    }),
-  );
-  const closed = new Set<WebSocketRoute>();
-  let override = "";
-  let kickoffs = 0;
-  let endFromAgent = () => {};
-  let sendUserAnswer = () => {};
-  let playAgentAudio: (seconds: number) => void = () => {};
-  const microphonePackets: boolean[] = [];
-  let audioEventId = 0;
-  await page.routeWebSocket("wss://api.elevenlabs.io/**", (socket) => {
-    playAgentAudio = (seconds) =>
-      socket.send(
-        JSON.stringify({
-          type: "audio",
-          audio_event: {
-            audio_base_64: Buffer.alloc(16000 * 2 * seconds).toString("base64"),
-            event_id: ++audioEventId,
+      }),
+    );
+    await page.route("**/api/sources?*", (route) =>
+      route.fulfill({ json: material ? [material] : [] }),
+    );
+    await page.route("**/api/sources", async (route) => {
+      expect(route.request().postData()).toContain("Synthetic thesis notes");
+      savedCollection = /name="collection_id"\r\n\r\n([^\r]+)/.exec(
+        route.request().postData()!,
+      )![1];
+      material = {
+        id: sourceId,
+        collection_id: savedCollection,
+        filename: "thesis.txt",
+        status: "ready",
+        chunk_count: 1,
+        size_bytes: 22,
+        content_type: "text/plain",
+        created_at: "2026-10-24T12:00:00Z",
+      };
+      await route.fulfill({ status: 202, json: { source: material } });
+    });
+    await page.route("**/api/speech/analyze", (route) =>
+      route.fulfill({ status: 202, json: { job_id: jobId } }),
+    );
+    await page.route("**/api/speech/jobs/*", (route) =>
+      route.fulfill({
+        json: {
+          job_id: jobId,
+          status: "completed",
+          result: {
+            audio: { summary: {} },
+            events: [],
+            words: [
+              { word: "Synthetic thesis result.", start_ms: 0, end_ms: 500 },
+            ],
+            asr_provider: "whisper",
+            synthetic_demo: true,
+            notices: [],
           },
-        }),
-      );
-    endFromAgent = () => socket.close({ code: 1000 });
-    sendUserAnswer = () =>
-      socket.send(
-        JSON.stringify({
-          type: "user_transcript",
-          user_transcription_event: {
-            user_transcript: "Synthetic spoken answer.",
+        },
+      }),
+    );
+    await page.route("**/api/questions/agent/settings", (route) =>
+      route.fulfill({ json: { available: true } }),
+    );
+    await page.route("**/api/questions/agent", async (route) => {
+      expect(route.request().postDataJSON()).toMatchObject({
+        claims: sourceCheck === "ready" ? claims : [],
+        presentation_mode: "thesis",
+        voice_role: expectedVoiceRole,
+        collection_id: savedCollection,
+        words: [{ word: "Synthetic thesis result.", start_ms: 0, end_ms: 500 }],
+      });
+      await route.fulfill({ status: 202, json: { job_id: jobId } });
+    });
+    await page.route("**/api/questions/agent/jobs/*", (route) =>
+      route.fulfill({
+        json: {
+          job_id: jobId,
+          status: "completed",
+          result: {
+            prompt: "Synthetic thesis context with source notes",
+            source_count: 1,
+            notices: [],
           },
-        }),
-      );
-    socket.onClose(() => closed.add(socket));
-    socket.onMessage((raw) => {
-      if (typeof raw !== "string") return;
-      const message = JSON.parse(raw);
-      if (message.user_audio_chunk) {
-        microphonePackets.push(
-          Buffer.from(message.user_audio_chunk, "base64").some(
-            (byte) => byte !== 0,
-          ),
-        );
-      }
-      if (message.type === "conversation_initiation_client_data") {
-        override = message.conversation_config_override.agent.prompt.prompt;
-        expect(message.conversation_config_override.agent.first_message).toBe(
-          "Ich habe noch ein paar Fragen. Bist du bereit?",
-        );
+        },
+      }),
+    );
+    await page.route("**/api/questions/agent/session", (route) =>
+      route.fulfill({
+        json: {
+          signed_url:
+            "wss://api.elevenlabs.io/v1/convai/conversation?agent_id=synthetic",
+        },
+      }),
+    );
+    const closed = new Set<WebSocketRoute>();
+    let override = "";
+    let kickoffs = 0;
+    const audioChunks: boolean[] = [];
+    let endFromAgent = () => {};
+    let sendUserAnswer = () => {};
+    let playAgentAudio: (seconds: number) => void = () => {};
+    const microphonePackets: boolean[] = [];
+    let audioEventId = 0;
+    await page.routeWebSocket("wss://api.elevenlabs.io/**", (socket) => {
+      playAgentAudio = (seconds) =>
         socket.send(
           JSON.stringify({
-            type: "conversation_initiation_metadata",
-            conversation_initiation_metadata_event: {
-              conversation_id: "synthetic-conversation",
-              agent_output_audio_format: "pcm_16000",
-              user_input_audio_format: "pcm_16000",
+            type: "audio",
+            audio_event: {
+              audio_base_64: Buffer.alloc(16000 * 2 * seconds).toString(
+                "base64",
+              ),
+              event_id: ++audioEventId,
             },
           }),
         );
+      endFromAgent = () => socket.close({ code: 1000 });
+      sendUserAnswer = () =>
         socket.send(
           JSON.stringify({
-            type: "agent_response",
-            agent_response_event: {
-              // Provider-supplied tags must still be hidden in the transcript.
-              agent_response:
-                "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?",
+            type: "user_transcript",
+            user_transcription_event: {
+              user_transcript: "Synthetic spoken answer.",
             },
           }),
         );
-      }
-      if (message.type === "user_message") kickoffs++;
+      socket.onClose(() => closed.add(socket));
+      socket.onMessage((raw) => {
+        if (typeof raw !== "string") return;
+        const message = JSON.parse(raw);
+        if (message.user_audio_chunk) {
+          audioChunks.push(
+            Buffer.from(message.user_audio_chunk, "base64").some(
+              (byte) => byte !== 0,
+            ),
+          );
+        }
+        if (message.user_audio_chunk) {
+          microphonePackets.push(
+            Buffer.from(message.user_audio_chunk, "base64").some(
+              (byte) => byte !== 0,
+            ),
+          );
+        }
+        if (message.type === "conversation_initiation_client_data") {
+          override = message.conversation_config_override.agent.prompt.prompt;
+          expect(message.conversation_config_override.agent.first_message).toBe(
+            "Ich habe noch ein paar Fragen. Bist du bereit?",
+          );
+          socket.send(
+            JSON.stringify({
+              type: "conversation_initiation_metadata",
+              conversation_initiation_metadata_event: {
+                conversation_id: "synthetic-conversation",
+                agent_output_audio_format: "pcm_16000",
+                user_input_audio_format: "pcm_16000",
+              },
+            }),
+          );
+          socket.send(
+            JSON.stringify({
+              type: "agent_response",
+              agent_response_event: {
+                // Provider-supplied tags must still be hidden in the transcript.
+                agent_response:
+                  "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?",
+              },
+            }),
+          );
+        }
+        if (message.type === "user_message") kickoffs++;
+      });
     });
-  });
-  await page.goto("/admin");
-  const savedProtection = page.getByRole("checkbox", {
-    name: "Protect agent speech",
-  });
-  await expect(savedProtection).not.toBeChecked();
-  await savedProtection.check();
-  await page.reload();
-  await expect(savedProtection).toBeChecked();
-  await page.goto("/sources");
-  await expect(page.locator('input[type="file"]')).toBeEnabled();
-  await page.getByLabel("What are you preparing for?").selectOption("thesis");
-  await expect(page.locator("#presentation-mode-focus")).toContainText(
-    "University professor",
-  );
-  await page.locator('input[type="file"]').setInputFiles({
-    name: "thesis.txt",
-    mimeType: "text/plain",
-    buffer: Buffer.from("Synthetic thesis notes"),
-  });
-  await expect(
-    page.getByRole("region", { name: "Uploaded sources" }),
-  ).toContainText("Ready");
-  await backend(page, true);
-  await page.getByRole("button", { name: "Finish & review" }).click();
-  await expect(page).toHaveURL(/\/review$/);
-  // A later browser collection choice must not retarget an already recorded take.
-  await page.evaluate(() =>
-    localStorage.setItem(
-      "pitchcoach.sourceCollection",
-      "00000000-0000-4000-8000-000000000099",
-    ),
-  );
-  await page.evaluate(() =>
-    localStorage.setItem("pitchcoach.presentationMode", "school"),
-  );
-  await page
-    .getByRole("group", { name: "Review steps" })
-    .getByRole("button", { name: "Practice questions" })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Meet your university professor." }),
-  ).toBeVisible();
-  const questioner = page.getByRole("combobox", {
-    name: "Who would you like to speak with?",
-  });
-  await expect(questioner).toHaveValue("auto");
-  await questioner.selectOption("student");
-  await expect(
-    page.getByRole("heading", { name: "Meet your student." }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Start voice questions" }).click();
-  await expect(
-    page.getByRole("button", { name: "End conversation" }),
-  ).toBeVisible({ timeout: 15000 });
-  await expect(questioner).toBeDisabled();
-  expect(override).toBe("Synthetic thesis context with source notes");
-  await expect(
-    page.getByRole("heading", {
-      name: "Ich habe noch ein paar Fragen. Bist du bereit?",
-    }),
-  ).toBeVisible();
-  expect(kickoffs).toBe(0);
-  const protection = page.getByRole("checkbox", {
-    name: "Protect agent speech",
-  });
-  await expect(protection).toBeChecked();
-  async function expectMicrophoneAudio(nonzero: boolean) {
-    const before = microphonePackets.length;
-    await expect
-      .poll(() => microphonePackets.length)
-      .toBeGreaterThan(before + 2);
-    await expect
-      .poll(() => microphonePackets.slice(-2))
-      .toEqual([nonzero, nonzero]);
-  }
-  // Use the actual SDK and AudioWorklet: agent playback sends only silent
-  // microphone PCM, despite the synthetic microphone's continuous tone.
-  await expectMicrophoneAudio(true);
-  playAgentAudio(3);
-  await expect(
-    page
-      .getByRole("status")
-      .filter({ hasText: "microphone automatically muted" }),
-  ).toBeVisible();
-  await expectMicrophoneAudio(false);
-  await expect(
-    page.getByRole("status").filter({ hasText: "Listening to your answer" }),
-  ).toBeVisible();
-  await expectMicrophoneAudio(true);
-
-  playAgentAudio(10);
-  await expect(
-    page
-      .getByRole("status")
-      .filter({ hasText: "microphone automatically muted" }),
-  ).toBeVisible();
-  await protection.uncheck();
-  await expectMicrophoneAudio(true);
-  // Changing the saved setting in Admin must reach an already open round.
-  const adminTab = await page.context().newPage();
-  await adminTab.goto("/admin");
-  await adminTab
-    .getByRole("checkbox", { name: "Protect agent speech" })
-    .check();
-  await expect(protection).toBeChecked();
-  await expectMicrophoneAudio(false);
-  await adminTab.close();
-  await page
-    .getByRole("button", { name: "Mute microphone", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Unmute microphone", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    page.getByRole("status").filter({ hasText: "Microphone muted" }),
-  ).toBeVisible();
-  await expectMicrophoneAudio(false);
-  await page
-    .getByRole("button", { name: "Unmute microphone", exact: true })
-    .click();
-  await expectMicrophoneAudio(true);
-  await noOverflow(page);
-  await page.screenshot({
-    path: info.outputPath("professor-question.png"),
-    fullPage: true,
-  });
-  const stoppedBeforeEnd = await page.evaluate(
-    () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
-  );
-  await page
-    .getByRole("button", { name: "End conversation", exact: true })
-    .click();
-  await expect.poll(() => closed.size).toBe(1);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+    await page.goto("/admin");
+    const savedProtection = page.getByRole("checkbox", {
+      name: "Protect agent speech",
+    });
+    await expect(savedProtection).not.toBeChecked();
+    await savedProtection.check();
+    await page.reload();
+    await expect(savedProtection).toBeChecked();
+    await page.goto("/sources");
+    await expect(page.locator('input[type="file"]')).toBeEnabled();
+    await page.getByLabel("What are you preparing for?").selectOption("thesis");
+    await expect(page.locator("#presentation-mode-focus")).toContainText(
+      "University professor",
+    );
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "thesis.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Synthetic thesis notes"),
+    });
+    await expect(
+      page.getByRole("region", { name: "Uploaded sources" }),
+    ).toContainText("Ready");
+    if (sourceCheck === "no sources") {
+      await page.route("**/api/sources?*", (route) =>
+        route.fulfill({ json: [] }),
+      );
+    }
+    await backend(page, true);
+    await page.getByRole("button", { name: "Finish & review" }).click();
+    await expect(page).toHaveURL(/\/review$/);
+    // A later browser collection choice must not retarget an already recorded take.
+    await page.evaluate(() =>
+      localStorage.setItem(
+        "pitchcoach.sourceCollection",
+        "00000000-0000-4000-8000-000000000099",
       ),
-    )
-    .toBeGreaterThan(stoppedBeforeEnd);
-  const stats = page.getByRole("heading", { name: "Your take at a glance" });
-  await expect(stats).toBeVisible();
-  await expect(stats).toBeFocused();
-  await expect(page.locator(".performance-score")).toHaveText("100/100");
-  const practiceAgain = page.getByRole("link", {
-    name: "Practice again",
-    exact: true,
+    );
+    await page.evaluate(() =>
+      localStorage.setItem("pitchcoach.presentationMode", "school"),
+    );
+    await page
+      .getByRole("group", { name: "Review steps" })
+      .getByRole("button", { name: "Practice questions" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Meet your university professor." }),
+    ).toBeVisible();
+    const questioner = page.getByRole("combobox", {
+      name: "Who would you like to speak with?",
+    });
+    await expect(questioner).toHaveValue("auto");
+    await questioner.selectOption("student");
+    await expect(
+      page.getByRole("heading", { name: "Meet your student." }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Start voice questions" }).click();
+    await expect(
+      page.getByRole("button", { name: "End conversation" }),
+    ).toBeVisible({ timeout: 15000 });
+    expect(checks).toBe(sourceCheck === "no sources" ? 0 : 1);
+    if (sourceCheck === "failure")
+      await expect(
+        page.getByText("The source check failed.", { exact: false }),
+      ).toBeVisible();
+    if (sourceCheck === "no sources")
+      await expect(
+        page.getByText("No ready sources were available", { exact: false }),
+      ).toBeVisible();
+    await expect(questioner).toBeDisabled();
+    expect(override).toBe("Synthetic thesis context with source notes");
+    await expect(
+      page.getByRole("heading", {
+        name: "Ich habe noch ein paar Fragen. Bist du bereit?",
+      }),
+    ).toBeVisible();
+    expect(kickoffs).toBe(0);
+    const protection = page.getByRole("checkbox", {
+      name: "Protect agent speech",
+    });
+    await expect(protection).toBeChecked();
+    async function expectMicrophoneAudio(nonzero: boolean) {
+      const before = microphonePackets.length;
+      await expect
+        .poll(() => microphonePackets.length)
+        .toBeGreaterThan(before + 2);
+      await expect
+        .poll(() => microphonePackets.slice(-2))
+        .toEqual([nonzero, nonzero]);
+    }
+    // Use the actual SDK and AudioWorklet: agent playback sends only silent
+    // microphone PCM, despite the synthetic microphone's continuous tone.
+    await expectMicrophoneAudio(true);
+    playAgentAudio(3);
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: "microphone automatically muted" }),
+    ).toBeVisible();
+    await expectMicrophoneAudio(false);
+    await expect(
+      page.getByRole("status").filter({ hasText: "Listening to your answer" }),
+    ).toBeVisible();
+    await expectMicrophoneAudio(true);
+
+    playAgentAudio(10);
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: "microphone automatically muted" }),
+    ).toBeVisible();
+    await protection.uncheck();
+    await expectMicrophoneAudio(true);
+    // Changing the saved setting in Admin must reach an already open round.
+    const adminTab = await page.context().newPage();
+    await adminTab.goto("/admin");
+    await adminTab
+      .getByRole("checkbox", { name: "Protect agent speech" })
+      .check();
+    await expect(protection).toBeChecked();
+    await expectMicrophoneAudio(false);
+    await adminTab.close();
+    await page
+      .getByRole("button", { name: "Mute microphone", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Unmute microphone", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("status").filter({ hasText: "Microphone muted" }),
+    ).toBeVisible();
+    await expectMicrophoneAudio(false);
+    await page
+      .getByRole("button", { name: "Unmute microphone", exact: true })
+      .click();
+    await expectMicrophoneAudio(true);
+    await noOverflow(page);
+    await page.screenshot({
+      path: info.outputPath("professor-question.png"),
+      fullPage: true,
+    });
+    const stoppedBeforeEnd = await page.evaluate(
+      () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+    );
+    await page
+      .getByRole("button", { name: "End conversation", exact: true })
+      .click();
+    await expect.poll(() => closed.size).toBe(1);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+        ),
+      )
+      .toBeGreaterThan(stoppedBeforeEnd);
+    const stats = page.getByRole("heading", { name: "Your take at a glance" });
+    await expect(stats).toBeVisible();
+    await expect(stats).toBeFocused();
+    await expect(page.locator(".performance-score")).toHaveText("100/100");
+    const practiceAgain = page.getByRole("link", {
+      name: "Practice again",
+      exact: true,
+    });
+    await expect(practiceAgain).toBeVisible();
+    await expect(practiceAgain).toHaveAttribute("href", "/live");
+    await expect(practiceAgain).toHaveClass(/button-primary/);
+    await page.screenshot({
+      path: info.outputPath("final-overall-score.png"),
+      fullPage: true,
+    });
+    await expect(
+      page.getByRole("heading", { name: "Meet your university professor." }),
+    ).not.toBeVisible();
+    const content = page
+      .locator(".performance-category")
+      .filter({ hasText: "Content (facts & knowledge)" });
+    if (sourceCheck === "ready") {
+      await expect(
+        content.locator(".performance-category-score"),
+      ).toContainText("100 /100");
+      await expect(content).toContainText(
+        "1 of 1 statements were backed by your sources",
+      );
+    } else {
+      await expect(content).toContainText(
+        "No checked statements or answered questions were available.",
+      );
+      await expect(
+        content.locator(".performance-category-score"),
+      ).toContainText("—");
+      return;
+    }
+    await noOverflow(page);
+    await page
+      .getByRole("button", { name: "Back to questions", exact: true })
+      .click();
+    await expect(stats).not.toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Meet your student." }),
+    ).toBeFocused();
+    await expect(questioner).toBeEnabled();
+    await questioner.selectOption("professor");
+    expectedVoiceRole = "professor";
+    await page
+      .getByRole("button", { name: "Start a new conversation", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "End conversation", exact: true }),
+    ).toBeVisible();
+    endFromAgent();
+    await expect(stats).toBeVisible();
+    await expect(stats).toBeFocused();
+    await expect.poll(() => closed.size).toBe(2);
+    const savedReviewUrl = page.url();
+    await practiceAgain.click();
+    await expect(page).toHaveURL(/\/live$/);
+    await expect(
+      page.getByRole("button", { name: "Enable camera", exact: true }),
+    ).toBeVisible();
+    // Starting another practice must retain the completed take and its questions.
+    await page.goto(savedReviewUrl);
+    await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
+    await page
+      .getByRole("group", { name: "Review steps" })
+      .getByRole("button", { name: "Practice questions" })
+      .click();
+    await page.getByText("Conversation transcript", { exact: true }).click();
+    await expect(page.locator(".conversation-transcript")).toContainText(
+      "Ich habe noch ein paar Fragen. Bist du bereit?",
+    );
+    await expect(questioner).toHaveValue("professor");
+    await page
+      .getByRole("button", { name: "Start a new conversation", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "End conversation", exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("group", { name: "Review steps" })
+      .getByRole("button", { name: "Review moments" })
+      .click();
+    await expect.poll(() => closed.size).toBe(3);
+    expect(kickoffs).toBe(0);
+    await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
+    await expect(
+      page.getByText("Sessions are saved in this browser", { exact: false }),
+    ).toBeVisible();
+    await page.reload();
+    await page
+      .getByRole("group", { name: "Review steps" })
+      .getByRole("button", { name: "Practice questions" })
+      .click();
+    await page.getByText("Conversation transcript", { exact: true }).click();
+    await expect(page.locator(".conversation-transcript")).toContainText(
+      "Ich habe noch ein paar Fragen. Bist du bereit?",
+    );
+    expect(closed.size).toBe(3);
+    expect(checks).toBe(1); // Reuse the saved source verdict, including after reload.
+
+    // Exercise the actual SDK connection and microphone cleanup at both limits.
+    await page
+      .getByRole("button", { name: "Start a new conversation", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "End conversation", exact: true }),
+    ).toBeVisible();
+    const stoppedBeforeLimit = await page.evaluate(
+      () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+    );
+    for (let turn = 0; turn < 12; turn++) sendUserAnswer();
+    await expect(
+      page.getByRole("button", { name: "Session limit reached", exact: true }),
+    ).toBeDisabled();
+    await expect.poll(() => closed.size).toBe(4);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+        ),
+      )
+      .toBeGreaterThan(stoppedBeforeLimit);
+    await expect(page.locator(".conversation-transcript li")).toHaveCount(13);
+
+    await page
+      .getByRole("button", { name: "Start a new round", exact: true })
+      .click();
+    await page.clock.install();
+    await page
+      .getByRole("button", { name: "Start voice questions", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "End conversation", exact: true }),
+    ).toBeVisible();
+    await page.clock.fastForward(600_000);
+    await expect(
+      page.getByRole("button", { name: "Session limit reached", exact: true }),
+    ).toBeDisabled();
+    await expect.poll(() => closed.size).toBe(5);
+
+    // The same deadline must cancel context preparation, before a socket exists.
+    await page
+      .getByRole("button", { name: "Start a new round", exact: true })
+      .click();
+    await page.route("**/api/questions/agent/jobs/*", (route) =>
+      route.fulfill({ json: { job_id: jobId, status: "running" } }),
+    );
+    await page
+      .getByRole("button", { name: "Start voice questions", exact: true })
+      .click();
+    await expect(
+      page.getByText("Reading your presentation and material…", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.clock.fastForward(600_000);
+    await expect(
+      page.getByRole("button", { name: "Session limit reached", exact: true }),
+    ).toBeDisabled();
+    expect(closed.size).toBe(5);
   });
-  await expect(practiceAgain).toBeVisible();
-  await expect(practiceAgain).toHaveAttribute("href", "/live");
-  await expect(practiceAgain).toHaveClass(/button-primary/);
-  await page.screenshot({
-    path: info.outputPath("final-overall-score.png"),
-    fullPage: true,
-  });
-  await expect(
-    page.getByRole("heading", { name: "Meet your university professor." }),
-  ).not.toBeVisible();
-  await expect(
-    page.getByText(
-      "No checked statements or answered questions were available.",
-    ),
-  ).toBeVisible();
-  await noOverflow(page);
-  await page
-    .getByRole("button", { name: "Back to questions", exact: true })
-    .click();
-  await expect(stats).not.toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Meet your student." }),
-  ).toBeFocused();
-  await expect(questioner).toBeEnabled();
-  await questioner.selectOption("professor");
-  expectedVoiceRole = "professor";
-  await page
-    .getByRole("button", { name: "Start a new conversation", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "End conversation", exact: true }),
-  ).toBeVisible();
-  endFromAgent();
-  await expect(stats).toBeVisible();
-  await expect(stats).toBeFocused();
-  await expect.poll(() => closed.size).toBe(2);
-  const savedReviewUrl = page.url();
-  await practiceAgain.click();
-  await expect(page).toHaveURL(/\/live$/);
-  await expect(
-    page.getByRole("button", { name: "Enable camera", exact: true }),
-  ).toBeVisible();
-  // Starting another practice must retain the completed take and its questions.
-  await page.goto(savedReviewUrl);
-  await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
-  await page
-    .getByRole("group", { name: "Review steps" })
-    .getByRole("button", { name: "Practice questions" })
-    .click();
-  await page.getByText("Conversation transcript", { exact: true }).click();
-  await expect(page.locator(".conversation-transcript")).toContainText(
-    "Ich habe noch ein paar Fragen. Bist du bereit?",
-  );
-  await expect(questioner).toHaveValue("professor");
-  await page
-    .getByRole("button", { name: "Start a new conversation", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "End conversation", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("group", { name: "Review steps" })
-    .getByRole("button", { name: "Review moments" })
-    .click();
-  await expect.poll(() => closed.size).toBe(3);
-  expect(kickoffs).toBe(0);
-  await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
-  await expect(
-    page.getByText("Sessions are saved in this browser", { exact: false }),
-  ).toBeVisible();
-  await page.reload();
-  await page
-    .getByRole("group", { name: "Review steps" })
-    .getByRole("button", { name: "Practice questions" })
-    .click();
-  await page.getByText("Conversation transcript", { exact: true }).click();
-  await expect(page.locator(".conversation-transcript")).toContainText(
-    "Ich habe noch ein paar Fragen. Bist du bereit?",
-  );
-  expect(closed.size).toBe(3);
-
-  // Exercise the actual SDK connection and microphone cleanup at both limits.
-  await page
-    .getByRole("button", { name: "Start a new conversation", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "End conversation", exact: true }),
-  ).toBeVisible();
-  const stoppedBeforeLimit = await page.evaluate(
-    () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
-  );
-  for (let turn = 0; turn < 12; turn++) sendUserAnswer();
-  await expect(
-    page.getByRole("button", { name: "Session limit reached", exact: true }),
-  ).toBeDisabled();
-  await expect.poll(() => closed.size).toBe(4);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
-      ),
-    )
-    .toBeGreaterThan(stoppedBeforeLimit);
-  await expect(page.locator(".conversation-transcript li")).toHaveCount(13);
-
-  await page
-    .getByRole("button", { name: "Start a new round", exact: true })
-    .click();
-  await page.clock.install();
-  await page
-    .getByRole("button", { name: "Start voice questions", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "End conversation", exact: true }),
-  ).toBeVisible();
-  await page.clock.fastForward(600_000);
-  await expect(
-    page.getByRole("button", { name: "Session limit reached", exact: true }),
-  ).toBeDisabled();
-  await expect.poll(() => closed.size).toBe(5);
-
-  // The same deadline must cancel context preparation, before a socket exists.
-  await page
-    .getByRole("button", { name: "Start a new round", exact: true })
-    .click();
-  await page.route("**/api/questions/agent/jobs/*", (route) =>
-    route.fulfill({ json: { job_id: jobId, status: "running" } }),
-  );
-  await page
-    .getByRole("button", { name: "Start voice questions", exact: true })
-    .click();
-  await expect(
-    page.getByText("Reading your presentation and material…", { exact: true }),
-  ).toBeVisible();
-  await page.clock.fastForward(600_000);
-  await expect(
-    page.getByRole("button", { name: "Session limit reached", exact: true }),
-  ).toBeDisabled();
-  expect(closed.size).toBe(5);
-});
+}
 
 test("past sessions keep video and updated feedback across reload and can be deleted", async ({
   page,
