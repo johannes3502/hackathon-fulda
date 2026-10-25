@@ -30,9 +30,12 @@ des Graphen, inklusive interpolierter Nulldurchgänge. Bereits abgespielte Zeit 
 kräftig eingefärbt, kommende Zeit gedämpft. Play/Pause und Zeitregler sind mit
 den nativen Videosteuerungen synchronisiert; Tastatursprünge bleiben möglich.
 
-1. Im Studio **Presentation & material** öffnen, Präsentationstyp wählen und
-   Material hochladen. PDF/PPTX/DOCX/TXT/MD, maximal 25 MB pro Datei. **Ready**
-   abwarten; **Manage material** öffnet die bestehende Quellenverwaltung.
+1. Unter **Your sources** den Präsentationstyp direkt neben dem Datei-Upload
+   wählen und Material hochladen. PDF/PPTX/DOCX/TXT/MD, maximal 25 MB pro Datei.
+   **Ready** abwarten, dann **Continue to recording**. Der Typ bleibt im Browser
+   über Navigation und Reload erhalten; im Studio ist er unter
+   **Presentation & material** vor der Aufnahme noch änderbar. Beim Start wird
+   er mit der Quellen-Collection im Take festgehalten.
 2. **Enable questions after recording** schaltet Backend-Transkription ein.
    Der sichtbare Aufnahmehinweis erklärt Deepgram EU und lokalen Whisper-Fallback.
 3. Aufnehmen und **Finish & review**. **Review moments** verbindet Video,
@@ -121,11 +124,14 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
   Nach diesem festen deutschen Einstieg wartet der Agent auf eine Bestätigung.
   Erst dann stellt er die erste konkrete Frage zum bereits übergebenen Transkript
   in dessen Sprache. Wer noch nicht bereit ist, bekommt Zeit.
-  Der Sprachagent ist in allen Präsentationsmodi eine Lehrkraft, die ihren
-  Schüler zum abgeschlossenen Vortrag befragt, kein Investor; ohne zusätzliche
-  Begrüßung, Vorstellung oder Rückblick.
-  Er prüft Verständnis, Zusammenhänge, Beispiele und Transfer anhand des
-  Vortrags oder Materials. Ist eine Antwort geprüft korrekt und beantwortet die
+  Sprachagent und getippte Fragerunde verwenden dieselben Modus-Vorgaben:
+  Startup = Investor (Nachfrage, Geschäftsmodell, Annahmen und konkreter Ask),
+  Thesis = Hochschullehrkraft (Methoden, Belege, Grenzen und Transfer),
+  Schule = Lehrkraft (Verständnis, Erklärungen und Beispiele),
+  Nonprofit = potenzielle Unterstützung (Mission, Wirkung, Machbarkeit und Mitmachen).
+  Alle Fragen bleiben am abgeschlossenen Vortrag oder Material verankert;
+  ohne zusätzliche Begrüßung, Vorstellung oder Rückblick.
+  Ist eine Antwort geprüft korrekt und beantwortet die
   Frage, folgt nur ein kurzer Bestätigungssatz und direkt die nächste Hauptfrage
   (nach der dritten die Abschlusshinweise). Keine Wiederholung der Antwort,
   lange Erklärung, ausführliches Lob oder weitere Nachfrage zur beantworteten
@@ -136,7 +142,7 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
   nächsten Hauptfrage wechseln, auch wenn die Antwort weiter falsch ist.
   Bei „weiß ich nicht“ oder Wunsch zu überspringen wechselt er früher weiter.
   Diese Grenzen sind Prompt-Vorgaben, keine programmatisch erzwungene
-  Gesprächssteuerung. Die Rollen der getippten Fragerunde bleiben modusabhängig.
+  Gesprächssteuerung. Die Quellenprüfung gilt unabhängig vom Modus.
 - In der lokalen `.env` setzen:
 
 ```dotenv

@@ -33,6 +33,14 @@ def test_modes_change_both_questions_and_answer_feedback(mode):
     assert PRESENTATION_STYLES[mode] in answer_model.prompts[0][0]
 
 
+@pytest.mark.parametrize("mode", PRESENTATION_STYLES)
+def test_voice_modes_change_the_role_and_question_focus(mode):
+    prompt = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode)).prompt
+    assert PRESENTATION_STYLES[mode] in prompt
+    assert all(style not in prompt for key, style in PRESENTATION_STYLES.items() if key != mode)
+    assert "Do not act as an investor" not in prompt
+
+
 def test_context_uses_only_the_requested_collection_and_includes_source_locations(monkeypatch):
     collection = uuid4()
     monkeypatch.setattr(agent.db, "list_sources", lambda value: [SimpleNamespace(status="ready")])
@@ -44,7 +52,7 @@ def test_context_uses_only_the_requested_collection_and_includes_source_location
     assert "Folie 3" in result.prompt
     assert "source_passages" in result.prompt and "transcript" in result.prompt
     assert "untrusted reference material" in result.prompt
-    assert "teacher asking a student" in result.prompt
+    assert PRESENTATION_STYLES["nonprofit"] in result.prompt
 
 
 def test_missing_or_processing_sources_are_not_presented_as_ready(monkeypatch):
@@ -56,21 +64,21 @@ def test_missing_or_processing_sources_are_not_presented_as_ready(monkeypatch):
 
 
 @pytest.mark.parametrize("mode", PRESENTATION_STYLES)
-def test_teacher_receives_the_spoken_content_and_waits_for_readiness(mode):
+def test_questioner_receives_the_spoken_content_and_waits_for_readiness(mode):
     result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode))
     context = json.loads(result.prompt.splitlines()[-1])
     assert context["transcript"] == " ".join(word.word for word in TRANSCRIPT)
     assert "Do not greet" in result.prompt
-    assert "teacher asking a student" in result.prompt
+    assert PRESENTATION_STYLES[mode] in result.prompt
     assert "The first message is 'Ich habe noch ein paar Fragen. Bist du bereit?'" in result.prompt
-    assert "Wait for the student to confirm they are ready before asking any presentation question" in result.prompt
+    assert "Wait for the presenter to confirm they are ready before asking any presentation question" in result.prompt
     assert "If they are not ready, give them time and do not start the questions" in result.prompt
     assert "without repeating the opening" in result.prompt
     assert "Do not add an introduction, recap or explanation" in result.prompt
-    assert all(style not in result.prompt for style in PRESENTATION_STYLES.values())
     assert "actual claim, example or explanation" in result.prompt
-    assert "breadth of understanding" in result.prompt
-    assert "new application or counterexample" in result.prompt
+    if mode == "thesis":
+        assert "breadth of understanding" in result.prompt
+        assert "new application or counterexample" in result.prompt
     assert "do not turn the conversation into unrelated trivia" in result.prompt
 
 
@@ -79,7 +87,7 @@ def test_teacher_moves_on_after_limited_follow_ups_even_if_the_answer_is_wrong()
     assert "ask one brief follow-up, and at most a second follow-up" in prompt
     assert "After at most two follow-ups" in prompt
     assert "continue to the next main question even if the answer is still wrong" in prompt
-    assert "Move on sooner if the student does not know or asks to skip" in prompt
+    assert "Move on sooner if the presenter does not know or asks to skip" in prompt
     assert "Never repeat a question until they get it right" in prompt
 
 
@@ -89,9 +97,9 @@ def test_teacher_keeps_feedback_short_for_verified_correct_answers(mode):
     assert "When an answer is verified as correct and answers the question" in prompt
     assert "acknowledge it in one short sentence, then move directly to the next main question" in prompt
     assert "or the closing suggestions after the third main question" in prompt
-    assert "Do not repeat the student's answer" in prompt
+    assert "Do not repeat the presenter's answer" in prompt
     assert "or ask another follow-up on an already answered question" in prompt
-    assert "Keep any required source attribution brief; explain further only if the student asks" in prompt
+    assert "Keep any required source attribution brief; explain further only if the presenter asks" in prompt
     assert "MUST call search_web and wait for its result" in prompt
     assert "If an answer is incorrect, incomplete or unsupported" in prompt
 

@@ -31,14 +31,11 @@ test("home shows an empty recording overview without demo statistics and keeps n
     page.getByRole("status").filter({ hasText: "Hier erscheinen" }),
   ).toContainText("Hier erscheinen deine aufgenommenen Präsentationen.");
 
-  await page.getByRole("button", { name: "Menü", exact: true }).click();
-  const drawer = page.getByRole("navigation", { name: "App-Navigation" });
-  await expect(drawer).toBeVisible();
+  const navigation = page.getByRole("navigation", { name: "Main navigation" });
   await expect(
-    drawer.getByRole("link", { name: /Start & Aufnahmen/i }),
+    navigation.getByRole("link", { name: "Home", exact: true }),
   ).toHaveAttribute("aria-current", "page");
-  await drawer.getByRole("link", { name: /Live-Studio/i }).click();
-  await expect(page).toHaveURL(/\/live$/);
+  await page.goto("/live");
 
   for (const [selector, color] of [
     ["body", "#f5f5f7"],
@@ -133,7 +130,7 @@ test("home shows an empty recording overview without demo statistics and keeps n
       await expect(page.getByRole("link", { name: "418 home" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Menü", exact: true }),
-    ).toHaveCount(path === "/live" ? 0 : 1);
+    ).toHaveCount(0);
     await expect(page.locator("main")).toHaveCount(1);
     expect(
       await page.evaluate(
@@ -286,32 +283,17 @@ test("shared navigation and help work with keyboard focus", async ({
   ).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("main")).toBeFocused();
-  const menuButton = page.getByRole("button", { name: "Menü", exact: true });
-  await menuButton.focus();
-  await page.keyboard.press("Enter");
-  await expect(
-    page.getByRole("navigation", { name: "App-Navigation" }),
-  ).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(
-    page.getByRole("navigation", { name: "App-Navigation" }),
-  ).toHaveCount(0);
-  await expect(menuButton).toBeFocused();
   const navigation = page.getByRole("navigation", { name: "Main navigation" });
   for (const [label, path] of [
-    ["Sources", "/sources"],
-    ["Sample demo", "/demo"],
     ["Admin", "/admin"],
-    ["Studio", "/live"],
+    ["Home", "/"],
   ]) {
     const link = navigation.getByRole("link", { name: label, exact: true });
     await link.focus();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(new RegExp(`${path}$`));
-    if (path !== "/live")
-      await expect(link).toHaveAttribute("aria-current", "page");
+    await expect(link).toHaveAttribute("aria-current", "page");
   }
-  await page.goBack();
   const help = page.getByRole("button", { name: "How it works" });
   await help.focus();
   await page.keyboard.press("Enter");

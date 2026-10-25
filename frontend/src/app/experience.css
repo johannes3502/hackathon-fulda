@@ -194,11 +194,6 @@
 body:has(.live-workspace) .practice-journey {
   display: none;
 }
-@media (max-width: 1280px) {
-  .brand-caption {
-    display: none;
-  }
-}
 @media (max-width: 900px) {
   .presentation-intro {
     grid-template-columns: minmax(0, 1fr);

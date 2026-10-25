@@ -255,9 +255,11 @@ führt einen Dialog mit einer Frage pro Schritt. Die Wiedergabe-Fenster nutzen
 das lokale Vollvideo; serverseitige Clip-Dateien sind gemäß aktuellem Backend-Vertrag nicht vorgesehen. Transkript und technische Details bleiben
 aufklappbar.
 
-Vor dem Take: Material zum Backend hochladen und Präsentationstyp wählen:
+Vor dem Take: Auf `/sources` neben dem Datei-Upload den Präsentationstyp wählen:
 Startup-Pitch, Bachelor-Verteidigung, Schulvortrag oder Nonprofit-Einladung.
-Der Typ verändert die Fragen und Kriterien, ohne Noten oder Scores. Der
+Die Auswahl bleibt über Navigation und Reload erhalten und wird beim
+Aufnahmestart im Take festgehalten. In Sprachdialog und getippter Fragerunde
+verändert derselbe Typ Rolle und Frageschwerpunkte, ohne Noten oder Scores. Der
 Nutzer hat ElevenLabs für den Sprachdialog beauftragt und konfiguriert den
 Agenten selbst nach der Implementierung. Getippte Fragen nutzen das
 konfigurierte Gemini-Modell (Cloud). Einrichtung: `docs/07-review-and-agent.md`.

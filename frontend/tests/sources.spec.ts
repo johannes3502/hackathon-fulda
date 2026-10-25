@@ -27,6 +27,18 @@ test("opening a native collection persists it and reopening keeps loaded sources
     });
   });
   await page.goto("/sources");
+  await expect(
+    page.getByRole("heading", { name: "Search your sources" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("textbox", { name: "Question or claim" }),
+  ).toHaveCount(0);
+  const library = page.getByRole("region", { name: "Uploaded sources" });
+  await expect(library).toBeVisible();
+  const gridWidth = await page
+    .locator(".sources-grid")
+    .evaluate((grid) => grid.clientWidth);
+  expect((await library.boundingBox())!.width).toBeCloseTo(gridWidth, 0);
   await page.getByText("Use this collection on another device").click();
   await page.getByLabel("Collection ID from another device").fill(id);
   await page

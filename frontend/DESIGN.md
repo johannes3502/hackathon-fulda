@@ -37,10 +37,8 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   Below, `StatsDashboard` shows counts, durations and observations from actual
   recordings in the current workspace, with an empty state before the first take.
   No synthetic percentages, monthly histories or performance scores appear.
-  `AppShell` provides both the header navigation (`Main navigation`) and a
-  slide-over navigation drawer (`Menü`) outside the record screen. The active destination
-  is identified visually and with `aria-current`. The drawer is a modal Radix
-  dialog with focus containment, Escape dismissal and focus restoration. A shared
+  `AppShell` provides the logo, Home and Admin links, appearance and help controls
+  outside the record screen. Active links use `aria-current`. A shared
   Prepare / Record / Review strip connects sources, studio and reviews; its Review
   link uses the current or latest take, or explicitly offers an example when no
   take exists. The record screen hides this strip during both camera setup and
@@ -117,9 +115,11 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   ElevenLabs only starts on an explicit click after its data-sharing notice;
   leaving the question view disconnects the agent. Missing configuration,
   unavailable services and missing transcripts have visible recovery paths.
-- **Sources:** place the document library and source search beside one another on
-  desktop and stack them on phones. Show supported formats, upload state, errors,
-  and when search becomes available. Continue to recording is the main action.
+- **Sources:** show a full-width document library with supported formats, upload
+  state and errors. Choose the presentation type alongside the upload, with the
+  questioner's role and focus visible. The choice persists across navigation and
+  reloads; the studio can adjust it before recording. Both voice and typed
+  questions use the take's frozen mode. Continue to recording is the main action.
 - **Sample:** retain explicit synthetic-data labels for the walkthrough and
   example annotations. Review scores use the disclosed rubric on the synthetic
   example evidence; the qualitative event graph uses only the

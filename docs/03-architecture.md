@@ -369,10 +369,11 @@ sequenceDiagram
 
 Der Web-Review hat zwei Ansichten: **Review moments** (begrenzte Wiedergabe-
 Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
-Vor der Aufnahme werden `presentationMode` (startup/thesis/school/nonprofit)
-und `sourceCollectionId` im Take eingefroren. Im getippten Fragepfad steuert der
-Modus Rolle und fachliche Schwerpunkte. Der Sprachagent ist immer eine
-Lehrkraft, die Verständnis des Vortrags prüft, ohne Scores oder Noten. Nach der
+Auf `/sources` wird `presentationMode` (startup/thesis/school/nonprofit) neben
+dem Upload gewählt und im Browser gespeichert. Vor der Aufnahme werden Modus
+und `sourceCollectionId` im Take eingefroren. In beiden Fragepfaden steuert
+derselbe Modus Rolle und fachliche Schwerpunkte: Investor, Hochschullehrkraft,
+Schullehrkraft oder potenzielle Unterstützung; ohne Scores oder Noten. Nach der
 vollständig beantworteten getippten Runde zeigt der Client zusätzlich eine
 Auswertung mit transparentem Heuristik-Score aus gemessenen Events; siehe
 `docs/07-review-and-agent.md`.
@@ -459,8 +460,10 @@ kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
 
 ```mermaid
 flowchart TD
-    DRAWER["AppShell: modaler Drawer + Header außerhalb des Record-Screens<br/>Open Sans + #3803bf, Hell/Dunkel/System<br/>Drawer: /, /live, /progress, /sources, /review-preview, /gestures, /demo<br/>Header-Nav zusätzlich: /admin"]
-    THEME["Root-Layout: gespeicherte Darstellung vor First Paint<br/>localStorage, CSS-Tokens, OS-Fallback"] -.-> DRAWER
+    HEADER["AppShell: Logo, Home und Admin außerhalb des Record-Screens<br/>Darstellung und Hilfe; kein Menü-Drawer"]
+    THEME["Root-Layout: gespeicherte Darstellung vor First Paint<br/>localStorage, CSS-Tokens, OS-Fallback"] -.-> HEADER
+    HEADER --> SP
+    HEADER --> ADMIN
     JOURNEY["Gemeinsamer Ablauf: Prepare / Record / Review<br/>aktuelle oder letzte Aufnahme, sonst markiertes Beispiel"] --> SRC
     JOURNEY --> LIVE
     JOURNEY --> LREV
@@ -470,12 +473,6 @@ flowchart TD
     SP -->|"Neue Präsentation"| SRC
     SP -->|"Quellen vorbereiten"| SRC
     SP -->|"Letzte Aufnahme, falls vorhanden"| LREV
-    DRAWER --> SP
-    DRAWER --> LIVE
-    DRAWER --> SRC
-    DRAWER --> RP
-    DRAWER --> WALK
-    DRAWER --> DEMOPAGE
     RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ausdrücklich markierte Beispiel-Scores"]
     SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
@@ -487,13 +484,12 @@ flowchart TD
     EVIDENCE --> LA
     DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
-    LIVE -->|"Back to sources vor Aufnahmestart"| SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]
-    SRC -->|"Weiter zur Aufnahme"| LIVE
+    LIVE -->|"Back to sources vor Aufnahmestart"| SRC["/sources<br/>SourceLibrary: Vortragstyp neben Datei-Upload,<br/>Status und Löschen"]
+    SRC -->|"Weiter zur Aufnahme<br/>Vortragstyp aus localStorage"| LIVE
     LIVE --> WALK["/gestures: synthetischer 22-s-Rundgang<br/>gleiche Regeln, keine Genauigkeitsvalidierung"]
     WALK --> LIVE
     ADMIN["/admin (Navbar, ohne Login)<br/>AdminPanel: Pose-Haltezeit,<br/>Hinweis-Mindestdauer + Lücke,<br/>Pose feedback: On/Review/Off je Regel,<br/>Analysis features: Modell/Modus/Feedback"] -->|"localStorage, ab nächster<br/>Kalibrierung/Aufnahme"| LIVE
     PROGRESSFE["/progress + /progress/demo<br/>Profil/Consent, Small Multiples, Rohpunkte, Lücken,<br/>Qualitätsmarker, Ziele, Export/Löschung<br/>kein Gesamtscore/Radar"] -. "progress.v1" .-> PAPI["GET/PUT /profiles/id/progress|goals"]
-    DRAWER --> PROGRESSFE
 
     PRAC --> STATE{"Phasen"}
     STATE --> P1["preflight -> countdown -><br/>presenting -> judge_thinking -><br/>judge_question -> answering"]
@@ -512,7 +508,7 @@ flowchart TD
     LA --> RA
     RA --> FGRAPH
 
-    SRC -->|"collection_id aus localStorage"| UPLOAD["POST /sources<br/>POST /sources/search"]
+    SRC -->|"collection_id aus localStorage"| UPLOAD["GET/POST /sources<br/>DELETE /sources/id"]
 
     subgraph Transport["VideoTransport: LiveStudio fest auf backend<br/>(Modus-Schalter entfernt)"]
         ANA["AnalysisTransport<br/>Backend-Upload + Polling, jede Web-Aufnahme"]

@@ -236,14 +236,10 @@ export function QuestionPractice({
       <div className="question-practice-heading">
         <div>
           <h2 id="question-practice-title" tabIndex={-1}>
-            Meet your{" "}
-            {method === "voice" ? "teacher" : mode.listener.toLowerCase()}.
+            Meet your {mode.listener.toLowerCase()}.
           </h2>
           <p>
-            {method === "voice"
-              ? "Understanding, reasoning and examples from your presentation."
-              : mode.focus}{" "}
-            One question at a time.
+            {mode.focus} One question at a time.
           </p>
         </div>
         <span className="badge">{mode.label}</span>
@@ -300,7 +296,7 @@ export function QuestionPractice({
                     : phase === "connecting"
                       ? "Connecting your microphone…"
                       : phase === "speaking"
-                        ? "Your teacher is speaking"
+                        ? `Your ${mode.listener.toLowerCase()} is speaking`
                         : phase === "listening"
                           ? muted
                             ? "Microphone muted"
@@ -382,7 +378,7 @@ export function QuestionPractice({
                     {messages.map((item, index) => (
                       <li key={index}>
                         <strong>
-                          {item.role === "user" ? "You" : "Teacher"}
+                          {item.role === "user" ? "You" : mode.listener}
                         </strong>
                         <p>{item.text}</p>
                       </li>

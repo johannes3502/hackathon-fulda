@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   FileText,
   LoaderCircle,
-  Search,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -13,6 +12,8 @@ import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiEndpoint } from "@/features/live/analysis";
+import { useLiveSessions } from "@/features/live/LiveSessionProvider";
+import { PresentationModeSelect } from "@/components/live/PresentationModeSelect";
 import {
   ACCEPT,
   checkFile,
@@ -21,11 +22,8 @@ import {
   deleteSource,
   isPending,
   listSources,
-  locationLabel,
-  searchSources,
   uploadSource,
   type Source,
-  type SourceHit,
 } from "@/features/sources/api";
 
 const size = (bytes: number) =>
@@ -78,15 +76,13 @@ function clientConfig(): Config {
 const subscribe = () => () => {};
 
 export function SourceLibrary() {
+  const { presentationMode, setPresentationMode } = useLiveSessions();
   const [selectedCollection, setSelectedCollection] = useState<string>();
   const [collectionDraft, setCollectionDraft] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
   const [uploading, setUploading] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [query, setQuery] = useState("");
-  const [hits, setHits] = useState<SourceHit[] | null>(null);
-  const [searching, setSearching] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   // Null on the server and during hydration; browser-only values afterwards.
   const config = useSyncExternalStore(subscribe, clientConfig, () => null);
@@ -149,7 +145,6 @@ export function SourceLibrary() {
     try {
       await deleteSource(api, source.id);
       setSources((current) => current.filter((item) => item.id !== source.id));
-      setHits(null);
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "Could not remove source.",
@@ -157,21 +152,6 @@ export function SourceLibrary() {
     }
   }
 
-  async function search(event: React.FormEvent) {
-    event.preventDefault();
-    if (!api || !collection || !query.trim()) return;
-    setSearching(true);
-    setError(null);
-    try {
-      setHits(await searchSources(api, collection, query.trim()));
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Search failed.");
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  const ready = sources.filter((source) => source.status === "ready").length;
   return (
     <AppShell experience="live">
       <div className="workspace sources-workspace">
@@ -211,6 +191,10 @@ export function SourceLibrary() {
               <h2>Source library</h2>
               <span className="badge">{sources.length} files</span>
             </div>
+            <PresentationModeSelect
+              mode={presentationMode}
+              onMode={setPresentationMode}
+            />
             <label
               className={dragging ? "source-drop dragging" : "source-drop"}
               onDragOver={(event) => {
@@ -274,56 +258,6 @@ export function SourceLibrary() {
               </ul>
             )}
           </section>
-          <section className="panel sources-panel" aria-label="Test retrieval">
-            <h2>Search your sources</h2>
-            <p className="muted small">
-              Ask a question or paste a claim from your talk. These passages are
-              used by fact-checking and the question round.
-            </p>
-            <form className="source-search" onSubmit={(e) => void search(e)}>
-              <Input
-                aria-label="Question or claim"
-                placeholder="e.g. How many students use the app?"
-                maxLength={2000}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-              <Button
-                type="submit"
-                disabled={!ready || !query.trim() || searching}
-              >
-                <Search size={16} /> Search
-              </Button>
-            </form>
-            {!ready && (
-              <p className="field-hint">
-                Search becomes available once a source is ready.
-              </p>
-            )}
-            {hits && hits.length === 0 && (
-              <p className="muted source-empty">No matching passages.</p>
-            )}
-            {hits && hits.length > 0 && (
-              <ol className="source-hits">
-                {hits.map((hit) => (
-                  <li key={hit.chunk_id}>
-                    <div className="source-hit-meta">
-                      <strong>{hit.filename}</strong>
-                      <span>{locationLabel(hit.location)}</span>
-                      <span className="badge">
-                        {hit.matched_by
-                          .map((by) =>
-                            by === "vector" ? "meaning" : "keyword",
-                          )
-                          .join(" + ")}
-                      </span>
-                    </div>
-                    <p>{hit.text}</p>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
         </div>
         {collection && (
           <details className="context-disclosure">
@@ -346,7 +280,6 @@ export function SourceLibrary() {
                   if (config && "api" in config)
                     cachedConfig = { ...config, collection: id };
                   setSources([]);
-                  setHits(null);
                   setError(null);
                   setSelectedCollection(id);
                 } catch (reason) {
@@ -362,7 +295,7 @@ export function SourceLibrary() {
               />
               <Button
                 type="submit"
-                disabled={!!uploading || searching || !collectionDraft.trim()}
+                disabled={!!uploading || !collectionDraft.trim()}
               >
                 Open collection
               </Button>
