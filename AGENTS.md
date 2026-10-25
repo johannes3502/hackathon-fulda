@@ -11,28 +11,35 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 | 1 | Posture / Gesture / Eye Tracking | Pose- und Gesten-Landmarks aus der Kamera; Kopforientierung als Proxy (kein Gaze); Regeln darauf erzeugen Events (z. B. „Haltung auffällig“) |
 | 2 | Transkription + Fact-Check | Transkript mit Wort-Timestamps; Abgleich der Aussagen per RAG mit vorab hochgeladenen Quellen (PDF, PPTX, …); Web-Fetch-Agent als Zweitquelle |
 | 3 | Sprechmerkmale | Tempo, Pausen, Zögern, Füllwörter, Lautstärke (zu leise/laut), Tonhöhenvariation (monoton); live Hinweise während des Vortrags |
-| 4 | Timestamp-Review | Events auf einer Timeline; `peakMs` springt zur Stelle in der lokalen Aufnahme; keine serverseitigen Clips |
-| 5 | Frage-Simulator | Agent stellt nach der Präsentation Fragen, abgeleitet aus Transkript, Quellen und Fact-Check-Funden |
+| 4 | Timestamp-Review | Events auf einer Timeline; `peakMs` springt zur Stelle in der lokalen Aufnahme; keine serverseitigen Clips; deterministische Aufbau-Rubrik und vier Evidenzprofile |
+| 5 | Frage-Simulator | Agent stellt nach der Präsentation Fragen, abgeleitet aus Transkript, Quellen und Fact-Check-Funden; serverseitige Rundenlimits; Evidenz-Auswertung ohne Gesamtscore |
 
-**Leitplanken:** nur diese fünf Features; Scores nur als transparente, evidenzbasierte Aggregation bereits gemessener Events (Auswertung nach der Fragerunde), keine erfundenen Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeitsbewertung; nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
+**Leitplanken:** nur diese fünf Features; Scores nur als transparente,
+evidenzbasierte Aggregate bereits gemessener Events (Review-Evidenzprofil und
+Auswertung nach der Fragerunde), kein Gesamtscore, keine erfundenen
+Schwellenwerte oder Genauigkeiten; keine Emotions-/Persönlichkeitsbewertung;
+nur synthetische Demo-Daten; „In unserem Prototyp …“ statt „validiert“.
 
-**Expliziter Nutzerauftrag (24.10.2026):** Im Review vier 0–100-Prototyp-Scores
-für Gestik, Fachwissen, Flow und Struktur statt bloßer Moment-Anzahlen anzeigen.
-Die Version `evidence-share-v1` bewertet die erfasste Evidenz: positive Zeitanteile
-gegen positive + kritische Zeitanteile; Fachwissen bevorzugt über entscheidbare
-Quellenurteile. Formel, Datenabdeckung und fehlende Daten bleiben sichtbar;
-ohne Evidenz kein Score. Keine Validierungs- oder Benotungsbehauptung. Der
+**Evidenzprofil im Review (25.10.2026):** Vier getrennte 0–100-Prototyp-Scores
+für **Körper & Gesten**, **Quellenbezug**, **Sprechfluss** und **Aufbau** statt
+bloßer Moment-Anzahlen. `evidence-share-v2` bewertet Zeitanteile mit
+additiver Glättung und Wilson-95-%-Spanne; Quellenbezug zählt nur entscheidbare
+Aussagen mit geprüftem Quellenzitat. Es gibt keinen Gesamtscore. Unter 5 s
+bewerteter Zeit bzw. ohne entscheidbare Aussage steht „–“; unter 30 s bzw. unter
+fünf Entscheidungen ist die Schätzung vorläufig. Formel, Abdeckung und fehlende
+Daten bleiben sichtbar. Keine Validierungs- oder Benotungsbehauptung. Der
 Zeitverlauf ist eine Linie aus geraden Segmenten; Zwischenwerte sind
-ausdrücklich interpoliert. **Struktur hat im Live-Pfad noch keine
-Evidenzquelle** (nur der synthetische Demo-Datensatz enthält Struktur-Momente);
-das bleibt bis zu einer eigenen Regel als „–“ sichtbar. TODO:
-`docs/14-open-todos.md`.
+ausdrücklich interpoliert.
 
-Review-Verdrahtung (25.10.2026): Beide Web-Review-Ansichten nutzen denselben
-Adapter für die gewählte, lokal gespeicherte Aufnahme. Quellen-Marker kommen
-aus dem aktuellen Fact-Check; nur Urteile mit geprüftem Quellenzitat fließen
-in den Fachwissen-Score ein. `/review-preview` bleibt ein markiertes Beispiel.
-Für Struktur existiert noch keine automatische Messregel; ohne Evidenz kein Score.
+**Aufbau (25.10.2026):** `structure-rubric-v1` läuft deterministisch im
+Frontend auf Wörtern und Zeitstempeln: DE/EN-Marker, Satz- und
+Abschnittserkennung, Einstieg, Abschluss, Abschnitte und Übergänge. Ein Score
+entsteht nur mit mindestens drei verfügbaren Signalen, 50 Wörtern und 45
+Sekunden. Die Marker erscheinen in der Review-Timeline und in beiden
+Review-Ansichten. Folienabdeckung ist nicht umgesetzt; die Rubrik ist eine
+Heuristik, nicht validiert. `/review-preview` bleibt ein markiertes Beispiel.
+Beide Web-Review-Ansichten nutzen denselben Adapter für die gewählte, lokal
+gespeicherte Aufnahme; Quellen-Marker kommen aus dem aktuellen Fact-Check.
 
 ## 2. Ablauf
 
@@ -58,6 +65,9 @@ Für Struktur existiert noch keine automatische Messregel; ohne Evidenz kein Sco
 | Capture | `getUserMedia` + `MediaRecorder`; Web Audio (`AudioWorklet` / `AnalyserNode`) für Live-Pegel |
 | Medien-Verarbeitung | `ffprobe` für Stream-Startzeiten/Dauer, `ffmpeg` nur für Audio-Dekodierung und ASR |
 | Transkription | Lokales Whisper (`faster-whisper`) hinter einem `Transcriber`-Interface (`{word, start_ms, end_ms}` + Text), Deepgram EU als wählbarer Live-Stream mit Wiederverwendung der finalen Wörter; Anbieter bleibt austauschbar |
+| Aufbau | Deterministische Frontend-Rubrik auf Wörtern und Zeitstempeln; keine Cloud, keine Folien; Heuristik |
+| Prompt-Sicherheit | Server-issued Question-Round in Redis (`round_id`/`question_id`, TTL 600 s), nonce-delimitierte untrusted-Blöcke, strikte Schema-/Zitatprüfung; Grenzen, kein Injection-Vollschutz |
+| Retention | Celery Beat 03:15 UTC, `retention_runs`, S3-`blob_deletions`-Outbox; Profil-Ablauf entkoppelt Sessions/Takes, optionales `deleteSessions` |
 
 **Vorschläge, noch zu bestätigen** (Bestätigung im `docs/02-ai-decision-log.md` festhalten; Vorlage: `templates/ai-decision-log.md`)
 
@@ -75,9 +85,11 @@ Für Struktur existiert noch keine automatische Messregel; ohne Evidenz kein Sco
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
 **Offen:** offene Punkte und TODOs stehen in `docs/14-open-todos.md`
-(Retention/Cleanup, Struktur-Evidenz, Persistenz-/Progress-Anbindung,
-Prompt-Safety-Grenzen, Demo-Härtung). Umgesetzt: Post-Transkription lokal und
-Text-Fragerunde mit Quellenvergleich ohne Noten.
+(Demo-Backup/Geräteabnahme, Persistenz-/Progress-Anbindung,
+Quellen-/S3-Lebenszyklus, Voice-Provider-Limits, automatisches Antwortende,
+Auth/Rate Limiting, Mobile-Workspace, Sprachkonsistenz, Folienabdeckung).
+Umgesetzt: deterministische Aufbau-Rubrik, zwei getrennte Evidenzprofile ohne
+Gesamtscore, serverseitige Frage-Runden und tägliche Retention.
 
 ## 4. Architektur
 
@@ -139,7 +151,7 @@ Event {
 - **Lokale Wiedergabe:** Kein Clip-/Snapshot-/Video-Endpunkt im Backend. Die Aufnahme bleibt im Client; Audio/Container nur temporär für Analyse. Take-Events liefern Start, Peak und Dauer. Coverage nur aus gemeldeten Messintervallen, fehlende Zeit bleibt unbekannt.
 - **Persistente Review:** `POST /sessions`, `/sessions/{id}/takes`, `/takes/{id}/events`, optional `/audio`, dann `/review`; `GET /timeline`, `/review`, `/jobs/{id}`. Neue POSTs brauchen `Idempotency-Key`. Template-Review ist Standard; LLM nur über geprüfte Evidence Cards und Platzhalter. `DELETE /sessions/{id}` kaskadiert Metadaten und entfernt temporäres Audio. P1/P2-Anbindung über Take-`/factcheck`, `/questions`, `/questions/answers`; Details in `docs/06-backend-review-api.md`.
 - **Fact-Check:** (1) LLM extrahiert prüfbare Aussagen mit Timestamp aus dem Transkript, (2) Top-k-Chunks pro Aussage aus pgvector, (3) LLM urteilt mit wörtlichem Zitat, (4) Code prüft per String-Match, dass das Zitat im Chunk steht. Drei Ergebnisse: *stützt*, *widerspricht*, *in den Quellen nicht gefunden*. Letzteres ist nicht „falsch“. Web-Fetch kommt erst danach als Zweitquelle.
-- **Frage-Agent:** Eingabe sind Transkript, Quellen-Chunks und die Fact-Check-Funde. Er fragt gezielt nach Widersprüchen und Lücken und vergleicht Antworten mit den Quellen. Ausgabe ohne Punkte oder Noten.
+- **Frage-Agent:** Eingabe sind Transkript, Quellen-Chunks und die Fact-Check-Funde. Er fragt gezielt nach Widersprüchen und Lücken und vergleicht Antworten mit den Quellen. Der Antwortvergleich selbst vergibt keine Punkte oder Noten; danach zeigt der Client getrennte Evidenzzeilen ohne Gesamtscore. Serverseitige Rundenlimits und TTL stehen in `docs/07-review-and-agent.md`.
 - **Fallback:** Bei LLM-Ausfall bleibt der Kurzreview aus den erhobenen Events als Template verfügbar. Die vorberechnete Beispiel-Session ist ein eigener, gekennzeichneter Demo-Pfad; sie ersetzt keine Daten einer echten Aufnahme. Sie dient dem Produktreview (Wert in unter 3 Minuten), Live-Aufnahme ist der zweite Pfad (30–60 s reichen).
 - **Datenschutz:** Demo-Daten synthetisch. Live-Aufnahmen der Jury sind echte personenbezogene Daten: Einwilligungshinweis, Originalaufnahme nach der Verarbeitung löschen, Drittanbieter-APIs benennen (relevant für die KI-Reflection).
 - **Daten und Secrets:** Postgres mit pgvector und SeaweedFS; der vorhandene Compose-Stack ist in Abschnitt 6 beschrieben. Secrets nur in `.env`, nicht committen.
@@ -176,26 +188,33 @@ docs/
   12-long-term-progress-data-design.md # Backend-Data-Design, Research, DDL, API
   13-long-term-progress-frontend-contract.md # progress.v1 und UI-Vertrag
   14-open-todos.md                 # Offene TODOs, Priorität und Abnahmekriterien
+  15-evidence-safety-retention-research.md # Research/Decision Record zu Struktur, Scores, Prompt-Grenzen, Retention
 templates/
   ai-decision-log.md               # Vorlage für die AI Reflection
   team-roles.md                    # Rollen, Gates, RACI
 ```
 
 Das lokale Grundgerüst startet aktuell FastAPI mit FFmpeg,
-einen separaten Celery-Worker, Redis, PostgreSQL **mit pgvector** und
-**SeaweedFS als S3-Speicher**. Die Queue wird mit einem synthetischen Job geprüft; Audio-/ASR-Jobs und
+einen separaten Celery-Worker, einen täglichen **Celery-Beat** (retention_sweep),
+Redis, PostgreSQL **mit pgvector** und **SeaweedFS als S3-Speicher**. Die Queue
+wird mit einem synthetischen Job geprüft; Audio-/ASR-Jobs und
 Job-Status-Endpunkte sind implementiert (Details: `backend/README.md`). Die additive
 Take-Review-API (`backend/app/review/`) speichert Sessions, Takes, Events, Reviews,
 Jobs und Wort-/Sprechdaten in Postgres. Sie bietet Template-/LLM-Review,
 Coverage, Fact-Check-/Frage-Anbindung und explizite Löschung ohne Server-Clips.
-Browser-Integration dieser neuen API ist ein separater Frontend-Change.
+Die serverseitige Retention löscht abgelaufene Session-/Profil-/Job-Daten über
+den Beat und eine S3-Outbox; Quellen-Collections und ältere S3-Präfixe werden
+nicht vollständig erfasst (offen). Browser-Integration der neuen Review-API ist
+ein separater Frontend-Change.
 Das optionale Long-Term-Progress-Backend ist umgesetzt
 (`backend/app/progress/`): pseudonyme Profile mit Token-Hash, additive
 `profile_id`/`presentation_mode`/`recorded_at`/`device_key`-Felder,
 `take_quality`/`take_metrics`, `progress_snapshots`/`progress_change_points`,
 optionale Ziele, `progress.v1`, Export und Löschung. Es gibt keinen
 Gesamtscore. Profil-Löschung entkoppelt Sessions/Takes und entfernt nur die
-abgeleiteten Progress-Daten; Session-Löschung bleibt separat. Details:
+abgeleiteten Progress-Daten; `DELETE /profiles/{id}?deleteSessions=true` löscht
+optional auch die verknüpfte serverseitige Analyse. Session-Löschung bleibt
+separat. Details:
 `docs/12-long-term-progress-data-design.md`; Frontend-Vertrag:
 `docs/13-long-term-progress-frontend-contract.md`; die Web-UI unter `/progress`
 ist umgesetzt (Consent, Demo, Filter, Ziele, Export, Löschung); die Verknüpfung
@@ -224,17 +243,24 @@ Getippte Antworten werden mit den Quellen verglichen (Zitat-Prüfung, optionale
 Nachfrage); Fragen mit gesprochener Stelle sind `question`-Events. Nach der
 vollständig beantworteten getippten Runde zeigt der Web-Review eine Auswertung
 (`frontend/src/features/evaluation/performance.ts`, Panel
-`PerformanceEvaluation.tsx`): transparenter Heuristik-Score 0–100 aus bereits
-gemessenen Events — Inhalt (Gewicht 0,5; Fact-Check- und Antwort-Urteile),
-Stimme (0,25) und Gestik (0,25; je 15 Punkte Abzug pro Marker/Minute, Floor 40,
-Gewichte renormalisiert wenn Daten fehlen) — mit Belegen, Stärken,
-Übungsvorschlägen und Methodenhinweis; keine Personenbewertung. Voice-Agent: Rolle `student` (neugieriger Erstsemester) oder
+`PerformanceEvaluation.tsx`, `practice.evidence.v2`): vier getrennte Zeilen für
+Quellenbindung Vortrag, Quellenbindung Antworten, Sprechmerkmale und Pose/Gesten.
+Nur die Quellenzeilen liefern Schätzungen mit Wilson-Spanne und geprüftem Zitat;
+Sprech- und Pose-Zeilen zählen Marker. Kein Gesamtscore, keine Gewichte, keine
+Labels wie „Strong“/„Fair“, keine Personenbewertung. Die Review-Scores
+(`evidence-share-v2`) bleiben davon getrennt. Voice-Agent: Rolle `student` (neugieriger Erstsemester) oder
 `tutor` (Professor/Tutor) wählbar; der Browser liest Fragen und Reaktionen per
 `speechSynthesis` vor, gesprochene Antworten gehen über
 `POST /questions/answers/voice` an den konfigurierten Transcriber (standardmäßig lokales Whisper) und werden danach wie getippte
 Antworten gegen die Quellen geprüft. Im Live-Studio lässt sich die
 Transkription (lokales Whisper) vor der Aufnahme zuschalten; die Wörter sind Eingabe
-für den Fact-Check. Das Next.js-Frontend läuft in einem
+für den Fact-Check. Prompt-Sicherheit: Der Client sendet für getippte Antworten
+nur `round_id` und `question_id`; die kanonische Frage und die Zähler liegen in
+Redis (TTL 600 s, max. 5 Startfragen, 3 Follow-ups, Standard 6 Turns, 4000 Zeichen pro
+Antwort, 25 MB Voice-Upload). Untrusted-Daten sind nonce-delimitiert, Ausgaben
+werden strikt validiert, URLs nur als `http(s)` ohne Credentials akzeptiert.
+Prompt-Injection ist damit nicht vollständig verhindert; die Voice-Grenzen sind
+teilweise Agentenkonfiguration. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
 Lokale Pose-Landmarks lassen sich im Kamera-Studio als JSONL exportieren;
 Darauf laufen lokale, kalibrierte Gesten-/Haltungsheuristiken (Hand hoch,
@@ -315,6 +341,26 @@ Benchmark auf dem M5 Pro/24 GB: synthetischer 30-s-Stream mit 80–182 ms
 Signal-Verarbeitungs-/Lieferzeit zusätzlich zum 5-s-Sammelintervall.
 Echtes Mikrofon/Safari und Genauigkeit sind damit nicht abgenommen.
 
+Struktur und Review-Scores (25.10.2026): Die Aufbau-Rubrik analysiert die
+gespeicherten Wörter im Browser und erzeugt Timeline-Marker für Einstieg,
+Abschluss, Abschnitte und Übergänge; sie ersetzt keine Folienprüfung. Die vier
+Review-Scores nutzen `evidence-share-v2`; die Auswertung nach der Fragerunde
+nutzt `practice.evidence.v2` mit vier Zeilen und ohne Gesamtscore. Beide
+Ansichten zeigen fehlende Daten als „–“ und keine Note.
+
+Retention und kleine Fixes (25.10.2026): `retention_sweep` läuft täglich um
+03:15 UTC über Celery Beat. Profil-Ablauf entfernt profil-eigene Daten und
+entkoppelt Sessions/Takes; `deleteSessions=true` löscht optional auch die
+serverseitige Analyse. Session-Löschung committet die DB und flusht danach die
+S3-Outbox. Der Frontend-Healthcheck deckt die Hauptseiten und
+`/api/health/ready` ab; das Frontend startet mit `restart: unless-stopped`.
+`templates/` ist im Compose-Backend unter `/templates` gemountet, aber nicht ins
+Image kopiert. Der Consent-Text nennt lokale/relative Backends „this local
+server“; Favicon/Icon/Apple-Icon sind vorhanden; `TakeFactcheckRequest` ist
+eindeutig benannt. Teststand: Backend 370 bestanden, 2 übersprungen; Frontend
+315 in 44 Dateien; Lint, Typecheck und Build grün. Das ist keine Genauigkeits-
+oder Geräteabnahme.
+
 Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
 sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
 Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`
@@ -358,7 +404,7 @@ Vor der Aufnahme stehen Material-Upload und vier Präsentationstypen bereit:
 `presentationMode` werden im Take festgehalten und an beide Fragepfade übergeben.
 ElevenLabs ist auf Nutzerwunsch als optionaler Sprachdialog integriert; Nutzer
 konfiguriert `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` selbst. Kontext als
-Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Sprachreaktionen sind nicht zitateverifiziert; die Auswertung nach der getippten Runde ist ein Client-Heuristik-Score aus gemessenen Events (siehe Abschnitt 6, Frage-Simulator).
+Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Sprachreaktionen sind nicht zitateverifiziert; die Auswertung nach der getippten Runde ist ein Client-Evidenzprofil aus gemessenen Events ohne Gesamtscore (siehe Abschnitt 6, Frage-Simulator).
 Bei unzureichenden Upload-Auszügen nutzt der ElevenLabs-Agent das Webhook-Tool
 `search_web` (Tavily, Secret im ElevenLabs-Konto) für gezielte öffentliche
 Sachfragen. Webquellen werden benannt; Suchfehler/fehlende Belege bleiben offen.

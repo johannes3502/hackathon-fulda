@@ -1,12 +1,12 @@
 # Long-Term-Fortschritt — Frontend Data Contract und Timeline-UI
 
-Status: **Web-UI umgesetzt (24.10.2026).** Route `/progress` mit
-Profil-/Consent-Flow, Small Multiples, Detail-Chart, Change-Points,
-Qualitätstabelle, Zielen, Export und Löschung; die synthetischen Demo-Daten
-liegen unter `/progress/demo`. Dieses Dokument bleibt der
-Arbeitsvertrag und beschreibt die API-Antwort `progress.v1`, die Bedeutung jedes
-Feldes, die Zustände und bewährte Muster für eine Timeline über viele
-Präsentationen. Die Verknüpfung neuer Live-Aufnahmen mit einem Profil
+Status: **Web-UI umgesetzt (24.10.2026); Retention- und Löschtexte am
+25.10.2026 präzisiert.** Route `/progress` mit Profil-/Consent-Flow, Small
+Multiples, Detail-Chart, Change-Points, Qualitätstabelle, Zielen, Export und
+Löschung; die synthetischen Demo-Daten liegen unter `/progress/demo`. Dieses
+Dokument bleibt der Arbeitsvertrag und beschreibt die API-Antwort `progress.v1`,
+die Bedeutung jedes Feldes, die Zustände und bewährte Muster für eine Timeline
+über viele Präsentationen. Die Verknüpfung neuer Live-Aufnahmen mit einem Profil
 (Checkliste in §2) ist noch offen.
 
 Die fachliche Datenspeicherung und Auswertung steht in
@@ -43,9 +43,10 @@ zu einem Durchschnittswert verschmelzen.
 ## 2. Voraussetzungen und Integrationscheckliste
 
 Long-Term-Tracking setzt voraus, dass Aufnahmen als Sessions/Takes in der
-bestehenden Review-API persistiert werden. Heute liegen Aufnahmen nur im
-Browser-RAM; die Startseite zählt den aktuellen Bestand. Vor der Progress-UI
-muss daher gelten:
+bestehenden Review-API persistiert werden. Lokale Takes inklusive Video liegen
+in IndexedDB und werden nach Reload wiederhergestellt; der Server hat nur
+Metadaten und Analyse. Die Anbindung an `/sessions`/`/takes` fehlt noch. Vor
+der Progress-UI muss daher gelten:
 
 - [ ] Beim Start einer Aufnahme wird eine Session mit `profileId` und
       `presentationMode` angelegt.
@@ -62,8 +63,9 @@ muss daher gelten:
 - [ ] Das Frontend behandelt fehlende/kaputte Tokens, gelöschte Profile und
       nicht verfügbare Backends.
 - [ ] Das lokale Video bleibt lokal; die Progress-UI verlinkt nur, wenn die
-      Aufnahme im Browser noch vorhanden ist. Nach einem Reload ist das Video
-      in der Regel weg; dann bleiben nur die Messwerte sichtbar.
+      Aufnahme im Browser noch vorhanden ist. IndexedDB kann bei Speicherdruck
+      Daten verdrängen; dann bleiben nur die Messwerte sichtbar und die UI sagt
+      „Video nicht mehr lokal verfügbar“.
 
 ## 3. Profil, Token und Consent
 
@@ -93,8 +95,11 @@ Regeln:
   `X-Profile-Token`.
 - Mehrere Profile pro Browser sind optional (z. B. für mehrere Personen). Dann
   `activeProfileId` separat speichern; die Daten dürfen nie vermischt werden.
-- „Profil löschen“ löscht serverseitig alle Fortschrittsdaten. Lokale Videos
-  müssen separat gelöscht werden; die UI muss beide Wirkungen nennen.
+- „Profil löschen“ entfernt serverseitig alle Fortschrittsdaten. Optional
+  (`deleteSessions=true`) werden auch verknüpfte Sessions/Takes und deren
+  serverseitige Analyse gelöscht; ohne Option bleiben sie unter ihrer eigenen
+  Einwilligung bestehen. Lokale Videos müssen separat gelöscht werden; die UI
+  muss beide Wirkungen nennen.
 - Bei `401 E_PROFILE_TOKEN_INVALID`: Profil zurücksetzen anbieten. Dabei
   erklären, dass die serverseitigen Fortschrittsdaten ohne Token nicht mehr
   erreichbar sind.
@@ -118,11 +123,24 @@ UI-Anforderungen:
 - Zweck: „Fortschritt über mehrere Präsentationen speichern und auswerten.“
 - Speicherort: „Auf dem Server, verknüpft mit einem zufälligen Profil. Kein
   Login, keine E-Mail.“
-- Aufbewahrung: konkretes Datum oder „bis zur Löschung“ nennen.
-- Jederzeit löschbar und exportierbar.
+- Aufbewahrung: Standard 12 Monate; die UI setzt beim Anlegen explizit ein
+  Jahr (`retention_origin='user'`), das durch neue Takes nicht automatisch
+  verlängert wird. Sie nennt das konkrete Datum, den täglichen Löschlauf und
+  dass der Zugriff nach Ablauf gesperrt ist. Eine Verkürzung/Verlängerung ist
+  serverseitig per `PATCH {retentionUntil}` möglich, in der UI aber noch nicht
+  angeboten. Das ist keine Rechtsgarantie; Quellen/S3-Lifecycle sind nicht
+  vollständig abgedeckt.
+- Jederzeit löschbar und exportierbar; die Löschung von Fortschritt und die
+  optionale Löschung der serverseitigen Analyse sind getrennt zu erklären.
 - Ohne Consent: keine Verknüpfung, keine Progress-Seite mit echten Daten;
   optional eine Erklärung mit CTA.
 - Der Consent darf nicht vorausgewählt sein.
+- Serverseitig speichert `speaker_profiles` die effektive Frist als
+  `retention_until` und ihre Herkunft als `retention_origin` (`default` oder
+  `user`). Die API liefert dem Frontend nur `consent.retentionUntil`; die
+  Herkunft ist kein eigener Response-Parameter. Die UI darf deshalb keine
+  Aussage über eine „Standard-“ oder „Nutzerfrist“ ableiten, außer sie kennt
+  den Erstellungsweg.
 
 ### 3.3 Profil anlegen
 
@@ -278,7 +296,7 @@ Content-Type: application/json
 | `POST` | `/api/profiles` | — | Profil + Token |
 | `GET` | `/api/profiles/{id}` | `X-Profile-Token` | Profil lesen |
 | `PATCH` | `/api/profiles/{id}` | `X-Profile-Token` | Name/Retention ändern |
-| `DELETE` | `/api/profiles/{id}` | `X-Profile-Token` | Profil + Daten löschen |
+| `DELETE` | `/api/profiles/{id}` | `X-Profile-Token` | Profil + Fortschrittsdaten löschen; `?deleteSessions=true` löscht zusätzlich Sessions/Takes/Analyse |
 | `GET` | `/api/profiles/{id}/progress` | `X-Profile-Token` | Timeline |
 | `GET` | `/api/profiles/{id}/progress/{metricId}` | `X-Profile-Token` | Metrik-Detail |
 | `GET` | `/api/profiles/{id}/goals` | `X-Profile-Token` | Ziele lesen |
@@ -294,7 +312,11 @@ Recompute läuft über Celery. `statusUrl` mit Token pollen, bis `status` den We
 denselben Idempotency-Key wiederverwenden; ein zweiter aktiver Lauf liefert
 `409`. Auch verknüpfte Session-/Take-/Job-Routen verlangen `X-Profile-Token`,
 anonyme Sessions bleiben kompatibel. Abgelaufene Profile liefern `410`,
-Löschen bleibt erlaubt. Antworten tragen `Cache-Control: private, no-store`.
+Löschen bleibt erlaubt. Ein täglicher Sweep (03:15 UTC) entfernt abgelaufene
+Profile/Sessions/Jobs und flusht die S3-Outbox; Profil-Ablauf entkoppelt
+Sessions/Takes. `DELETE /profiles/{id}?deleteSessions=true` löscht optional
+zusätzlich die serverseitige Analyse. Antworten tragen
+`Cache-Control: private, no-store`.
 
 `includeExcluded=false` ändert nur die sichtbaren Punkte, keine Qualitätszähler
 oder Trends. `sequence` behält Lücken; `versionBreak` unterdrückt die numerische
@@ -868,6 +890,7 @@ usw. sind für die direkte Darstellung dupliziert; bei Widerspruch gilt
 
 | Feld | Bedeutung | UI-Regel |
 |---|---|---|
+| `profile.consent.retentionUntil` | effektive serverseitige Frist (`retention_until`) | Als Datum anzeigen; „nach Ablauf gesperrt, täglicher Löschlauf“. Keine Frist → „keine automatische Frist“. |
 | `sequence` | 1-basierte Reihenfolge der Takes im Profil, global (nicht pro Filter neu nummeriert) | Als „Aufnahme #13“ anzeigen; nicht als ID verwenden. |
 | `profile.eligibleTakes` | Takes mit mindestens einer eligible primären Metrik | „20 von 24 Aufnahmen vergleichbar“; nicht als Summe aller Metrikpunkte lesen. |
 | `recordedAt` | Aufnahmezeit (Client, mit TZ) | Lokal formatieren; bei `recordedAtSource`-Hinweis „Serverzeit“ kennzeichnen. |
@@ -1214,6 +1237,7 @@ Hell/Dunkel/System und Reduced Motion (`frontend/DESIGN.md`).
 | Version break | Unterbrochene Linie + „Regelversion geändert; Vergleich über den Bruch nicht möglich.“ |
 | 401 | „Profil nicht mehr erreichbar. Token zurücksetzen?“ (Datenverlust erklären). |
 | 404 | „Profil wurde gelöscht.“ + CTA neues Profil. |
+| 410 | „Aufbewahrungsfrist abgelaufen. Zugriff gesperrt; der tägliche Löschlauf entfernt die Daten.“ Kein Retry, Profil zurücksetzen anbieten. |
 | 503 | „Fortschritt gerade nicht verfügbar.“ + Retry; gecachte Daten mit Stand anzeigen. |
 | Recompute läuft | „Wird neu berechnet …“ mit Job-Status; keine doppelten Anfragen. |
 | Kein lokales Video | „Aufnahme nicht mehr lokal verfügbar“; Metadaten bleiben. |
@@ -1233,6 +1257,10 @@ Hell/Dunkel/System und Reduced Motion (`frontend/DESIGN.md`).
 - „Regelversion geändert. Die Reihe ist an dieser Stelle unterbrochen.“
 - „Heuristik, unvalidiert. Fehlende Daten werden nicht ersetzt.“
 - „Video nicht mehr lokal verfügbar. Die Messwerte bleiben sichtbar.“
+- „Aufbewahrung bis {Datum}; danach ist der Zugriff gesperrt und der tägliche
+  Löschlauf entfernt die serverseitigen Fortschrittsdaten.“
+- „Profil löschen entfernt Messwerte, Ziele und Trends. Optional löscht es auch
+  die verknüpfte serverseitige Analyse; lokale Videos bleiben im Browser.“
 
 ### 9.3 Badges
 
@@ -1346,6 +1374,10 @@ schwergewichtige Dashboard-Suite für sechs Sparklines einführen.
 - [ ] Keine Farbe als einziges Unterscheidungsmerkmal.
 - [ ] Keine Token-/Profil-Leaks in Logs/URLs/Fehlermeldungen.
 - [ ] Export enthält keine Rohmedien/Wörter/Landmarks.
+- [ ] Löschdialog nennt Fortschritt, optional `deleteSessions=true` und die
+  lokalen Videos getrennt; 204/404/410 verhalten sich korrekt.
+- [ ] Retentionstext nennt Datum, täglichen Löschlauf und die fehlende
+  Rechtsgarantie; nach Ablauf erscheint der 410-Zustand.
 
 ## 14. Offene Designfragen
 
@@ -1369,6 +1401,10 @@ schwergewichtige Dashboard-Suite für sechs Sparklines einführen.
    duzt; konsistent bleiben.
 10. **Export:** CSV reicht für Analyse; JSON für Vollständigkeit. Beides
     anbieten, aber nicht als Hauptaktion.
+11. **Retention-Frist ändern:** Serverseitig per `PATCH {retentionUntil}`
+    möglich; die UI bietet noch keinen Editor und zeigt die beim Anlegen
+    gesetzten 12 Monate. Offen, ob eine Verkürzung/Verlängerung in der UI
+    angeboten wird.
 
 ## 15. Quellen und weiterführende Literatur
 

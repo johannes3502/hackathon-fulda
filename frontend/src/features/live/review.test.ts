@@ -1,6 +1,14 @@
 import { expect, it } from "vitest";
 import type { LiveFeedback } from "./contracts";
-import { needsPractice, playbackAnnotation, reviewMoments } from "./review";
+import {
+  needsPractice,
+  playbackAnnotation,
+  recordingFeedback,
+  reviewMoments,
+  structureFeedback,
+} from "./review";
+import { analyzeStructure } from "../structure/analyze";
+import { germanTalk } from "../structure/fixtures";
 
 const pace: LiveFeedback = {
   id: "pace",
@@ -42,4 +50,32 @@ it("keeps the same posture-adjustment classification as live monitoring", () => 
     evidence: { payload: { rule: "arms_crossed" } },
   } as LiveFeedback;
   expect(needsPractice(crossed)).toBe(true);
+});
+
+it("appends deterministic, bounded structure moments with structure ids", () => {
+  const structure = analyzeStructure(germanTalk.words, germanTalk.durationMs);
+  const moments = structureFeedback(structure, germanTalk.durationMs);
+  expect(moments.length).toBeGreaterThan(0);
+  expect(moments.every((moment) => moment.id.startsWith("structure-"))).toBe(
+    true,
+  );
+  expect(new Set(moments.map((moment) => moment.id)).size).toBe(moments.length);
+  expect(
+    moments.every(
+      (moment) =>
+        moment.startMs >= 0 &&
+        moment.endMs <= germanTalk.durationMs &&
+        moment.endMs > moment.startMs,
+    ),
+  ).toBe(true);
+  const combined = recordingFeedback({
+    feedback: [],
+    factCheck: undefined,
+    durationMs: germanTalk.durationMs,
+    words: germanTalk.words,
+    structure,
+  });
+  expect(combined.filter((moment) => moment.category === "structure")).toEqual(
+    moments,
+  );
 });

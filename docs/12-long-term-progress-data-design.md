@@ -1,14 +1,15 @@
 # Long-Term-Fortschritt — Data Design, Speicherung und Auswertung
 
-Status: **Backend und Web-UI umgesetzt (24.10.2026).** Der Code liegt in
-`backend/app/progress/`, die additiven Spalten/Tabellen werden beim Start
-idempotent angelegt. Die 10 neuen Backend-Tests laufen zusammen mit der
-bestehenden Suite (290 passed, 1 skipped). Die Web-Oberfläche `/progress`
-(Consent, Demo, Filter, Ziele, Export und Löschung) ist umgesetzt; die
-Verknüpfung neuer Live-Aufnahmen mit einem Profil ist noch offen. Dieses
-Dokument beschreibt weiterhin
-die Zielarchitektur und die Gründe; Abweichungen zum ersten Entwurf sind in §2.3
-ausdrücklich festgehalten. Der Frontend-Vertrag steht separat in
+Status: **Backend und Web-UI umgesetzt (24.10.2026); Retention am 25.10.2026
+ergänzt.** Der Code liegt in `backend/app/progress/`, die additiven
+Spalten/Tabellen werden beim Start idempotent angelegt. Der aktuelle Prüfstand
+(25.10.2026) ist 370 bestandene und 2 übersprungene Backend-Tests sowie 314
+Frontend-Tests in 44 Dateien; Lint, Typecheck und Build sind grün. Die
+Web-Oberfläche `/progress` (Consent, Demo, Filter, Ziele, Export und Löschung)
+ist umgesetzt; die Verknüpfung neuer Live-Aufnahmen mit einem Profil ist noch
+offen. Dieses Dokument beschreibt weiterhin die Zielarchitektur und die Gründe;
+Abweichungen zum ersten Entwurf sind in §2.3 ausdrücklich festgehalten. Der
+Frontend-Vertrag steht separat in
 [`13-long-term-progress-frontend-contract.md`](13-long-term-progress-frontend-contract.md).
 
 > **Leitplanken des Projekts bleiben gültig.** Es gibt keinen Gesamtscore,
@@ -157,7 +158,7 @@ Korrekturen fest; sie ersetzt die früheren Aussagen an den betroffenen Stellen.
 | **Mehrfachtests** | Sieben primäre Metriken wurden vorab festgelegt. | Benjamini–Hochberg `q=0.1` über die primären Metriken; `adjustedP` bleibt `null`, wenn kein p-Wert berechnet wurde. |
 | **Ziel-Valenz** | „Verbesserung/Rückschritt“ ist ohne Ziel nicht definierbar. `mixed` ist eine Aussage über mehrere Metriken, nicht über eine einzelne Reihe. | `goalStatus` pro Metrik kennt nur `not_applicable`, `unknown`, `on_track`, `off_track`. `mixed` bleibt ausschließlich eine mögliche spätere Profil-Zusammenfassung. Change-Point-Arten `regression`/`recovery` nur mit Ziel; sonst `step_up`/`step_down`. |
 | **Fehlender Wert** | `value NOT NULL` widersprach der dokumentierten „nicht berechenbar“-Semantik. | `take_metrics.value` ist **nullable**. Kein Wert bedeutet unbekannt, nicht 0. |
-| **Löschung** | Ein Profil-Löschvorgang darf nicht stillschweigend Analysedaten löschen, die unter einer separaten Session-Einwilligung stehen. | Profil löschen entfernt Token, Ziele, Snapshots, Change-Points sowie `take_quality`/`take_metrics`; Sessions/Takes werden per `ON DELETE SET NULL` **entkoppelt**, nicht gelöscht. Für die vollständige Löschung bleibt `DELETE /sessions/{id}` separat. |
+| **Löschung** | Ein Profil-Löschvorgang darf nicht stillschweigend Analysedaten löschen, die unter einer separaten Session-Einwilligung stehen. | Profil löschen entfernt Token, Ziele, Snapshots, Change-Points sowie `take_quality`/`take_metrics`; Sessions/Takes werden per `ON DELETE SET NULL` **entkoppelt**, nicht gelöscht. `DELETE /profiles/{id}?deleteSessions=true` löscht optional zusätzlich die verknüpfte serverseitige Analyse; ohne den Parameter bleibt `DELETE /sessions/{id}` der separate Weg. |
 | **Partitionierung** | PostgreSQL nennt als Faustregel eine Tabelle größer als der physische RAM; die Partitionierungsspalte muss zum Query-Muster passen. | Keine Partitionierung im MVP. Ein späterer Schnitt muss `profile_id`/Zeit gemeinsam berücksichtigen; `computed_at` allein würde Profilabfragen nicht zuverlässig pruning-fähig machen. |
 | **Token** | 256-Bit-Zufallstoken sind für SHA-256-Speicherung ausreichend; `localStorage` bleibt XSS-exponiert. | Token nur als Hash, Rotation/Revoke, keine Logs. Für Produktion ist HttpOnly-Cookie/echtes Auth zu prüfen; das ist keine Hackathon-Zusage. |
 | **Wiederholte Takes** | Mehrere Takes derselben Session sind keine unabhängigen Präsentationen. | Die Timeline zählt weiterhin Takes (Vertrag), aber der Server setzt die Confidence auf `low` und liefert die Limitation `clustered-takes`, wenn mehrere eligible Takes dieselbe Session teilen. Empfehlung: eine primäre Aufnahme pro Präsentation. |
@@ -182,7 +183,7 @@ OWASP-Hinweise zu `localStorage` und die W3C-WAI-Tutorials geprüft.
 | `jobs` | Audio-/Review-/Fact-Check-/Frage-Jobs | ein Job pro Take | Nein, nur Betrieb. |
 | `sources`, `source_chunks` | Quellen, Chunks, Embeddings | Collection | Kontext für Inhaltsmetriken, nicht Fortschritt selbst. |
 | `takes.analysis` (JSONB) | Wörter, `audioSummary`, `wordSummary`, `asrProvider`, `syntheticDemo`, `notices`, `factcheck`, `questions` | pro Take | Ja, aber als JSONB nicht querybar/versioniert. |
-| Browser-Speicher | FeatureFlags, Quellen-Collection, Darstellung, aktuelle Aufnahmen im Speicher | pro Browser | Keine Historie; `LiveSessionProvider` hält Takes nur im RAM. |
+| Browser-Speicher | FeatureFlags, Quellen-Collection, Darstellung; abgeschlossene Takes in IndexedDB (inzwischen umgesetzt) | pro Browser | Lokale Historie vorhanden; serverseitige Progress-Verknüpfung weiterhin offen. |
 
 ### 3.2 Relevante vorhandene Messwerte
 
@@ -241,8 +242,9 @@ OWASP-Hinweise zu `localStorage` und die W3C-WAI-Tutorials geprüft.
 6. **Qualitätsentscheidung pro Metrik.** Coverage existiert, aber kein
    explizites `eligible`/`exclusion_reasons` je Fortschrittsmetrik. Ein Take kann
    für Pose auswertbar und für das Transkript unbrauchbar sein.
-7. **Persistente Browser-Historie.** Die Startseite zählt nur Takes im
-   aktuellen RAM-Bestand. Nach Neuladen ist die Historie weg.
+7. **Persistente Browser-Historie (inzwischen umgesetzt).** Abgeschlossene
+   Takes liegen in IndexedDB; die Startseite zählt den wiederhergestellten
+   Bestand. Die Anbindung an die serverseitige Progress-API bleibt offen.
 8. **Frontend-Anbindung an die Review-API.** Die Session-/Take-API ist laut
    Projektdokumentation implementiert, aber die Browser-Aufnahmen werden noch
    nicht durchgängig als Sessions/Takes persistiert. Das ist Voraussetzung für
@@ -370,6 +372,7 @@ erDiagram
         text locale
         jsonb consent
         timestamptz retention_until
+        text retention_origin "default/user"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -390,6 +393,7 @@ erDiagram
         jsonb consent
         jsonb capture
         timestamptz created_at
+        timestamptz retention_until
     }
     TAKES {
         uuid id PK
@@ -508,6 +512,21 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
+    RETENTION_RUNS {
+        uuid id PK
+        timestamptz started_at
+        timestamptz finished_at
+        text status "running/completed/skipped/failed"
+        jsonb counts
+        text error_code
+    }
+    BLOB_DELETIONS {
+        text object_key PK
+        int attempts
+        timestamptz next_attempt_at
+        text last_error_code
+        timestamptz created_at
+    }
 ```
 
 ### 5.2 Tabellen und DDL
@@ -526,6 +545,8 @@ CREATE TABLE IF NOT EXISTS speaker_profiles (
     locale text NOT NULL DEFAULT 'de' CHECK (locale IN ('de', 'en')),
     consent jsonb NOT NULL,
     retention_until timestamptz,
+    retention_origin text NOT NULL DEFAULT 'default'
+        CHECK (retention_origin IN ('default', 'user')),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -589,6 +610,8 @@ ALTER TABLE sessions
     ADD COLUMN IF NOT EXISTS presentation_mode text
     CHECK (presentation_mode IS NULL OR presentation_mode IN
            ('startup', 'thesis', 'school', 'nonprofit'));
+ALTER TABLE sessions
+    ADD COLUMN IF NOT EXISTS retention_until timestamptz;
 
 ALTER TABLE takes
     ADD COLUMN IF NOT EXISTS profile_id uuid REFERENCES speaker_profiles(id) ON DELETE SET NULL;
@@ -915,6 +938,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS progress_runs_one_active_idx
 ```
 
 Fehler enthalten nur Codes. Der Token schützt auch den Status-Endpunkt.
+
+#### 5.2.10 Retention-Läufe und S3-Outbox (implementiert)
+
+```sql
+CREATE TABLE IF NOT EXISTS retention_runs (
+    id uuid PRIMARY KEY,
+    started_at timestamptz NOT NULL,
+    finished_at timestamptz,
+    status text NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'skipped')),
+    counts jsonb NOT NULL DEFAULT '{}',
+    error_code text
+);
+
+CREATE TABLE IF NOT EXISTS blob_deletions (
+    object_key text PRIMARY KEY,
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    next_attempt_at timestamptz NOT NULL DEFAULT now(),
+    last_error_code text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+```
+
+`retention_runs` enthält nur Zähler und Fehlercodes, keine Inhalte.
+`blob_deletions` wird in derselben Transaktion wie die Metadaten-Löschung
+befüllt; der S3-Aufruf folgt nach dem Commit. Fehler erhöhen `attempts` und
+verschieben `next_attempt_at` exponentiell bis maximal eine Stunde.
 
 ### 5.3 Feld- und Null-Semantik
 
@@ -1441,7 +1490,7 @@ Umgang mit Datenqualität.
 | `POST` | `/profiles` | Profil + Token anlegen | `201 { profile, token, tokenIssued:true }`; Retry `200 { profile, tokenIssued:false }` |
 | `GET` | `/profiles/{profileId}` | Profil lesen | `200 { profile }` |
 | `PATCH` | `/profiles/{profileId}` | Name/Locale/Retention ändern | `200 { profile }` |
-| `DELETE` | `/profiles/{profileId}` | Profil und alle Fortschrittsdaten löschen | `204` |
+| `DELETE` | `/profiles/{profileId}` | Profil und Fortschrittsdaten löschen; `?deleteSessions=true` zusätzlich verknüpfte Sessions/Takes/Analyse | `204` |
 | `POST` | `/profiles/{profileId}/rotate-token` | Token rotieren | `200 { token }` |
 | `GET` | `/profiles/{profileId}/progress` | Timeline-Daten | `200 ProgressResponse (progress.v1)` |
 | `GET` | `/profiles/{profileId}/progress/{metricId}` | Detail einer Metrik | `200 { series }` |
@@ -1460,7 +1509,8 @@ Bestehende Routen werden additiv erweitert:
   `capture.deviceKey`.
 - `GET /sessions/{id}` und `GET /takes/{id}` liefern die neuen Felder.
 - `DELETE /sessions/{id}` kaskadiert weiterhin; `take_metrics`/
-  `take_quality` hängen an `takes` und verschwinden mit.
+  `take_quality` hängen an `takes` und verschwinden mit. Die Route committet die
+  DB-Löschung und flusht danach die `blob_deletions`-Outbox.
 
 ### 9.3 `POST /profiles`
 
@@ -1670,28 +1720,45 @@ Regeln:
 
 ### 10.3 Aufbewahrung
 
-- `retention_until` am Profil; Empfehlung: 12 Monate nach dem letzten Take,
-  danach automatische Löschung (Cron/Scheduler).
-- Eine Verkürzung von `retention_until` ist eine Löschzusage: Die UI muss
-  bestätigen, dass Daten nach dem neuen Datum entfernt werden; der Cleanup-Job
-  löscht sie, nicht das Frontend.
-- Für die Hackathon-Demo: „bis zur Löschung“ sichtbar kommunizieren; keine
-  automatische Löschung ohne Entscheidung.
-- Löschung ist hart (keine versteckten Kopien): Profil, Token, Ziele,
-  `take_quality`/`take_metrics`, `progress_snapshots`/`progress_change_points`
-  und `progress_runs` werden entfernt. Zugehörige Sessions/Takes werden per `ON DELETE SET NULL`
-  **entkoppelt** und bleiben unter ihrer eigenen Session-Einwilligung bestehen.
-  Für die vollständige Löschung von Analysedaten ist `DELETE /sessions/{id}`
-  separat aufzurufen; die UI muss beide Wirkungen unterscheiden.
-- `DELETE /profiles/{id}` ist idempotent: bereits gelöscht → `204`, ohne
-  versteckte Daten wiederherzustellen.
-- Lokale Videos werden **nicht** vom Server gelöscht; das Frontend muss sie
-  separat löschen und beide Wirkungen anzeigen.
+- **Standard:** 12 Monate (`RETENTION_PROFILE_DAYS`, `RETENTION_SESSION_DAYS`).
+  Ein Profil ohne eigene Frist hat `retention_origin='default'` und wird bei
+  neuen Takes bis `recorded_at + 365 Tage` verlängert. Eine vom Nutzer gesetzte
+  Frist hat `retention_origin='user'` und wird nicht implizit verlängert. Die
+  Web-UI setzt beim Anlegen explizit ein Jahr, daher ist ein dort erzeugtes
+  Profil `user` und wird durch neue Takes nicht verlängert.
+- **Täglicher Sweep:** Celery Beat startet `retention_sweep` um 03:15 UTC. Ein
+  Advisory Lock verhindert parallele Läufe; `retention_runs` protokolliert
+  Status und Zähler. Abgelaufene Profile/Sessions, hängende Jobs (2 h),
+  terminale Jobs (30 Tage) und abgelaufene Idempotenz werden entfernt.
+- **S3-Outbox:** Objekt-Keys werden in derselben Transaktion wie die
+  Metadaten-Löschung in `blob_deletions` geschrieben. Die S3-Löschung folgt nach
+  dem Commit; Fehler bleiben mit Retry in der Outbox. Eine Session-Löschung
+  committet die DB und flusht danach die Outbox best-effort.
+- **Profil-Ablauf:** Profil, Token, Ziele, `take_quality`/`take_metrics`,
+  `progress_snapshots`/`progress_change_points` und `progress_runs` werden
+  entfernt. Zugehörige Sessions/Takes bleiben per `ON DELETE SET NULL`
+  **entkoppelt** und unter ihrer eigenen Session-Einwilligung bestehen.
+- **Optionale vollständige Löschung:** `DELETE /profiles/{id}?deleteSessions=true`
+  löscht zusätzlich verknüpfte Sessions/Takes und die serverseitige Analyse.
+  Ohne den Parameter ist `DELETE /sessions/{id}` der separate Weg. Die UI zeigt
+  beide Wirkungen; lokale Videos bleiben im Browser.
+- **Grenzen:** Quellen-Collections und mehrere S3-Präfixe (u. a.
+  `agent-context-jobs`, ältere Analysepfade) werden nicht vollständig
+  durchsucht. Eine S3-Lifecycle-Regel ist nur Backstop und im lokalen SeaweedFS
+  nicht verifiziert. Es gibt **keine Rechtsgarantie** und keine Zusage, dass
+  jede Kopie gelöscht ist. `DELETE /profiles/{id}` ist idempotent (bereits
+  gelöscht → 204); lokale Videos werden nicht vom Server gelöscht.
+- **UI-Copy:** Die Oberfläche nennt „Aufbewahrung zunächst 12 Monate“, „nach
+  Ablauf gesperrt“ und „automatische Löschung läuft täglich“. Sie zeigt die
+  Frist aus `consent.retentionUntil`, bietet aber noch keine eigene Änderung
+  der Frist an, obwohl `PATCH {retentionUntil}` serverseitig existiert.
 
 ### 10.4 Sicherheit
 
 - Token: 256 Bit Zufall, nur Hash gespeichert, Rotation/Revoke.
-- Rate Limits pro IP und Token; keine Profil-Enumeration.
+- Rate Limits pro IP und Token sind **nicht implementiert**; die lokale API ist
+  für `localhost` gedacht. Profil-Enumeration wird durch den Token erschwert,
+  nicht durch ein allgemeines Auth-System verhindert.
 - Alle Profil-Routen und alle verknüpften Session-/Take-/Job-Routen prüfen den
   Token, einschließlich Lesen, Upload, Löschung und Idempotenz-Replays.
 - Abgelaufene Profile liefern `410`; Profil-/Session-Löschung bleibt mit gültigem
@@ -1730,7 +1797,7 @@ oder Login. Das ist eine offene Entscheidung, keine stille Annahme.
 | Backfill | Aus Events/Wörtern; bei fehlenden Rohdaten `versionBreak` statt Lüge. |
 | Determinismus | Gleicher Input + gleiche Versionen → gleicher Output; Tests mit Fixtures. |
 | Monitoring | Anzahl eligible/excluded, Recompute-Dauer, Fehlerraten, API-Latenz; keine Inhalte loggen. |
-| Retention-Job | Täglich; löscht abgelaufene Profile; dokumentiert Anzahl, keine Inhalte. |
+| Retention-Job | Täglich 03:15 UTC; löscht abgelaufene Profile/Sessions/Jobs/Idempotenz, flusht die S3-Outbox; dokumentiert Anzahl, keine Inhalte. Quellen/S3-Präfixe nicht vollständig abgedeckt. |
 | Schema-Migration | Aktuell idempotente DDL; für Produktion Alembic einführen. |
 
 ## 12. Testing und Acceptance Criteria
@@ -1747,7 +1814,7 @@ oder Login. Das ist eine offene Entscheidung, keine stille Annahme.
 | Ziel | increase/decrease/target_band; `on_track`/`off_track`/`unknown` (kein `mixed` pro Metrik). |
 | Versionierung | Regel-/Metrikwechsel → `versionBreak`, keine durchgehende Linie. |
 | Idempotenz | Zweiter Recompute mit gleichem Input → gleicher `input_hash`/Snapshot. |
-| Löschung | Profil/Session/Take löschen → alle abgeleiteten Zeilen weg. |
+| Löschung | Profil löschen entfernt Progress-Zeilen und entkoppelt Sessions/Takes; `deleteSessions=true` bzw. Session-Löschung entfernt auch die Analyse. |
 | API-Vertrag | camelCase, `schemaVersion`, keine Score-/Ranking-Felder, keine Medien-URLs. |
 | Performance | 20/100/1.000 Takes; API < 500 ms bei gecachten Snapshots. |
 
@@ -1792,11 +1859,16 @@ oder Login. Das ist eine offene Entscheidung, keine stille Annahme.
 - `POST /sessions` mit `profileId` und `X-Profile-Token`; `POST /sessions/{id}/takes`
   prüft den Token, wenn die Session einem Profil gehört. Bestehende Sessions ohne
   Profil bleiben kompatibel.
-- Review-Runde: Gesamtsuite 320 passed, 1 optionaler Skip (lokales Postgres,
-  synthetische Daten, keine externen Keys nötig). Pure Statistik-/Metriktests
-  laufen auch ohne Postgres. Recompute zusätzlich mit echtem Celery/Redis geprüft.
-- Noch offen: Frontend-Anbindung, Retention-Cron, Rate Limiting, Multi-Device,
-  echte Nutzerdaten-Validierung.
+- Review-Runde: 370 bestandene, 2 übersprungene Backend-Tests (lokales
+  Postgres, synthetische Daten, keine externen Keys nötig); 314 Frontend-Tests
+  in 44 Dateien, Lint/Typecheck/Build grün. Recompute zusätzlich mit echtem
+  Celery/Redis geprüft. Das sind synthetische Tests, keine Nutzerdaten- oder
+  Genauigkeitsvalidierung.
+- Retention: täglicher Beat 03:15 UTC, `retention_runs`, `blob_deletions`,
+  Profil-Entkopplung und optionales `deleteSessions` umgesetzt.
+- Noch offen: Frontend-Anbindung an `/sessions`/`/takes`, Rate Limiting,
+  Multi-Device, echte Nutzerdaten-Validierung und die vollständige
+  Quellen-/S3-Lifecycle-Prüfung.
 
 ### Phase 0 — Voraussetzungen
 
@@ -1823,7 +1895,7 @@ oder Login. Das ist eine offene Entscheidung, keine stille Annahme.
 ### Phase 3 — Ziele und Export
 
 - `profile_goals`, Ziel-Status, Export/CSV.
-- Retention-Job.
+- Retention-Job (umgesetzt: täglicher Sweep plus Outbox).
 
 ### Phase 4 — Optionen
 
@@ -1840,8 +1912,10 @@ implementierten Stand.
 
 1. **Identität:** anonymes Browser-Profil mit Token (empfohlen) oder späteres
    Login? Ohne Login ist Multi-Device-Sync nicht möglich.
-2. **Retention:** 12 Monate, 24 Monate oder „bis Löschung“? Muss sichtbar
-   entschieden und im Consent genannt werden.
+2. **Retention:** Entscheidung für den Prototyp: 12 Monate Standard, täglicher
+   Sweep, Nutzerfrist über `PATCH` möglich. Offen ist eine UI zum Ändern der
+   Frist; die Web-Oberfläche zeigt derzeit die beim Anlegen gesetzten 12 Monate.
+   Keine Aussage zu Rechtskonformität.
 3. **Primäre Metriken:** Ist die Auswahl in §6.1 die richtige? Besonders
    `pose.gesture_rate_per_min` ist neutral und nur mit Ziel sinnvoll.
 4. **Ziel-Valenz:** Sollen Nutzer Ziele setzen dürfen, oder bleibt die Timeline

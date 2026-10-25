@@ -3,6 +3,7 @@ import type { FeatureFlags } from "./feature-flags";
 import type { QuestionAnswer, QuestionResult } from "../questions/api";
 import type { components } from "../../../../api/schema";
 import type { PresentationMode } from "../questions/presentation";
+import type { StructureAnalysis } from "../structure/types";
 export type Word = components["schemas"]["Word"];
 export type FactCheckResult = components["schemas"]["FactCheckResult"];
 export type TranscriptWord = components["schemas"]["Word"];
@@ -67,6 +68,7 @@ export type LiveRecording = {
   analysisUploaded?: boolean;
   conversation?: { role: "user" | "agent"; text: string }[];
   words?: Word[];
+  structure?: StructureAnalysis;
   factCheck?: FactCheckResult;
   questions?: QuestionResult;
   answers?: Record<string, QuestionAnswer>;

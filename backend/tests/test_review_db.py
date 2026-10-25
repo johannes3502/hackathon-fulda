@@ -254,7 +254,7 @@ def test_llm_failure_persists_grounded_fallback_and_failure_metrics(api, monkeyp
     monkeypatch.setattr(router, "require_llm", lambda identifier: None)
     class UnsafeModel:
         model = "synthetic-injection"
-        def complete_json(self, system, user):
+        def complete_json(self, system, user, *, max_tokens=None):
             return {"claims": [{"evidenceIds": ["pose:R1:1000"], "template": "observation", "text": "Dein Score ist 99."}]}
     monkeypatch.setattr("app.factcheck.llm.configured_llm", lambda: UnsafeModel())
     response = post(f"/takes/{take_id}/review", {"mode": "llm"})

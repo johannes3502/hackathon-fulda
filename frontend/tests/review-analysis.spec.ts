@@ -6,20 +6,23 @@ test("four evidence-based scores sit above the video and the curve is continuous
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/review-preview");
   const scores = page.getByRole("region", {
-    name: "Bewertung der vier Kriterien",
+    name: "Evidenzprofil der vier Kriterien",
   });
   await expect(scores.locator(".review-score-card")).toHaveCount(4);
   await expect(scores.locator(".review-score-value")).toHaveText([
-    "100/100",
-    "0/100",
-    "43/100",
-    "100/100",
+    "92/100",
+    "50/100",
+    "44/100",
+    "95/100",
   ]);
   const values = await scores.locator(".review-score-value").allTextContents();
   expect(
     (await scores.boundingBox())!.y + (await scores.boundingBox())!.height,
   ).toBeLessThan((await page.locator("video").boundingBox())!.y);
-  await scores.getByRole("button").filter({ hasText: "Flow" }).click();
+  await scores
+    .getByRole("button")
+    .filter({ hasText: "Sprechfluss" })
+    .click();
   await expect(page.locator(".review418-moment")).toHaveCount(2);
   await expect(scores.locator(".review-score-value")).toHaveText(values);
   await page
@@ -46,10 +49,11 @@ test("four evidence-based scores sit above the video and the curve is continuous
     )
     .toBeGreaterThan(0);
   await scores
-    .getByText("Wie wird der Score berechnet?", { exact: true })
+    .getByText("Wie wird das Evidenzprofil berechnet?", { exact: true })
     .click();
+  await expect(scores).toContainText("Wilson-95%-Intervall");
   await expect(scores).toContainText(
-    "Neutrale Beobachtungen und nicht beobachtete Zeit fließen nicht ein",
+    "nicht zu einem Gesamtscore verrechnet",
   );
   await scores.locator("summary").click();
   await page.screenshot({
@@ -220,7 +224,7 @@ test("review connects annotations, evidence and video timestamps", async ({
   );
   await page
     .locator(".review418-criterion")
-    .filter({ hasText: "Gestik" })
+    .filter({ hasText: "Körper & Gesten" })
     .click();
   await expect(page.locator(".review418-moment")).toHaveCount(1);
   await expect(page.locator(".feedback-graph-dot")).toHaveCount(1);

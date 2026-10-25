@@ -844,8 +844,10 @@ HTTP-Codes:
 - Event-Upserts sind zusätzlich über `(take_id, dedupe_key)` idempotent.
 - UUID-Job und Response werden vor dem Enqueue atomar gespeichert. Fällt das
   Publizieren aus, liefert die Anfrage 503; derselbe POST/Key publiziert beim
-  Retry denselben noch wartenden Job. Ein periodischer Outbox-Sweeper ist
-  nicht implementiert. Ein Take erlaubt höchstens einen aktiven langen Job.
+  Retry denselben noch wartenden Job. Ein täglicher Retention-Sweep erfasst
+  hängende und terminale Jobs sowie die S3-Outbox; ein vor dem Enqueue
+  verwaister Job braucht weiterhin denselben POST/Key oder eine
+  Session-Löschung. Ein Take erlaubt höchstens einen aktiven langen Job.
 
 ### 6.13 Long-Term-Progress (additiv)
 
@@ -1221,13 +1223,23 @@ Niemals „falsch“, „erfunden“, „halluziniert“, „beweist“.
 ### 8.6 Prompt-Injection
 
 - Keine Tools, kein Browsing, keine Codeausführung im Review-Writer.
-- Transkript/Quellen mit zufälligen Nonce-Delimitern abgrenzen:
-  `<data-7f3a9c>…</data-7f3a9c>`.
+- Transkript/Quellen mit zufälligen Nonce-Delimitern abgrenzen; nach jedem Block
+  folgt die Policy erneut. Implementiert in `backend/app/prompt_safety.py`.
 - Daten-Text nie in den System-Prompt interpolieren.
-- Control-/Zero-Width-/Bidi-Zeichen entfernen.
-- Output nur Schema + Enums; keine URLs/HTML.
+- Getippte Antworten nur über `round_id`/`question_id`; die kanonische Frage
+  kommt aus der Redis-Runde. Ein clientseitig erfundener Fragetext wird
+  abgelehnt. TTL 600 s, 5 Startfragen, 3 Follow-ups, Standard 6 Turns,
+  4000 Zeichen.
+- Output nur Schema + Enums; keine freien URLs/HTML. Web-URLs nur als absolute
+  `http(s)`-URLs ohne Credentials/Steuerzeichen.
 - Verifier prüft unbekannte Quellen, verbotene Phrasen und Zahlen.
 - Injection-Versuche loggen, aber den Inhalt nicht stillschweigend löschen.
+
+Prompt-Injection ist damit **nicht vollständig verhindert**. Die Maßnahmen
+erschweren Kollisionen, Rollenwechsel und Kosteneskalation, ersetzen aber keine
+Authentifizierung, kein Rate Limiting und keine vollständige Modellkontrolle.
+Voice-Grenzen im Browser (600 s/12 Antworten) sind teilweise
+Agentenkonfiguration.
 
 ### 8.7 Modell-Settings
 
@@ -1255,28 +1267,39 @@ Kausalität oder Ratschläge ungültig. Menschliche Claim-Labels bleiben nötig.
 
 | Daten | Ort | Retention |
 |---|---|---|
-| Session/Take/Event/Review | Postgres | bis Löschung oder Retention-Frist |
+| Session/Take/Event/Review | Postgres | bis Löschung oder Retention-Frist (Standard 365 Tage) |
 | Progress-Profil/Token/Metriken/Ziele | Postgres | Profil-Retention; Löschung entfernt abgeleitete Progress-Daten |
-| Audio-Upload | S3/SeaweedFS temporär | bis Job-Ende, dann löschen |
-| Quellen-Uploads | S3/SeaweedFS | bestehende Sources-Retention |
+| Audio-Upload | S3/SeaweedFS temporär | bis Job-Ende, dann löschen; Outbox-Retry |
+| Quellen-Uploads | S3/SeaweedFS | manuell; keine vollständige automatische Frist |
+| Review-Jobs/Idempotenz | Postgres | 30 Tage terminal bzw. Ablauf |
 | Video | Browser IndexedDB | lokal, bis Nutzer löscht |
 | Presigned URLs | nirgends persistiert | bei Bedarf neu erzeugen |
+
+Der tägliche `retention_sweep` (03:15 UTC) läuft mit Advisory Lock und schreibt
+`retention_runs`. Er entfernt abgelaufene Profile/Sessions, hängende Jobs nach
+2 h, terminale Jobs nach 30 Tagen und abgelaufene Idempotenz. S3-Löschungen
+laufen über `blob_deletions` nach dem DB-Commit. Quellen-Collections und ältere
+S3-Präfixe sind nicht vollständig abgedeckt; Lifecycle-Regeln sind Backstop,
+nicht verifiziert. Keine Rechtsgarantie.
 
 ### 9.2 Löschung
 
 `DELETE /api/sessions/{id}`:
 
 - löscht Session, Takes, Events, Reviews, Jobs (Cascade),
-- löscht temporäre Audio-Objekte, falls noch vorhanden,
-- setzt `deleted_at` für Audit, oder hartes Delete nach Retention,
+- schreibt zu löschende Audio-Objekte in `blob_deletions`,
+- löscht temporäre Audio-Objekte nach dem DB-Commit über die Outbox,
+- führt ein hartes Delete aus (kein Soft-Delete-Audit),
 - löscht **nicht** das lokale Video im Browser.
 
 Das Frontend muss die lokale Kopie separat löschen und dem Nutzer beide Wirkungen anzeigen.
 
 `DELETE /api/profiles/{id}` löscht Profil, Token, Ziele und die abgeleiteten
 Progress-Zeilen. Es entfernt **nicht** die Sessions/Takes; deren `profile_id`
-wird per `ON DELETE SET NULL` entkoppelt. Für die vollständige Löschung der
-Analyse ist zusätzlich `DELETE /api/sessions/{id}` nötig.
+wird per `ON DELETE SET NULL` entkoppelt. `DELETE /api/profiles/{id}?deleteSessions=true`
+löscht optional zusätzlich verknüpfte Sessions/Takes und die serverseitige
+Analyse. Ohne den Parameter ist `DELETE /api/sessions/{id}` der separate Weg.
+Die Session-Löschung committet die DB und flusht danach die S3-Outbox.
 
 ### 9.3 Logs
 
@@ -1403,8 +1426,10 @@ nun auf den tatsächlichen Protokoll-Disconnect vor Verlassen des Kontextes;
 Produktions-Streaming wurde dabei nicht geändert.
 
 Offene Abnahme: menschliche Labels/Modellqualität, echtes Mikrofon und Geräte,
-Browser-IndexedDB und Video-Sprünge (Frontend-Team), öffentliche Absicherung
-und automatische Retention. Lokaler Scope bleibt bestätigt. Ohne erneuten
-POST/Key oder Session-Löschung gibt es keine automatische Bergung eines vor
-dem Enqueue verwaisten Jobs. Harte Worker-Abbrüche verzögern Audio-Cleanup bis
-zur erneuten Zustellung; ein allgemeiner Retention-Sweeper ist nicht Teil dieser Umsetzung.
+Browser-IndexedDB und Video-Sprünge (Frontend-Team), öffentliche Absicherung,
+Authentifizierung/Rate Limiting sowie die vollständige Quellen-/S3-Lifecycle-
+Prüfung. Lokaler Scope bleibt bestätigt. Der tägliche Retention-Sweep ist
+implementiert; ohne erneuten POST/Key oder Session-Löschung gibt es weiterhin
+keine automatische Bergung eines vor dem Enqueue verwaisten Jobs. Harte
+Worker-Abbrüche verzögern Audio-Cleanup bis zur erneuten Zustellung; die
+Outbox wird täglich nachgezogen. Keine Rechts- oder Vollständigkeitsgarantie.

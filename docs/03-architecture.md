@@ -31,11 +31,11 @@ flowchart TB
         TR["Transcription-Router<br/>POST /transcription/analyze-words"]
         SO["Sources-Router<br/>/sources CRUD + /sources/search"]
         FC["Factcheck-Router<br/>POST /factcheck<br/>GET /factcheck/jobs/id, /settings"]
-        QR["Questions-Router<br/>POST /questions, /questions/answers,<br/>/questions/answers/voice<br/>GET /questions/jobs/id, /questions/answers/id"]
+        QR["Questions-Router<br/>POST /questions, /questions/answers,<br/>/questions/answers/voice<br/>GET /questions/jobs/id, /questions/answers/id<br/>Runde: round_id + question_id"]
         RV["Review-Router (additiv)<br/>/sessions, /takes, /jobs<br/>Idempotency-Key, camelCase<br/>verknüpft: X-Profile-Token"]
         PR["Progress-Router (additiv)<br/>/profiles, /progress, /goals<br/>X-Profile-Token, Idempotency-Key"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job,<br/>recompute_progress, worker_probe (Smoke)"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job,<br/>recompute_progress, retention_sweep,<br/>worker_probe (Smoke)"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -50,8 +50,12 @@ flowchart TB
     end
 
     subgraph Infra["Infrastruktur (Docker Compose)"]
-        PG[("PostgreSQL 18<br/>+ pgvector<br/>Sessions, Progress-Profile,<br/>Metriken, Chunks")]
+        PG[("PostgreSQL 18<br/>+ pgvector<br/>Sessions, Progress-Profile,<br/>Metriken, Chunks, Retention-Runs")]
         RD[("Redis 8<br/>Broker DB0 / Results DB1")]
+        RL["Question-Round Ledger<br/>Redis: round_id/question_id<br/>TTL 600 s, kanonische Frage,<br/>max. 5 Start / 3 Follow-ups / Standard 6 Turns"]
+        RET["Retention-Sweep<br/>03:15 UTC, Advisory Lock,<br/>Profile/Sessions/Jobs/Idempotenz"]
+        OUT["blob_deletions-Outbox<br/>Retry; S3-Löschung nach Commit"]
+        BEAT["Celery Beat<br/>retention_sweep 03:15 UTC"]
         S3[("SeaweedFS<br/>S3-kompatibel<br/>Port 8333")]
     end
 
@@ -107,9 +111,16 @@ flowchart TB
     FC -- "enqueue" --> CEL
     QR -- "Request in S3" --> S3
     QR -- "enqueue" --> CEL
+    QR -- "validate/claim: round_id + question_id" --> RL
+    RL --> RD
 
     CEL --> RD
     RD --> TASKS
+    BEAT -- "publishes retention_sweep" --> RD
+    TASKS --> RET
+    RET -- "Profile, Sessions, Jobs, Idempotenz" --> PG
+    RET --> OUT
+    OUT -- "S3-Löschung nach DB-Commit" --> S3
     TASKS --> SIG
     TASKS --> WORDS
     TASKS --> INGEST
@@ -149,9 +160,10 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph Host["docker compose (localhost only)"]
-        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000<br/>Health: Homepage, Studio, Review, Backend"]
-        BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, --reload"]
+        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000<br/>Health: /, /demo, /gestures, /sources,<br/>/progress, /admin, /live, Review, /api/health/ready<br/>restart: unless-stopped"]
+        BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, --reload<br/>Templates: Compose-Mount /templates"]
         WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Concurrency 2"]
+        BT["beat<br/>Celery Beat, ein Scheduler<br/>retention_sweep 03:15 UTC"]
         PG[("postgres<br/>pgvector :5432<br/>Volume: postgres_data")]
         RD[("redis :6379<br/>AOF, noeviction<br/>Volume: redis_data")]
         ST[("storage<br/>SeaweedFS :8333<br/>Volume: media_data")]
@@ -163,6 +175,8 @@ flowchart LR
     BE -->|"storage healthy"| ST
     BE -->|"redis healthy"| RD
     WK -->|"backend healthy vor Start"| BE
+    BT -->|"backend + redis healthy vor Start"| BE
+    BT -->|"publishes retention_sweep"| RD
     WK -. "Runtime-Verbindungen über x-backend-Umgebung,<br/>keine eigenen Health-Gates" .-> PG
     WK -.-> ST
     WK -.-> RD
@@ -298,8 +312,44 @@ sequenceDiagram
     A-->>C: Events + peakMs + Review, keine Clip-/Video-URL
     C->>C: Sprung in lokaler Aufnahme (Client-Vertrag)
     C->>A: DELETE /sessions/id
-    A->>S: Noch vorhandene temporäre Uploads löschen
-    A->>P: Cascade: Takes, Events, Reviews, Jobs, Idempotenz
+    A->>P: Cascade und blob_deletions in derselben Transaktion
+    A->>P: Commit
+    A->>S: Outbox flushen, verbleibende temporäre Uploads löschen
+    Note over A,S: Fehlgeschlagene S3-Löschung bleibt in der Outbox<br/>für den täglichen retention_sweep
+```
+
+### 3c. Täglicher Retention-Sweep
+
+```mermaid
+sequenceDiagram
+    participant B as Celery Beat (03:15 UTC)
+    participant R as Redis
+    participant W as Worker (retention_sweep)
+    participant P as Postgres
+    participant S as SeaweedFS
+
+    B->>R: retention_sweep einreihen
+    R->>W: Task zustellen
+    W->>P: pg_try_advisory_lock(retention-sweep-v1)
+    alt Lock belegt
+        W->>P: Lauf als skipped protokollieren
+    else Lock frei
+        W->>P: retention_runs (running)
+        W->>P: abgelaufene Profile (Progress-Daten löschen, Sessions/Takes entkoppeln)
+        W->>P: abgelaufene Sessions (Cascade)
+        W->>P: hängende Jobs > 2 h fehlschlagen
+        W->>P: terminale Jobs > 30 Tage löschen
+        W->>P: abgelaufene Idempotenz löschen
+        W->>P: blob_deletions lesen (FOR UPDATE SKIP LOCKED)
+        W->>S: Objekte löschen
+        alt S3-Fehler
+            W->>P: Versuch erhöhen, nächster Versuch in der Outbox
+        else Erfolg
+            W->>P: Outbox-Zeile löschen
+        end
+        W->>P: retention_runs (completed, Zähler, Fehlercode)
+    end
+    Note over W,S: Quellen-Collections und ältere S3-Präfixe sind nicht vollständig abgedeckt.<br/>Lifecycle-Regeln sind Backstop, nicht verifiziert.
 ```
 
 ## 4. RAG-Pipeline: Quellen-Ingest, Suche und Fact-Check
@@ -372,10 +422,14 @@ Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
 Vor der Aufnahme werden `presentationMode` (startup/thesis/school/nonprofit)
 und `sourceCollectionId` im Take eingefroren. Im getippten Fragepfad steuert der
 Modus Rolle und fachliche Schwerpunkte. Der Sprachagent ist immer eine
-Lehrkraft, die Verständnis des Vortrags prüft, ohne Scores oder Noten. Nach der
-vollständig beantworteten getippten Runde zeigt der Client zusätzlich eine
-Auswertung mit transparentem Heuristik-Score aus gemessenen Events; siehe
-`docs/07-review-and-agent.md`.
+Lehrkraft, die Verständnis des Vortrags prüft, ohne Gesamtscore oder Note. Nach
+der vollständig beantworteten getippten Runde zeigt der Client zusätzlich
+`practice.evidence.v2` mit vier getrennten Zeilen aus gemessenen Events; nur die
+Quellenzeilen liefern Schätzungen. Siehe `docs/07-review-and-agent.md`.
+Getippte Antworten laufen über eine serverseitige Redis-Runde (`round_id` +
+`question_id`, TTL 600 s, max. 3 Follow-ups, Standard 6 Turns); der Voice-Pfad ist im
+Browser auf 600 s/12 Antworten begrenzt, harte Anbieterlimits bleiben
+Agentenkonfiguration.
 
 ```mermaid
 sequenceDiagram
@@ -385,6 +439,7 @@ sequenceDiagram
     participant S3 as SeaweedFS
     participant W as Celery Worker
     participant PG as Postgres + pgvector
+    participant R as Redis (Question-Round)
     participant E as ElevenLabs Agent
     participant T as Tavily (Websuche)
     participant L as Gemini (JSON-Modus)
@@ -411,7 +466,7 @@ sequenceDiagram
         E-->>FE: Verbindung bestätigt
         E->>FE: Ich habe noch ein paar Fragen. Bist du bereit? (Audio + Text)
         U->>FE: Bereitschaft bestätigen
-        FE->>E: Mikrofon-Audio; erst danach erste Frage zum Vortrag
+        FE->>E: Mikrofon-Audio, erst danach erste Frage zum Vortrag
         loop Eine Frage nach der anderen
             E->>FE: Frage / Reaktion, Audio + Text
             U->>FE: Gesprochene Antwort
@@ -419,15 +474,15 @@ sequenceDiagram
             opt Upload-Auszüge fehlen oder klären Sachfrage nicht
                 E->>T: search_web: gezielte öffentliche Sachfrage
                 T-->>E: Bis zu drei Treffer mit Titel, URL und Auszug
-                Note over E: Webquelle nennen; bei Fehler/fehlendem Beleg Urteil offenlassen
+                Note over E: Webquelle nennen, bei Fehler oder fehlendem Beleg Urteil offenlassen
             end
             Note over E: Prompt: höchstens zwei Nachfragen, danach nächste Hauptfrage
         end
         alt End conversation oder reguläres Agent-Ende
             U->>FE: Gespräch beenden
             FE->>E: Verbindung schließen, Mikrofon freigeben
-            FE->>FE: PerformanceEvaluation anzeigen; Fokus auf Statistik-Überschrift
-            Note over FE: Gleiche vorhandene Messdaten wie bei getippter Runde;<br/>keine neuen Urteile über gesprochene Antworten
+            FE->>FE: PerformanceEvaluation anzeigen, Fokus auf Statistik-Überschrift
+            Note over FE: Gleiche vorhandene Messdaten wie bei getippter Runde,<br/>keine neuen Urteile über gesprochene Antworten
         else Ansicht verlassen / Verbindung abbrechen
             FE->>E: Verbindung schließen, keine Auswertung öffnen
         end
@@ -436,15 +491,18 @@ sequenceDiagram
         FE->>BE: POST /questions (Wörter, Funde, Collection, Modus)
         W->>PG: Hybrid-Suche
         W->>L: Fragen mit Beleg-Verweisen
+        W->>R: create_round: kanonische Fragen + Zähler (TTL 600 s)
         W->>S3: status.json, Request löschen
-        FE->>BE: GET /questions/jobs/id
+        FE->>BE: GET /questions/jobs/id (round_id)
         U->>FE: Eine Frage beantworten
-        FE->>BE: POST /questions/answers + GET /questions/answers/id
+        FE->>BE: POST /questions/answers {round_id, question_id, answer}
+        BE->>R: validate + claim_turn (max. 3 Follow-ups, Standard 6 Turns)
         W->>L: Quellenvergleich + Nachfrage
         W->>W: Zitat im Quelltext prüfen
+        W->>R: complete_turn + gecachte Auswertung
         FE->>FE: Nächste Frage / Nachfrage anzeigen
         U->>FE: Letzte Frage beantworten
-        FE->>FE: Auswertung: Client-Heuristik-Score<br/>(Inhalt 0,5 / Stimme 0,25 / Gestik 0,25)<br/>kein Backend-Aufruf
+        FE->>FE: Auswertung: practice.evidence.v2<br/>4 getrennte Zeilen, kein Gesamtscore<br/>kein Backend-Aufruf für die Darstellung
     end
 ```
 
@@ -483,8 +541,11 @@ flowchart TD
     LIVE["/live - LiveStudio<br/>Kamera-Setup: gleiche Seitenbreite wie Upload, ohne Header und Schrittleiste<br/>Back to sources vor Aufnahmestart<br/>Ab Aufnahmestart: Vollbild ohne Navigation, Pose-Overlay<br/>Immer Live + Backend-Analyse,<br/>Options: Vortragstyp, Material und Transkript,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider + IndexedDB<br/>Video, Analyse und Fragen je Aufnahme<br/>Wiederherstellung nach Reload"] -.-> LIVE
     STORE --> EVIDENCE["recordingReviewData + recordingFeedback<br/>Video, Dauer und Events der gewählten Aufnahme<br/>Quellen-Marker aus aktuellem Fact-Check<br/>Fragen zählen nicht als Präsentationsevidenz"]
+    EVIDENCE --> STRUCT["structure-rubric-v1<br/>Wörter + Zeitstempel, DE/EN-Marker,<br/>Satz-/Abschnittsgrenzen, 4 Signale<br/>Score nur ≥3 Signale, 50 Wörter, 45 s<br/>keine Folien, Heuristik"]
     EVIDENCE --> LREV
     EVIDENCE --> LA
+    STRUCT --> LREV
+    STRUCT --> SCORES
     DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
     LIVE -->|"Back to sources vor Aufnahmestart"| SRC["/sources<br/>SourceLibrary: Upload, Status,<br/>Suchtest"]
@@ -502,11 +563,11 @@ flowchart TD
     LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video, Stärken und nächste Übungsschritte<br/>Feste Erklärungen aus Messdaten ohne LLM<br/>Transkript, Quellencheck und Exporte als Details"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>sourceCollectionId des aufgenommenen Takes"]
     LREV -->|"POST /questions/agent + /agent/session<br/>oder /questions + /answers"| QAPI["ElevenLabs-Dialog oder getippte Fragen<br/>Startup, Thesis, Schule, Nonprofit<br/>eine Frage pro Schritt"]
-    QAPI -->|"Sprachdialog beenden oder<br/>getippte Runde beantworten"| FINALSTATS["PerformanceEvaluation: Your take at a glance<br/>bestehende Messdaten, Heuristik und Grenzen"]
+    QAPI -->|"Sprachdialog beenden oder<br/>getippte Runde beantworten"| FINALSTATS["PerformanceEvaluation: Your take at a glance<br/>practice.evidence.v2: 4 getrennte Zeilen<br/>Quellen-Schätzungen + Markerzahlen, kein Gesamtscore"]
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]
     RP --> RA["ReviewAnalysis + PerformanceGraph / FeedbackGraph<br/>qualitativer Event-Saldo, positive Hinweise oben<br/>neutrale Mittellinie, Anpassungshinweise unten<br/>video.currentTime, Zeitmarken, Abschnitt-Loop"]
-    LREV --> SCORES["ReviewScores über dem Video<br/>evidence-share-v1: 4 Kriterien, 0–100<br/>Zeitanteile / Quellenurteile mit geprüftem Zitat<br/>Aufnahmetitel, Abdeckung und fehlende Daten<br/>Struktur live ohne Evidenzquelle (nur Demo)"]
+    LREV --> SCORES["ReviewScores über dem Video<br/>evidence-share-v2: 4 Kriterien, 0–100<br/>Körper &amp; Gesten, Quellenbezug, Sprechfluss, Aufbau<br/>Glättung + Wilson-95-%-Spanne; Quellenbezug nur mit geprüftem Zitat<br/>Aufbau aus structure-rubric-v1; keine Folien<br/>kein Gesamtscore, fehlende Daten „–“"]
     RA --> SCORES
     LREV --> FGRAPH["VideoPlayback + FeedbackGraph unter dem Video<br/>Zackiger Liniengraph, Zwischenwerte linear interpoliert<br/>Gute Momente oben; farbige Wiedergabeleiste darunter<br/>Cursor + abgespielter Fortschritt an video.currentTime<br/>Play/Pause / Zeitregler / Zeitmarken ↔ lokales Video"]
     LA --> RA
@@ -564,6 +625,7 @@ erDiagram
         text locale
         jsonb consent "long-term-progress"
         timestamptz retention_until
+        text retention_origin "default/user"
     }
     PROFILE_TOKENS {
         uuid id PK
@@ -581,6 +643,7 @@ erDiagram
         jsonb consent
         jsonb capture "inkl. deviceKey"
         timestamptz created_at
+        timestamptz retention_until
         timestamptz deleted_at
     }
     TAKES {
@@ -720,6 +783,21 @@ erDiagram
         jsonb response
         timestamptz expires_at
     }
+    RETENTION_RUNS {
+        uuid id PK
+        timestamptz started_at
+        timestamptz finished_at
+        text status "running/completed/skipped/failed"
+        jsonb counts
+        text error_code
+    }
+    BLOB_DELETIONS {
+        text object_key PK
+        int attempts
+        timestamptz next_attempt_at
+        text last_error_code
+        timestamptz created_at
+    }
 
     SOURCES {
         uuid id PK
@@ -758,6 +836,10 @@ Zusätzlich gelten Constraints: `events.peak_ms` liegt innerhalb
 Die Embedding-Spalte ist bewusst dimensionsfrei, damit das Modell
 ausgetauscht werden kann; Abfragen vergleichen nur Vektoren desselben
 `embedding_model`.
+`speaker_profiles.retention_origin` unterscheidet die Standardfrist (`default`,
+bei neuen Takes verlängerbar) von einer Nutzerfrist (`user`, nicht implizit
+verlängert). `retention_runs` protokolliert nur Zähler und Fehlercodes;
+`blob_deletions` ist die transaktionale Outbox für S3-Löschungen.
 
 Zusätzlich (außerhalb Postgres):
 
@@ -815,7 +897,11 @@ Backend-Analyse den Live-Marker im Review. Ein fehlender neutraler Handwert im
 Pose-Payload ist `null`; die Haltungsreferenz benötigt keine ruhigen oder
 sichtbaren Hände.
 
-Alle Kennwerte sind Messwerte ohne Notenbewertung ("Measured values only; no score or grade").
+Live-Hinweise und einzelne Messwerte sind keine Noten. Die vier
+Review-Evidenzprofile (`evidence-share-v2`) und die vier Zeilen nach der
+Fragerunde (`practice.evidence.v2`) sind getrennte, begrenzte Heuristiken ohne
+Gesamtscore; fehlende Evidenz bleibt „–“, nicht 0. Die Aufbau-Rubrik nutzt nur
+Wörter und Zeitstempel.
 
 ## 10. API-Endpunkte im Überblick
 
@@ -837,9 +923,9 @@ flowchart LR
         F1["GET /factcheck/settings"]
         F2["POST /factcheck"]
         F3["GET /factcheck/jobs/{job_id}"]
-        Q1["POST /questions"]
+        Q1["POST /questions (round_id)"]
         Q2["GET /questions/jobs/{job_id}"]
-        Q3["POST /questions/answers"]
+        Q3["POST /questions/answers<br/>round_id + question_id"]
         Q4["GET /questions/answers/{job_id}"]
         Q5["POST /questions/answers/voice"]
         Q6["GET /questions/agent/settings"]
@@ -852,7 +938,7 @@ flowchart LR
         V4["POST /takes/id/review<br/>GET /takes/id/review<br/>GET /takes/id/timeline"]
         V5["GET /jobs/id<br/>GET /takes/id/evaluation"]
         V6["POST /takes/id/factcheck<br/>POST / GET /takes/id/questions<br/>POST /takes/id/questions/answers"]
-        P1["POST /profiles<br/>GET/PATCH/DELETE /profiles/id<br/>POST /profiles/id/rotate-token"]
+        P1["POST /profiles<br/>GET/PATCH/DELETE /profiles/id<br/>DELETE ?deleteSessions=true<br/>POST /profiles/id/rotate-token"]
         P2["GET /profiles/id/progress<br/>GET /profiles/id/progress/metricId<br/>POST /profiles/id/progress/recompute: 202<br/>GET /profiles/id/progress/runs/runId"]
         P3["GET/PUT/DELETE /profiles/id/goals/metricId<br/>GET /profiles/id/takes<br/>GET /profiles/id/export"]
     end
@@ -865,17 +951,20 @@ flowchart LR
 
 Der Vertrag wird über `npm run api:generate` aus dem FastAPI-Code generiert (`api/openapi.json` -> `api/schema.d.ts`) und ist damit immer synchron zum Backend.
 
-Die Progress-Endpunkte sind serverseitig implementiert (`backend/app/progress/`),
-aber noch nicht in der Web-Navigation verdrahtet. `POST /sessions` akzeptiert
+Die Progress-Endpunkte sind serverseitig implementiert (`backend/app/progress/`)
+und die Web-UI unter `/progress` ist erreichbar; die Verknüpfung neuer
+Live-Aufnahmen mit einem Profil ist noch offen. `POST /sessions` akzeptiert
 optional `profileId` und verlangt dann `X-Profile-Token`;
 alle verknüpften Session-/Take-/Job-Routen prüfen diesen Token, auch beim Lesen,
 Upload, Löschen und bei Idempotenz-Retries. Abgelaufene Profile liefern `410`,
 Löschen bleibt erlaubt. Sessions ohne Profil bleiben unverändert.
 Explizites Recompute läuft über Celery und `progress_runs`; normale Reads
 extrahieren nur geänderte Takes und schreiben das tatsächlich angefragte Fenster.
-Die Profil-Löschung entkoppelt
-Sessions/Takes (`ON DELETE SET NULL`) und entfernt nur die abgeleiteten
-Progress-Daten; die Session-Löschung bleibt separat.
+Die Profil-Löschung entkoppelt Sessions/Takes (`ON DELETE SET NULL`) und entfernt
+nur die abgeleiteten Progress-Daten.
+`DELETE /profiles/{id}?deleteSessions=true` löscht optional zusätzlich die
+verknüpfte serverseitige Analyse; die separate Session-Löschung committet die DB
+und flusht danach die S3-Outbox.
 
 ## Deep Research (24.10.2026)
 
@@ -892,8 +981,9 @@ API-Dokumentation geprüft. Ihre Umsetzung ist noch offen. Drei Vorgaben:
 Live-Analyse soll **ereignisgetrieben auf finalisierten ASR-Segmenten** laufen
 (nicht auf einem festen 20–30-s-Takt), der finale Fact-Check ist
 **quellengebunden, aber nicht autoritativ** (keine Live-Urteile,
-„nicht gefunden“ ≠ „falsch“), und das Gespräch soll **harte Grenzen** haben
-(3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop). Im Code ist bisher nur
-das Maximum von fünf Anfangsfragen im getippten Pfad umgesetzt, kein
-Sitzungstimer oder globales Follow-up-Limit. Gemini ist Cloud ohne
-EU-Region-Pinning; nur synthetische Demo-Daten oder Vertex AI mit EU-Region.
+„nicht gefunden“ ≠ „falsch“), und das Gespräch soll **harte Grenzen** haben.
+Im getippten Pfad sind 5 Startfragen (Default 3), 3 Follow-ups, Standard 6 Turns und
+TTL 600 s serverseitig umgesetzt; im Voice-Pfad gelten 600 s/12 Antworten im
+Browser, harte Provider-Limits bleiben Agentenkonfiguration. Gemini ist Cloud
+ohne EU-Region-Pinning; nur synthetische Demo-Daten oder Vertex AI mit
+EU-Region.

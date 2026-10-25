@@ -3,6 +3,7 @@
 .kilocode/
 .opencode/
 .idea/
+.playwright-mcp/
 
 # Share workspace configuration, but keep personal editor state out of Git.
 /.vscode/*
@@ -22,6 +23,7 @@ node_modules/
 # Build output
 .next*/
 /frontend/public/pose/runtime/
+/frontend/next-env.d.ts
 out/
 dist/
 build/

@@ -1,16 +1,32 @@
 import type { ClaimResult, FactCheckResult } from "../factcheck/api";
+import { evidenceVerdict } from "../factcheck/api";
 import type { LiveFeedback, LiveMetric, Word } from "../live/contracts";
 import type { PoseEvent } from "../pose/evaluation";
 import type { QuestionAnswer, QuestionResult } from "../questions/api";
+import {
+  countEvidence,
+  type CountEvidence,
+  type EvidenceStatus,
+} from "../scoring/evidence";
 
-export type EvaluationCategory = "content" | "voice" | "gesture";
+export const PRACTICE_EVIDENCE_VERSION = "practice.evidence.v2";
+export type EvaluationCategory =
+  | "source-talk"
+  | "source-answers"
+  | "speech"
+  | "gesture";
 export type PoseKind = "posture" | "gesture" | "gaze";
 
 export type PerformanceCategory = {
   category: EvaluationCategory;
   label: string;
-  weight: number;
-  score: number | null;
+  estimate: number | null;
+  rawValue: number | null;
+  low: number | null;
+  high: number | null;
+  status: EvidenceStatus | null;
+  coverage: number | null;
+  counts: string[];
   summary: string;
   evidence: string[];
   limitation?: string;
@@ -18,12 +34,11 @@ export type PerformanceCategory = {
 
 export type PerformanceEvaluation = {
   categories: PerformanceCategory[];
-  score: number | null;
-  label: string;
   strengths: string[];
   improvements: string[];
   limitations: string[];
-  method: "evidence-count-heuristic.v1";
+  notice: string;
+  method: "practice.evidence.v2";
 };
 
 export type PerformanceInput = {
@@ -37,38 +52,6 @@ export type PerformanceInput = {
   metrics?: LiveMetric[];
 };
 
-/**
- * Scoring formulas for "evidence-count-heuristic.v1" — a transparent
- * aggregation of moments the prototype already measured, not a validated
- * grade and never a claim about the person.
- *
- * Content (weight 0.5)
- *   Every fact-check claim and every answered question (an answer counts only
- *   when its key is the id of a question in questions.questions) adds points
- *   by verdict: supports = 1, contradicts = 0, not_found/unchecked = 0.5.
- *   score = round(100 * points / items); null without claims and answers.
- * Voice (weight 0.25)
- *   events = feedback items with category pace/volume/pitch/filler/pause
- *   (case-insensitive). eventsPerMin = events / max(0.5, durationMs / 60000).
- *   score = round(max(40, 100 - eventsPerMin * 15)).
- *   Null when there are no words and no such events.
- * Gesture (weight 0.25)
- *   events = feedback items with category posture/gesture/gaze (case-
- *   insensitive, browser labels "Posture"/"Gestures"/"Head" included);
- *   poseEvents are counted only when feedback has no pose category — one
- *   source consistently. Same formula as voice; null without any pose events.
- * Overall
- *   Weighted mean over non-null categories with weights renormalized
- *   (content + voice only -> 2/3 and 1/3); null when all categories are null.
- *   Labels: >= 85 "Strong", >= 70 "Solid", >= 55 "Fair", else "Keep practicing".
- */
-
-const VERDICT_POINTS: Record<ClaimResult["verdict"], number> = {
-  supports: 1,
-  contradicts: 0,
-  not_found: 0.5,
-  unchecked: 0.5,
-};
 const VOICE_CATEGORIES = ["pace", "volume", "pitch", "filler", "pause"];
 const GESTURE_KINDS: Record<string, PoseKind> = {
   posture: "posture",
@@ -87,84 +70,41 @@ const ADJUSTMENT_LABELS: Record<string, string> = {
   gesture: "gestures",
   gaze: "head direction",
 };
+const NOTICE = "No overall score: these rows measure different things.";
 const LIMITATIONS = [
-  "This is a heuristic summary from measured moments, not a validated grade.",
-  "It counts events from prototype rules; it does not compare you with other speakers.",
+  "This profile reports measured evidence, not a validated grade.",
+  "The rows measure different things and are not combined into an overall score.",
   "“Not found in sources” does not mean a statement is wrong.",
-  "The content score reflects coverage by your uploaded sources, not general knowledge.",
+  "Speech and pose rows count prototype markers; missing markers do not prove the skill was good.",
 ];
 
 const categoryKey = (category: string) => category.trim().toLowerCase();
 const plural = (count: number) => (count === 1 ? "" : "s");
 const minutesOf = (durationMs: number) =>
   Math.max(0.5, durationMs / 60000);
-const deductionScore = (events: number, durationMs: number) =>
-  Math.round(Math.max(40, 100 - (events / minutesOf(durationMs)) * 15));
-const overallLabel = (score: number | null) =>
-  score === null
-    ? "Not enough data"
-    : score >= 85
-      ? "Strong"
-      : score >= 70
-        ? "Solid"
-        : score >= 55
-          ? "Fair"
-          : "Keep practicing";
 
-type ContentStats = {
-  score: number | null;
-  claims: number;
-  claimSupports: number;
-  claimContradicts: number;
-  claimUnresolved: number;
-  answers: number;
-  answerSupports: number;
-  answerContradicts: number;
-  answerUnresolved: number;
-  unanswered: number;
-};
-
-function contentStats(input: PerformanceInput): ContentStats {
-  const claims = input.factCheck?.claims ?? [];
-  const questions = input.questions?.questions ?? [];
-  const answers = input.answers ?? {};
-  const answered = questions
-    .map((question) => answers[question.id])
-    .filter((answer): answer is QuestionAnswer => !!answer);
-  const verdicts = [
-    ...claims.map((claim) => claim.verdict),
-    ...answered.map((answer) => answer.review.verdict),
-  ];
-  const points = verdicts.reduce(
-    (sum, verdict) => sum + VERDICT_POINTS[verdict],
-    0,
-  );
+function sourceCategory(
+  category: EvaluationCategory,
+  label: string,
+  estimate: CountEvidence,
+  summary: string,
+  counts: string[],
+  evidence: string[],
+  limitation?: string,
+): PerformanceCategory {
   return {
-    score: verdicts.length
-      ? Math.round((100 * points) / verdicts.length)
-      : null,
-    claims: claims.length,
-    claimSupports: claims.filter((claim) => claim.verdict === "supports")
-      .length,
-    claimContradicts: claims.filter((claim) => claim.verdict === "contradicts")
-      .length,
-    claimUnresolved: claims.filter(
-      (claim) =>
-        claim.verdict === "not_found" || claim.verdict === "unchecked",
-    ).length,
-    answers: answered.length,
-    answerSupports: answered.filter(
-      (answer) => answer.review.verdict === "supports",
-    ).length,
-    answerContradicts: answered.filter(
-      (answer) => answer.review.verdict === "contradicts",
-    ).length,
-    answerUnresolved: answered.filter(
-      (answer) =>
-        answer.review.verdict === "not_found" ||
-        answer.review.verdict === "unchecked",
-    ).length,
-    unanswered: questions.length - answered.length,
+    category,
+    label,
+    estimate: estimate.value,
+    rawValue: estimate.rawValue,
+    low: estimate.low,
+    high: estimate.high,
+    status: estimate.status,
+    coverage: estimate.coverage,
+    counts,
+    summary,
+    evidence,
+    ...(estimate.value === null && limitation ? { limitation } : {}),
   };
 }
 
@@ -180,151 +120,211 @@ function poseKindsFrom(
   return poseEvents.map((event) => event.type);
 }
 
-function countEvidence(
+function countEvidenceItems(
   kinds: string[],
   labels: Record<string, string>,
   noun: string,
 ): string[] {
   return [...new Set(kinds)].map((kind) => {
     const count = kinds.filter((item) => item === kind).length;
-    return `${count} ${labels[kind] ?? kind} ${noun}${plural(count)}`;
+    const label = labels[kind] ?? kind;
+    return `${count} ${count === 1 ? label.replace(/s$/, "") : label} ${noun}${plural(count)}`;
   });
+}
+
+function claimVerdicts(factCheck?: FactCheckResult | null) {
+  return (factCheck?.claims ?? []).map((claim) => evidenceVerdict(claim));
+}
+
+function answerVerdicts(
+  questions: QuestionResult["questions"],
+  answers: Record<string, QuestionAnswer>,
+) {
+  return questions
+    .map((question) => answers[question.id])
+    .filter((answer): answer is QuestionAnswer => !!answer)
+    .map((answer) =>
+      evidenceVerdict({
+        verdict: answer.review.verdict,
+        evidence: answer.review.evidence,
+      }),
+    );
+}
+
+function verdictCounts(verdicts: ClaimResult["verdict"][]) {
+  const supports = verdicts.filter((verdict) => verdict === "supports").length;
+  const contradicts = verdicts.filter(
+    (verdict) => verdict === "contradicts",
+  ).length;
+  return {
+    supports,
+    contradicts,
+    unassessed: verdicts.length - supports - contradicts,
+  };
 }
 
 export function evaluatePerformance(
   input: PerformanceInput,
 ): PerformanceEvaluation {
-  const durationMs = Number.isFinite(input.durationMs) ? input.durationMs : 0;
+  const durationMs = Number.isFinite(input.durationMs)
+    ? Math.max(0, input.durationMs)
+    : 0;
   const feedback = input.feedback ?? [];
-  const content = contentStats(input);
+  const claims = claimVerdicts(input.factCheck);
+  const talk = verdictCounts(claims);
+  const talkEstimate = countEvidence(talk);
+  const questions = input.questions?.questions ?? [];
+  const answers = input.answers ?? {};
+  const answered = questions
+    .map((question) => answers[question.id])
+    .filter((answer): answer is QuestionAnswer => !!answer);
+  const answerChecks = answerVerdicts(questions, answers);
+  const answersCount = verdictCounts(answerChecks);
+  const answerEstimate = countEvidence(answersCount);
+
+  const talkEvidence = [
+    talk.supports
+      ? `${talk.supports} of ${claims.length} statements were backed by your sources`
+      : "",
+    talk.contradicts
+      ? `${talk.contradicts} statement${plural(talk.contradicts)} differ from a source`
+      : "",
+    talk.unassessed
+      ? `${talk.unassessed} statement${plural(talk.unassessed)} not settled by the checked sources`
+      : "",
+  ].filter(Boolean);
+  const answerEvidence = [
+    answersCount.supports
+      ? `${answersCount.supports} of ${answered.length} answers matched the sources`
+      : "",
+    answersCount.contradicts
+      ? `${answersCount.contradicts} answer${plural(answersCount.contradicts)} differed from the sources`
+      : "",
+    answersCount.unassessed
+      ? `${answersCount.unassessed} answer${plural(answersCount.unassessed)} not settled by the checked sources`
+      : "",
+    questions.length > answered.length
+      ? `${questions.length - answered.length} question${plural(questions.length - answered.length)} still unanswered`
+      : "",
+  ].filter(Boolean);
 
   const voice = feedback.filter((item) =>
     VOICE_CATEGORIES.includes(categoryKey(item.category)),
   );
   const hasWords = (input.words ?? []).length > 0;
-  const voiceScore =
-    hasWords || voice.length ? deductionScore(voice.length, durationMs) : null;
-
+  const voiceMeasured = hasWords || voice.length > 0;
+  const voiceRate = voice.length / minutesOf(durationMs);
   const poseKinds = poseKindsFrom(feedback, input.poseEvents ?? []);
-  const gestureScore = poseKinds.length
-    ? deductionScore(poseKinds.length, durationMs)
-    : null;
-
-  const settled = content.claimSupports + content.answerSupports;
-  const differs = content.claimContradicts + content.answerContradicts;
-  const unresolved = content.claimUnresolved + content.answerUnresolved;
-  const items = content.claims + content.answers;
-
-  const contentEvidence = [
-    content.claimSupports
-      ? `${content.claimSupports} of ${content.claims} statements were backed by your sources`
-      : "",
-    content.claimContradicts
-      ? `${content.claimContradicts} statement${plural(content.claimContradicts)} differ from a source`
-      : "",
-    content.claimUnresolved
-      ? `${content.claimUnresolved} statement${plural(content.claimUnresolved)} not settled by the checked sources`
-      : "",
-    content.answerSupports
-      ? `${content.answerSupports} of ${content.answers} answers matched the sources`
-      : "",
-    content.answerContradicts
-      ? `${content.answerContradicts} answer${plural(content.answerContradicts)} differed from the sources`
-      : "",
-    content.answerUnresolved
-      ? `${content.answerUnresolved} answer${plural(content.answerUnresolved)} not settled by the checked sources`
-      : "",
-  ].filter(Boolean);
-
-  const voiceEvidence = countEvidence(
-    voice.map((item) => categoryKey(item.category)),
-    ADJUSTMENT_LABELS,
-    "adjustment",
-  );
-  const gestureEvidence = countEvidence(
-    poseKinds,
-    ADJUSTMENT_LABELS,
-    "marker",
-  );
+  const poseRate = poseKinds.length / minutesOf(durationMs);
 
   const categories: PerformanceCategory[] = [
+    sourceCategory(
+      "source-talk",
+      "Source grounding (talk)",
+      talkEstimate,
+      claims.length
+        ? `${talk.supports} supported, ${talk.contradicts} differed and ${talk.unassessed} not settled by the checked sources. Only statements with a verified source quote decide the estimate.`
+        : "No checked statements were available for the talk.",
+      [
+        `${claims.length} checked statement${plural(claims.length)}`,
+        `${talk.supports} supported`,
+        `${talk.contradicts} differed`,
+        `${talk.unassessed} not settled`,
+      ],
+      talkEvidence,
+      "Run a source check with verified quotes to estimate source grounding.",
+    ),
+    sourceCategory(
+      "source-answers",
+      "Source grounding (answers)",
+      answerEstimate,
+      !questions.length
+        ? "No practice questions were available."
+        : !answered.length
+          ? `${questions.length} question${plural(questions.length)} available; none answered yet.`
+          : `${answered.length} of ${questions.length} questions answered. ${answersCount.supports} supported, ${answersCount.contradicts} differed and ${answersCount.unassessed} not settled by the checked sources.`,
+      [
+        `${answered.length} of ${questions.length} answered`,
+        `${answersCount.supports} supported`,
+        `${answersCount.contradicts} differed`,
+        `${answersCount.unassessed} not settled`,
+      ],
+      answerEvidence,
+      "Answer at least one practice question to estimate answer grounding.",
+    ),
     {
-      category: "content",
-      label: "Content (facts & knowledge)",
-      weight: 0.5,
-      score: content.score,
-      summary:
-        content.score === null
-          ? "No checked statements or answered questions were available."
-          : `${settled} of ${items} checked statements and answers fit the sources; ${differs} differed, ${unresolved} were not settled by the checked sources.`,
-      evidence: contentEvidence,
-      ...(content.score === null
-        ? {
+      category: "speech",
+      label: "Speech delivery",
+      estimate: null,
+      rawValue: null,
+      low: null,
+      high: null,
+      status: null,
+      coverage: null,
+      counts: voiceMeasured
+        ? [
+            `${voice.length} speech adjustment${plural(voice.length)}`,
+            `${voiceRate.toFixed(1)} per minute`,
+          ]
+        : [],
+      summary: voiceMeasured
+        ? "Counts of measured pacing, volume, pitch, filler and pause markers."
+        : "No transcript or speech feedback was recorded.",
+      evidence: voiceMeasured
+        ? countEvidenceItems(
+            voice.map((item) => categoryKey(item.category)),
+            ADJUSTMENT_LABELS,
+            "adjustment",
+          )
+        : [],
+      ...(!voiceMeasured
+        ? { limitation: "Without words or speech feedback no markers are counted." }
+        : {
             limitation:
-              "Run a fact-check or answer the practice questions to get a content summary.",
-          }
-        : {}),
-    },
-    {
-      category: "voice",
-      label: "Voice",
-      weight: 0.25,
-      score: voiceScore,
-      summary:
-        voiceScore === null
-          ? "No transcript or speech adjustments were recorded."
-          : `${voice.length} pace, volume, pitch, filler or pause adjustment${plural(voice.length)} — about ${(voice.length / minutesOf(durationMs)).toFixed(1)} per minute.`,
-      evidence: voiceEvidence,
-      ...(voiceScore === null
-        ? {
-            limitation:
-              "Without words or speech feedback no voice score is calculated.",
-          }
-        : {}),
+              "Counts are not converted to a score; missing markers do not prove the skill was good.",
+          }),
     },
     {
       category: "gesture",
-      label: "Gesture",
-      weight: 0.25,
-      score: gestureScore,
-      summary:
-        gestureScore === null
-          ? "Posture was not evaluated."
-          : `${poseKinds.length} posture, gesture or head-direction marker${plural(poseKinds.length)} — about ${(poseKinds.length / minutesOf(durationMs)).toFixed(1)} per minute.`,
-      evidence: gestureEvidence,
-      ...(gestureScore === null
+      label: "Pose & gesture",
+      estimate: null,
+      rawValue: null,
+      low: null,
+      high: null,
+      status: null,
+      coverage: null,
+      counts: poseKinds.length
+        ? [
+            `${poseKinds.length} pose or gesture marker${plural(poseKinds.length)}`,
+            `${poseRate.toFixed(1)} per minute`,
+          ]
+        : [],
+      summary: poseKinds.length
+        ? "Counts of posture, gesture and head-direction markers from pose feedback."
+        : "Posture was not evaluated.",
+      evidence: countEvidenceItems(
+        poseKinds,
+        ADJUSTMENT_LABELS,
+        "marker",
+      ),
+      ...(!poseKinds.length
         ? { limitation: "No pose markers were recorded." }
-        : {}),
+        : {
+            limitation:
+              "Counts are not converted to a score; missing markers do not prove the skill was good.",
+          }),
     },
   ];
 
-  const scored = categories.filter(
-    (category): category is PerformanceCategory & { score: number } =>
-      category.score !== null,
-  );
-  const weightSum = scored.reduce((sum, category) => sum + category.weight, 0);
-  const score = weightSum
-    ? Math.round(
-        scored.reduce(
-          (sum, category) => sum + category.score * category.weight,
-          0,
-        ) / weightSum,
-      )
-    : null;
-
   const strengths: string[] = [];
-  if (content.claims && content.claimSupports)
+  if (talk.supports)
     strengths.push(
-      `${content.claimSupports} of ${content.claims} statements were backed by your sources`,
+      `${talk.supports} of ${claims.length} statements were backed by your sources`,
     );
-  if (content.answers && content.answerSupports)
+  if (answersCount.supports)
     strengths.push(
-      `${content.answerSupports} of ${content.answers} answers matched the sources`,
+      `${answersCount.supports} of ${answered.length} answers matched the sources`,
     );
-  if (voiceScore !== null && voiceScore >= 85)
-    strengths.push("Few pacing, volume or pitch adjustments were detected");
-  if (gestureScore !== null && gestureScore >= 85)
-    strengths.push("Few posture or gesture adjustments were detected");
 
   const adjustments = new Map<string, number>();
   for (const item of feedback) {
@@ -341,7 +341,7 @@ export function evaluatePerformance(
       mostAdjusted = { label: ADJUSTMENT_LABELS[key] ?? key, count };
 
   const improvements: string[] = [];
-  if (differs)
+  if (talk.contradicts || answersCount.contradicts)
     improvements.push(
       "Revisit the contradicted statements with your material in the moments list.",
     );
@@ -349,18 +349,17 @@ export function evaluatePerformance(
     improvements.push(
       `Most adjustments were in ${mostAdjusted.label} — replay those moments on the timeline.`,
     );
-  if (content.unanswered)
+  if (questions.length > answered.length)
     improvements.push(
-      "Answer the remaining questions to sharpen the content evaluation.",
+      "Answer the remaining questions to sharpen the source grounding.",
     );
 
   return {
     categories,
-    score,
-    label: overallLabel(score),
     strengths: strengths.slice(0, 3),
     improvements: improvements.slice(0, 3),
     limitations: LIMITATIONS,
-    method: "evidence-count-heuristic.v1",
+    notice: NOTICE,
+    method: PRACTICE_EVIDENCE_VERSION,
   };
 }

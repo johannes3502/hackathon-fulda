@@ -60,7 +60,13 @@ export function ReviewAnalysis({
   );
   const selected = moments.find((item) => item.id === selectedId);
   const selectedIndex = visible.findIndex((item) => item.id === selectedId);
-  const scores = reviewScores(moments, data.durationMs, data.claims);
+  const scores = reviewScores(
+    moments,
+    data.durationMs,
+    data.claims,
+    data.structure,
+    { structureFromMoments: data.demo },
+  );
 
   useEffect(() => {
     // Preloaded media can finish or fail before hydration attaches its handlers.

@@ -4,6 +4,13 @@ import {
   evaluatePerformance,
   type PerformanceInput,
 } from "@/features/evaluation/performance";
+import type { EvidenceStatus } from "@/features/scoring/evidence";
+
+const STATUS_LABELS: Record<EvidenceStatus, string> = {
+  insufficient: "limited evidence",
+  provisional: "provisional",
+  reportable: "sufficient evidence",
+};
 
 export function PerformanceEvaluation({ input }: { input: PerformanceInput }) {
   const evaluation = evaluatePerformance(input);
@@ -14,58 +21,66 @@ export function PerformanceEvaluation({ input }: { input: PerformanceInput }) {
     >
       <div className="panel-title-row">
         <h2 id="performance-evaluation-title" tabIndex={-1}>
-          <Gauge size={18} /> Your take at a glance
+          <Gauge size={18} /> Evidence profile
         </h2>
-        {evaluation.score !== null && (
-          <span className="badge">{evaluation.label}</span>
-        )}
+        <span className="badge">{evaluation.method}</span>
       </div>
       <p className="field-hint">
-        Heuristic summary from measured moments, not a validated grade.
+        Measured evidence from this take, not a validated grade.
       </p>
-      <div className="performance-overall" aria-label="Overall prototype score">
-        {evaluation.score === null ? (
-          <strong>No overall score available</strong>
-        ) : (
-          <>
-            <span className="performance-score">
-              {evaluation.score}
-              <small>/100</small>
-            </span>
-            <span className="performance-label">{evaluation.label}</span>
-          </>
-        )}
-      </div>
-      {evaluation.score === null && (
-        <p className="field-hint">
-          No transcript, source verdicts or voice/gesture feedback were
-          available for this take. Create a transcript or run a source check in
-          the review to calculate a score.
-        </p>
-      )}
+      <p className="performance-notice">{evaluation.notice}</p>
       <ul className="performance-categories">
-        {evaluation.categories.map((category) => (
-          <li key={category.category} className="performance-category">
-            <div className="performance-category-head">
-              <strong>{category.label}</strong>
-              <span className="performance-category-score">
-                {category.score === null ? "—" : category.score}
-                <small> /100 · weight {category.weight}</small>
-              </span>
-            </div>
-            <p>{category.summary}</p>
-            {category.limitation && (
-              <p className="muted small">{category.limitation}</p>
-            )}
-            {category.evidence.length > 0 && (
-              <ul className="performance-evidence">
-                {category.evidence.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
+        {evaluation.categories.map((category) => {
+          const hasEstimate = category.estimate !== null;
+          return (
+            <li key={category.category} className="performance-category">
+              <div className="performance-category-head">
+                <strong>{category.label}</strong>
+                <span className="performance-category-score">
+                  {hasEstimate ? (
+                    <>
+                      {category.estimate}
+                      <small> /100</small>
+                    </>
+                  ) : (
+                    "counts only"
+                  )}
+                </span>
+              </div>
+              <p className="performance-category-meta">
+                {hasEstimate &&
+                category.low !== null &&
+                category.high !== null
+                  ? `Range ${category.low}–${category.high}`
+                  : "No numeric estimate"}
+                {category.status
+                  ? ` · ${STATUS_LABELS[category.status]}`
+                  : " · counts only"}
+                {category.coverage !== null
+                  ? ` · ${Math.round(category.coverage * 100)}% decided`
+                  : ""}
+              </p>
+              <p>{category.summary}</p>
+              {category.limitation && (
+                <p className="muted small">{category.limitation}</p>
+              )}
+              {category.counts.length > 0 && (
+                <ul className="performance-counts">
+                  {category.counts.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )}
+              {category.evidence.length > 0 && (
+                <ul className="performance-evidence">
+                  {category.evidence.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
       </ul>
       <div className="performance-lists">
         <div>
@@ -105,11 +120,13 @@ export function PerformanceEvaluation({ input }: { input: PerformanceInput }) {
           ))}
         </ul>
         <p className="field-hint">
-          Method: {evaluation.method}. Content averages verdict points
-          (supported = 1, differed = 0, not settled = 0.5); voice and gesture
-          deduct 15 points per adjustment per minute from 100, with a floor of
-          40. Weights: content 0.5, voice 0.25, gesture 0.25, renormalized when
-          a category has no data.
+          Method: {evaluation.method}. Source grounding uses a smoothed share:
+          (supported + 1) ÷ (supported + contradicted + 2), with a Wilson 95%
+          range. An estimate stays provisional below five decided statements and
+          is withheld without any decided statement. Speech and pose rows count
+          measured prototype markers only; they are not converted to a score.
+          The rows measure different things, so they are not combined into an
+          overall score.
         </p>
       </details>
     </section>

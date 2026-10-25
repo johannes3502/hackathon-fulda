@@ -240,4 +240,58 @@ CREATE TABLE IF NOT EXISTS progress_runs (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS progress_runs_one_active_idx
     ON progress_runs(profile_id) WHERE status IN ('queued', 'running');
+
+ALTER TABLE speaker_profiles
+    ADD COLUMN IF NOT EXISTS retention_origin text NOT NULL DEFAULT 'default';
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conname = 'speaker_profiles_retention_origin_check'
+           AND conrelid = 'speaker_profiles'::regclass
+    ) THEN
+        ALTER TABLE speaker_profiles
+            ADD CONSTRAINT speaker_profiles_retention_origin_check
+            CHECK (retention_origin IN ('default', 'user'));
+    END IF;
+END $$;
+
+-- Existing profiles without an explicit end date get the documented default.
+UPDATE speaker_profiles
+   SET retention_until = created_at + interval '365 days'
+ WHERE retention_until IS NULL AND retention_origin = 'default';
+CREATE INDEX IF NOT EXISTS speaker_profiles_retention_idx
+    ON speaker_profiles(retention_until) WHERE retention_until IS NOT NULL;
+
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS retention_until timestamptz;
+UPDATE sessions s
+   SET retention_until = COALESCE(p.retention_until, s.created_at + interval '365 days')
+  FROM speaker_profiles p
+ WHERE s.profile_id = p.id AND s.retention_until IS NULL;
+UPDATE sessions
+   SET retention_until = created_at + interval '365 days'
+ WHERE retention_until IS NULL;
+CREATE INDEX IF NOT EXISTS sessions_retention_idx
+    ON sessions(retention_until) WHERE retention_until IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS retention_runs (
+    id uuid PRIMARY KEY,
+    started_at timestamptz NOT NULL,
+    finished_at timestamptz,
+    status text NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'skipped')),
+    counts jsonb NOT NULL DEFAULT '{}',
+    error_code text
+);
+CREATE INDEX IF NOT EXISTS retention_runs_started_idx
+    ON retention_runs(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS blob_deletions (
+    object_key text PRIMARY KEY,
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    next_attempt_at timestamptz NOT NULL DEFAULT now(),
+    last_error_code text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS blob_deletions_due_idx
+    ON blob_deletions(next_attempt_at, created_at);
 """

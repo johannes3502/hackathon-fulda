@@ -2,7 +2,8 @@ import type { LiveFeedback, LiveRecording } from "@/features/live/contracts";
 import { evidenceVerdict, type ClaimResult } from "@/features/factcheck/api";
 import { STAT_LABELS } from "@/components/stats/stats";
 import { cueAppearance } from "@/features/live/cue-appearance";
-import { recordingFeedback } from "@/features/live/review";
+import { recordingFeedback, structureForRecording } from "@/features/live/review";
+import type { StructureAnalysis } from "@/features/structure/types";
 
 export type Criterion = keyof typeof STAT_LABELS;
 export type ReviewMoment = {
@@ -29,6 +30,7 @@ export type ReviewData = {
   performance: PerformancePoint[];
   moments: ReviewMoment[];
   claims?: ClaimResult[];
+  structure?: StructureAnalysis;
 };
 
 export function timestamp(ms: number) {
@@ -122,6 +124,8 @@ export function feedbackToMoment(
 
 /** Both review views read this take, including source checks added after capture. */
 export function recordingReviewData(recording: LiveRecording): ReviewData {
+  const structure = structureForRecording(recording);
+  const take = structure ? { ...recording, structure } : recording;
   return {
     title: recording.config.title,
     durationMs: recording.durationMs,
@@ -130,7 +134,8 @@ export function recordingReviewData(recording: LiveRecording): ReviewData {
     notice: recording.notice ?? undefined,
     performance: [],
     claims: recording.factCheck?.claims,
-    moments: recordingFeedback(recording).map((item) => {
+    structure,
+    moments: recordingFeedback(take).map((item) => {
       const factIndex = /^fact-(\d+)$/.exec(item.id);
       const claim = factIndex
         ? recording.factCheck?.claims[Number(factIndex[1])]
@@ -148,11 +153,64 @@ export const DEMO_REVIEW: ReviewData = {
   poster: "/review-demo/poster.png",
   demo: true,
   performance: [],
+  claims: [
+    {
+      claim:
+        "Die Plattform verbindet eine Lernfrage mit einer gemeinsamen Übung und einer kurzen Reflexion.",
+      transcript:
+        "Die fiktive Lernplattform verbindet eine Lernfrage mit einer gemeinsamen Übung und einer kurzen Reflexion.",
+      t_ms: 6_000,
+      duration_ms: 4_000,
+      verdict: "supports",
+      explanation:
+        "Das synthetische Demo-Konzept beschreibt dieselbe Verbindung.",
+      checked: ["upload"],
+      evidence: {
+        kind: "upload",
+        label: "Demo-Konzept · Abschnitt 1",
+        passage:
+          "Die fiktive Lernplattform verbindet eine Lernfrage mit einer gemeinsamen Übung und einer kurzen Reflexion.",
+        quote:
+          "Die fiktive Lernplattform verbindet eine Lernfrage mit einer gemeinsamen Übung und einer kurzen Reflexion.",
+        quote_verified: "exact",
+        filename: "source.txt",
+      },
+    },
+    {
+      claim: "Der erste Pilot startet mit zwanzig Teilnehmenden.",
+      transcript: "Unser erster Pilot startet mit zwanzig Teilnehmenden.",
+      t_ms: 43_000,
+      duration_ms: 5_000,
+      verdict: "contradicts",
+      explanation:
+        "Das Demo-Konzept nennt zwölf Teilnehmende für den ersten Pilot.",
+      checked: ["upload"],
+      evidence: {
+        kind: "upload",
+        label: "Demo-Konzept · Abschnitt 2",
+        passage:
+          "Für den ersten Demo-Pilot sind 12 Teilnehmende vorgesehen.",
+        quote: "Für den ersten Demo-Pilot sind 12 Teilnehmende vorgesehen.",
+        quote_verified: "exact",
+        filename: "source.txt",
+      },
+    },
+    {
+      claim: "Der Erfolg des Piloten wird an einer konkreten Lernaufgabe gemessen.",
+      transcript: "Danach schauen wir, ob unser Ansatz funktioniert.",
+      t_ms: 83_000,
+      duration_ms: 4_000,
+      verdict: "not_found",
+      explanation:
+        "Im Demo-Konzept ist noch keine konkrete Lernaufgabe festgelegt.",
+      checked: ["upload"],
+    },
+  ],
   moments: [
     {
       id: "opening",
       tMs: 8000,
-      durationMs: 4000,
+      durationMs: 10000,
       criterion: "structure",
       kind: "positive",
       title: "Ein Einstieg, der Orientierung gibt",
@@ -165,7 +223,7 @@ export const DEMO_REVIEW: ReviewData = {
     {
       id: "gesture",
       tMs: 18000,
-      durationMs: 4000,
+      durationMs: 10000,
       criterion: "gesture",
       kind: "positive",
       title: "Die Geste unterstützt deine Aussage",
@@ -177,7 +235,7 @@ export const DEMO_REVIEW: ReviewData = {
     {
       id: "hesitation",
       tMs: 31000,
-      durationMs: 4000,
+      durationMs: 8000,
       criterion: "flow",
       kind: "attention",
       title: "Hier stockt der Sprechfluss",
@@ -208,7 +266,7 @@ export const DEMO_REVIEW: ReviewData = {
     {
       id: "transition",
       tMs: 58000,
-      durationMs: 4000,
+      durationMs: 10000,
       criterion: "structure",
       kind: "positive",
       title: "Klarer Übergang zum nächsten Schritt",
@@ -220,7 +278,7 @@ export const DEMO_REVIEW: ReviewData = {
     {
       id: "pause",
       tMs: 72000,
-      durationMs: 3000,
+      durationMs: 6000,
       criterion: "flow",
       kind: "positive",
       title: "Die Pause lässt den Gedanken wirken",

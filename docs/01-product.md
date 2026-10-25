@@ -18,11 +18,11 @@ Grundgerüst ist festgelegt (Abschnitt 3, Technik).
 
 | # | Feature | Erste Beschreibung |
 |---|---|---|
-| 1 | **Live Posture / Gesture / Eye Tracking** | Körperhaltung, Gestik und Blickverhalten werden während der Präsentation live erfasst. |
+| 1 | **Live Posture / Gesture / Eye Tracking** | Körperhaltung, Gestik und Blickverhalten werden während der Präsentation live erfasst; Kopforientierung als Proxy, kein Gaze. |
 | 2 | **Audio-Transkription + Fact-Checking** | Die gesprochene Präsentation wird transkribiert. Fakten werden über Daten-Upload und einen Web-Fetch-Agent geprüft. |
-| 3 | **Sprechmerkmale** | Pausen, Zögern, Sprechtempo und Füllwörter werden erfasst (Liste offen: „…“). |
-| 4 | **Timestamp-Feedback** | Nach dem Feedback kann man zurückscrollen und Fehler zeitpunktbezogen ansehen. |
-| 5 | **Frage-Simulator** | Im Anschluss an die Präsentation werden Fragen simuliert. Details offen. |
+| 3 | **Sprechmerkmale** | Pausen, Zögern, Sprechtempo, Füllwörter, Lautstärke und Tonhöhenvariation werden erfasst; Live-Hinweise sind Heuristiken. |
+| 4 | **Timestamp-Feedback** | Nach dem Feedback kann man zurückscrollen und Fehler zeitpunktbezogen ansehen; dazu vier getrennte Evidenzprofile inklusive Aufbau. |
+| 5 | **Frage-Simulator** | Im Anschluss an die Präsentation werden Fragen simuliert; serverseitige Rundenlimits und eine Evidenz-Auswertung ohne Gesamtscore. |
 
 ---
 
@@ -49,20 +49,26 @@ neuen Analysefunktionen oder Bewertungen. Gestaltungsvertrag: `frontend/DESIGN.m
 
 ---
 
-## 3. Offen — muss das Team entscheiden
+## 3. Entscheidungen und offene Punkte
 
 Ergänzender Nutzerauftrag (24.10.2026): Vier 0–100-Scores über dem Review-Video
-statt Moment-Anzahlen. `evidence-share-v1` nutzt bewertete positive bzw. kritische
-Zeitanteile (Überlappungen derselben Art vereinigt); Fachwissen nutzt bevorzugt
-gestützte / (gestützte + widersprochene) Aussagen. Nicht gefunden, ungeprüft,
-neutrale Beobachtungen und unbeobachtete Zeit erzeugen keine Benotung. Kein
-Score ohne bewertbare Evidenz; Zeitabdeckung und Formel stehen im UI.
+statt Moment-Anzahlen. `evidence-share-v2` nutzt bewertete positive bzw. kritische
+Zeitanteile (Überlappungen derselben Art vereinigt), additive Glättung und eine
+Wilson-95-%-Spanne. Quellenbezug nutzt `(gestützte + 1) / (gestützte +
+widersprochene + 2)` und nur Aussagen mit geprüftem Quellenzitat. Nicht
+gefunden, ungeprüft, neutrale Beobachtungen und unbeobachtete Zeit erzeugen
+keine Benotung. Unter 5 s bewerteter Zeit bzw. ohne entscheidbare Aussage steht
+„–“; unter 30 s bzw. unter fünf Entscheidungen ist die Schätzung vorläufig.
+Kein Score ohne bewertbare Evidenz; Zeitabdeckung und Formel stehen im UI.
 Die Graph-Darstellung ist eine durchgehende Linie aus geraden Segmenten ohne
 Säulenflächen, mit beweglichem Wiedergabepunkt. Zwischenwerte sind als
 Interpolation gekennzeichnet, nicht als zusätzliche Messungen.
-**Struktur hat im Live-Pfad noch keine Evidenzquelle**; nur der synthetische
-Demo-Datensatz enthält Struktur-Momente. Der Live-Score bleibt dort bis zu
-einer eigenen Regel „–“ (TODO: [14-open-todos.md](14-open-todos.md)).
+**Aufbau ist seit 25.10.2026 im Live-Pfad gemessen:** die deterministische
+Rubrik `structure-rubric-v1` erkennt DE/EN-Marker, Sätze, Abschnitte, Einstieg,
+Abschluss und Übergänge aus den Wörtern. Ein Score entsteht nur mit mindestens
+drei Signalen, 50 Wörtern und 45 s; Folien, Betonung und Mimik werden nicht
+geprüft. Die Rubrik ist eine Heuristik, nicht validiert. `/review-preview` bleibt
+ein markiertes Beispiel. Kein Gesamtscore.
 
 Review-Graph (24.10.2026, Nutzerauftrag): Timestamp-Momente als qualitativer
 Verlauf unter dem Video. Nach Nutzerkorrektur positive Momente oberhalb,
@@ -103,21 +109,30 @@ und besser lesbarer Schrift.
 - Fehlende Evidenz wird als „in den Quellen nicht gefunden“ gezeigt, nicht als falsch.
 
 ### Frage-Simulator
-- Umgesetzt (24.10.2026, Nutzerauftrag): bis zu 3 Fragen pro Runde, zuerst zu
-  Widersprüchen und nicht belegten Aussagen aus dem Fact-Check, dann zu
-  Quelleninhalten, die im Vortrag fehlen, dann zu unklaren Stellen.
+- Umgesetzt (24.10.2026, Nutzerauftrag): standardmäßig bis zu 3 Startfragen
+  (konfigurierbar bis 5), zuerst zu Widersprüchen und nicht belegten Aussagen aus
+  dem Fact-Check, dann zu Quelleninhalten, die im Vortrag fehlen, dann zu
+  unklaren Stellen. Eine Runde hat serverseitig maximal 3 Follow-ups und
+  standardmäßig 6 Antwort-Turns (bis 12 konfigurierbar); TTL 600 s.
 - Antworten getippt oder gesprochen; Abgleich mit den Quellen (stützt /
-  widerspricht / nicht gefunden) plus optionale Nachfrage. Keine Punkte,
-  keine Noten.
+  widerspricht / nicht gefunden) plus optionale Nachfrage. Der Antwortvergleich
+  selbst vergibt keine Punkte oder Noten; die getrennte Auswertung zeigt danach
+  Evidenzzeilen ohne Gesamtscore.
+- Prompt-Sicherheit (25.10.2026): Der Client sendet nur `round_id` und
+  `question_id`; die kanonische Frage liegt in Redis. Nonce-delimitierte
+  untrusted-Blöcke, strikte Schema-/Zitatprüfung, 4000 Zeichen pro Antwort,
+  25 MB Voice-Upload, eine akzeptierte Auswertung pro Frage. Prompt-Injection
+  ist dadurch nicht vollständig verhindert.
 - Voice-Agent (24.10.2026, Nutzerauftrag): Gespräch nach dem Vortrag in zwei
   Rollen, „Curious student“ (naiv, duzt, fragt nach Begriffen und Beispielen)
   und „Professor / tutor“ (präzise, siezt, fragt nach Belegen). Fragen und
   Reaktionen liest der Browser vor (`speechSynthesis`); die gesprochene
   Antwort wird per konfiguriertem Transcriber (standardmäßig lokales Whisper) transkribiert und gegen die hochgeladenen
   Vorlesungsunterlagen geprüft. Die Rolle ändert nur den Stil, nicht die
-  Quellenbindung.
+  Quellenbindung. Im Browser gelten 600 s und 12 Antworten; harte
+  Anbieterlimits sind von der ElevenLabs-Konfiguration abhängig (offen).
 - Offen: automatisches Antwortende per Stille-Erkennung (aktuell Button
-  „Done“), Sprache außer Deutsch, Anzahl der Fragen.
+  „Done“), Sprache außer Deutsch, harte Provider-Limits.
 
 ### Daten und Datenschutz
 - Live-Sessions werden lokal in IndexedDB gespeichert: Video, Transkript,
@@ -141,13 +156,21 @@ und besser lesbarer Schrift.
   Celery verarbeitet Silero-VAD/RMS/YIN sowie standardmäßig lokales
   faster-whisper (deutsch); Deepgram-ASR (EU) bleibt optional.
   Originale werden nach terminaler Verarbeitung gelöscht; Ergebnisse verbleiben
-  in S3. Stalled Jobs und Speicherfehler benötigen noch eine Cleanup-Regel.
-  Der Smoke-Test entfernt seine synthetischen Audiodaten wieder.
+  in S3. Ein täglicher Retention-Sweep (03:15 UTC) entfernt abgelaufene
+  Profile/Sessions, fehlgeschlagene hängende Jobs nach 2 h, terminale Jobs nach
+  30 Tagen und abgelaufene Idempotenz; S3-Löschungen laufen über eine Outbox.
+  Quellen-Collections und ältere S3-Präfixe werden nicht vollständig erfasst;
+  eine Lifecycle-Regel ist nur Backstop und nicht verifiziert. Es gibt keine
+  Rechtsgarantie.
 - Redis hält Hintergrundjobs und kleine Status-/Referenzwerte in einem
   persistenten Docker-Volume. Task-Ergebnisse verfallen nach einer Stunde;
   dies legt keine Aufbewahrungsdauer für Medien oder Transkripte fest.
-- Offen: automatische Aufbewahrungsdauer für Sessions und abgeleitete Daten;
-  Wiederanlauf-/Cleanup-Regel für nie erneut zugestellte, verwaiste Jobs.
+- Aufbewahrung: Standard 12 Monate für Profile/Sessions, konfigurierbar über
+  `RETENTION_*`; Profil-Ablauf entfernt profil-eigene Daten und entkoppelt
+  Sessions/Takes. `DELETE /profiles/{id}?deleteSessions=true` löscht optional
+  auch die serverseitige Analyse; Session-Löschung bleibt separat. Die
+  Web-Oberfläche zeigt die Frist und den täglichen Löschlauf, bietet aber noch
+  keine eigene Änderung der Frist an.
 - Neue Session-API verlangt Einwilligung; Cloud-Verarbeitung benötigt den
   Scope `local-and-cloud-analysis`. Lokaler Template-Pfad ohne LLM bleibt verfügbar.
   Der Kurzreview zeigt Stärken und Übungsschritte zusammen. Feste Erklärungen
@@ -215,7 +238,12 @@ einbauen**:
 | 24.10.2026 | Pose-/Feedback-Anforderungen festgelegt | Deep Research zu Haltung, Kopforientierung, Händen, Füßen und Gesten; Research-Ziele in `docs/04-pose-tracking-requirements.md`; aktueller Integrationsstand dort separat markiert. |
 | 24.10.2026 | Gemini statt lokalem Ollama | Nutzerauftrag: Gemini-Key aus dem Image-Skill in die lokale `.env`, Ollama aus dem Projekt entfernen, schwache Gemini-Modelle testen. Die frühere Local-only-Zusage ist hinfällig; nur synthetische Demo-Daten oder Vertex AI mit EU-Region. |
 | 24.10.2026 | Long-Term-Progress-Backend | Nutzerauftrag: Frontend-Plan auf `main`, Backend-Plan validieren und implementieren. Pseudonymes Profil, versionierte Metriken, robuste Trends, Change-Points, optionale Ziele, Export/Löschung; kein Gesamtscore. Frontend-Anbindung bleibt offen. |
-| 25.10.2026 | Pitch/Doku an Scores und offene Punkte angepasst | Keine „keine Scores“-Aussage mehr im Pitch; Test-/API-Zahlen aktualisiert; Graph-Doku auf gerade Segmente korrigiert; offene TODOs in `docs/14-open-todos.md` festgehalten. Struktur bleibt im Live-Pfad ohne Evidenzquelle. |
+| 25.10.2026 | Pitch/Doku an Scores und offene Punkte angepasst | Keine „keine Scores“-Aussage mehr im Pitch; Test-/API-Zahlen aktualisiert; Graph-Doku auf gerade Segmente korrigiert; offene TODOs in `docs/14-open-todos.md` festgehalten. Damaliger Stand: Struktur ohne Live-Evidenz; mit dem Folge-Change vom 25.10.2026 behoben. |
+| 25.10.2026 | Deterministische Aufbau-Rubrik | `structure-rubric-v1` aus Wörtern und Zeitstempeln; DE/EN-Marker, Satz-/Abschnittsgrenzen, Gates 3 Signale/50 Wörter/45 s; Timeline und beide Review-Ansichten. Keine Folien, keine Validierung. |
+| 25.10.2026 | Evidenzprofile v2 | `evidence-share-v2` mit Glättung, Wilson-Spanne und Statusstufen; `practice.evidence.v2` mit vier getrennten Zeilen. Kein Gesamtscore, keine Noten, keine Labels. |
+| 25.10.2026 | Serverseitige Frage-Runden und Prompt-Grenzen | Redis-Runde mit TTL 600 s, 5 Startfragen/3 Follow-ups/6 Turns, 4000 Zeichen, 25 MB Voice, kanonische Frage, Nonce-Blöcke, strikte Ausgabeprüfung. Prompt-Injection bleibt ein Restrisiko. |
+| 25.10.2026 | Tägliche Retention und Löschpfade | Celery Beat 03:15 UTC, `retention_runs`, S3-Outbox, Profil-Entkopplung, optionales `deleteSessions`, Stale-/Terminal-Jobs und Idempotenz. Keine Rechts- oder Vollständigkeitsgarantie; Quellen/S3-Lifecycle offen. |
+| 25.10.2026 | Kleine Demo- und Betriebsfixes | Consent „this local server“, Icons, `TakeFactcheckRequest`, Compose-Templates-Mount, Frontend-Healthcheck/Restart, `.playwright-mcp/` ignoriert, `next-env.d.ts` generiert, `reportlab` in Dev-Requirements. |
 
 ## Integrierte Analyse-Schalter (24.10.2026)
 
@@ -249,26 +277,29 @@ aufklappbar.
 
 Vor dem Take: Material zum Backend hochladen und Präsentationstyp wählen:
 Startup-Pitch, Bachelor-Verteidigung, Schulvortrag oder Nonprofit-Einladung.
-Der Typ verändert die Fragen und Kriterien, ohne Noten oder Scores. Der
+Der Typ verändert die Fragen und fachlichen Schwerpunkte, nicht die
+Evidenzregeln. Der
 Nutzer hat ElevenLabs für den Sprachdialog beauftragt und konfiguriert den
 Agenten selbst nach der Implementierung. Getippte Fragen nutzen das
 konfigurierte Gemini-Modell (Cloud). Einrichtung: `docs/07-review-and-agent.md`.
 
-### Auswertung nach der Fragerunde (24.10.2026)
+### Auswertung nach der Fragerunde (24.10.2026, v2 am 25.10.2026)
 
 Nutzerauftrag: Nach den Agenten-Fragen eine Auswertung des Vortrags. Sobald
 jede Frage der getippten Runde beantwortet ist, zeigt der Web-Review unten eine
-Zusammenfassung mit Score 0–100 und drei Kategorien: **Inhalt** (Fakten und
-Wissen, Gewicht 0,5 — Anteil quellengestützter Aussagen und Antwort-Urteile),
-**Stimme** (0,25) und **Gestik** (0,25 — Abzug je Marker pro Minute). Dazu
-evidenzbasierte Stärken, Übungsvorschläge und ein aufklappbarer
-Methoden-/Grenzen-Hinweis. Der Score ist eine transparente Client-Heuristik aus
-bereits gemessenen Events (`evidence-count-heuristic.v1`), keine Note und keine
-Personenbewertung; Details: `docs/07-review-and-agent.md`. Diese Auswertung ist
-**getrennt** von den vier Review-Scores (`evidence-share-v1`): andere Formel,
-andere Bezugsgröße, kein gemeinsamer Gesamtscore. Die UI soll die beiden
-Ergebnisse entsprechend benennen; eine Vereinheitlichung ist offen
-(`docs/14-open-todos.md`).
+Zusammenfassung mit vier getrennten Zeilen: **Quellenbindung Vortrag**,
+**Quellenbindung Antworten**, **Sprechmerkmale** und **Pose/Gesten**. Nur die
+beiden Quellenzeilen liefern Schätzungen mit Wilson-95-%-Spanne und geprüftem
+Zitat; Sprech- und Pose-Zeilen zählen Marker und Rate pro Minute. Es gibt
+**keinen Gesamtscore, keine Gewichte und keine Labels** wie „Strong“ oder
+„Fair“. Dazu erscheinen evidenzbasierte Stärken, Übungsvorschläge und ein
+aufklappbarer Methoden-/Grenzen-Hinweis. Die Auswertung ist eine transparente
+Client-Heuristik aus bereits gemessenen Events (`practice.evidence.v2`), keine
+Note und keine Personenbewertung; Details: `docs/07-review-and-agent.md`.
+Diese Auswertung ist **getrennt** von den vier Review-Scores
+(`evidence-share-v2`): andere Formel, andere Bezugsgröße, kein gemeinsamer
+Gesamtscore. Die UI benennt beide Ergebnisse entsprechend. Eine Vereinheitlichung
+ist nicht geplant; die Zeilen messen unterschiedliche Dinge.
 
 ## Deep Research (24.10.2026)
 
@@ -277,8 +308,9 @@ evidenzgeordnet. Wichtig für die Produktzusage: Der Fact-Check ist eine
 quellengebundene Prüfung mit Zitat-Gate, keine Wahrheitsgarantie; „nicht
 gefunden“ ist nicht „falsch“. Der geplante TTS-Voice-Agent soll im Gespräch kurzes
 aufgabenbezogenes Feedback, die vollständige Evidenz steht im Review. Harte
-Grenzen des Plans: 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop. Umgesetzt
-ist bisher das Maximum von fünf Anfangsfragen im getippten Pfad; ein
-Sitzungstimer oder ein globales Follow-up-Limit ist noch nicht implementiert.
-Scores gibt es nur in der transparenten Auswertung nach der getippten
-Fragerunde (siehe oben); weiterhin keine Personenbewertung.
+Grenzen des aktuellen getippten Pfads: maximal 5 Startfragen (Default 3),
+3 Follow-ups, 6 Turns pro Runde, TTL 600 s, 4000 Zeichen pro Antwort. Im
+Voice-Pfad gelten im Browser 600 s und 12 Antworten; harte Anbieterlimits sind
+von der ElevenLabs-Konfiguration abhängig und nicht im Code garantiert. Scores
+gibt es als getrennte Review-Evidenz und als vierzeilige Auswertung nach der
+Fragerunde, jeweils ohne Gesamtscore und ohne Personenbewertung.

@@ -13,7 +13,7 @@ import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import type { LiveFeedback } from "@/features/live/contracts";
-import { needsPractice, recordingFeedback } from "@/features/live/review";
+import { needsPractice, recordingFeedback, structureForRecording } from "@/features/live/review";
 import { PRESENTATION_MODES } from "@/features/questions/presentation";
 import { clipRange } from "@/features/live/protocol";
 import { cueAppearance } from "@/features/live/cue-appearance";
@@ -42,8 +42,10 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
   const [view, setView] = useState<"moments" | "questions">("moments");
   const [all, setAll] = useState(true);
   if (!recording) return <MissingRecording />;
-  const moments = recordingFeedback(recording);
-  const reviewData = recordingReviewData(recording);
+  const structure = structureForRecording(recording);
+  const take = structure ? { ...recording, structure } : recording;
+  const moments = recordingFeedback(take);
+  const reviewData = recordingReviewData(take);
   const practice = moments.filter(needsPractice);
   const strengths = moments.filter((item) => item.kind === "positive");
   const visible = all || !practice.length ? moments : practice;
@@ -111,6 +113,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 reviewData.moments,
                 reviewData.durationMs,
                 reviewData.claims,
+                reviewData.structure,
               )}
               demo={recording.transcript?.synthetic ?? false}
               recordingTitle={reviewData.title}

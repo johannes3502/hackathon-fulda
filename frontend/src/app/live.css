@@ -1670,6 +1670,15 @@ body:has(.live-workspace-large) .app-footer {
   margin-top: 8px;
   padding: 20px 24px;
 }
+.performance-notice {
+  margin: 4px 0 18px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
 .performance-overall {
   display: flex;
   align-items: center;
@@ -1723,8 +1732,18 @@ body:has(.live-workspace-large) .app-footer {
   font-weight: 500;
   color: var(--muted);
 }
+.performance-category-meta {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
 .performance-category p {
   margin: 6px 0 0;
+}
+.performance-counts {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.8125rem;
 }
 .performance-evidence {
   margin: 8px 0 0;

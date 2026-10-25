@@ -418,7 +418,7 @@ class ReviewReused(Model):
     review_id: UUID
 
 
-class FactcheckRequest(Model):
+class TakeFactcheckRequest(Model):
     use_web: bool = False
 
 

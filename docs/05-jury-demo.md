@@ -36,6 +36,17 @@ Turbopack findet neue Module im laufenden Container sonst gelegentlich nicht
 6. Für Sprache/Fragen entweder **Try sample demo** als ausdrücklich vorbereitetes
    Szenario zeigen oder den echten lokalen Quellenpfad unten nutzen.
 
+Über dem Review-Video stehen vier getrennte Evidenzprofile: **Körper & Gesten**,
+**Quellenbezug**, **Sprechfluss** und **Aufbau**. Jedes zeigt eine 0–100-
+Schätzung nur mit ausreichender Evidenz, sonst „–“, dazu Abdeckung und
+Wilson-Spanne. Es gibt keinen Gesamtscore. **Aufbau** kommt aus der
+deterministischen `structure-rubric-v1` (Wörter und Zeitstempel, DE/EN-Marker,
+Einstieg/Abschluss/Abschnitte/Übergänge); sie prüft keine Folien und ist eine
+Heuristik. Bei kurzen Aufnahmen unter 50 Wörtern/45 s bleibt der Aufbau offen.
+Nach der getippten Fragerunde erscheinen vier weitere Zeilen
+(`practice.evidence.v2`), ebenfalls ohne Gesamtscore; nur die Quellenzeilen sind
+Schätzungen, Sprech-/Pose-Zeilen sind Zähler.
+
 ## Echte lokale Sprache und Fragen (optional, etwa 2 weitere Minuten)
 
 Gemini-Key in `.env` setzen, Backend/Worker neu starten und den Smoke ausführen:
@@ -78,6 +89,9 @@ Vor-Ort-Abnahme nicht. Keine echten Juryaufnahmen als Testfixtures einchecken.
 
 | Check | Abnahme | Status |
 | --- | --- | --- |
+| Frischer Start / Healthcheck | `docker compose up --build -d --wait`, `/health/ready` und `/api/health/ready` prüfen; Frontend bei Bedarf neu starten | Vor jeder Vorführung wiederholen; Dev-/Turbopack-Restrisiko bleibt |
+| Demo-Backup | Screenshots oder Screen-Recording von Sample-Demo und Live-Review außerhalb des Repos | Offen – vor der Jury ablegen |
+| Evidenzprofil / Aufbau | Vier Kriterien über dem Video, „–“ bei fehlender Evidenz; Aufbau-Marker im Review | Mit synthetischen Daten geprüft; reale Kamera-/ASR-Qualität offen |
 | Lokaler Start ohne Login | Demo-Laptop: `http://localhost:3000`, `/gestures` und `/live` öffnen | Lokale Browser-Tests; am Stand nochmals öffnen |
 | Echter Kameraweg auf Demo-Laptop | Hand hoch, Hände zusammen, seitlicher Versatz; zusätzlich Neigung/Arme verschränkt | Nutzer bestätigt beide Handgesten und seitlichen Versatz. Mindestdauer danach auf 0,8 s reduziert; neue Geschwindigkeit, Neigung und Arme verschränkt noch real prüfen |
 | Hand-/Körperframing | Hinweise bei verdeckten Händen, fehlenden Hüften und Verlassen des Bildes | Offen – vor Ort ausführen |
@@ -152,7 +166,7 @@ Vor Ort weiter offen: echtes GPU-Verhalten, Heavy-Durchsatz unter Kamera-/Audio-
 Last, Verzögerung durch VIDEO-Glättung und Erkennungsqualität. Automatisierte
 Tests mit synthetischen Bildern belegen Start und Datenfluss, keine Genauigkeit.
 
-## Deep Research (24.10.2026)
+## Deep Research (24.10.2026, Stand 25.10.2026)
 
 - **Gemini statt Ollama:** Der Quellenvergleich braucht jetzt einen
   `GEMINI_API_KEY` in `.env`; es gibt keinen stillen lokalen Fallback. Der
@@ -162,11 +176,16 @@ Tests mit synthetischen Bildern belegen Start und Datenfluss, keine Genauigkeit.
 - **Datenschutz:** Gemini ist Cloud ohne EU-Region-Pinning. Für die Jury nur
   synthetische Inhalte verwenden; keine echten Personenaufnahmen an das LLM
   senden.
-- **Fragegrenzen:** 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop; die
-  Begründung und Zitate stehen in `docs/11-deep-research-validation.md`.
-  Im Voice-Pfad sind sie derzeit Prompt-Vorgaben, nicht hart erzwungen (TODO).
-- **Scores:** Struktur hat im Live-Pfad keine Evidenzquelle und bleibt „–“;
-  Struktur-Momente im Demo-Review sind synthetisch. Die vier Review-Scores und
-  die Auswertung nach der Fragerunde sind getrennte Heuristiken (TODO).
+- **Fragegrenzen:** Im getippten Pfad serverseitig 5 Startfragen (Default 3),
+  3 Follow-ups, 6 Turns und TTL 600 s; Antworten 4000 Zeichen, Voice 25 MB.
+  Im Browser-Voice-Pfad 600 s/12 Antworten. Ob ElevenLabs zusätzliche harte
+  Limits erzwingt, ist Agentenkonfiguration und nicht im Code garantiert.
+- **Scores:** Vier getrennte Review-Evidenzprofile (`evidence-share-v2`) und
+  vier Zeilen nach der Fragerunde (`practice.evidence.v2`), jeweils ohne
+  Gesamtscore. Aufbau ist live gemessen, aber heuristisch und ohne
+  Folienabdeckung. Keine Validierungs- oder Genauigkeitszusage.
+- **Retention:** Täglicher Sweep 03:15 UTC für Profile/Sessions/Jobs/Idempotenz
+  und S3-Outbox; Quellen und ältere S3-Präfixe sind nicht vollständig
+  abgedeckt. Keine Rechtsgarantie.
 - **Was die Demo nicht verspricht:** keine Genauigkeits-, Latenz- oder
   Lernwirksamkeitsgarantie; keine Noten oder Personenbewertung.

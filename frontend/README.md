@@ -25,8 +25,13 @@ opens the missing-recording state; it does not create a take or access a recordi
   90-second video with timestamped example notes, sources and prototype scores.
   The matching `/live/[sessionId]/analysis` view and the main review use one
   adapter for the selected recording's video, duration, feedback and latest
-  source checks. Knowledge scores require a verified source quote; missing
-  measurements stay empty (including structure, which has no automatic rule).
+  source checks. The four `evidence-share-v2` rows are **Body & gestures**,
+  **Source grounding**, **Speech flow** and **Structure**; there is no overall
+  score. Knowledge scores require a verified source quote; time/structure scores
+  need enough assessed evidence and show `–` otherwise. Structure comes from the
+  deterministic `structure-rubric-v1` (words and timestamps, DE/EN markers,
+  opening/closing/sections/transitions, at least 3 signals, 50 words and 45 s);
+  it does not inspect slides and is an unvalidated heuristic.
   Click a marker or the timeline to seek; the slider supports keyboard seeking.
   Selected sections play with
   ±2 seconds of context and optional looping. Criterion buttons filter moments.
@@ -60,6 +65,18 @@ opens the missing-recording state; it does not create a take or access a recordi
   recorded take choose **Check facts**. Gemini selects claims and
   compares retrieved passages. **Start question round** asks follow-up questions;
   enter a text answer to compare it with the sources. Quotes are verified against retrieved text.
+  Typed answers use a server-issued question round: the browser sends only
+  `roundId` and `questionId`; the canonical question stays on the server
+  (Redis TTL 600 s, max. 5 initial questions, 3 follow-ups, 6 turns, 4000
+  characters per answer). Voice uploads are capped at 25 MB. Identical retries
+  are cached; a second different answer to the same question is rejected.
+  These limits reduce prompt-injection and cost risk but do not solve prompt
+  injection. The ElevenLabs voice path is additionally limited in the browser to
+  600 s / 12 answers; provider-side hard limits are agent configuration.
+  After a completed typed round, `practice.evidence.v2` shows four separate rows
+  (source grounding talk, source grounding answers, speech marker counts,
+  pose/gesture marker counts). Only the source rows are estimates; there is no
+  overall practice score and no label such as "Strong" or "Fair".
   [Setup, evaluation and limits](../docs/06-local-coaching.md).
 - **Rewatch feedback sections:** seek to a marker, loop the surrounding section,
   or play the full take. Backend review also accepts word-timestamp JSON from
@@ -70,7 +87,12 @@ opens the missing-recording state; it does not create a take or access a recordi
 Completed recordings and their results stay in this browser across reloads;
 download important videos as a backup. Backend mode uploads the complete take
 after stopping and retains analysis results in S3; original uploads are deleted after terminal
-processing. See [storage behavior and limits](../backend/README.md).
+processing. Server-side profiles, sessions and review jobs follow the daily
+retention sweep (03:15 UTC, default 12 months); profile expiry unlinks sessions
+instead of deleting them, and `deleteSessions=true` is an explicit full delete.
+Source uploads and some older S3 prefixes are not fully swept; lifecycle rules
+are a backstop, not a verified guarantee. See
+[storage behavior and limits](../backend/README.md).
 Failed analysis preserves the local recording. Sample findings are simulated.
 
 ## Local pose capture
@@ -126,6 +148,11 @@ docker compose exec frontend npm test
 
 For local browser tests: `npx playwright install chromium`, then
 `npm run test:e2e`. Production build: `npm run build`.
+Current synthetic check (25.10.2026): 315 unit tests in 44 files, lint,
+typecheck and build green. This does not establish model, camera or device
+accuracy. The Compose frontend healthcheck covers `/`, `/demo`, `/gestures`,
+`/sources`, `/progress`, `/admin`, `/live`, `/live/healthcheck/review`,
+`/review-preview` and `/api/health/ready`; `restart: unless-stopped` is set.
 
 [Design notes](DESIGN.md) · [Implementation decisions](../docs/02-ai-decision-log.md).
 The user confirmed three camera gestures. Safari/iOS and microphone transcription

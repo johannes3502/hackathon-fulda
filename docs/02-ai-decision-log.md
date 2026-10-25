@@ -1075,3 +1075,63 @@ Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
   Sprechern, „nicht gefunden“ heißt nicht falsch, Inhalts-Score misst
   Quellenabdeckung statt Allgemeinwissen, keine Personenbewertung.
 - Prüfungen: `typecheck`, `lint`, 8 neue Vitest-Unit-Tests für die Formel.
+
+## Struktur, Evidenzprofile v2, Prompt-Grenzen und Retention (25.10.2026)
+
+Nutzerauftrag: Doku und Code auf den implementierten Stand von
+`feature/structure-safety-scores` bringen; nur Dokumentation ändern, keine
+Code-/Teständerung, kein Commit. Die folgenden Entscheidungen sind umgesetzt;
+sie ersetzen die früheren Aussagen „Struktur ohne Evidenzquelle“, „v1“,
+„kein globales Follow-up-Limit“ und „kein Retention-Sweep“ für den aktuellen
+Stand. Historische Einträge oben bleiben unverändert.
+
+- **Aufbau deterministisch statt LLM.** `structure-rubric-v1` analysiert Wörter
+  und Zeitstempel im Browser: DE/EN-Marker, Satzsegmentierung, Jaccard-
+  Abschnittsgrenzen, Einstieg/Abschluss/Abschnitte/Übergänge. Gates: mindestens
+  3 verfügbare Signale, 50 Wörter, 45 s; Konfidenz low/medium/high; Score nur
+  als gerundetes Mittel der verfügbaren Komponenten. Folien, Betonung und Mimik
+  fehlen. Verworfen wurden eine LLM-Rubrik (nicht deterministisch, Cloud) und
+  ein reiner Markerzähler (zu leicht auslösbar). Keine Pk-/Genauigkeitsauswertung;
+  Research-Bezug: Hearst TextTiling, Pevzner/Hearst.
+- **Review-Evidenz `evidence-share-v2`.** Vier getrennte Kriterien: Körper &
+  Gesten, Quellenbezug, Sprechfluss, Aufbau. Zeitformel `(positive ms + 1000) /
+  (bewertete ms + 2000)` mit Wilson-95-%-Spanne und hälftiger Zuordnung von
+  Überlappungen; Quellenbezug `(S+1)/(S+W+2)` nur mit geprüftem Zitat. Unter 5 s
+  bzw. ohne entscheidbare Aussage „–“; unter 30 s/30 % bzw. <5 Entscheidungen
+  vorläufig; Endpunkte erst ab 30 s/10 Entscheidungen. Kein Gesamtscore.
+- **Praxisprofil `practice.evidence.v2`.** Vier Zeilen statt gewichtetem
+  0–100-Score: Quellenbindung Vortrag, Quellenbindung Antworten, Sprechmerkmale,
+  Pose/Gesten. Nur die Quellenzeilen sind Schätzungen; Sprech-/Pose-Zeilen sind
+  Zähler. Keine Gewichte, keine Labels, kein Gesamtscore. Die alte
+  `evidence-count-heuristic.v1` wird nicht mehr verwendet. Begründung: OECD-
+  Composite-Kritik, Inkommensurabilität der Zeilen, fehlende Validierung.
+- **Prompt-Sicherheit und Rundenlimits.** Getippte Antworten nutzen eine
+  serverseitige Redis-Runde (`round_id`/`question_id`, kanonische Frage, TTL
+  600 s). Limits: 5 Startfragen (Default 3), 3 Follow-ups, Standard 6 Turns
+  (bis 12 konfigurierbar), 4000
+  Zeichen, 25 MB Voice, eine akzeptierte Auswertung pro Frage, idempotenter
+  identischer Retry, 180-s-Pending-Claim. Untrusted-Daten sind nonce-delimitiert;
+  Ausgaben werden strikt validiert, Quellenzitate geprüft, URLs auf `http(s)`
+  ohne Credentials begrenzt. Prompt-Injection bleibt ein Restrisiko; die
+  Voice-Grenzen (600 s/12 Antworten im Browser) sind teilweise
+  Agentenkonfiguration. Quellen: OWASP LLM01/05/07/10, Microsoft Spotlighting.
+- **Retention.** Täglicher Celery-Beat 03:15 UTC mit Advisory Lock,
+  `retention_runs`, `blob_deletions`-Outbox, `RETENTION_*`-Konfiguration.
+  Profil-Ablauf entfernt profil-eigene Daten und entkoppelt Sessions/Takes;
+  `deleteSessions=true` löscht optional die serverseitige Analyse;
+  Session-Löschung committet zuerst und flusht dann die Outbox. Hängende Jobs
+  nach 2 h, terminale Jobs nach 30 Tagen, abgelaufene Idempotenz. Quellen und
+  ältere S3-Präfixe sind nicht vollständig abgedeckt; S3-Lifecycle ist Backstop,
+  nicht verifiziert. Keine Rechts- oder Vollständigkeitsgarantie.
+- **Kleine Fixes.** Consent „this local server“, Favicon/Icon/Apple-Icon,
+  `TakeFactcheckRequest`, Compose-Mount `./templates:/templates:ro` (nicht im
+  Image), Frontend-Healthcheck über die Hauptseiten und `/api/health/ready`,
+  `restart: unless-stopped`, entferntes `.next`-Volume, ignorierte
+  `.playwright-mcp/`, generierte/ignorierte `frontend/next-env.d.ts`,
+  `reportlab` in den Dev-Requirements. Das Backend-Image enthält die Templates
+  weiterhin nicht; dieser Punkt bleibt offen.
+- **Prüfstand.** Backend 370 bestanden, 2 übersprungen; Frontend 314 bestanden
+  in 44 Dateien; Lint, Typecheck und Build grün. Synthetische Tests, keine
+  Genauigkeits-, Geräte- oder Rechtsabnahme. Offene Punkte:
+  `docs/14-open-todos.md`; Research/Quellen:
+  `docs/15-evidence-safety-retention-research.md`.
