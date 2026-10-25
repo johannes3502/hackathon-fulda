@@ -78,7 +78,7 @@ smoke command above to check the running containers.
 | FastAPI + Uvicorn | API; connection helpers and health endpoints | `http://localhost:8000` |
 | Celery worker | Background jobs in separate Python processes | Internal; no host port |
 | Redis | Celery broker (DB 0) and temporary task results (DB 1) | Internal `redis:6379`; no host port |
-| MediaPipe | Pose/hand tracking in the browser and native app | Client-side; no Python package in the backend image |
+| MediaPipe | Pose/hand tracking in the browser | Client-side; no Python package in the backend image |
 | PostgreSQL + pgvector | Sessions, takes, events, reviews, jobs, word timestamps, source chunks and embeddings | `localhost:5432` |
 | SeaweedFS | Sources and temporary audio-analysis uploads; no review playback media | `http://localhost:8333` |
 | OpenAI-compatible LLM (external or local) | Fact-check: claim extraction and judgments; optional | `LLM_BASE_URL` in `.env` |

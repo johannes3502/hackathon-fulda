@@ -132,10 +132,3 @@ implementiert. Lokale Löschung und getrennte Backend-Daten sind dokumentiert.
 Sample-Steuerung ersetzen. Die Mock-Zeit `atMs` ist aktive Übungszeit mit Pause;
 sie ist nicht die MediaRecorder-Zeit. IDs, Sequenzen und Revisionen schützen vor
 verspäteten/duplizierten Nachrichten; fehlende Werte bleiben `null`.
-
-Die [native App](../mobile/README.md) nutzt dieselben HTTP-Analyse-/Quellen-
-Verträge, lokale Pose-/Videodaten und eine explizit synthetische Demo. Quellen
-werden über eine Collection-ID auf demselben API-Server geteilt, nicht Videos
-oder Übungshistorie. Native Aufnahme-Zeitanker sind als ungefähr markiert.
-Die native UI hat ihren eigenen Integrationsumfang; Web-Fragerunde und neue
-Review-Zielverträge sind dort nicht automatisch umgesetzt.

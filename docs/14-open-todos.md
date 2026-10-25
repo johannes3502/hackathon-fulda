@@ -66,8 +66,8 @@ Entscheidungslogs bleiben erhalten.
   Deepgram/ElevenLabs im Demo-Setup bewusst aktivieren oder ausschalten und
   im Pitch nicht als aktiv behaupten.
 - [ ] Automatisches Antwortende per Stille (VAD) und Sitzungstimer.
-- [x] Root-Checks für den Mobile-Workspace sind eingerichtet; `lint`,
-  `typecheck` und Tests laufen über die npm-Workspaces.
+- [x] Der native Mobile-Workspace wurde entfernt; `lint`, `typecheck` und
+  Tests prüfen den verbleibenden Web-Workspace.
 - [ ] Backend-Testpackaging: `templates/` wird nicht ins Backend-Image kopiert;
   `test_web_search_tool_uses_server_secret_and_bounded_results` schlägt nur im
   Container fehl. `COPY templates/ /templates/` ergänzen oder den Test
