@@ -20,12 +20,13 @@ import psycopg
 
 from app.events import Event, merge_timeline
 from app.factcheck.llm import ChatModel, LLMError, structured_json
-from app.factcheck.drafts import ExtractedClaims, Judgment
+from app.factcheck.drafts import ExtractedClaim, ExtractedClaims, Judgment
 from app.factcheck.models import (
     ClaimResult, Evidence, EvidenceKind, FactCheckConfig, FactCheckRequest, FactCheckResult,
 )
 from app.factcheck.transcript import Sentence, clock, sentences, windows
 from app.factcheck.web import WebPassage, WebSearcher
+from app.prompt_safety import safe_http_url, untrusted_block
 from app.sources import retrieval
 from app.sources.models import SourceHit
 from app.sources.numbers import numbers_in
@@ -82,24 +83,27 @@ def extract_claims(llm: ChatModel, items: list[Sentence], limit: int) -> list[Cl
         if len(claims) >= limit:
             break
         transcript = "\n".join(f"[{s.number}] ({clock(s.start_ms)}) {s.text}" for s in batch)
-        answer = structured_json(llm, EXTRACT_PROMPT.replace("{limit}", str(limit - len(claims))),
-                                   f"Transkript (Satznummer, Zeit, Satz):\n{transcript}", ExtractedClaims)
+        answer = structured_json(
+            llm, EXTRACT_PROMPT.replace("{limit}", str(limit - len(claims))),
+            "Transkript (Satznummer, Zeit, Satz):\n" + untrusted_block("transcript", transcript),
+            ExtractedClaims,
+        )
         raw = answer.get("claims")
         if not isinstance(raw, list):
             raise LLMError("Model answer has no claims list")
         for item in raw:
-            if not isinstance(item, dict) or not isinstance(item.get("claim"), str):
+            try:
+                draft = ExtractedClaim.model_validate(item)
+            except ValueError:
                 continue
-            text = item["claim"].strip()[:500]
-            numbers = item.get("sentences")
-            refs = sorted({by_number[n] for n in numbers if isinstance(n, int) and n in by_number},
-                          key=lambda s: s.number) if isinstance(numbers, list) else []
+            text = draft.claim.strip()[:500]
+            refs = sorted({by_number[n] for n in draft.sentences if n in by_number}, key=lambda s: s.number)
             # Claims without a valid sentence reference cannot be placed on the timeline.
             if not text or not refs or text.casefold() in seen:
                 continue
             seen.add(text.casefold())
-            query = item.get("query") if isinstance(item.get("query"), str) and item["query"].strip() else text
-            claims.append(Claim(text, query.strip()[:300], tuple(refs)))
+            query = draft.query.strip() or text
+            claims.append(Claim(text, query[:300], tuple(refs)))
             if len(claims) >= limit:
                 break
     return claims
@@ -134,7 +138,7 @@ def verified_evidence(quote: object, preferred: object, passages: list[Passage],
             return Evidence(
                 kind=passage.kind, label=passage.label, quote=verified, passage=passage.text,
                 filename=hit.filename if hit else None, source_id=hit.source_id if hit else None,
-                location=hit.location if hit else None, url=web.url if web else None, quote_verified=match,
+                location=hit.location if hit else None, url=web.url if web and safe_http_url(web.url) else None, quote_verified=match,
                 retrieval_score=hit.retrieval_score if hit else None, similarity=hit.similarity if hit else None,
                 matched_by=hit.matched_by if hit else [], weak=hit.weak if hit else False,
             )
@@ -165,19 +169,23 @@ def numeric_gate(claim: str, quote: str, verdict: str) -> str | None:
 def judge(llm: ChatModel, claim: Claim, passages: list[Passage], config: FactCheckConfig) -> tuple[str, str, Evidence | None, list[str]]:
     """Return verdict, explanation, verified evidence and notes."""
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1))
-    answer = structured_json(llm, JUDGE_PROMPT, f"Behauptung: {claim.text}\n\nAuszüge:\n{context}", Judgment)
-    verdict = answer.get("verdict")
-    explanation = answer.get("explanation") if isinstance(answer.get("explanation"), str) else ""
-    if verdict not in ("supports", "contradicts", "not_found"):
-        return "unchecked", "", None, ["Modellantwort ohne gültiges Urteil verworfen."]
-    if verdict == "not_found":
-        return "not_found", explanation.strip(), None, []
-    evidence = verified_evidence(answer.get("quote"), answer.get("passage"), passages, config.min_quote_chars)
+    user = "\n\n".join([
+        "Behauptung (untrusted):\n" + untrusted_block("claim", claim.text),
+        "Auszüge (untrusted):\n" + untrusted_block("passages", context),
+    ])
+    answer = structured_json(llm, JUDGE_PROMPT, user, Judgment)
+    try:
+        judgment = Judgment.model_validate(answer)
+    except ValueError:
+        return "unchecked", "", None, ["Modellantwort entsprach nicht dem Schema."]
+    if judgment.verdict == "not_found":
+        return "not_found", judgment.explanation.strip(), None, []
+    evidence = verified_evidence(judgment.quote, judgment.passage, passages, config.min_quote_chars)
     if evidence is not None:
-        note = numeric_gate(claim.text, evidence.quote, verdict)
+        note = numeric_gate(claim.text, evidence.quote, judgment.verdict)
         if note:
             return "unchecked", "", None, [note]
-        return verdict, explanation.strip(), evidence, []
+        return judgment.verdict, judgment.explanation.strip(), evidence, []
     return "unchecked", "", None, ["Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen."]
 
 

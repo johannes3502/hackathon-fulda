@@ -8,9 +8,9 @@ class Draft(BaseModel):
 
 
 class ExtractedClaim(Draft):
-    sentences: list[int]
+    sentences: list[int] = Field(default_factory=list)
     claim: str
-    query: str
+    query: str = ""
 
 
 class ExtractedClaims(Draft):
@@ -19,24 +19,25 @@ class ExtractedClaims(Draft):
 
 class Judgment(Draft):
     verdict: Literal["supports", "contradicts", "not_found"]
-    passage: int | None
-    quote: str
-    explanation: str
+    passage: int | None = None
+    quote: str = ""
+    explanation: str = ""
 
 
 class AnswerJudgment(Judgment):
-    follow_up: str
+    follow_up: str = ""
+    reply: str = ""
 
 
 class QuestionDraft(Draft):
     kind: Literal["contradiction", "unsupported", "gap", "clarification"]
     question: str
-    reason: str
-    finding: int | None
-    sentences: list[int]
-    passage: int | None
-    quote: str
-    query: str
+    reason: str = ""
+    finding: int | None = None
+    sentences: list[int] = Field(default_factory=list)
+    passage: int | None = None
+    quote: str = ""
+    query: str = ""
 
 
 class QuestionDrafts(Draft):

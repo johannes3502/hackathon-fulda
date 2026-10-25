@@ -322,6 +322,7 @@ export interface paths {
          *     Sends transcript sentences, findings and upload passages to the configured
          *     OpenAI-compatible model (same as the fact-check). Questions with a spoken
          *     passage carry `t_ms` of the recording and appear as `question` events.
+         *     The result includes a server-issued `round_id`; answers must use it.
          */
         post: operations["start_questions_questions_post"];
         delete?: never;
@@ -409,10 +410,11 @@ export interface paths {
         put?: never;
         /**
          * Start Answer Review
-         * @description Compare a typed answer with the question's evidence and upload passages.
+         * @description Compare a typed answer with the canonical question of a server-issued round.
          *
-         *     Result is a verdict with a verbatim quote and an optional follow-up
-         *     question; no points or grades.
+         *     `question_id` and `round_id` are required. A legacy `question` field is
+         *     ignored and never becomes evidence. Result is a verdict with a verbatim
+         *     quote and an optional follow-up question; no points or grades.
          */
         post: operations["start_answer_review_questions_answers_post"];
         delete?: never;
@@ -928,7 +930,15 @@ export interface components {
              * @enum {string}
              */
             presentation_mode: "startup" | "thesis" | "school" | "nonprofit";
-            question: components["schemas"]["Question"];
+            /** @description Deprecated. Ignored when round_id is set; the HTTP API rejects it without a round. */
+            question?: components["schemas"]["Question"] | null;
+            /** Question Id */
+            question_id?: string | null;
+            /**
+             * Round Id
+             * @description Server-issued question round
+             */
+            round_id?: string | null;
         };
         /** AnswerReview */
         AnswerReview: {
@@ -1074,7 +1084,7 @@ export interface components {
             recording: string;
             /**
              * Request
-             * @description VoiceAnswerRequest JSON: question, collection_id, persona
+             * @description VoiceAnswerRequest JSON: round_id, question_id, persona
              */
             request: string;
         };
@@ -1450,14 +1460,6 @@ export interface components {
             model: string | null;
             /** Web Provider */
             web_provider: string | null;
-        };
-        /** FactcheckRequest */
-        FactcheckRequest: {
-            /**
-             * Useweb
-             * @default false
-             */
-            useWeb: boolean;
         };
         /** FailedJob */
         FailedJob: {
@@ -2316,7 +2318,10 @@ export interface components {
             /** Prompthash */
             promptHash?: string | null;
         };
-        /** Question */
+        /**
+         * Question
+         * @description A canonical question stored in the round ledger and returned to clients.
+         */
         Question: {
             /**
              * Claim
@@ -2366,17 +2371,35 @@ export interface components {
          */
         QuestionConfig: {
             /**
+             * Max Follow Ups
+             * @description Maximum follow-up questions per round
+             * @default 3
+             */
+            max_follow_ups: number;
+            /**
              * Max Questions
              * @description Maximum initial questions; follow-ups are separate
              * @default 3
              */
             max_questions: number;
             /**
+             * Max Turns
+             * @description Maximum answered question turns per round
+             * @default 6
+             */
+            max_turns: number;
+            /**
              * Min Quote Chars
              * @description Minimum verified quote length after optional short-anchor expansion
              * @default 12
              */
             min_quote_chars: number;
+            /**
+             * Round Ttl S
+             * @description Server-side round lifetime in seconds
+             * @default 600
+             */
+            round_ttl_s: number;
             /**
              * Source Passages
              * @description Upload passages shown to the model to find gaps
@@ -2464,6 +2487,11 @@ export interface components {
             presentation_mode: "startup" | "thesis" | "school" | "nonprofit";
             /** Questions */
             questions: components["schemas"]["Question"][];
+            /**
+             * Round Id
+             * @description Server-issued round for follow-up answers
+             */
+            round_id?: string | null;
             /** Sources Used */
             sources_used: boolean;
         };
@@ -2932,6 +2960,14 @@ export interface components {
             /** Recordedat */
             recordedAt?: string | null;
             timebase: components["schemas"]["Timebase"];
+        };
+        /** TakeFactcheckRequest */
+        TakeFactcheckRequest: {
+            /**
+             * Useweb
+             * @default false
+             */
+            useWeb: boolean;
         };
         /** TakeJobAccepted */
         TakeJobAccepted: {
@@ -3533,7 +3569,9 @@ export interface operations {
     };
     delete_profile_profiles__profile_id__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                deleteSessions?: boolean;
+            };
             header: {
                 "Idempotency-Key": string;
                 "X-Profile-Token"?: string | null;
@@ -6072,7 +6110,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["FactcheckRequest"] | null;
+                "application/json": components["schemas"]["TakeFactcheckRequest"] | null;
             };
         };
         responses: {

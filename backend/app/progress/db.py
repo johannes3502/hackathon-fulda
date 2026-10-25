@@ -13,6 +13,7 @@ from psycopg.types.json import Jsonb
 
 from app.progress import definitions
 from app.progress.schema import PROGRESS_SCHEMA
+from app.retention import outbox, policy
 from app.review import db as review_db
 from app.review.errors import ReviewError
 
@@ -77,12 +78,16 @@ def _consent_out(consent) -> dict:
 
 
 def profile_identity(row) -> dict:
+    consent = _consent_out(row["consent"])
+    # The column is the effective server-side retention; it can be extended by
+    # new takes without rewriting the user's original consent declaration.
+    consent["retentionUntil"] = row.get("retention_until")
     return {
         "profileId": row["id"],
         "displayName": row["display_name"],
         "locale": row["locale"],
         "createdAt": row["created_at"],
-        "consent": _consent_out(row["consent"]),
+        "consent": consent,
     }
 
 
@@ -114,14 +119,17 @@ def authenticate(connection, profile_id, token, *, allow_expired=False, lock=Fal
     return row
 
 
-def create_profile(connection, request, raw_token):
+def create_profile(connection, request, raw_token, *, now=None):
     profile_id = uuid4()
+    now = policy.as_utc(now or datetime.now(timezone.utc))
     consent = request.consent.model_dump(mode="json", by_alias=True)
+    retention = policy.profile_until(request.consent.retention_until, now)
+    origin = "user" if request.consent.retention_until is not None else "default"
     row = connection.execute(
-        "INSERT INTO speaker_profiles(id,display_name,locale,consent,retention_until)"
-        " VALUES (%s,%s,%s,%s,%s) RETURNING *",
+        "INSERT INTO speaker_profiles(id,display_name,locale,consent,retention_until,retention_origin)"
+        " VALUES (%s,%s,%s,%s,%s,%s) RETURNING *",
         (profile_id, request.display_name, request.locale, Jsonb(consent),
-         request.consent.retention_until)).fetchone()
+         retention, origin)).fetchone()
     connection.execute(
         "INSERT INTO profile_tokens(id,profile_id,token_hash,label) VALUES (%s,%s,%s,%s)",
         (uuid4(), profile_id, token_hash(raw_token), "browser"))
@@ -133,14 +141,16 @@ def update_profile(connection, profile_id, request):
     display_name = current["display_name"] if request.display_name is None else request.display_name
     locale = current["locale"] if request.locale is None else request.locale
     retention = current["retention_until"]
+    origin = current["retention_origin"]
     consent = dict(current["consent"])
     if "retention_until" in request.model_fields_set:
         retention = request.retention_until
+        origin = "user"
         consent["retentionUntil"] = retention.isoformat() if retention is not None else None
     return connection.execute(
-        "UPDATE speaker_profiles SET display_name=%s,locale=%s,retention_until=%s,consent=%s,"
-        "updated_at=now() WHERE id=%s RETURNING *",
-        (display_name, locale, retention, Jsonb(consent), profile_id)).fetchone()
+        "UPDATE speaker_profiles SET display_name=%s,locale=%s,retention_until=%s,"
+        "retention_origin=%s,consent=%s,updated_at=now() WHERE id=%s RETURNING *",
+        (display_name, locale, retention, origin, Jsonb(consent), profile_id)).fetchone()
 
 
 def rotate_token(connection, profile_id):
@@ -152,21 +162,59 @@ def rotate_token(connection, profile_id):
     return raw
 
 
-def delete_profile(connection, profile_id):
+def delete_profile(connection, profile_id, *, delete_sessions=False, now=None):
+    """Delete profile-owned data; linked sessions/takes stay unless requested.
+
+    Blob keys are queued in the same transaction and removed from S3 only
+    after the caller commits. Profile expiry therefore never deletes sessions.
+    """
     row = connection.execute("SELECT id FROM speaker_profiles WHERE id=%s FOR UPDATE",
                              (profile_id,)).fetchone()
     if row is None:
-        return False
-    ids = [item["id"] for item in connection.execute(
-        "SELECT id FROM takes WHERE profile_id=%s", (profile_id,)).fetchall()]
-    if ids:
-        connection.execute("DELETE FROM take_metrics WHERE take_id = ANY(%s)", (ids,))
-        connection.execute("DELETE FROM take_quality WHERE take_id = ANY(%s)", (ids,))
+        return {"deleted": False, "profiles": 0, "sessionsDeleted": 0,
+                "takesDeleted": 0, "sessionsUnlinked": 0, "takesUnlinked": 0,
+                "blobsQueued": 0, "takeDataDeleted": 0}
+    session_ids = [item["id"] for item in connection.execute(
+        "SELECT id FROM sessions WHERE profile_id=%s", (profile_id,)).fetchall()]
+    take_ids = [item["id"] for item in connection.execute(
+        "SELECT id FROM takes WHERE profile_id=%s OR session_id IN"
+        " (SELECT id FROM sessions WHERE profile_id=%s)",
+        (profile_id, profile_id)).fetchall()]
+    blobs = 0
+    if delete_sessions and take_ids:
+        job_rows = connection.execute(
+            "SELECT object_key FROM jobs WHERE take_id = ANY(%s)"
+            " AND object_key IS NOT NULL", (take_ids,)).fetchall()
+        blobs = outbox.enqueue(connection, (item["object_key"] for item in job_rows), now=now)
+    take_data = 0
+    if take_ids:
+        take_data = connection.execute(
+            "DELETE FROM take_metrics WHERE take_id = ANY(%s)", (take_ids,)).rowcount
+        take_data += connection.execute(
+            "DELETE FROM take_quality WHERE take_id = ANY(%s)", (take_ids,)).rowcount
+    sessions_deleted = takes_deleted = 0
+    if delete_sessions:
+        takes_deleted = len(take_ids)
+        sessions_deleted = connection.execute(
+            "DELETE FROM sessions WHERE profile_id=%s", (profile_id,)).rowcount
+        connection.execute("DELETE FROM takes WHERE profile_id=%s", (profile_id,))
     connection.execute("DELETE FROM progress_change_points WHERE profile_id=%s", (profile_id,))
     connection.execute("DELETE FROM progress_snapshots WHERE profile_id=%s", (profile_id,))
     connection.execute("DELETE FROM profile_goals WHERE profile_id=%s", (profile_id,))
+    connection.execute(
+        "DELETE FROM profile_idempotency WHERE profile_id=%s OR scope LIKE %s",
+        (profile_id, f"profiles:{profile_id}:%"))
     connection.execute("DELETE FROM speaker_profiles WHERE id=%s", (profile_id,))
-    return True
+    return {
+        "deleted": True,
+        "profiles": 1,
+        "sessionsDeleted": sessions_deleted,
+        "takesDeleted": takes_deleted,
+        "sessionsUnlinked": 0 if delete_sessions else len(session_ids),
+        "takesUnlinked": 0 if delete_sessions else len(take_ids),
+        "blobsQueued": blobs,
+        "takeDataDeleted": take_data,
+    }
 
 
 @contextmanager

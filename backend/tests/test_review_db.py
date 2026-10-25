@@ -216,6 +216,7 @@ def test_queue_outage_retries_same_durable_job_and_final_events_win(api, monkeyp
 
 
 def test_question_jobs_and_answer_comparison_are_take_scoped(api, monkeypatch):
+    from app.questions import rounds
     from app.questions.models import AnswerReview, Question, QuestionConfig, QuestionResult
     from app.review import router
     client, post, create, *_ = api
@@ -226,7 +227,10 @@ def test_question_jobs_and_answer_comparison_are_take_scoped(api, monkeypatch):
         connection.execute("UPDATE takes SET analysis=%s WHERE id=%s", (Jsonb({"words": [{"word": "Synthetisch", "start_ms": 0, "end_ms": 500}]}), take_id))
     question = Question(id="q_1", kind="clarification", question="Was bedeutet der Begriff?", reason="Synthetische Rückfrage",
                         t_ms=0, duration_ms=500, query="Synthetisch")
-    result = QuestionResult(questions=[question], events=[], model="synthetic-test", sources_used=False, config=QuestionConfig(), notices=[])
+    state = rounds.create_round([question], QuestionConfig(), collection_id=None,
+                                persona="student", presentation_mode="thesis")
+    result = QuestionResult(round_id=state.round_id, questions=[question], events=[],
+                            model="synthetic-test", sources_used=False, config=QuestionConfig(), notices=[])
     monkeypatch.setattr(worker, "model_job", lambda *args: ("questions", result.model_dump(mode="json"), []))
     accepted = post(f"/takes/{take_id}/questions", {"persona": "student"})
     assert accepted.status_code == 202, accepted.text
@@ -244,6 +248,9 @@ def test_question_jobs_and_answer_comparison_are_take_scoped(api, monkeypatch):
     assert service.queued_job(job_id)["input"] == {}
     evaluation = client.get(f"/takes/{take_id}/evaluation")
     assert evaluation.status_code == 200 and evaluation.json()["evaluation"]["humanLabeledClaims"] is None
+    rounds.expire(state.round_id)
+    assert post(f"/takes/{take_id}/questions/answers",
+                {"questionId": "q_1", "answer": "Synthetische Antwort"}).status_code == 410
 
 
 def test_llm_failure_persists_grounded_fallback_and_failure_metrics(api, monkeypatch):
@@ -254,7 +261,7 @@ def test_llm_failure_persists_grounded_fallback_and_failure_metrics(api, monkeyp
     monkeypatch.setattr(router, "require_llm", lambda identifier: None)
     class UnsafeModel:
         model = "synthetic-injection"
-        def complete_json(self, system, user):
+        def complete_json(self, system, user, *, max_tokens=None):
             return {"claims": [{"evidenceIds": ["pose:R1:1000"], "template": "observation", "text": "Dein Score ist 99."}]}
     monkeypatch.setattr("app.factcheck.llm.configured_llm", lambda: UnsafeModel())
     response = post(f"/takes/{take_id}/review", {"mode": "llm"})

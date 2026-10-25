@@ -60,6 +60,30 @@ def recompute_progress(self, run_id: str) -> dict[str, str]:
     return {"run_id": run_id}
 
 
+@celery_app.task(bind=True, acks_late=True, reject_on_worker_lost=True, max_retries=3,
+                 soft_time_limit=240, time_limit=300, expires=3600)
+def retention_sweep(self) -> dict:
+    """Daily server-side cleanup; the Postgres advisory lock prevents overlap."""
+    from app.retention.service import sweep
+
+    try:
+        result = sweep()
+    except SoftTimeLimitExceeded:
+        raise
+    except Exception as error:
+        if self.request.retries >= self.max_retries:
+            logging.getLogger(__name__).warning(
+                "Retention sweep task failed (%s)", type(error).__name__)
+            raise
+        raise self.retry(countdown=300) from error
+    counts = result.get("counts", {})
+    if result.get("status") == "failed" or counts.get("errors") or counts.get("blobsFailed"):
+        if self.request.retries < self.max_retries:
+            raise self.retry(countdown=300)
+        raise RuntimeError("Retention cleanup remains incomplete after retries")
+    return result
+
+
 @celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
 def ingest_source(self, source_id: str) -> dict[str, str]:
     """Extract, chunk and embed one uploaded source; status lives in PostgreSQL."""
@@ -139,9 +163,11 @@ def _model_job(task, job_id: str, prefix: str, job_model, run, error: str,
             try:
                 status = job_model(job_id=job_id, status="completed", result=run(request))
             except (Exception, SoftTimeLimitExceeded) as failure:
+                from app.questions.rounds import RoundError
                 # Never put model answers, transcripts or credentials into logs or Redis.
                 logging.getLogger(__name__).warning("%s job %s failed (%s)", prefix, job_id, type(failure).__name__)
-                status = job_model(job_id=job_id, status="failed", error=error)
+                message = failure.message if isinstance(failure, RoundError) else error
+                status = job_model(job_id=job_id, status="failed", error=message)
             storage.write_json(job_id, "status.json", status.model_dump(mode="json"), prefix)
         for name in inputs:
             s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=storage.key(job_id, name, prefix))

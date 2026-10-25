@@ -185,10 +185,14 @@ export async function removeGoal(
   );
 }
 
-export async function deleteProfile(profile: StoredProfile): Promise<void> {
+export async function deleteProfile(
+  profile: StoredProfile,
+  options?: { deleteSessions?: boolean },
+): Promise<void> {
+  const query = options?.deleteSessions ? "?deleteSessions=true" : "";
   try {
     await request<void>(
-      `/api/profiles/${encodeURIComponent(profile.profileId)}`,
+      `/api/profiles/${encodeURIComponent(profile.profileId)}${query}`,
       profile,
       {
         method: "DELETE",

@@ -16,7 +16,7 @@ from app.factcheck.models import FactCheckConfig
 @pytest.fixture(autouse=True)
 def clean_llm_environment(monkeypatch):
     for name in ("LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY",
-                 "LLM_JSON_MODE", "LLM_TEMPERATURE", "LLM_TIMEOUT_S"):
+                 "LLM_JSON_MODE", "LLM_TEMPERATURE", "LLM_TIMEOUT_S", "LLM_MAX_OUTPUT_TOKENS"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -122,7 +122,8 @@ def test_invalid_endpoints_are_unavailable_without_exposing_config(monkeypatch, 
 @pytest.mark.parametrize(("name", "value"), [
     ("LLM_TIMEOUT_S", "0"), ("LLM_TIMEOUT_S", "-1"), ("LLM_TIMEOUT_S", "nan"),
     ("LLM_TIMEOUT_S", "inf"), ("LLM_TEMPERATURE", "nan"), ("LLM_TEMPERATURE", "secret"),
-    ("LLM_JSON_MODE", "typo"),
+    ("LLM_JSON_MODE", "typo"), ("LLM_MAX_OUTPUT_TOKENS", "0"), ("LLM_MAX_OUTPUT_TOKENS", "9000"),
+    ("LLM_MAX_OUTPUT_TOKENS", "many"),
 ])
 def test_invalid_options_disable_settings_and_preflight(monkeypatch, gemini, name, value):
     monkeypatch.setenv("GEMINI_API_KEY", "test-only")
@@ -187,6 +188,24 @@ def test_structured_requests_keep_schema_and_untrusted_data_instructions():
     assert "No grades, personality, emotion or intent judgments" in system
     assert json.loads(system.split("JSON schema: ")[1]) == Probe.model_json_schema()
     assert user == "Synthetic data"
+    assert model.complete_json.call_args.kwargs["max_tokens"] is None
+    structured_json(model, "Task", "Synthetic data", Probe, max_tokens=321)
+    assert model.complete_json.call_args.kwargs["max_tokens"] == 321
+
+
+def test_output_token_limit_is_bounded_and_sent_to_the_provider(monkeypatch, gemini):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only")
+    assert configured_llm().max_tokens == 1024
+    monkeypatch.setenv("LLM_MAX_OUTPUT_TOKENS", "2048")
+    assert configured_llm().max_tokens == 2048
+
+    def handle(request):
+        assert json.loads(request.read())["max_tokens"] == 2048
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]})
+
+    model = configured_llm()
+    model.transport = httpx.MockTransport(handle)
+    assert model.complete_json("s", "u") == {}
 
 
 @pytest.mark.parametrize("choice", [

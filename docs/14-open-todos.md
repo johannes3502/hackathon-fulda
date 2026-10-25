@@ -1,8 +1,7 @@
 # Offene TODOs — Stand 25.10.2026
 
-Diese Liste hält Punkte fest, die bewusst nicht in diesem Change umgesetzt
-wurden. Erledigt wurden nur Pitch-Korrekturen, der reproduzierbare
-Pitch-Generator und der Doku-Abgleich.
+Diese Liste trennt erledigte Änderungen und offene Abnahme. Stand nach dem
+reviewten Merge von `feature/structure-safety-scores`, 25.10.2026.
 
 ## P0 — vor Jury/Feature Freeze entscheiden
 
@@ -14,15 +13,11 @@ Pitch-Generator und der Doku-Abgleich.
   Daten. Checkliste in `13-long-term-progress-frontend-contract.md` §2
   abarbeiten, inklusive `profileId`, `deviceKey`, `takeId`-Zuordnung und
   lokalem Video-Link.
-- [ ] **Retention/Cleanup der 12-Monats-Frist.** Die UI nennt 12 Monate
-  (`ProgressDashboard.tsx:911`), aber es gibt keinen Löschjob. Benötigt:
-  täglicher Celery-Cleanup für abgelaufene Profile (Progress-Daten, Ziele,
-  Snapshots, Change-Points, `take_metrics`/`take_quality`; Sessions/Takes
-  dabei entkoppeln, nicht automatisch löschen), konfigurierbare Frist und
-  Tests für idempotente Wiederholung. S3-Analyseergebnisse und Jobs brauchen
-  eine eigene TTL/Cleanup-Regel. Bis dahin die UI-Formulierung auf
-  „Zugriff gesperrt; automatische Löschung folgt“ ändern oder die Frist
-  entfernen.
+- [x] **Profil-Retention und Take-Job-Cleanup.** Ein Compose-Beat plant täglich
+  um 03:15 UTC begrenzte Batches; Profile werden gelöscht, Sessions/Takes nur
+  entkoppelt. Verknüpfte Sessions haben keine automatische Session-Frist.
+  Explizite Profilfristen bleiben erhalten. S3-Löschungen laufen über eine
+  transaktionale Outbox mit Retry. Legacy-S3-Ergebnisse und Quellen bleiben P1.
 - [ ] **Session-/Take-Löschung serverseitig.** Lokal ist Löschen bereits
   umgesetzt (IndexedDB, `LiveReview` → „Delete saved session“). Das Backend
   `DELETE /sessions/{id}` kaskadiert, wird vom Web-Frontend aber nicht
@@ -30,13 +25,15 @@ Pitch-Generator und der Doku-Abgleich.
   Nach der Persistenz-Anbindung: `DELETE` mit Profil-Token, lokale und
   serverseitige Daten gemeinsam bestätigen, Verhalten bei 404/410/offline
   testen.
-- [ ] **Prompt-Safety-Grenzen erzwingen.** Im getippten Pfad sind
-  `max_questions` und ein Follow-up pro Antwort vorhanden, aber es gibt keinen
-  globalen Follow-up-/Turn-Cap und keinen Sitzungstimer. Im Voice-Pfad sind
-  10 Minuten Hard Stop und Turn-Grenzen nur Prompt-Vorgaben. Getippter Pfad:
-  serverseitige Zähler/Validator. Voice/ElevenLabs: Client-Timer,
-  Turn-Zähler, sichtbarer Stop und `endSession`, Abschlussgrund loggen.
-  Automatisches Antwortende per Stille bleibt separat.
+- [x] **Runden- und Browserlimits.** Fragen-/Take-API nutzen Redis-Runden mit
+  fester TTL, reservierten Turns, globalem Follow-up-Limit und Review-Cache.
+  ElevenLabs wird im Browser nach 600 s ab Start oder 12 Nutzerbeiträgen
+  beendet; auch Verbindungsaufbau und späte SDK-Verbindungen werden abgebrochen.
+  Nonce-Blöcke und strikte Schemata ergänzen die Zitat-/Zahlenprüfung.
+  Client-Fact-Check-Funde bleiben untrusted; kein vollständiger Injection-Schutz.
+- [ ] **Anbieter-Limits abnehmen.** Browser-Timer ersetzen keine harten Grenzen
+  im ElevenLabs-Konto. Tatsächlichen Anbieter-Abbruch und Mikrofon-Freigabe auf
+  dem Demo-Gerät prüfen. Automatisches Antwortende per Stille bleibt separat.
 - [ ] **Zwei Score-Systeme klar trennen.** Review nutzt
   `evidence-share-v1` (drei Kriterien, Zeitanteile/Quellenurteile), die
   Auswertung nach der Fragerunde `evidence-count-heuristic.v1` (drei
@@ -46,9 +43,9 @@ Pitch-Generator und der Doku-Abgleich.
 - [ ] **Demo-Härtung.** Der Compose-Frontend läuft im Dev-Modus
   (`frontend/Dockerfile:19`). Nach Merges kann Turbopack neue Module nicht
   finden (beobachtet: `/review-preview` 500; Restart behob es). Vor der Jury
-  frisch bauen/restarten und/oder auf Production-Build wechseln. Healthcheck
-  um `/review-preview`, `/demo`, `/gestures`, `/sources`, `/progress`,
-  `/admin` erweitern.
+  frisch bauen/restarten und/oder auf Production-Build wechseln. Der Healthcheck
+  deckt inzwischen auch `/review-preview`, `/demo`, `/gestures`, `/sources`,
+  `/progress` und `/admin` ab; das persistente Next-Volume entfällt.
 - [ ] **Localhost/QR/Smartphone entscheiden.** `compose.yaml` bindet nur
   `127.0.0.1`; ein Jury-Gerät oder QR-Code ist damit nicht erreichbar. Wenn
   nötig: HTTPS-Tunnel, `0.0.0.0`-Bind und CORS anpassen. Sonst in der
@@ -61,14 +58,13 @@ Pitch-Generator und der Doku-Abgleich.
 
 ## P1 — nach dem Hackathon
 
-- [ ] Retention auch für Audio-/S3-Ergebnisse, Jobs, Idempotency-Einträge und
-  Quellen-Collections dokumentieren und testen.
+- [ ] Retention für Legacy-S3-Ergebnispräfixe und Quellen-Collections ergänzen.
+  Kein verifiziertes S3-Lifecycle-Backstop vorhanden.
 - [ ] Optionalen Web-Fallback (`WEB_SEARCH_PROVIDER=wikipedia`) und
   Deepgram/ElevenLabs im Demo-Setup bewusst aktivieren oder ausschalten und
   im Pitch nicht als aktiv behaupten.
-- [ ] Automatisches Antwortende per Stille (VAD) und Sitzungstimer.
-- [ ] Root-Checks für den Mobile-Workspace wiederherstellen
-  (`npm ci` oder Mobile aus den Workspaces nehmen).
+- [ ] Automatisches Antwortende per Stille (VAD); Browser-Sitzungstimer ist umgesetzt.
+- [x] Mobile-Workspace ist bereits auf `main` entfernt; Root-Checks nutzen nur das Web-Frontend.
 - [ ] Backend-Testpackaging: `templates/` wird nicht ins Backend-Image kopiert;
   `test_web_search_tool_uses_server_secret_and_bounded_results` schlägt nur im
   Container fehl. `COPY templates/ /templates/` ergänzen oder den Test
@@ -76,14 +72,13 @@ Pitch-Generator und der Doku-Abgleich.
 
 ## P2 — Kleinigkeiten
 
-- [ ] Consent-Text zeigt technisch `/api` statt „local server“
-  (`LiveStudio.tsx:541`).
-- [ ] Favicon fehlt (`/favicon.ico` 404).
+- [x] Consent-Text benennt lokale Endpunkte als „this local server“.
+- [x] Favicon und App-Icons vorhanden.
 - [ ] Sprachkonsistenz: Start/Progress deutsch, Studio/Review englisch;
   `html lang="en"` für deutsche Startseite prüfen.
 - [ ] Hydration-Warnung auf `/demo` beseitigen.
-- [ ] OpenAPI-Schemas `FactCheckRequest` und `FactcheckRequest` unterscheiden
-  nur in Groß-/Kleinschreibung; für generierte Clients umbenennen.
+- [x] Take-Optionen heißen `TakeFactcheckRequest`; kein nur durch Großschreibung
+  abweichendes OpenAPI-Modell mehr.
 - [ ] Untracked Demo-Material (`test-presentations/`,
   `scripts/make_test_presentations.py`) committen oder entfernen.
 - [ ] README-/Doc-Reste nach dem Score-Update regelmäßig gegen den Code

@@ -74,9 +74,31 @@ Ohne ausreichende Evidenz bleibt der jeweilige Score offen.
 - **Safari/iOS** früh auf echtem Gerät testen (andere Container-Formate, `MediaRecorder` liefert MP4 statt WebM).
 
 **Offen:** offene Punkte und TODOs stehen in `docs/14-open-todos.md`
-(Retention/Cleanup, Persistenz-/Progress-Anbindung,
-Prompt-Safety-Grenzen, Demo-Härtung). Umgesetzt: Post-Transkription lokal und
+(Legacy-S3-/Quellen-Cleanup, Persistenz-/Progress-Anbindung,
+Anbieter-Limits, Demo-Härtung). Umgesetzt: Post-Transkription lokal und
 Text-Fragerunde mit Quellenvergleich ohne Noten.
+
+Reviewter Merge von `feature/structure-safety-scores` (25.10.2026): Die drei
+Review-Kriterien und `evidence-share-v1` bleiben bestehen. Aufbau-Rubrik,
+`evidence-share-v2`, Glättung und Konfidenzspannen sind nicht übernommen.
+Fragen-API und Take-Fragenpfad verwenden serverseitige Redis-Runden mit fester
+TTL (Standard 600 s), reservierten Turns und begrenzten Nachfragen. Identische
+Antwort-Retries verwenden den gespeicherten Review; andere Antworten auf dieselbe
+Frage werden abgelehnt. Ein Worker-Abbruch kann einen Turn bis zum Rundenende
+reservieren. Der ElevenLabs-Dialog endet im Browser nach 600 s ab Start oder
+12 Nutzerbeiträgen; Anbieter-Limits bleiben separat.
+Modell-Eingaben sind nonce-begrenzt; Schema-, Zitat- und Zahlenprüfungen bleiben
+Pflicht. Das ist kein vollständiger Prompt-Injection-Schutz.
+
+Retention: Ein einzelner Compose-`beat` plant täglich um 03:15 UTC den
+`retention_sweep`. Standardprofile laufen nach 365 Tagen ab; neue verknüpfte
+Takes verlängern nur die Standardfrist. Explizite Fristen und aufgehobene
+Fristen bleiben erhalten. Profilablauf/-löschung entkoppelt Sessions/Takes und
+löscht nur Progress-Daten. Verknüpfte Sessions erhalten keine automatische
+Session-Frist; anonyme Sessions haben eine eigene 365-Tage-Frist. Nur ein
+explizites `DELETE /profiles/{id}?deleteSessions=true` löscht verknüpfte
+Session-Daten mit. S3-Löschungen stehen transaktional in `blob_deletions` und
+werden nach Commit wiederholt. Legacy-S3-Ergebnisse und Quellen bleiben offen.
 
 ## 4. Architektur
 

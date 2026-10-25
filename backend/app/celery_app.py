@@ -3,6 +3,7 @@
 import os
 
 from celery import Celery
+from celery.schedules import crontab
 
 celery_app = Celery(
     "presentation_trainer",
@@ -17,6 +18,14 @@ celery_app.conf.update(
     result_serializer="json",
     task_track_started=True,
     result_expires=3600,
+    timezone="UTC",
+    enable_utc=True,
+    beat_schedule={
+        "retention-sweep": {
+            "task": "app.tasks.retention_sweep",
+            "schedule": crontab(hour=3, minute=15),
+        },
+    },
     # Long jobs run in prefork children; reserve only one job per process.
     worker_prefetch_multiplier=1,
     task_acks_late=True,

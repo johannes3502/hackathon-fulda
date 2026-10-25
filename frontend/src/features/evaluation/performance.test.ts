@@ -53,7 +53,11 @@ const answer = (verdict: AnswerReview["verdict"]): QuestionAnswer => ({
   review: review(verdict),
 });
 const questionResult = (questions: Question[]): QuestionResult => ({
+  roundId: null,
   config: {
+    max_follow_ups: 3,
+    max_turns: 6,
+    round_ttl_s: 600,
     max_questions: 3,
     min_quote_chars: 12,
     source_passages: 6,

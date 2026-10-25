@@ -7,6 +7,27 @@ Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
 
 ## Ablauf
 
+Reviewter Merge, 25.10.2026: Die folgende Drei-Kriterien-Entscheidung hat Vorrang
+vor der älteren Aufbau-/Score-v2-Arbeit im Feature-Branch. Die Web-Fragerunde
+bleibt ausschließlich der ElevenLabs-Dialog. Ein Browser-Timer begrenzt sie ab
+Start auf zehn Minuten; nach zwölf Nutzerbeiträgen wird die Verbindung ebenfalls
+geschlossen. Abbruch während Vorbereitung/Verbindungsaufbau beendet auch spät
+erzeugte SDK-Verbindungen. Das sind Browser-Grenzen, keine Zusage über harte
+Limits im Anbieterkonto. `Start a new round` setzt die lokale Runde zurück.
+
+Die kompatible Fragen-API gibt `round_id` zurück. Antworten senden `round_id`
+und `question_id` statt einer frei vorgegebenen Frage. Redis speichert Fragen,
+reservierte Turns und fertige Reviews in einem Wert mit fester TTL (Standard
+600 s); kurze Runden-Locks verhindern verlorene Zähler bei parallelen Antworten.
+Standardlimits: drei Anfangsfragen, drei Nachfragen, sechs Antwort-Turns.
+Identische Wiederholungen liefern den gespeicherten Review; eine geänderte
+Antwort auf dieselbe Frage ergibt 409. Alte gespeicherte Fragen ohne Runden-ID
+müssen neu erzeugt werden. Auch der persistente Take-Pfad nutzt diese Grenzen.
+Ein harter Worker-Abbruch hält die Reservierung bis zum Rundenende; fehlgeschlagene
+Modell-/ASR-Aufrufe geben sie frei. Keine automatische Wiederholung bezahlter
+Modellaufrufe. Client-Befunde bleiben untrusted Hinweise; die Runden-ID ist
+kein Authentizitätsnachweis für einen zuvor vom Client gesendeten Fact-Check.
+
 Ergänzender Nutzerauftrag (aktualisiert 25.10.2026): Drei 0–100-Prototyp-Scores
 für Gestik, Fachwissen und Flow stehen über dem Video.
 `evidence-share-v1` bewertet positive / (positive + kritische) Zeitanteile,
