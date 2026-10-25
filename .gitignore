@@ -58,3 +58,13 @@ desktop.ini
 # Local QA captures and throwaway probe scripts
 /captures/
 /promo/record/
+
+# Promo intermediates and local QA
+/promo/public/films/raw/
+/promo/public/films/final/qc/
+/promo/public/films/final/cards/
+/promo/public/films/final/*-clip.mp4
+/promo/public/voice/probe/
+/promo/public/voice/fit/
+/promo/public/voice/trim/
+/promo/public/voice/*-mix-raw.wav

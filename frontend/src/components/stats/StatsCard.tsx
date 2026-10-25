@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import {
@@ -9,6 +9,7 @@ import {
   Video,
 } from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
+import { FilmShowcase } from "@/components/landing/FilmShowcase";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { time } from "@/lib/utils";
 import { summarizeRecordings } from "./stats";
@@ -28,6 +29,7 @@ export function StatsDashboard() {
     <AppShell experience="live">
       <div className="stats418-dashboard" lang="de">
         <PresentationIntro />
+        <FilmShowcase />
         <section className="stats418-hero" aria-label="Deine Aufnahmen">
           <div className="stats418-hero-info">
             <span className="stats418-section-eyebrow">

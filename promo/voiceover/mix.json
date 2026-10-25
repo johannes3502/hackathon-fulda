@@ -1,0 +1,147 @@
+{
+  "progress": {
+    "total": 43.633,
+    "audio": "voice\\progress-mix.wav",
+    "cues": [
+      {
+        "id": "progress-01-intro",
+        "start": 0.5,
+        "duration": 3.859,
+        "end": 4.359,
+        "atempo": 1.0
+      },
+      {
+        "id": "progress-02-hero",
+        "start": 4.95,
+        "duration": 2.993,
+        "end": 7.943,
+        "atempo": 1.0
+      },
+      {
+        "id": "progress-03-overview",
+        "start": 8.7,
+        "duration": 4.733,
+        "end": 13.433,
+        "atempo": 1.22
+      },
+      {
+        "id": "progress-04-metrics",
+        "start": 13.7,
+        "duration": 2.474,
+        "end": 16.174,
+        "atempo": 1.05
+      },
+      {
+        "id": "progress-05-click",
+        "start": 17.2,
+        "duration": 1.779,
+        "end": 18.979,
+        "atempo": 1.0
+      },
+      {
+        "id": "progress-06-history",
+        "start": 19.4,
+        "duration": 2.888,
+        "end": 22.288,
+        "atempo": 1.2
+      },
+      {
+        "id": "progress-07-focus",
+        "start": 22.5,
+        "duration": 3.03,
+        "end": 25.53,
+        "atempo": 1.05
+      },
+      {
+        "id": "progress-08-why",
+        "start": 25.85,
+        "duration": 3.779,
+        "end": 29.629,
+        "atempo": 1.18
+      },
+      {
+        "id": "progress-09-changes",
+        "start": 30.05,
+        "duration": 3.079,
+        "end": 33.129,
+        "atempo": 1.08
+      },
+      {
+        "id": "progress-10-limits",
+        "start": 34.1,
+        "duration": 2.315,
+        "end": 36.415,
+        "atempo": 1.0
+      },
+      {
+        "id": "progress-11-outro",
+        "start": 37.43,
+        "duration": 5.627,
+        "end": 43.057,
+        "atempo": 1.0
+      }
+    ]
+  },
+  "review": {
+    "total": 38.1,
+    "audio": "voice\\review-mix.wav",
+    "cues": [
+      {
+        "id": "review-01-intro",
+        "start": 0.5,
+        "duration": 1.777,
+        "end": 2.277,
+        "atempo": 1.0
+      },
+      {
+        "id": "review-02-scores",
+        "start": 3.75,
+        "duration": 5.035,
+        "end": 8.785,
+        "atempo": 1.2
+      },
+      {
+        "id": "review-03-method",
+        "start": 8.9,
+        "duration": 5.794,
+        "end": 14.694,
+        "atempo": 1.12
+      },
+      {
+        "id": "review-04-fact-a",
+        "start": 14.8,
+        "duration": 3.362,
+        "end": 18.162,
+        "atempo": 1.1
+      },
+      {
+        "id": "review-04-fact-b",
+        "start": 18.3,
+        "duration": 2.807,
+        "end": 21.107,
+        "atempo": 1.12
+      },
+      {
+        "id": "review-05-jump",
+        "start": 21.2,
+        "duration": 4.179,
+        "end": 25.379,
+        "atempo": 1.05
+      },
+      {
+        "id": "review-06-graph",
+        "start": 26.4,
+        "duration": 3.848,
+        "end": 30.248,
+        "atempo": 1.0
+      },
+      {
+        "id": "review-07-outro",
+        "start": 32.7,
+        "duration": 4.772,
+        "end": 37.472,
+        "atempo": 1.0
+      }
+    ]
+  }
+}
