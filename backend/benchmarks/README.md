@@ -22,3 +22,7 @@ in `benchmarks/results/` und wird mit committet, um Rechner zu vergleichen
 Parameter: 5×10 Query-Läufe (Latenz p50/p95) und 128 Chunks à ~1200 Zeichen
 (Throughput, Batch-Latenz). Optional überschreibbar via `--query-reps`,
 `--num-chunks`, `--chunk-chars`.
+Alle drei Werte müssen positive Ganzzahlen sein. Mit `--output-dir /tmp/418-benchmark`
+lassen sich JSON- und Markdown-Berichte in einem anderen Verzeichnis ablegen;
+relative Pfade beziehen sich auf das aktuelle Arbeitsverzeichnis. Ohne Flag
+bleibt `backend/benchmarks/results/` das Ziel.

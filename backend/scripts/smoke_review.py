@@ -31,23 +31,32 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default=os.getenv("API_URL", "http://127.0.0.1:8000"))
     parser.add_argument("--llm", action="store_true", help="Also exercise the configured writer (explicit opt-in)")
+    parser.add_argument("--request-timeout", type=float, default=20, help="HTTP request timeout in seconds (default: 20)")
+    parser.add_argument("--job-timeout", type=float, help="Maximum polling time per job in seconds (default: 30, or 180 with --llm)")
+    parser.add_argument("--poll-interval", type=float, default=0.2, help="Seconds between job status requests (default: 0.2)")
     args = parser.parse_args()
-    with httpx.Client(base_url=args.url, timeout=20, trust_env=False) as client:
+    if args.job_timeout is None:
+        args.job_timeout = 180 if args.llm else 30
+    for name in ("request_timeout", "job_timeout", "poll_interval"):
+        value = getattr(args, name)
+        if not math.isfinite(value) or value <= 0:
+            parser.error(f"--{name.replace('_', '-')} must be a finite number greater than zero")
+    with httpx.Client(base_url=args.url, timeout=args.request_timeout, trust_env=False) as client:
         session_id = None
         def post(path, body=None, key=None, **kwargs):
             result = client.post(path, json=body, headers={"Idempotency-Key": key or str(uuid4())}, **kwargs)
             result.raise_for_status()
             return result
         def wait(job_id):
-            deadline = time.monotonic() + (180 if args.llm else 30)
+            deadline = time.monotonic() + args.job_timeout
             while time.monotonic() < deadline:
                 response = client.get(f"/jobs/{job_id}")
                 response.raise_for_status()
                 job = response.json()["job"]
                 if job["status"] in {"completed", "failed"}:
                     return job
-                time.sleep(0.2)
-            raise RuntimeError("Synthetic job exceeded smoke deadline")
+                time.sleep(min(args.poll_interval, max(0, deadline - time.monotonic())))
+            raise RuntimeError(f"Synthetic job exceeded {args.job_timeout:g}s smoke deadline")
         try:
             client.get("/health/ready").raise_for_status()
             created = post("/sessions", {"title": "Synthetischer Backend-Smoke", "consent": {

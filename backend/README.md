@@ -209,6 +209,35 @@ docker compose exec -T backend python - --llm < backend/scripts/smoke_review.py
 PYTHONPATH=backend backend/.venv/bin/python -m pytest backend/tests -q
 ```
 
+### CLI options for development scripts
+
+Run these commands from `backend/` with its Python environment. Every script
+supports `--help`. Timeouts and polling intervals are positive, finite seconds;
+defaults preserve the existing smoke behavior. The job timeout bounds polling
+between requests; an individual HTTP request can additionally consume its
+request timeout. The live receive timeout applies to each message, including
+the initial `ready` handshake.
+
+| Command (`python -m scripts.…`) | Additional options and defaults |
+|---|---|
+| `smoke_audio recording.wav` | `--url` (`API_URL` or `http://localhost:8000`), `--request-timeout 15`, `--job-timeout 60`, `--poll-interval 0.25` |
+| `smoke_review` | `--request-timeout 20`, `--job-timeout 30` (180 with `--llm`), `--poll-interval 0.2`; existing `--url` still selects the server |
+| `smoke_live recording.wav` | `--connect-timeout 15`, `--receive-timeout 60`; existing `--url` and `--feedback` still select the server and analysis |
+| `benchmark_embedding` | `--output-dir benchmarks/results` (default is relative to the backend directory) |
+| `export_openapi` | `--output PATH` selects the file to write or validate with `--check`; default: repository `api/openapi.json` |
+
+Explicit output paths are relative to the current working directory. The root
+`npm run api:export` wrapper runs in `backend/`, so
+`npm run api:export -- --output ../api/custom.json` writes `api/custom.json`.
+
+```sh
+python -m scripts.smoke_audio tests/fixtures/speech-de.wav --job-timeout 120 --poll-interval 0.5
+python -m scripts.smoke_review --url http://127.0.0.1:8000 --request-timeout 30 --job-timeout 90
+python -m scripts.smoke_live tests/fixtures/speech-de.wav --feedback --receive-timeout 90
+python -m scripts.export_openapi --output /tmp/418-openapi.json
+python -m scripts.export_openapi --output /tmp/418-openapi.json --check
+```
+
 The smoke exercises real HTTP/Celery/Postgres/S3, verifies deletion, and times
 a five-minute metadata-only take with 60 events. Database tests in
 `tests/test_review_db.py` additionally run when `POSTGRES_HOST`, `POSTGRES_PORT`,

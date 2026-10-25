@@ -140,7 +140,11 @@ def main() -> None:
     parser.add_argument("--query-reps", type=int, default=5, help="Wiederholungen der 10 Queries")
     parser.add_argument("--num-chunks", type=int, default=128, help="Dokument-Chunks à ~1200 Zeichen")
     parser.add_argument("--chunk-chars", type=int, default=1200, help="Zielgröße eines Chunks in Zeichen")
+    parser.add_argument("--output-dir", type=Path, default=BACKEND_DIR / "benchmarks" / "results", help="Verzeichnis für JSON- und Markdown-Berichte (Standard: benchmarks/results)")
     args = parser.parse_args()
+    for name in ("query_reps", "num_chunks", "chunk_chars"):
+        if getattr(args, name) <= 0:
+            parser.error(f"--{name.replace('_', '-')} must be greater than zero")
 
     result: dict = {
         "benchmark": "rag-embedding",
@@ -216,7 +220,7 @@ def main() -> None:
 
     result["finished_at_utc"] = datetime.now(timezone.utc).isoformat()
 
-    outdir = BACKEND_DIR / "benchmarks" / "results"
+    outdir = args.output_dir
     outdir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     host = result["system"]["hostname"]

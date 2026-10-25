@@ -12,6 +12,7 @@ fixtures only, never real microphone captures.
 import argparse
 import asyncio
 import json
+import math
 import subprocess
 import time
 import wave
@@ -44,10 +45,10 @@ def delivery_delay_ms(elapsed_ms: float, audio_position_ms: float) -> float:
     return max(0.0, elapsed_ms - audio_position_ms)
 
 
-async def measure(ws_url: str, frames: list[bytes]) -> None:
-    async with websockets.connect(ws_url, open_timeout=15) as ws:
+async def measure(ws_url: str, frames: list[bytes], *, connect_timeout: float = 15, receive_timeout: float = 60) -> None:
+    async with websockets.connect(ws_url, open_timeout=connect_timeout) as ws:
         await ws.send('{"type": "start", "sample_rate": 16000}')
-        assert json.loads(await ws.recv()) == {"type": "ready", "sample_rate": 16000}
+        assert json.loads(await asyncio.wait_for(ws.recv(), timeout=receive_timeout)) == {"type": "ready", "sample_rate": 16000}
         started = time.monotonic()
         state = {"latency_ms": [], "texts": [], "events": []}
 
@@ -65,7 +66,7 @@ async def measure(ws_url: str, frames: list[bytes]) -> None:
         reader = asyncio.create_task(sender())
         done = False
         while not done:
-            payload = await asyncio.wait_for(ws.recv(), timeout=60)
+            payload = await asyncio.wait_for(ws.recv(), timeout=receive_timeout)
             if isinstance(payload, bytes):
                 raise AssertionError("Unexpected binary frame from the server")
             message = json.loads(payload)
@@ -106,12 +107,18 @@ def main() -> None:
     parser.add_argument("recording", type=Path, help="Synthetic German recording")
     parser.add_argument("--url", default="http://127.0.0.1:8000")
     parser.add_argument("--feedback", action="store_true", help="Measure signal feedback instead of captions")
+    parser.add_argument("--connect-timeout", type=float, default=15, help="WebSocket connection timeout in seconds (default: 15)")
+    parser.add_argument("--receive-timeout", type=float, default=60, help="Maximum wait per server message in seconds, including ready (default: 60)")
     args = parser.parse_args()
+    for name in ("connect_timeout", "receive_timeout"):
+        value = getattr(args, name)
+        if not math.isfinite(value) or value <= 0:
+            parser.error(f"--{name.replace('_', '-')} must be a finite number greater than zero")
     ws_url = args.url.replace("https://", "wss://").replace("http://", "ws://").rstrip("/")
     ws_url += "/speech/feedback" if args.feedback else "/speech/live"
     frames = pcm_frames(args.recording)
     print(f"Streaming {len(frames)} frames ({len(frames) * FRAME_MS / 1000:.1f} s) in real time...")
-    asyncio.run(measure(ws_url, frames))
+    asyncio.run(measure(ws_url, frames, connect_timeout=args.connect_timeout, receive_timeout=args.receive_timeout))
 
 
 if __name__ == "__main__":

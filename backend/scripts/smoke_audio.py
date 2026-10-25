@@ -1,6 +1,7 @@
 """Exercise upload → Redis → worker → Silero → S3 with a synthetic WAV."""
 
 import argparse
+import math
 import os
 import time
 from pathlib import Path
@@ -16,9 +17,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("recording", type=Path, help="Synthetic fixture only")
     parser.add_argument("--transcribe", action="store_true", help="Use configured ASR (may call paid provider)")
+    parser.add_argument("--url", default=os.getenv("API_URL", "http://localhost:8000"), help="API base URL (default: API_URL or localhost:8000)")
+    parser.add_argument("--request-timeout", type=float, default=15, help="HTTP request timeout in seconds (default: 15)")
+    parser.add_argument("--job-timeout", type=float, default=60, help="Maximum job polling time in seconds (default: 60)")
+    parser.add_argument("--poll-interval", type=float, default=0.25, help="Seconds between job status requests (default: 0.25)")
     args = parser.parse_args()
+    for name in ("request_timeout", "job_timeout", "poll_interval"):
+        value = getattr(args, name)
+        if not math.isfinite(value) or value <= 0:
+            parser.error(f"--{name.replace('_', '-')} must be a finite number greater than zero")
     job_id = None
-    with httpx.Client(base_url="http://localhost:8000", timeout=15) as client:
+    with httpx.Client(base_url=args.url, timeout=args.request_timeout) as client:
         try:
             with args.recording.open("rb") as recording:
                 response = client.post("/speech/analyze", files={"recording": recording},
@@ -26,7 +35,7 @@ def main():
             assert response.status_code == 202, response.text
             accepted = response.json()
             job_id = accepted["job_id"]
-            deadline = time.monotonic() + 60
+            deadline = time.monotonic() + args.job_timeout
             while time.monotonic() < deadline:
                 response = client.get(accepted["status_url"])
                 response.raise_for_status()
@@ -34,7 +43,9 @@ def main():
                 if status["status"] in ("completed", "failed"):
                     break
                 assert client.get("/health/live").status_code == 200
-                time.sleep(0.25)
+                time.sleep(min(args.poll_interval, max(0, deadline - time.monotonic())))
+            else:
+                raise RuntimeError(f"Audio job exceeded {args.job_timeout:g}s smoke deadline")
             assert status["status"] == "completed", status.get("error") or status["status"]
             result = status["result"]
             assert result["audio"]["heuristics"]["activity_detector"] == "silero"
