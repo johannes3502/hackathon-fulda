@@ -108,7 +108,8 @@ export function LiveStudio() {
     untilMs: number;
   } | null>(null);
   const [transcribe, setTranscribe] = useState(true);
-  const [liveCaptions, setLiveCaptions] = useState(true);
+  // Deepgram streaming is opt-in; local Whisper after stopping is the default.
+  const [liveCaptions, setLiveCaptions] = useState(false);
   const [caption, setCaption] = useState({ text: "", status: "" });
   const captions = useRef<LiveCaptions | null>(null);
   const [endpoint, setEndpoint] = useState(
@@ -768,7 +769,6 @@ export function LiveStudio() {
             onPrepare={() => {
               stopCamera();
               setTranscribe(true);
-              setLiveCaptions(true);
             }}
           />
           <details className="live-settings recording-settings">
@@ -836,7 +836,7 @@ export function LiveStudio() {
                 )}
                 <p className="field-hint">
                   {transcribe
-                    ? "A completed live transcript is reused in your review. Local Whisper is the fallback. Review recognition errors before checking claims against your sources."
+                    ? "Local Whisper transcribes after stopping. Optional Deepgram streaming needs DEEPGRAM_API_KEY and drops German filler words. Review recognition errors before checking claims against your sources."
                     : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
                 </p>
               </div>

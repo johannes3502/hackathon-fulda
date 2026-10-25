@@ -13,7 +13,7 @@ import numpy as np
 from pydantic import BaseModel
 
 from app.transcription.models import Word
-from app.transcription.transcriber import _env_bool, _env_int, load_whisper_model
+from app.transcription.transcriber import _env_bool, _env_int, load_whisper_model, whisper_prompt
 
 
 class LiveWordsMessage(BaseModel):
@@ -98,10 +98,10 @@ class WhisperStreamingTranscriber:
             compute_type=os.getenv("WHISPER_COMPUTE_TYPE", "int8").strip() or "int8",
             model_dir=os.getenv("WHISPER_MODEL_DIR", "").strip() or None,
             model_path=os.getenv("WHISPER_MODEL_PATH", "").strip() or None,
-            language=os.getenv("WHISPER_LANGUAGE", "de").strip() or None,
+            language=(language := os.getenv("WHISPER_LANGUAGE", "de").strip() or None),
             beam_size=_env_int("WHISPER_LIVE_BEAM_SIZE", _env_int("WHISPER_BEAM_SIZE", 5)),
             vad_filter=_env_bool("WHISPER_LIVE_VAD_FILTER", False),
-            initial_prompt=os.getenv("WHISPER_INITIAL_PROMPT", "").strip() or None,
+            initial_prompt=whisper_prompt(language),
         )
 
     def transcribe_window(self, samples: np.ndarray, sample_rate: int) -> list[Word]:

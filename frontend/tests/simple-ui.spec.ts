@@ -176,8 +176,12 @@ test("recording consent stays visible while diagnostics and server details are o
     "By starting, you agree to send your video and microphone audio",
   );
   await expect(page.locator(".recording-consent")).toBeVisible();
+  // Deepgram streaming is opt-in; by default only local Whisper transcribes.
   await expect(page.locator(".recording-consent")).toContainText(
-    "Deepgram’s EU endpoint",
+    "Whisper transcribes locally after stopping",
+  );
+  await expect(page.locator(".recording-consent")).not.toContainText(
+    "Deepgram",
   );
 });
 

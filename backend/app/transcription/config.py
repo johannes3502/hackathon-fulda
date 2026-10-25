@@ -7,13 +7,16 @@ prototype and are returned with every analysis so the UI can label them as
 
 from pydantic import BaseModel, Field
 
-DEFAULT_FILLERS = ["äh", "ähm", "öh", "öhm", "hm", "hmm", "mhm", "uh", "um"]
+# German hesitations first. Ambiguous words with a real meaning ("also",
+# "halt", "eh", "em" as in EM) stay out; a custom list can add them.
+DEFAULT_FILLERS = ["äh", "ähm", "äm", "ehm", "öh", "öhm", "hm", "hmm", "mhm", "uh", "um"]
 
 
 class WordConfig(BaseModel):
     # Gap between two words that counts as a pause.
     pause_min_ms: int = Field(default=2000, ge=0)
-    # Single tokens counted as fillers, compared case-insensitively without punctuation.
+    # Single tokens counted as fillers, compared case-insensitively without
+    # punctuation; stretched spellings ("ähhh", "hmmm") match their short form.
     fillers: list[str] = Field(default_factory=lambda: list(DEFAULT_FILLERS))
     # The same word twice within this gap counts as a repetition ("ich ich").
     repetition_max_gap_ms: int = Field(default=1000, ge=0)
