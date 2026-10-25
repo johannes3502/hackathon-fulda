@@ -70,9 +70,13 @@ def test_questioner_receives_the_spoken_content_and_waits_for_readiness(mode):
     assert context["transcript"] == " ".join(word.word for word in TRANSCRIPT)
     assert "Do not greet" in result.prompt
     assert PRESENTATION_STYLES[mode] in result.prompt
-    assert "The first message is '[rushed] Ich habe noch ein paar Fragen. Bist du bereit?'" in result.prompt
-    assert "Prefix every spoken message with the audio tag [rushed]" in result.prompt
-    assert "never rush the presenter" in result.prompt
+    assert "The first message is 'Ich habe noch ein paar Fragen. Bist du bereit?'" in result.prompt
+    assert "[rushed]" not in result.prompt
+    assert "brisk" not in result.prompt
+    assert "Focus primarily on reasoning" in result.prompt
+    assert "why choices were made" in result.prompt
+    assert "Do not ask the presenter to name, locate or describe sources" in result.prompt
+    assert "Use sources yourself to verify factual feedback" in result.prompt
     assert "Wait for the presenter to confirm they are ready before asking any presentation question" in result.prompt
     assert "If they are not ready, give them time and do not start the questions" in result.prompt
     assert "without repeating the opening" in result.prompt
