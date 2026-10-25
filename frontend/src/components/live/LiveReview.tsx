@@ -30,9 +30,17 @@ import { VideoPlayback } from "./VideoPlayback";
 import { ReviewScores } from "./ReviewScores";
 import { reviewScores } from "@/features/live/review-scores";
 import { recordingReviewData } from "../analysis/review-data";
+import { StageQuestion } from "@/components/stage/StageQuestion";
 import "./review-accessibility.css";
+import "./stage-live.css";
 
-export function LiveReview({ sessionId }: { sessionId: string }) {
+export function LiveReview({
+  sessionId,
+  stage = false,
+}: {
+  sessionId: string;
+  stage?: boolean;
+}) {
   const { recordings, remove } = useLiveSessions();
   const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -57,15 +65,31 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
 
   return (
     <AppShell experience="live">
-      <div className="workspace review-workspace">
-        <div className="workspace-back">
-          <Link href="/live">
-            <ArrowLeft size={15} aria-hidden="true" /> Record again
-          </Link>
-        </div>
+      <div
+        className={`workspace review-workspace${stage ? " stage-live" : ""}`}
+      >
+        {stage ? (
+          <div className="stage-live-bar">
+            <div>
+              <strong>418 · Pitch Mode</strong>
+              <span>Jury-Review · eine vorbereitete Datenschutzfrage</span>
+            </div>
+            <div className="stage-live-actions">
+              <Link href="/stage">Stage</Link>
+            </div>
+          </div>
+        ) : (
+          <div className="workspace-back">
+            <Link href="/live">
+              <ArrowLeft size={15} aria-hidden="true" /> Record again
+            </Link>
+          </div>
+        )}
         <div className="workspace-heading">
           <div>
-            <h1>Make your next take stronger.</h1>
+            <h1>
+              {stage ? "Dein Auftritt, eine Frage." : "Make your next take stronger."}
+            </h1>
             <p>
               {recording.config.title} · {mode.label} ·{" "}
               {time(recording.durationMs)}
@@ -74,10 +98,12 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 : ""}
             </p>
           </div>
-          <Button onClick={() => setView("questions")}>
-            <MessageSquare size={17} aria-hidden="true" /> Practice questions
-            <ArrowRight size={16} aria-hidden="true" />
-          </Button>
+          {!stage && (
+            <Button onClick={() => setView("questions")}>
+              <MessageSquare size={17} aria-hidden="true" /> Practice questions
+              <ArrowRight size={16} aria-hidden="true" />
+            </Button>
+          )}
         </div>
         {recording.notice && (
           <p className="status-warning" role="status">
@@ -85,24 +111,26 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
           </p>
         )}
         <SessionStorageNotice />
-        <div
-          className="review-view-switch"
-          role="group"
-          aria-label="Review steps"
-        >
-          <button
-            aria-pressed={view === "moments"}
-            onClick={() => setView("moments")}
+        {!stage && (
+          <div
+            className="review-view-switch"
+            role="group"
+            aria-label="Review steps"
           >
-            <Play size={17} /> Review moments
-          </button>
-          <button
-            aria-pressed={view === "questions"}
-            onClick={() => setView("questions")}
-          >
-            <MessageSquare size={17} /> Practice questions
-          </button>
-        </div>
+            <button
+              aria-pressed={view === "moments"}
+              onClick={() => setView("moments")}
+            >
+              <Play size={17} /> Review moments
+            </button>
+            <button
+              aria-pressed={view === "questions"}
+              onClick={() => setView("questions")}
+            >
+              <MessageSquare size={17} /> Practice questions
+            </button>
+          </div>
+        )}
         {view === "moments" ? (
           <>
             <ReviewScores
@@ -244,15 +272,17 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 </p>
               </aside>
             </div>
-            <div className="review-continue">
-              <div>
-                <h2>Now defend your ideas.</h2>
-                <p>Your teacher will ask about what you presented.</p>
+            {!stage && (
+              <div className="review-continue">
+                <div>
+                  <h2>Now defend your ideas.</h2>
+                  <p>Your teacher will ask about what you presented.</p>
+                </div>
+                <Button onClick={() => setView("questions")}>
+                  Practice questions <ArrowRight size={17} />
+                </Button>
               </div>
-              <Button onClick={() => setView("questions")}>
-                Practice questions <ArrowRight size={17} />
-              </Button>
-            </div>
+            )}
             <details className="review-details">
               <summary>Transcript and source checks</summary>
               <RecordedTranscript recording={recording} onSelect={jump} />
@@ -329,6 +359,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
                 )}
               </div>
             </details>
+            {stage && <StageQuestion />}
           </>
         ) : (
           <QuestionPractice recording={recording} />

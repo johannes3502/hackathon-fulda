@@ -49,10 +49,7 @@ export function usePoseCapture(
   }, [enabled, start]);
   function beginRecording(timestamp: number, sessionId?: string) {
     recording.current = false;
-    if (
-      owner.current &&
-      (state?.phase === "running" || state?.phase === "loading")
-    ) {
+    if (owner.current) {
       recording.current = true;
       owner.current.beginRecording(timestamp, sessionId);
       setState((previous) =>

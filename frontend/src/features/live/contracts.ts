@@ -40,6 +40,9 @@ export type LiveConfig = {
   endpoint: string;
   transcribe?: boolean;
   featureFlags?: FeatureFlags;
+  /** Stage recordings keep the normal path untouched; this only bounds the wait. */
+  analysisTimeoutMs?: number;
+  stage?: boolean;
 };
 export type VideoChunkMeta = {
   type: "video.chunk";

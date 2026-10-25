@@ -14,7 +14,7 @@ from app.connections import s3_client
 from app.factcheck.llm import configured_llm
 from app.jobs import QueueUnavailable, enqueue_task
 from app.questions.models import AnswerJob, AnswerRequest, QuestionJob, QuestionRequest, VoiceAnswerRequest
-from app.questions import agent, rounds
+from app.questions import agent, pitch, rounds
 from app.speech import storage
 from app.speech.job_models import AcceptedJob
 from app.tasks import AGENT_PREFIX, ANSWER_PREFIX, QUESTION_PREFIX, generate_questions, prepare_agent, review_answer, review_voice_answer
@@ -76,6 +76,15 @@ def _status(job_id: UUID, prefix: str, job_model):
 @router.get("/agent/settings")
 def agent_settings() -> agent.AgentSettings:
     return agent.settings()
+
+
+@router.get("/pitch")
+def pitch_context(response: Response) -> pitch.PitchContext:
+    """The fixed jury question and agent context; no LLM, Redis or provider needed."""
+    if not pitch.enabled():
+        raise HTTPException(404, "Pitch mode is disabled")
+    response.headers["Cache-Control"] = "no-store"
+    return pitch.context()
 
 
 @router.post("/agent", status_code=202)

@@ -83,9 +83,10 @@ docker --context colima compose up --build -d --wait backend worker
 
 Use that context for subsequent Compose commands. Existing Docker Desktop
 volumes and Colima volumes are separate. Gemini is reached over outbound HTTPS;
-no host-gateway or local model server is needed. In the studio, unavailable
-analysis blocks capture with a retry message; **Speech analysis → Off** allows a
-local camera-only take. No recording exists if startup fails before capture.
+no host-gateway or local model server is needed. In the normal studio,
+unavailable analysis blocks capture with a retry message; the local stage path
+(`/stage` → **Lokale Sofortaufnahme**) records without an upload. No recording
+exists if startup fails before capture.
 
 ## IntelliJ IDEA and VS Code
 
@@ -852,3 +853,20 @@ Lesbar über `GET /api/sessions/{sessionId}` und
 `GET /api/takes/{takeId}/timeline` bzw. `/review`. Das bestehende Web-Studio nutzt
 weiterhin den Browser-Arbeitsbereich und die ältere Audio-Job-API; der Seed
 legt deshalb keine lokalen Videos oder Frontend-Aufnahmen an.
+
+## Synthetischer Fortschritts-Seed für UI-Tests
+
+Ein festes Profil mit 24 Takes (20 auswertbar, 4 zu kurz), Wort-Timestamps,
+Pose-/Sprach-/Fact-Check-Events und vier Zielen einspielen:
+
+```sh
+docker compose run --rm --no-deps -v ./backend/scripts:/app/scripts:ro backend python -m scripts.seed_progress_demo
+```
+
+`--reset` löscht nur dieses Seed-Profil samt Sessions und legt es neu an.
+Die Ausgabe enthält `profileId`, den lokalen `pp_`-Token und den fertigen
+`localStorage`-Eintrag `pitchcoach.progress-profile.v1`. Damit lässt sich die
+Seite `/progress` ohne Profil-Erstellung direkt gegen die Datenbank testen.
+Alle Werte sind synthetisch (Seed-Version `synthetic-progress-seed.v1`), die
+Takes heißen entsprechend und tragen einen Hinweis; es werden keine Medien
+hochgeladen und keine Modelle aufgerufen.

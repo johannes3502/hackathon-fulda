@@ -52,6 +52,7 @@ export class LiveRecorder {
     private onProgress: (state: LiveProgress) => void,
     private onComplete: (recording: LiveRecording) => void,
     private onRecordingStart?: (timestamp: number) => void,
+    private onCaptured?: (recording: LiveRecording) => void,
   ) {}
   private publish() {
     if (!this.disposed) this.onProgress({ ...this.progress });
@@ -200,6 +201,20 @@ export class LiveRecorder {
           { once: true },
         ),
       );
+    this.stream
+      .getAudioTracks()
+      .forEach((track) =>
+        track.addEventListener(
+          "ended",
+          () => {
+            if (!this.stopping)
+              this.fail(
+                "Microphone capture ended. Recording stopped; the video is ready to review.",
+              );
+          },
+          { once: true },
+        ),
+      );
     recorder.start(500);
   }
   stop() {
@@ -218,6 +233,59 @@ export class LiveRecorder {
     this.recorder.stop();
     this.stream.getTracks().forEach((track) => track.stop());
   }
+  private createdAt = new Date().toISOString();
+  private snapshot(video: Blob, videoUrl: string, final: boolean): LiveRecording {
+    return {
+      id: this.id,
+      config: this.config,
+      createdAt: this.createdAt,
+      durationMs: this.progress.elapsedMs,
+      video,
+      videoUrl,
+      mimeType: video.type,
+      feedback: this.progress.feedback,
+      metrics: this.progress.metrics,
+      words: this.transcript?.words,
+      chunksSent: this.progress.chunksSent,
+      bytesSent: this.progress.bytesSent,
+      completion: this.failed ? "interrupted" : "complete",
+      notice:
+        this.progress.notice ??
+        (!final && this.config.mode === "backend"
+          ? "Video saved locally. Analysis is still running; you can open the review now."
+          : null),
+      transcript: this.transcript,
+      analysisUploaded:
+        final && this.config.mode === "backend" && !this.failed
+          ? true
+          : undefined,
+    };
+  }
+  private async finishWithTimeout(video: Blob) {
+    const finish = this.transport.finish(this.progress.elapsedMs, video);
+    const timeoutMs = this.config.analysisTimeoutMs;
+    if (!timeoutMs) {
+      await finish;
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const outcome = await Promise.race([
+        finish.then(() => "done" as const),
+        new Promise<"timeout">((resolve) => {
+          timer = setTimeout(() => resolve("timeout"), timeoutMs);
+        }),
+      ]);
+      if (outcome === "timeout") {
+        finish.catch(() => {});
+        throw new Error(
+          "Analysis is taking too long. The video is saved locally; open the review now.",
+        );
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
   private async finalize() {
     clearInterval(this.timer);
     this.stream.getTracks().forEach((track) => track.stop());
@@ -231,9 +299,11 @@ export class LiveRecorder {
     const video = new Blob(this.chunks, {
       type: this.recorder?.mimeType || "video/webm",
     });
+    const videoUrl = URL.createObjectURL(video);
+    this.onCaptured?.(this.snapshot(video, videoUrl, false));
     if (!this.failed) {
       try {
-        await this.transport.finish(this.progress.elapsedMs, video);
+        await this.finishWithTimeout(video);
         if (this.config.mode === "backend") {
           this.progress.chunksSent = 1;
           this.progress.bytesSent = video.size;
@@ -249,23 +319,7 @@ export class LiveRecorder {
     this.transport.close();
     if (this.disposed) return;
     this.chunks = [];
-    this.onComplete({
-      id: this.id,
-      config: this.config,
-      createdAt: new Date().toISOString(),
-      durationMs: this.progress.elapsedMs,
-      video,
-      videoUrl: URL.createObjectURL(video),
-      mimeType: video.type,
-      feedback: this.progress.feedback,
-      metrics: this.progress.metrics,
-      words: this.transcript?.words,
-      chunksSent: this.progress.chunksSent,
-      bytesSent: this.progress.bytesSent,
-      completion: this.failed ? "interrupted" : "complete",
-      notice: this.progress.notice,
-      transcript: this.transcript,
-    });
+    this.onComplete(this.snapshot(video, videoUrl, true));
   }
   dispose() {
     this.disposed = true;

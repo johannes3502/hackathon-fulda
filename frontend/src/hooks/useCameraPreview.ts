@@ -4,6 +4,7 @@ export type CameraStatus =
   "idle" | "pending" | "active" | "denied" | "unavailable" | "failed";
 export function useCameraPreview() {
   const [status, setStatus] = useState<CameraStatus>("idle");
+  const [audioAvailable, setAudioAvailable] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const generation = useRef(0);
@@ -16,6 +17,7 @@ export function useCameraPreview() {
   const stop = () => {
     release();
     setStatus("idle");
+    setAudioAvailable(null);
   };
   const enable = async (audio = false) => {
     release();
@@ -25,35 +27,58 @@ export function useCameraPreview() {
       return;
     }
     setStatus("pending");
+    const videoConstraints: MediaTrackConstraints = { facingMode: "user" };
+    const audioConstraints: MediaTrackConstraints = {
+      autoGainControl: false,
+      noiseSuppression: false,
+      echoCancellation: false,
+    };
+    let stream: MediaStream;
+    let audioReady = audio;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: audio
-          ? {
-              autoGainControl: false,
-              noiseSuppression: false,
-              echoCancellation: false,
-            }
-          : false,
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints,
+        audio: audio ? audioConstraints : false,
       });
-      if (request !== generation.current) {
-        stream.getTracks().forEach((t) => t.stop());
+    } catch (error) {
+      // A denied or busy microphone must not take the camera and pose preview
+      // down with it. Retry video-only; backend recording still refuses to
+      // start without audio, but the local fallback can record the picture.
+      if (!audio) {
+        if (request !== generation.current) return;
+        setAudioAvailable(null);
+        setStatus(mediaError(error));
         return;
       }
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setStatus("active");
-    } catch (e) {
-      if (request !== generation.current) return;
-      setStatus(
-        e instanceof DOMException && e.name === "NotAllowedError"
-          ? "denied"
-          : e instanceof DOMException && e.name === "NotFoundError"
-            ? "unavailable"
-            : "failed",
-      );
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints,
+          audio: false,
+        });
+        audioReady = false;
+      } catch {
+        if (request !== generation.current) return;
+        setAudioAvailable(null);
+        setStatus(mediaError(error));
+        return;
+      }
     }
+    if (request !== generation.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    streamRef.current = stream;
+    if (videoRef.current) videoRef.current.srcObject = stream;
+    setAudioAvailable(audioReady);
+    setStatus("active");
   };
   const getStream = () => streamRef.current;
-  return { status, videoRef, enable, stop, getStream };
+  return { status, audioAvailable, videoRef, enable, stop, getStream };
+}
+function mediaError(error: unknown): CameraStatus {
+  return error instanceof DOMException && error.name === "NotAllowedError"
+    ? "denied"
+    : error instanceof DOMException && error.name === "NotFoundError"
+      ? "unavailable"
+      : "failed";
 }
