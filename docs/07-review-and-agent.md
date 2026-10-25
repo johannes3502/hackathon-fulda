@@ -8,6 +8,20 @@ die lokale Jury-Frage unter `/stage` funktioniert ohne Anbieter.
 
 ## Ablauf
 
+Gesprächspartner (25.10.2026): Vor dem Start der ElevenLabs-Fragerunde lässt
+sich unter **Who would you like to speak with?** zwischen **Automatic**,
+**Student**, **University professor** und **School teacher** wählen.
+Automatic übernimmt die bisherige Rolle des Präsentationstyps. Eine explizite
+Wahl ersetzt nur die Rolle und den Fragestil; Thema, Quellen, Faktenprüfung
+und fachlicher Kontext bleiben erhalten. Die konfigurierte ElevenLabs-Stimme
+ändert sich dadurch nicht. Während einer laufenden Runde ist die Auswahl
+gesperrt; für einen Wechsel die Runde beenden und neu starten. Die Rolle der
+gestarteten Runde bleibt als `conversationRole` mit dem lokalen Take gespeichert,
+auch nach Reload; vorhandene Gesprächszeilen behalten ihre zugehörige Rolle.
+`POST /questions/agent` akzeptiert dafür `AgentRequest.voice_role`
+(`student`, `professor`, `teacher`, optional/null); der Worker übernimmt sie
+aus dem gespeicherten Job. Bestehende Aufrufe ohne Feld bleiben kompatibel.
+
 Reviewter Merge, 25.10.2026: Die folgende Drei-Kriterien-Entscheidung hat Vorrang
 vor der älteren Aufbau-/Score-v2-Arbeit im Feature-Branch. Die Web-Fragerunde
 bleibt ausschließlich der ElevenLabs-Dialog. Ein Browser-Timer begrenzt sie ab

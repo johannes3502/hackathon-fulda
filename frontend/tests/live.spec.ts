@@ -1774,6 +1774,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   const sourceId = "87654321-4321-4321-4321-cba987654321";
   let material: Record<string, unknown> | null = null;
   let savedCollection = "";
+  let expectedVoiceRole: "student" | "professor" | null = "student";
   await page.route("**/api/sources?*", (route) =>
     route.fulfill({ json: material ? [material] : [] }),
   );
@@ -1821,6 +1822,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   await page.route("**/api/questions/agent", async (route) => {
     expect(route.request().postDataJSON()).toMatchObject({
       presentation_mode: "thesis",
+      voice_role: expectedVoiceRole,
       collection_id: savedCollection,
       words: [{ word: "Synthetic thesis result.", start_ms: 0, end_ms: 500 }],
     });
@@ -1958,10 +1960,19 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   await expect(
     page.getByRole("heading", { name: "Meet your university professor." }),
   ).toBeVisible();
+  const questioner = page.getByRole("combobox", {
+    name: "Who would you like to speak with?",
+  });
+  await expect(questioner).toHaveValue("auto");
+  await questioner.selectOption("student");
+  await expect(
+    page.getByRole("heading", { name: "Meet your student." }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Start voice questions" }).click();
   await expect(
     page.getByRole("button", { name: "End conversation" }),
   ).toBeVisible({ timeout: 15000 });
+  await expect(questioner).toBeDisabled();
   expect(override).toBe("Synthetic thesis context with source notes");
   await expect(
     page.getByRole("heading", {
@@ -2111,8 +2122,11 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     .click();
   await expect(stats).not.toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Meet your university professor." }),
+    page.getByRole("heading", { name: "Meet your student." }),
   ).toBeFocused();
+  await expect(questioner).toBeEnabled();
+  await questioner.selectOption("professor");
+  expectedVoiceRole = "professor";
   await page
     .getByRole("button", { name: "Start a new conversation", exact: true })
     .click();
@@ -2140,6 +2154,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   await expect(page.locator(".conversation-transcript")).toContainText(
     "Ich habe noch ein paar Fragen. Bist du bereit?",
   );
+  await expect(questioner).toHaveValue("professor");
   await page
     .getByRole("button", { name: "Start a new conversation", exact: true })
     .click();

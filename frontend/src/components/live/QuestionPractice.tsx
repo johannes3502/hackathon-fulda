@@ -10,6 +10,7 @@ import {
 import type { Conversation } from "@elevenlabs/client";
 import { AudioLines, Mic, MicOff, RotateCcw, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NativeSelect } from "@/components/ui/input";
 import type { LiveRecording } from "@/features/live/contracts";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import {
@@ -20,6 +21,11 @@ import {
   type AgentSettings,
 } from "@/features/questions/agent";
 import { PRESENTATION_MODES } from "@/features/questions/presentation";
+import {
+  VOICE_ROLES,
+  voiceRoleLabel,
+  type VoiceRole,
+} from "@/features/questions/roles";
 import { VoiceMicrophone } from "@/features/questions/microphone";
 import {
   storeVoiceProtection,
@@ -44,6 +50,9 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     "idle" | "preparing" | "connecting" | "listening" | "speaking"
   >("idle");
   const [muted, setMuted] = useState(true);
+  const [voiceRole, setVoiceRole] = useState<VoiceRole | null>(
+    () => recording.conversationRole ?? null,
+  );
   const protectAgentSpeech = useSyncExternalStore(
     subscribeVoiceProtection,
     voiceProtectionSnapshot,
@@ -67,6 +76,14 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   );
   const mode =
     PRESENTATION_MODES[recording.config.presentationMode ?? "school"];
+  const listener = voiceRoleLabel(
+    voiceRole,
+    recording.config.presentationMode ?? "school",
+  );
+  const conversationListener = voiceRoleLabel(
+    recording.conversationRole ?? null,
+    recording.config.presentationMode ?? "school",
+  );
   const active = phase !== "idle";
   const connected = phase === "listening" || phase === "speaking";
   const messages = recording.conversation ?? [];
@@ -191,14 +208,23 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     microphone.setMuted(true);
     setError("");
     setNotices([]);
-    update(recording.id, (take) => ({ ...take, conversation: [] }));
+    update(recording.id, (take) => ({
+      ...take,
+      conversation: [],
+      conversationRole: voiceRole,
+    }));
     const began = Date.now();
     turnCount.current = 0;
     setStartedAt(began);
     setNow(began);
     setPhase("preparing");
     try {
-      const context = await prepareAgent(recording, collection, pending.signal);
+      const context = await prepareAgent(
+        recording,
+        collection,
+        pending.signal,
+        voiceRole,
+      );
       const signedUrl = await agentSession(
         recording.config.endpoint,
         pending.signal,
@@ -369,11 +395,43 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
       <div className="question-practice-heading">
         <div>
           <h2 id="question-practice-title" tabIndex={-1}>
-            Meet your {mode.listener.toLowerCase()}.
+            Meet your {listener.toLowerCase()}.
           </h2>
           <p>{mode.focus} One question at a time.</p>
         </div>
         <span className="badge">{mode.label}</span>
+      </div>
+      <div className="field">
+        <label htmlFor={`questioner-role-${recording.id}`}>
+          Who would you like to speak with?
+        </label>
+        <NativeSelect
+          id={`questioner-role-${recording.id}`}
+          value={voiceRole ?? "auto"}
+          disabled={active || transcribing}
+          aria-describedby={`questioner-role-hint-${recording.id}`}
+          onChange={(event) =>
+            setVoiceRole(
+              event.target.value === "auto"
+                ? null
+                : (event.target.value as VoiceRole),
+            )
+          }
+        >
+          <option value="auto">Automatic · {mode.listener}</option>
+          {Object.entries(VOICE_ROLES).map(([role, { label }]) => (
+            <option key={role} value={role}>
+              {label}
+            </option>
+          ))}
+        </NativeSelect>
+        <p className="field-hint" id={`questioner-role-hint-${recording.id}`}>
+          {voiceRole
+            ? VOICE_ROLES[voiceRole].detail
+            : "Uses the audience for your presentation type."}{" "}
+          Changes the role and question style; the voice stays the same.
+          {active && " End this conversation to choose another role."}
+        </p>
       </div>
       {!recording.words?.length ? (
         <div className="question-empty">
@@ -403,7 +461,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
                 : phase === "connecting"
                   ? "Connecting your microphone…"
                   : phase === "speaking"
-                    ? `Your ${mode.listener.toLowerCase()} is speaking${muted ? " · microphone muted" : protectAgentSpeech ? " · microphone automatically muted" : ""}`
+                    ? `Your ${listener.toLowerCase()} is speaking${muted ? " · microphone muted" : protectAgentSpeech ? " · microphone automatically muted" : ""}`
                     : phase === "listening"
                       ? muted
                         ? "Hold to talk when you’re ready"
@@ -543,7 +601,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
                 {messages.map((item, index) => (
                   <li key={index}>
                     <strong>
-                      {item.role === "user" ? "You" : mode.listener}
+                      {item.role === "user" ? "You" : conversationListener}
                     </strong>
                     <p>{item.text}</p>
                   </li>

@@ -16,7 +16,7 @@ from app.main import app
 from app.questions import agent, router
 from app.questions.models import AnswerRequest, QuestionRequest
 from app.questions.pipeline import generate_questions, review_answer
-from app.questions.styles import PRESENTATION_STYLES
+from app.questions.styles import PRESENTATION_FOCUS, PRESENTATION_STYLES, VOICE_ROLE_STYLES
 from tests.test_factcheck import TRANSCRIPT, hit
 from tests.test_questions import Model, question
 
@@ -36,11 +36,38 @@ def test_modes_change_both_questions_and_answer_feedback(mode):
 
 @pytest.mark.parametrize("mode", PRESENTATION_STYLES)
 def test_voice_modes_change_the_role_and_question_focus(mode):
-    prompt = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode)).prompt
+    prompt = agent.prepare_context(agent.AgentRequest(words=TRANSCRIPT, presentation_mode=mode)).prompt
     assert PRESENTATION_STYLES[mode] in prompt
     assert all(style not in prompt for key, style in PRESENTATION_STYLES.items() if key != mode)
     assert "Do not act as an investor" not in prompt
     assert "Return only the requested JSON object" not in prompt
+
+
+@pytest.mark.parametrize("mode", PRESENTATION_STYLES)
+@pytest.mark.parametrize("role", VOICE_ROLE_STYLES)
+def test_selected_voice_role_replaces_the_default_role_but_keeps_the_presentation_focus(mode, role):
+    request = agent.AgentRequest(words=TRANSCRIPT, presentation_mode=mode, voice_role=role)
+    prompt = agent.prepare_context(request).prompt
+    assert VOICE_ROLE_STYLES[role] in prompt
+    assert PRESENTATION_FOCUS[mode] in prompt
+    assert all(style not in prompt for style in PRESENTATION_STYLES.values())
+    assert all(style not in prompt for key, style in VOICE_ROLE_STYLES.items() if key != role)
+    assert "MUST call search_web and wait for its result" in prompt
+    assert "Never invent citations, grades, scores" in prompt
+
+
+def test_voice_worker_restores_the_selected_role_from_the_queued_request(monkeypatch):
+    from app import tasks
+
+    request = agent.AgentRequest(words=TRANSCRIPT, presentation_mode="school", voice_role="student")
+
+    def model_job(task, job_id, prefix, job_model, run, error):
+        return run(request.model_dump(mode="json"))
+
+    monkeypatch.setattr(tasks, "_model_job", model_job)
+    result = tasks.prepare_agent.run("synthetic-role-job")
+    assert VOICE_ROLE_STYLES["student"] in result.prompt
+    assert PRESENTATION_FOCUS["school"] in result.prompt
 
 
 def test_context_uses_only_the_requested_collection_and_includes_source_locations(monkeypatch):
@@ -48,7 +75,7 @@ def test_context_uses_only_the_requested_collection_and_includes_source_location
     monkeypatch.setattr(agent.db, "list_sources", lambda value: [SimpleNamespace(status="ready")])
     retrieve = Mock(return_value=[hit()])
     monkeypatch.setattr(agent.retrieval, "search", retrieve)
-    result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, collection_id=collection, presentation_mode="nonprofit"))
+    result = agent.prepare_context(agent.AgentRequest(words=TRANSCRIPT, collection_id=collection, presentation_mode="nonprofit"))
     assert retrieve.call_args.args[0] == collection
     assert result.source_count == 1
     assert "Folie 3" in result.prompt
@@ -58,11 +85,11 @@ def test_context_uses_only_the_requested_collection_and_includes_source_location
 
 
 def test_missing_or_processing_sources_are_not_presented_as_ready(monkeypatch):
-    result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT))
+    result = agent.prepare_context(agent.AgentRequest(words=TRANSCRIPT))
     assert result.source_count == 0 and result.notices
     monkeypatch.setattr(agent.db, "list_sources", lambda value: [SimpleNamespace(status="processing")])
     with pytest.raises(ValueError, match="processing"):
-        agent.prepare_context(QuestionRequest(words=TRANSCRIPT, collection_id=uuid4()))
+        agent.prepare_context(agent.AgentRequest(words=TRANSCRIPT, collection_id=uuid4()))
 
 
 def test_voice_retrieval_samples_the_end_of_long_talks(monkeypatch):
@@ -73,7 +100,7 @@ def test_voice_retrieval_samples_the_end_of_long_talks(monkeypatch):
     monkeypatch.setattr(agent.retrieval, "search", retrieve)
     words = [Word(word=f"Thema{index}.", start_ms=index * 1000, end_ms=index * 1000 + 900)
              for index in range(400)]
-    agent.prepare_context(QuestionRequest(words=words, collection_id=uuid4()))
+    agent.prepare_context(agent.AgentRequest(words=words, collection_id=uuid4()))
     queries = [call.args[1] for call in retrieve.call_args_list]
     assert 1 < len(queries) <= 4 and all(len(query) <= 500 for query in queries)
     assert any("Thema399." in query for query in queries)
@@ -81,7 +108,7 @@ def test_voice_retrieval_samples_the_end_of_long_talks(monkeypatch):
 
 @pytest.mark.parametrize("mode", PRESENTATION_STYLES)
 def test_questioner_receives_the_spoken_content_and_waits_for_readiness(mode):
-    result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode))
+    result = agent.prepare_context(agent.AgentRequest(words=TRANSCRIPT, presentation_mode=mode))
     block = re.search(r"<untrusted-reference-[0-9a-f]{32}>\n(.*)\n</untrusted-reference-[0-9a-f]{32}>",
                       result.prompt, re.S)
     assert block is not None
@@ -108,7 +135,7 @@ def test_questioner_receives_the_spoken_content_and_waits_for_readiness(mode):
 
 
 def test_teacher_moves_on_after_limited_follow_ups_even_if_the_answer_is_wrong():
-    prompt = agent.prepare_context(QuestionRequest(words=TRANSCRIPT)).prompt
+    prompt = agent.prepare_context(agent.AgentRequest(words=TRANSCRIPT)).prompt
     assert "ask one brief follow-up, and at most a second follow-up" in prompt
     assert "After at most two follow-ups" in prompt
     assert "continue to the next main question even if the answer is still wrong" in prompt
@@ -118,7 +145,7 @@ def test_teacher_moves_on_after_limited_follow_ups_even_if_the_answer_is_wrong()
 
 @pytest.mark.parametrize("mode", PRESENTATION_STYLES)
 def test_teacher_keeps_feedback_short_for_verified_correct_answers(mode):
-    prompt = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode)).prompt
+    prompt = agent.prepare_context(agent.AgentRequest(words=TRANSCRIPT, presentation_mode=mode)).prompt
     assert "When an answer is verified as correct and answers the question" in prompt
     assert "acknowledge it in one short sentence, then move directly to the next main question" in prompt
     assert "or the closing suggestions after the third main question" in prompt
@@ -133,7 +160,7 @@ def test_teacher_keeps_feedback_short_for_verified_correct_answers(mode):
 def test_teacher_searches_when_sources_do_not_settle_a_claim(monkeypatch, has_sources):
     monkeypatch.setattr(agent.db, "list_sources", lambda _: [SimpleNamespace(status="ready")])
     monkeypatch.setattr(agent.retrieval, "search", lambda *args: [hit()])
-    result = agent.prepare_context(QuestionRequest(
+    result = agent.prepare_context(agent.AgentRequest(
         words=TRANSCRIPT, collection_id=uuid4() if has_sources else None))
     assert "Use source_passages first" in result.prompt
     assert "MUST call search_web and wait for its result" in result.prompt
@@ -210,6 +237,10 @@ def test_agent_api_queues_context_without_needing_the_local_llm(monkeypatch):
     assert response.status_code == 202
     assert enqueue.await_args.args[0] is router.prepare_agent
     assert store.call_args.args[1].presentation_mode == "startup"
+    response = client.post("/questions/agent", json={**body, "voice_role": "student"})
+    assert response.status_code == 202
+    assert store.call_args.args[1].voice_role == "student"
+    assert client.post("/questions/agent", json={**body, "voice_role": "invented"}).status_code == 422
     assert client.post("/questions/agent", json={**body, "presentation_mode": "grade_me"}).status_code == 422
     assert "synthetic-secret" not in client.get("/questions/agent/settings").text
 

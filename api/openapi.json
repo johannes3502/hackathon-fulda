@@ -107,6 +107,89 @@
         "title": "AgentJob",
         "type": "object"
       },
+      "AgentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "claims": {
+            "description": "Fact-check findings of the same transcript",
+            "items": {
+              "$ref": "#/components/schemas/ClaimResult"
+            },
+            "maxItems": 30,
+            "title": "Claims",
+            "type": "array"
+          },
+          "collection_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Uploaded sources for gaps and answer reviews",
+            "title": "Collection Id"
+          },
+          "config": {
+            "$ref": "#/components/schemas/QuestionConfig"
+          },
+          "persona": {
+            "default": "tutor",
+            "description": "Who asks: curious student or professor/tutor",
+            "enum": [
+              "student",
+              "tutor"
+            ],
+            "title": "Persona",
+            "type": "string"
+          },
+          "presentation_mode": {
+            "default": "thesis",
+            "enum": [
+              "startup",
+              "thesis",
+              "school",
+              "nonprofit"
+            ],
+            "title": "Presentation Mode",
+            "type": "string"
+          },
+          "voice_role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "student",
+                  "professor",
+                  "teacher"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional questioner role; null keeps the presentation's default role. Voice identity is unchanged.",
+            "title": "Voice Role"
+          },
+          "words": {
+            "description": "Word timestamps relative to recording start",
+            "items": {
+              "$ref": "#/components/schemas/Word"
+            },
+            "maxItems": 50000,
+            "minItems": 1,
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "words"
+        ],
+        "title": "AgentRequest",
+        "type": "object"
+      },
       "AgentSession": {
         "properties": {
           "signed_url": {
@@ -8809,7 +8892,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/QuestionRequest"
+                "$ref": "#/components/schemas/AgentRequest"
               }
             }
           },

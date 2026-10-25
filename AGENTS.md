@@ -421,6 +421,13 @@ Auf Nutzerwunsch ist die Web-Fragerunde nur noch ein ElevenLabs-Sprachdialog;
 kompatibel. Keine Vorgabe für schnelleres Sprechen und kein `[rushed]`-Tag.
 Der Sprachagent fragt vor allem nach Gründen, Entscheidungen und Erklärungen,
 nicht nach Quellen, Dateien oder Seiten; Quellen nutzt er selbst zur Faktenprüfung.
+Vor dem Start der ElevenLabs-Runde ist der Gesprächspartner auswählbar:
+Automatisch (bisherige Modus-Rolle), Student, Professor oder Lehrkraft.
+`POST /questions/agent` akzeptiert optional `voice_role`; der Kontext-Worker
+ersetzt nur die Rolle, behält aber den fachlichen Fokus des Takes. Die Stimme
+bleibt konfiguriert wie zuvor. Während der Runde ist die Auswahl gesperrt;
+`conversationRole` wird mit dem Gespräch lokal gespeichert und nach Reload
+wiederhergestellt. Der kompatible getippte Fragepfad bleibt unverändert.
 Audio-Tags werden aus dem sichtbaren Gespräch entfernt.
 `Protect agent speech` ist optional (Standard aus, bisheriges Verhalten), unter
 `/admin` → Voice questions und direkt in der Fragerunde schaltbar; pro Browser
