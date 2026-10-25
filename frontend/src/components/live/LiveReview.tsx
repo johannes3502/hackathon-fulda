@@ -145,6 +145,11 @@ export function LiveReview({
               demo={recording.transcript?.synthetic ?? false}
               recordingTitle={reviewData.title}
             />
+            <FactCheckPanel
+              key={recording.id}
+              recording={recording}
+              onSelect={jump}
+            />
             <div className="review-stage-grid">
               <VideoPlayback
                 recording={{ ...recording, feedback: moments }}
@@ -289,7 +294,6 @@ export function LiveReview({
             <details className="review-details">
               <summary>Transcript and source checks</summary>
               <RecordedTranscript recording={recording} onSelect={jump} />
-              <FactCheckPanel recording={recording} onSelect={jump} />
             </details>
             <details className="review-details">
               <summary>Recording details and exports</summary>

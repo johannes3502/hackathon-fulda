@@ -69,13 +69,23 @@ export function FactCheckPanel({
     return () => active.abort();
   }, [endpoint, collection]);
 
-  const words = recording.words ?? [];
+  const words = recording.words ?? recording.transcript?.words ?? [];
   const result = recording.factCheck;
   const feedback = result ? factFeedback(result, recording.durationMs) : [];
   const web = useWeb && !!settings?.web_provider;
-  const canRun = !busy && !!settings?.available && words.length > 0;
+  const canRun =
+    !busy &&
+    !!settings?.available &&
+    words.length > 0 &&
+    (readySources !== 0 || web);
+  const assessed =
+    result?.claims.filter((claim) => {
+      const verdict = evidenceVerdict(claim);
+      return verdict === "supports" || verdict === "contradicts";
+    }).length ?? 0;
 
   async function check() {
+    if (!canRun) return;
     const active = new AbortController();
     controller.current?.abort();
     controller.current = active;
@@ -93,7 +103,7 @@ export function FactCheckPanel({
       );
       if (active.signal.aborted) return;
       update(recording.id, (current) =>
-        current.words !== words
+        (current.words ?? current.transcript?.words) !== words
           ? current
           : {
               ...current,
@@ -133,20 +143,32 @@ export function FactCheckPanel({
         {result && <span className="badge">{result.claims.length}</span>}
       </div>
       <p>
-        Factual statements from your transcript are compared with your uploaded
-        sources first (slides, lecture notes, papers).
-        {settings?.web_provider
-          ? ` Statements your sources don't settle can be searched on ${providerName(settings.web_provider)}.`
-          : ""}{" "}
-        “Not found” means not covered by the checked sources, not wrong.
+        {result
+          ? assessed
+            ? `${assessed} source-verified statements contribute to your Fachwissen score.`
+            : "No source-verified verdicts are available. Fachwissen stays open; statements not found in sources are not counted as wrong."
+          : "Fachwissen needs a source check. Use Check facts to compare your transcript with your material and calculate the score."}
       </p>
+      {!words.length && (
+        <p className="status-warning" role="status">
+          No transcript is available for this recording. Enable transcription
+          for a new recording or import word timestamps in Recording details.
+        </p>
+      )}
+      {readySources === 0 && !web && (
+        <p className="status-warning" role="status">
+          No sources are ready. Use Manage sources to upload material, then
+          refresh status
+          {settings?.web_provider ? " or enable web search" : ""}.
+        </p>
+      )}
       <dl className="fact-check-inputs">
         <div>
           <dt>Transcript</dt>
           <dd>
             {words.length
               ? `${words.length} words`
-              : "None yet. Turn on transcription before recording or import word timestamps above."}
+              : "None yet. Enable transcription for a new recording or import word timestamps in Recording details."}
           </dd>
         </div>
         <div>
@@ -173,8 +195,9 @@ export function FactCheckPanel({
       )}
       {settings && !settings.available && (
         <p className="status-warning" role="status">
-          The model is unavailable. Check the backend model settings and API
-          key, then refresh its status.
+          Fact-checking is unavailable: the backend model or API key is not
+          configured correctly. Fachwissen cannot be calculated until the
+          backend configuration is fixed. Then refresh status and check facts.
         </p>
       )}
       {settings?.available && (
@@ -184,7 +207,8 @@ export function FactCheckPanel({
           {web
             ? ` and short search queries to ${providerName(settings.web_provider)}`
             : ""}
-          . Only quotes found in a source count as evidence; fuzzy matches are marked.
+          . Only quotes found in a source count as evidence; fuzzy matches are
+          marked.
         </p>
       )}
       <Button onClick={() => void check()} disabled={!canRun}>
@@ -213,7 +237,10 @@ export function FactCheckPanel({
         {notice}
       </p>
       {result && (
-        <>
+        <details>
+          <summary>
+            Checked statements and sources ({result.claims.length})
+          </summary>
           <ol className="fact-claims">
             {result.claims.map((claim, index) => (
               <li
@@ -277,7 +304,7 @@ export function FactCheckPanel({
               <li key={item}>{item}</li>
             ))}
           </ul>
-        </>
+        </details>
       )}
     </section>
   );

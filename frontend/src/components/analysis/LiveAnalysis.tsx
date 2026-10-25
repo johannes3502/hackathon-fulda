@@ -15,6 +15,7 @@ export function LiveAnalysis({ sessionId }: { sessionId: string }) {
       backHref={`/live/${sessionId}/review`}
       backLabel="Zur Aufnahmeübersicht"
       data={recordingReviewData(recording)}
+      recording={recording}
     />
   );
 }
