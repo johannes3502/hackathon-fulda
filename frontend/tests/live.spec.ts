@@ -1897,7 +1897,11 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     });
   });
   await page.goto("/sources");
+  await expect(page.locator('input[type="file"]')).toBeEnabled();
   await page.getByLabel("What are you preparing for?").selectOption("thesis");
+  await expect(page.locator("#presentation-mode-focus")).toContainText(
+    "University professor",
+  );
   await page.locator('input[type="file"]').setInputFiles({
     name: "thesis.txt",
     mimeType: "text/plain",
@@ -1966,6 +1970,13 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   await expect(stats).toBeVisible();
   await expect(stats).toBeFocused();
   await expect(page.locator(".performance-score")).toHaveText("100/100");
+  const practiceAgain = page.getByRole("link", {
+    name: "Practice again",
+    exact: true,
+  });
+  await expect(practiceAgain).toBeVisible();
+  await expect(practiceAgain).toHaveAttribute("href", "/live");
+  await expect(practiceAgain).toHaveClass(/button-primary/);
   await page.screenshot({
     path: info.outputPath("final-overall-score.png"),
     fullPage: true,
@@ -1996,9 +2007,23 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   await expect(stats).toBeVisible();
   await expect(stats).toBeFocused();
   await expect.poll(() => closed.size).toBe(2);
+  const savedReviewUrl = page.url();
+  await practiceAgain.click();
+  await expect(page).toHaveURL(/\/live$/);
+  await expect(
+    page.getByRole("button", { name: "Enable camera", exact: true }),
+  ).toBeVisible();
+  // Starting another practice must retain the completed take and its questions.
+  await page.goto(savedReviewUrl);
+  await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
   await page
-    .getByRole("button", { name: "Back to questions", exact: true })
+    .getByRole("group", { name: "Review steps" })
+    .getByRole("button", { name: "Practice questions" })
     .click();
+  await page.getByText("Conversation transcript", { exact: true }).click();
+  await expect(page.locator(".conversation-transcript")).toContainText(
+    "Ich habe noch ein paar Fragen. Bist du bereit?",
+  );
   await page
     .getByRole("button", { name: "Start a new conversation", exact: true })
     .click();

@@ -1,7 +1,8 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Conversation } from "@elevenlabs/client";
-import { AudioLines, Mic, MicOff, Square } from "lucide-react";
+import { AudioLines, Mic, MicOff, RotateCcw, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { LiveRecording } from "@/features/live/contracts";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
@@ -282,9 +283,16 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     return (
       <div className="question-practice">
         <PerformanceEvaluation input={recording} />
-        <Button variant="outline" onClick={() => setFinished(false)}>
-          Back to questions
-        </Button>
+        <div className="question-actions">
+          <Button asChild>
+            <Link href="/live">
+              <RotateCcw size={17} aria-hidden="true" /> Practice again
+            </Link>
+          </Button>
+          <Button variant="outline" onClick={() => setFinished(false)}>
+            Back to questions
+          </Button>
+        </div>
       </div>
     );
 
