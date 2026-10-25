@@ -187,21 +187,20 @@ Die Auswertung ist rein clientseitig und deterministisch
 kein LLM, Eingaben sind nur Daten, die der Browser ohnehin hat
 (Fact-Check-Urteile, Antwort-Urteile, Wörter, Feedback-Events, Pose-Events).
 
-Formel `evidence-count-heuristic.v1` — **separat** von den drei Review-Scores
-oben. Die Werte sind nicht vergleichbar und werden nicht zu einem Gesamtscore
-verrechnet; „Inhalt“ ist nicht dasselbe wie „Fachwissen“ im Review:
+Formel `evidence-share-v1` wie in den Review-Scores; die Fragerunde ergänzt
+geprüfte Antworten und behält ihre transparente Gewichtung:
 
-- **Inhalt** (Gewicht 0,5): Jede Fact-Check-Aussage und jede beantwortete Frage
-  zählt nach Urteil — `supports` = 1, `contradicts` = 0, `not_found`/
-  `unchecked` = 0,5. Score = 100 · Punkte / Items.
-- **Stimme** (0,25): 100 abzüglich 15 Punkte pro Tempo-/Lautstärke-/Tonhöhen-,
-  Füllwort- und Pausen-Marker pro Minute, Floor 40.
-- **Gestik** (0,25): gleiche Formel über Pose-Marker (Haltung, Gesten,
-  Kopfrichtung). Fehlt eine Kategorie (z. B. keine Pose-Daten), entfällt sie
-  mit Renormalisierung der Gewichte; ohne Daten erscheint kein Score.
-- Labels: ab 85 „Strong“, ab 70 „Solid“, ab 55 „Fair“, darunter „Keep
-  practicing“; Stärken und Übungsvorschläge folgen nur aus Zählern
-  (z. B. „3 von 5 Aussagen quellengestützt“).
+- **Inhalt** (Gewicht 0,5): Anteil `supports` an `supports` + `contradicts`,
+  nur bei geprüftem Quellenzitat (`exact`/`fuzzy`). `not_found`, `unchecked`
+  und Urteile ohne geprüftes Zitat bleiben unbewertet.
+- **Stimme** (0,25) und **Gestik** (0,25): positive Zeit geteilt durch positive
+  plus kritische Zeit. Überlappende Intervalle zählen pro Art nur einmal;
+  neutrale Hinweise und unbekannte Zeit bleiben unbewertet. Abdeckung und
+  positive/kritische Sekunden stehen im Panel. Positive Pausen werden nicht
+  als Korrekturen gezählt; ein Transkript allein ergibt keinen Stimm-Score.
+- Fehlende Kategorien entfallen mit Renormalisierung der Gewichte; ohne
+  Evidenz kein Score. Labels bleiben ab 85 „Strong“, ab 70 „Solid“, ab 55
+  „Fair“, darunter „Keep practicing“. Lob kommt nur aus positiver Evidenz.
 
 Grenzen (im Panel aufklappbar benannt): unvalidierte Heuristik aus
 Prototyp-Regeln, kein Vergleich mit anderen Sprechern, „nicht gefunden“ ist
@@ -212,7 +211,8 @@ Inhalts-Kategorie auf den Fact-Check beschränkt.
 
 ## Daten und Grenzen
 
-Abgeschlossene Live-Sessions einschließlich Video, Pose-Log, Analyse und
+Gestoppte Live-Sessions werden vor der Backend-Analyse mit Video und Pose-Log
+lokal gesichert. Analyse und Fragen werden anschließend ergänzt. Sessions mit
 Fragen-/Gesprächsverlauf werden pro Take in Browser-IndexedDB gespeichert.
 Updates aus späteren Analysen und Gesprächen werden ebenfalls gespeichert.
 Nach Reload entstehen neue Objekt-URLs aus den gespeicherten Blobs. Studio

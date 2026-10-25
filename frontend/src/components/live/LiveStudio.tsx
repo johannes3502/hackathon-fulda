@@ -76,6 +76,7 @@ export function LiveStudio() {
   const { stageRef, toggleRef, fullscreen, toggle } = useStageFullscreen();
   const {
     save,
+    update,
     recordings,
     featureFlags,
     setFeatureFlags,
@@ -290,7 +291,21 @@ export function LiveStudio() {
               })),
           ].sort((a, b) => a.startMs - b.startMs),
         });
-        router.push(`/live/${recording.id}/review`);
+      },
+      (recording) => {
+        update(recording.id, (stored) => ({
+          ...stored,
+          metrics: recording.metrics,
+          words: recording.words ?? stored.words,
+          transcript: recording.transcript ?? stored.transcript,
+          completion: recording.completion,
+          notice: recording.notice,
+          chunksSent: recording.chunksSent,
+          bytesSent: recording.bytesSent,
+          feedback: mergeSpeechFeedback(recording.feedback, stored.feedback),
+        }));
+        if (generation === startGeneration.current)
+          router.push(`/live/${recording.id}/review`);
       },
       (timestamp) => {
         pose.beginRecording(timestamp, recorder.id);

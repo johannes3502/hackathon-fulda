@@ -39,6 +39,7 @@ async def _accept(request: BaseModel, prefix: str, job_model, task, status_path:
         await run_in_threadpool(_store, job_id, request, prefix, job_model(job_id=job_id, status="queued"), recording)
         await enqueue_task(task, job_id)
     except (QueueUnavailable, BotoCoreError, ClientError) as error:
+        await run_in_threadpool(storage.discard_job, job_id, prefix)
         raise HTTPException(503, "Question storage or queue unavailable") from error
     return AcceptedJob(job_id=job_id, status_url=f"{status_path}/{job_id}")
 

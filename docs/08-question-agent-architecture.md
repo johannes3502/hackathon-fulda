@@ -36,7 +36,7 @@ Nach der Umsetzung gehören die betroffenen Diagramme in
 | Antwortprüfung | Urteil + Zitat + `reply` + `follow_up`, keine Noten | `POST /questions/answers` |
 | Gesprochene Antwort | Upload → Whisper → gleiche Prüfung | `POST /questions/answers/voice` |
 | Live-ASR | `WS /speech/live`, 2-s-Fenster, Wörter/Text | `backend/app/speech/live.py` |
-| TTS | Browser `speechSynthesis` | `frontend/src/features/questions/voice.ts` |
+| Web-Sprachdialog | ElevenLabs SDK; alter Browser-TTS-Client entfernt | `frontend/src/components/live/QuestionPractice.tsx` |
 | Web-Suche | Wikipedia/Tavily, optional, nur für offene Claims | `backend/app/factcheck/web.py` |
 
 Gemessene Latenzen aus dem Repo: Fragenrunde **6,1 s**, Antwortprüfung
@@ -622,7 +622,7 @@ Alles optional und abwärtskompatibel; die bestehende UI ignoriert neue Felder.
   <https://elevenlabs.io/docs/eleven-agents/customization/llm/custom-llm>
 - Bestehende Implementierung: `backend/app/questions/pipeline.py`,
   `backend/app/questions/models.py`, `backend/app/speech/live.py`,
-  `frontend/src/features/questions/voice.ts`
+  `frontend/src/components/live/QuestionPractice.tsx`
 
 ## 12. Deep Research (24.10.2026)
 

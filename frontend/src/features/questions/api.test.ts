@@ -3,12 +3,10 @@ import {
   generateQuestions,
   questionFeedback,
   reviewAnswer,
-  reviewVoiceAnswer,
   withFollowUp,
   type Question,
   type QuestionResult,
 } from "./api";
-import { nextQuestion } from "./voice";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -131,53 +129,6 @@ it("sends the answer with its question and rejects invalid reviews", async () =>
       0,
     ),
   ).rejects.toThrow("invalid answer review");
-});
-
-it("uploads a spoken answer as multipart and returns its transcript", async () => {
-  const review = {
-    verdict: "not_found",
-    explanation: "",
-    checked: ["upload"],
-    model: "test-model",
-    reply: "Okay, danke!",
-    answer: "Aus Gestein.",
-  };
-  const fetcher = jobFetcher("/questions/answers", review);
-  vi.stubGlobal("fetch", fetcher);
-  const reviewed = await reviewVoiceAnswer(
-    "/api",
-    {
-      question: moon,
-      recording: new Blob(["synthetic"], { type: "audio/webm" }),
-      collectionId: null,
-      persona: "student",
-    },
-    new AbortController().signal,
-    0,
-  );
-  expect(reviewed.answer).toBe("Aus Gestein.");
-  const [path, init] = fetcher.mock.calls[0];
-  expect(path).toBe("/api/questions/answers/voice");
-  expect(init.headers).toBeUndefined();
-  const body = init.body as FormData;
-  expect((body.get("recording") as File).name).toBe("answer.webm");
-  expect(JSON.parse(body.get("request") as string)).toEqual({
-    question: moon,
-    collection_id: null,
-    persona: "student",
-    presentation_mode: "thesis",
-  });
-  expect(fetcher.mock.calls[2][0]).toBe(`/api/questions/answers/${jobId}`);
-});
-
-it("asks unanswered questions in list order", () => {
-  const followUp = { ...moon, id: "q1.f", kind: "follow_up" as const };
-  const questions = withFollowUp([moon, gap], "q1", followUp);
-  expect(nextQuestion(questions, new Set())?.id).toBe("q1");
-  expect(nextQuestion(questions, new Set(["q1"]))?.id).toBe("q1.f");
-  expect(
-    nextQuestion(questions, new Set(["q1", "q1.f", "q2"])),
-  ).toBeUndefined();
 });
 
 it("places follow-ups after their question and only timed questions on the timeline", () => {

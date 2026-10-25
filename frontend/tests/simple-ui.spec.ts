@@ -417,3 +417,12 @@ test("enlarged text reflows without hiding navigation or primary controls", asyn
     }
   }
 });
+
+test("progress consent distinguishes access expiry from automatic deletion", async ({
+  page,
+}) => {
+  await page.goto("/progress");
+  await expect(
+    page.getByText("Nach 12 Monaten", { exact: false }),
+  ).toContainText("Automatische Löschung ist noch nicht umgesetzt");
+});

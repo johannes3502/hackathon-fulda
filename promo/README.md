@@ -22,12 +22,19 @@ erfundenen Scores oder Genauigkeiten.
 ## Befehle
 
 ```sh
-npm install
+npm ci
 npm run studio   # Remotion Studio (Vorschau)
 npm run still    # Einzelbild als Vorschau
-npm run render   # out/PitchPractice-Promo.mp4 (CRF 16)
+npm run render   # out/PitchPractice-Promo.mp4 (CRF 12)
 ```
 
 Zeitpunkte der Szenen liegen in `src/theme.ts` (`SCENES`); Farben und
 Typografie in `COLORS`/`FONT`. Chrom-Runtime lädt Remotion beim ersten
 Render automatisch (chrome-headless-shell).
+
+Die Transitiv-Abhängigkeit Zod ist auf 4.6.6 festgelegt, da frühere Versionen
+von GHSA-mrhx-c7xc-m3w5 betroffen sind. Remotion 4.0.538 erwartet noch 4.5.4
+und meldet daher eine Versionswarnung. Bundle und Privacy-Render wurden mit
+4.6.6 geprüft; den Override entfernen, sobald Remotion die korrigierte Version
+selbst verlangt. Die lokale Aufnahme wird vorübergehend zum Analyse-Server
+hochgeladen; der Privacy-Text benennt dies ausdrücklich.

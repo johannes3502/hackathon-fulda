@@ -2432,3 +2432,45 @@ test("review scores and statistics follow each recorded take across views and re
       .getByRole("link", { name: /Review/ }),
   ).toHaveAttribute("href", new URL(secondReview).pathname);
 });
+
+test("a stopped take survives leaving the studio while analysis is still queued", async ({
+  page,
+}) => {
+  await syntheticCamera(page);
+  await syntheticPose(page);
+  const id = "12345678-1234-1234-1234-123456789abc";
+  await page.route("**/api/speech/analyze", (route) =>
+    route.fulfill({ status: 202, json: { job_id: id } }),
+  );
+  await page.route(`**/api/speech/jobs/${id}`, (route) =>
+    route.fulfill({ json: { job_id: id, status: "queued" } }),
+  );
+  await enable(page);
+  await page
+    .getByRole("button", { name: "Start recording", exact: true })
+    .click();
+  await expect(page.locator(".live-view-time").first()).not.toHaveText("0:00");
+  await page
+    .getByRole("button", { name: "Finish & review", exact: true })
+    .click();
+  await expect(
+    page.getByText("Sessions are saved in this browser", { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByRole("region", { name: "Studio options" })
+    .getByRole("link", { name: "Admin", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto("/");
+  await page.locator(".stats418-take-list a").first().click();
+  await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
+  const video = page.getByLabel("Recorded pitch video");
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.readyState),
+    )
+    .toBeGreaterThanOrEqual(2);
+  await expect(
+    page.getByText("Analysis was cancelled.", { exact: false }),
+  ).toBeVisible();
+});

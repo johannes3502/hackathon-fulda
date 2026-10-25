@@ -9,13 +9,16 @@
     "still": "remotion still src/index.ts PitchPractice out/preview.png"
   },
   "dependencies": {
-    "@remotion/cli": "4.0.417",
+    "@remotion/cli": "4.0.538",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "remotion": "4.0.417"
+    "remotion": "4.0.538"
   },
   "devDependencies": {
     "@types/react": "19.2.7",
     "typescript": "5.9.3"
+  },
+  "overrides": {
+    "zod": "4.6.6"
   }
 }

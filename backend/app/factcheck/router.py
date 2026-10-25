@@ -50,6 +50,7 @@ async def start_fact_check(request: FactCheckRequest) -> AcceptedJob:
         await run_in_threadpool(_store, job_id, request)
         await enqueue_task(fact_check, job_id)
     except (QueueUnavailable, BotoCoreError, ClientError) as error:
+        await run_in_threadpool(storage.discard_job, job_id, PREFIX)
         raise HTTPException(503, "Fact-check storage or queue unavailable") from error
     return AcceptedJob(job_id=job_id, status_url=f"/factcheck/jobs/{job_id}")
 

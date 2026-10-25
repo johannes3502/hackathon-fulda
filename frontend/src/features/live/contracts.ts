@@ -41,14 +41,6 @@ export type LiveConfig = {
   transcribe?: boolean;
   featureFlags?: FeatureFlags;
 };
-export type VideoChunkMeta = {
-  type: "video.chunk";
-  sessionId: string;
-  seq: number;
-  startMs: number;
-  endMs: number;
-  byteLength: number;
-};
 export type LiveMessage =
   | { type: "feedback"; sessionId: string; feedback: LiveFeedback }
   | { type: "metrics"; sessionId: string; atMs: number; metrics: LiveMetric[] }
@@ -92,7 +84,6 @@ export interface VideoTransport {
     session: { sessionId: string; title: string; mimeType: string },
     receive: (message: LiveMessage) => void,
   ): Promise<void>;
-  send(chunk: Blob, meta: VideoChunkMeta): Promise<void>;
   finish(durationMs: number, recording?: Blob): Promise<void>;
   close(): void;
 }

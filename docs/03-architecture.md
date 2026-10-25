@@ -18,7 +18,7 @@ flowchart TB
         MR["MediaRecorder / Vision Camera<br/>Video + Audio"]
     end
 
-    WEB -->|"LiveSessionProvider: abgeschlossene Takes und Review-Updates"| IDB["Browser IndexedDB<br/>Video, Pose-Log, Transkript, Feedback,<br/>Fragen, Antworten, Gespräch"]
+    WEB -->|"LiveSessionProvider: Video direkt nach Stop sichern, Analyse später ergänzen"| IDB["Browser IndexedDB<br/>Video, Pose-Log, Transkript, Feedback,<br/>Fragen, Antworten, Gespräch"]
     IDB -->|"Nach Reload: Blob-URLs neu erzeugen"| WEB
 
     subgraph API["api/ - Geteilter API-Vertrag"]
@@ -217,10 +217,12 @@ sequenceDiagram
         DG-->>BE: Restwörter und Abschlussmetadaten, Verbindung schließen
         BE-->>FE: Finale words, text, done
     end
+    FE->>FE: MediaRecorder-Blob + Browser-Events in IndexedDB sichern
     FE->>BE: POST /speech/analyze (recording, transcribe, optional live_transcript)
     Note over FE,BE: Mit finalem Cloud-Transkript local_only=false, sonst true
     BE->>S3: Original speichern
     BE->>R: Task analyze_speech einreihen
+    Note over BE,S3: Enqueue-/Speicherfehler: abgelehnten Job entfernen; keine 202-Antwort
     BE-->>FE: 202 {job_id, status_url}
 
     W->>R: Job holen (Lock 660s)
@@ -240,7 +242,8 @@ sequenceDiagram
     end
     W->>W: Wortpausen mit Satzkontext behalten, überlappende Signalpausen ersetzen
     W->>W: merge_timeline, übrige Signalpausen behalten
-    W->>S3: Ergebnis speichern, Original löschen
+    W->>S3: Terminales Ergebnis speichern, Original + Request löschen
+    Note over W,S3: Speicherfehler beim Cleanup: Task-Retry, terminales Ergebnis wiederverwenden
 
     loop Polling 1x/s (max 11 min)
         FE->>BE: GET /speech/jobs/{job_id}
@@ -308,6 +311,7 @@ sequenceDiagram
 flowchart TB
     UP["Upload /sources<br/>PDF, PPTX, DOCX, TXT, MD<br/>max 25 MB, kein OCR"] --> API["Sources-Router"]
     API --> S3A[("S3: sources/id/original")]
+    API -. "DELETE: DB-Zeile sperren, S3 löschen, danach DB-DELETE committen" .-> S3A
     API --> Q["Celery: ingest_source<br/>(idempotent, Redis-Lock)"]
     Q --> EX["extract.py<br/>PDF je Seite - PPTX je Folie<br/>DOCX je Absatz - TXT/MD je Block"]
     EX --> CH["chunking.py<br/>~1200 Zeichen, Satzgrenzen,<br/>~200 Overlap"]
@@ -446,7 +450,7 @@ sequenceDiagram
         W->>W: Zitat im Quelltext prüfen
         FE->>FE: Nächste Frage / Nachfrage anzeigen
         U->>FE: Letzte Frage beantworten
-        FE->>FE: Auswertung: Client-Heuristik-Score<br/>(Inhalt 0,5 / Stimme 0,25 / Gestik 0,25)<br/>kein Backend-Aufruf
+        FE->>FE: Auswertung: evidence-share-v1<br/>(Inhalt 0,5 / Stimme 0,25 / Gestik 0,25)<br/>kein Backend-Aufruf
     end
 ```
 
@@ -477,7 +481,7 @@ flowchart TD
     SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
     LIVE["/live - LiveStudio<br/>Vor Kamera-Aktivierung: gleiche Seitenbreite wie Upload, ohne Header und Schrittleiste<br/>Back to sources vor Aufnahmestart<br/>Ab Kamera-Aktivierung: Vollbild mit Pose-Overlay<br/>Back-Link in der Toolbar bis Aufnahmestart<br/>Immer Live + Backend-Analyse,<br/>Options: Vortragstyp, Material und Transkript,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
-    STORE["Root-Layout: LiveSessionProvider + IndexedDB<br/>Video, Analyse und Fragen je Aufnahme<br/>Wiederherstellung nach Reload"] -.-> LIVE
+    STORE["Root-Layout: LiveSessionProvider + IndexedDB<br/>Video direkt nach Stop, Analyse und Fragen als Updates<br/>Wiederherstellung nach Reload"] -.-> LIVE
     STORE --> EVIDENCE["recordingReviewData + recordingFeedback<br/>Video, Dauer und Events der gewählten Aufnahme<br/>Quellen-Marker aus aktuellem Fact-Check<br/>Fragen zählen nicht als Präsentationsevidenz"]
     EVIDENCE --> LREV
     EVIDENCE --> LA
@@ -511,7 +515,6 @@ flowchart TD
 
     subgraph Transport["VideoTransport: LiveStudio fest auf backend<br/>(Modus-Schalter entfernt)"]
         ANA["AnalysisTransport<br/>Backend-Upload + Polling, jede Web-Aufnahme"]
-        DEMO["LocalVideoTransport<br/>nur noch Tests; kein Upload"]
     end
     LIVE --> Transport
 ```
@@ -767,7 +770,7 @@ Zusätzlich (außerhalb Postgres):
 | Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), optional Profil-ID/Token (`pp_…`) und zufälliger `deviceKey`; Token ist XSS-exponiert |
-| Browser IndexedDB `presentation-recordings`, Store `recordings` | Abgeschlossene Live-Takes inklusive Video-/Pose-Log-Blobs, Config mit FeatureFlags/presentationMode/sourceCollectionId, ElevenLabs-Gespräch, Wörter, Pose-Events, Fact-Check, Fragen und Antworten; pro Take gespeichert, nach Reload wiederhergestellt. Objekt-URLs nur im Arbeitsspeicher. Löschen im Review entfernt den lokalen Take, keine Backend-Daten/Quellen. |
+| Browser IndexedDB `presentation-recordings`, Store `recordings` | Gestoppte Live-Takes, vor der Backend-Analyse gesichert, inklusive Video-/Pose-Log-Blobs, Config mit FeatureFlags/presentationMode/sourceCollectionId, ElevenLabs-Gespräch, Wörter, Pose-Events, Fact-Check, Fragen und Antworten; pro Take gespeichert, nach Reload wiederhergestellt. Objekt-URLs nur im Arbeitsspeicher. Löschen im Review entfernt den lokalen Take, keine Backend-Daten/Quellen. |
 
 ## 9. Event-Modell: gemeinsame Timeline
 
@@ -852,7 +855,7 @@ flowchart LR
         P3["GET/PUT/DELETE /profiles/id/goals/metricId<br/>GET /profiles/id/takes<br/>GET /profiles/id/export"]
     end
 
-    WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5 & Q6 & Q7 & Q8 & Q9
+    WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q6 & Q7 & Q8 & Q9
     MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
     CLIENT["Neuer Take-Client-Vertrag<br/>Frontend-Integration separat"] -.-> V1 & V2 & V3 & V4 & V5 & V6
     PROGRESS["Progress-Client<br/>X-Profile-Token"] -.-> P1 & P2 & P3

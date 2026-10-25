@@ -24,13 +24,11 @@ describe("admin live-hint settings", () => {
       stabilizeHoldMs: POSE_RULES.stabilizeHoldMs,
       minDisplayMs: POSE_RULES.minDisplayMs,
       minDisplayGapMs: POSE_RULES.minDisplayGapMs,
-      praiseAfterMs: POSE_RULES.praiseAfterMs,
     });
     const custom = {
       stabilizeHoldMs: 1000,
       minDisplayMs: 4000,
       minDisplayGapMs: 0,
-      praiseAfterMs: 5000,
     };
     saveLiveHintSettings(custom);
     expect(loadLiveHintSettings()).toEqual(custom);
@@ -65,5 +63,16 @@ describe("admin live-hint settings", () => {
     });
     localStorage.setItem(STORAGE_KEY, "{not json");
     expect(loadLiveHintSettings()).toEqual(DEFAULT_LIVE_HINT_SETTINGS);
+  });
+});
+
+it("ignores retired praise settings in older browser preferences", () => {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ praiseAfterMs: 5000, minDisplayMs: 3500 }),
+  );
+  expect(loadLiveHintSettings()).toEqual({
+    ...DEFAULT_LIVE_HINT_SETTINGS,
+    minDisplayMs: 3500,
   });
 });

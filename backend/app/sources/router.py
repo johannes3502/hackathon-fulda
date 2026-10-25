@@ -32,8 +32,14 @@ def _store(source: Source, file):
 
 
 def _remove(source_id: UUID):
-    db.delete_source(source_id)
-    s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=object_key(source_id))
+    with db.connect() as connection:
+        row = connection.execute("SELECT object_key FROM sources WHERE id = %s FOR UPDATE", (source_id,)).fetchone()
+        if row is None:
+            return False
+        # Keep the row available for retry if object storage is unavailable.
+        s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=row["object_key"])
+        connection.execute("DELETE FROM sources WHERE id = %s", (source_id,))
+    return True
 
 
 @router.post("", status_code=202)
@@ -105,10 +111,8 @@ def get_source(source_id: UUID) -> Source:
 def delete_source(source_id: UUID) -> Response:
     """Delete the file, its chunks and vectors."""
     try:
-        key = db.delete_source(source_id)
-        if key is None:
+        if not _remove(source_id):
             raise HTTPException(404, "Unknown source")
-        s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=key)
     except UNAVAILABLE as error:
         raise HTTPException(503, "Source storage unavailable") from error
     return Response(status_code=204)

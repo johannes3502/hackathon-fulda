@@ -23,11 +23,6 @@ def _store_upload(job_id: str, recording, options: AnalysisOptions):
     storage.write_json(job_id, "status.json", AnalysisJob(job_id=job_id, status="queued").model_dump())
 
 
-def _remove_job(job_id: str):
-    for name in ("recording", "request.json", "status.json"):
-        s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=storage.key(job_id, name))
-
-
 @router.post("/analyze", status_code=202)
 async def analyze(
     recording: UploadFile = File(description="Synthetic audio/video recording (WebM, MP4, WAV, ...)"),
@@ -60,10 +55,7 @@ async def analyze(
         await run_in_threadpool(_store_upload, job_id, recording.file, AnalysisOptions(audio=parsed, transcribe=transcribe, live_transcript=streamed))
         await enqueue_task(analyze_speech, job_id)
     except (QueueUnavailable, BotoCoreError, ClientError) as error:
-        try:
-            await run_in_threadpool(_remove_job, job_id)
-        except (BotoCoreError, ClientError):
-            pass  # Storage outage can also prevent cleanup; report service failure.
+        await run_in_threadpool(storage.discard_job, job_id)
         raise HTTPException(503, "Analysis storage or queue unavailable") from error
     return AcceptedJob(job_id=job_id, status_url=f"/speech/jobs/{job_id}")
 

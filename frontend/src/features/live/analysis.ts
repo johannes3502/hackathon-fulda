@@ -1,3 +1,8 @@
+import {
+  callBackend,
+  isObject as object,
+  waitForBackendJob,
+} from "../../lib/backend-job";
 import type { components } from "../../../../api/schema";
 import type { LiveFeedback, LiveMetric, LiveTranscript } from "./contracts";
 import { feedbackEnabled, type FeatureFlags } from "./feature-flags";
@@ -7,8 +12,6 @@ type Word = components["schemas"]["Word"];
 // Match the live-caption adapter's allowance for encoder/frame rounding.
 // Imported timestamps remain strict; this only applies to backend results.
 export const BACKEND_TIMESTAMP_TOLERANCE_MS = 250;
-const object = (v: unknown): v is Record<string, unknown> =>
-  !!v && typeof v === "object" && !Array.isArray(v);
 const time = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v) && v >= 0;
 
@@ -29,83 +32,35 @@ export function apiEndpoint(value: string, secure: boolean) {
   return url.toString().replace(/\/$/, "");
 }
 
-export async function request(
-  endpoint: string,
-  path: string,
-  signal: AbortSignal,
-  init?: RequestInit,
-) {
-  const response = await fetch(`${endpoint}${path}`, {
-    ...init,
-    signal: AbortSignal.any([signal, AbortSignal.timeout(120000)]),
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    let detail = "";
-    try {
-      const body = await response.json();
-      if (typeof body.detail === "string")
-        detail = ` ${body.detail.slice(0, 250)}`;
-    } catch {}
-    throw new Error(
-      `Backend ${path} failed (HTTP ${response.status}).${detail}`,
-    );
-  }
-  if (response.status === 204) return undefined;
-  return response.json() as Promise<unknown>;
-}
+export { callBackend as request };
 
 export async function waitForAudioJob(
   endpoint: string,
   accepted: unknown,
   signal: AbortSignal,
 ) {
-  if (
-    !object(accepted) ||
-    typeof accepted.job_id !== "string" ||
-    !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(accepted.job_id)
-  )
-    throw new Error("The backend returned an invalid analysis job.");
-  const active = AbortSignal.any([signal, AbortSignal.timeout(660000)]);
-  while (true) {
-    active.throwIfAborted();
-    const job = await request(
-      endpoint,
-      `/speech/jobs/${accepted.job_id}`,
-      active,
-    );
-    if (!object(job) || job.job_id !== accepted.job_id)
-      throw new Error("The backend returned an invalid analysis job.");
-    if (job.status === "failed")
-      throw new Error(
-        "Audio analysis failed. Your local recording is preserved.",
-      );
-    if (job.status === "completed") {
-      if (!object(job.result) || !object(job.result.audio))
-        throw new Error("The backend returned an invalid analysis.");
-      return {
-        ...job.result,
-        words: job.result.words,
-        summary: job.result.audio.summary,
-        events: job.result.events,
-        transcription: job.result.transcription,
-      };
-    }
-    if (job.status !== "queued" && job.status !== "running")
-      throw new Error("The backend returned an invalid analysis job.");
-    await new Promise<void>((resolve, reject) => {
-      const abort = () => {
-        clearTimeout(timer);
-        reject(active.reason);
-      };
-      const timer = setTimeout(() => {
-        active.removeEventListener("abort", abort);
-        resolve();
-      }, 1000);
-      active.addEventListener("abort", abort, { once: true });
-      if (active.aborted) abort();
-    });
-  }
+  const result = await waitForBackendJob(
+    endpoint,
+    accepted,
+    {
+      statusPath: "/speech/jobs",
+      label: "analysis",
+      valid: (
+        value,
+      ): value is Record<string, unknown> & {
+        audio: Record<string, unknown>;
+      } => object(value) && object(value.audio),
+    },
+    signal,
+    1000,
+  );
+  return {
+    ...result,
+    words: result.words,
+    events: result.events,
+    transcription: result.transcription,
+    summary: result.audio.summary,
+  };
 }
 
 export function parseWords(value: unknown, durationMs: number): Word[] {

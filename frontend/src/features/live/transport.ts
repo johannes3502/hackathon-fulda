@@ -45,7 +45,6 @@ export class AnalysisTransport implements VideoTransport {
       );
     }
   }
-  async send() {} // Full MediaRecorder output is uploaded only after stopping.
   async finish(durationMs: number, recording?: Blob) {
     if (!recording?.size) throw new Error("No recording was captured.");
     const liveTranscript = this.transcribe
@@ -128,23 +127,14 @@ export class AnalysisTransport implements VideoTransport {
   }
 }
 
-// Local recordings receive only actual browser observations. No scripted markers.
-export class LocalVideoTransport implements VideoTransport {
-  async connect() {}
-  async send() {}
-  async finish() {}
-  close() {}
-}
 export function createVideoTransport(
   config: LiveConfig,
   finishTranscript?: (durationMs: number) => Promise<LiveTranscript | null>,
 ): VideoTransport {
-  return config.mode === "local"
-    ? new LocalVideoTransport()
-    : new AnalysisTransport(
-        config.endpoint,
-        config.transcribe,
-        config.featureFlags,
-        finishTranscript,
-      );
+  return new AnalysisTransport(
+    config.endpoint,
+    config.transcribe,
+    config.featureFlags,
+    finishTranscript,
+  );
 }

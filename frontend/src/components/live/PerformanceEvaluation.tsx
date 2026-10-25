@@ -38,9 +38,9 @@ export function PerformanceEvaluation({ input }: { input: PerformanceInput }) {
       </div>
       {evaluation.score === null && (
         <p className="field-hint">
-          No transcript, source verdicts or voice/gesture feedback were
-          available for this take. Create a transcript or run a source check in
-          the review to calculate a score.
+          No assessed source verdicts or voice/gesture evidence were available
+          for this take. Record feedback or run a source check in the review to
+          calculate a score.
         </p>
       )}
       <ul className="performance-categories">
@@ -105,11 +105,12 @@ export function PerformanceEvaluation({ input }: { input: PerformanceInput }) {
           ))}
         </ul>
         <p className="field-hint">
-          Method: {evaluation.method}. Content averages verdict points
-          (supported = 1, differed = 0, not settled = 0.5); voice and gesture
-          deduct 15 points per adjustment per minute from 100, with a floor of
-          40. Weights: content 0.5, voice 0.25, gesture 0.25, renormalized when
-          a category has no data.
+          Method: {evaluation.method}. Content counts source-verified supported
+          verdicts divided by supported plus contradicted verdicts. Unresolved
+          verdicts are excluded. Voice and gesture use positive time divided by
+          positive plus corrective time; overlapping intervals are counted once
+          per kind. Missing evidence stays unscored. Weights: content 0.5, voice
+          0.25, gesture 0.25, renormalized when a category has no data.
         </p>
       </details>
     </section>

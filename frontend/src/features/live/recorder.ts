@@ -24,11 +24,7 @@ export class LiveRecorder {
   private recorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private startedAt = 0;
-  private lastChunkMs = 0;
-  private seq = 0;
   private timer?: ReturnType<typeof setInterval>;
-  private queue: Promise<void> = Promise.resolve();
-  private queuedBytes = 0;
   private totalBytes = 0;
   private disposed = false;
   private stopping = false;
@@ -50,6 +46,7 @@ export class LiveRecorder {
     private config: LiveConfig,
     private transport: VideoTransport,
     private onProgress: (state: LiveProgress) => void,
+    private onCapture: (recording: LiveRecording) => void,
     private onComplete: (recording: LiveRecording) => void,
     private onRecordingStart?: (timestamp: number) => void,
   ) {}
@@ -127,43 +124,9 @@ export class LiveRecorder {
       );
     }
     recorder.ondataavailable = (event) => {
-      if (this.disposed || !event.data.size) return;
+      if ((this.disposed && !this.stopping) || !event.data.size) return;
       this.chunks.push(event.data);
       this.totalBytes += event.data.size;
-      const endMs = this.stopping
-        ? this.progress.elapsedMs
-        : performance.now() - this.startedAt;
-      const meta = {
-        type: "video.chunk" as const,
-        sessionId: this.id,
-        seq: ++this.seq,
-        startMs: this.lastChunkMs,
-        endMs,
-        byteLength: event.data.size,
-      };
-      this.lastChunkMs = endMs;
-      this.queuedBytes += event.data.size;
-      if (this.queuedBytes > 8 * 1024 * 1024)
-        this.fail(
-          "Video processing fell behind. Recording stopped; the local video is still available.",
-        );
-      this.queue = this.queue.then(async () => {
-        try {
-          if (this.disposed || this.failed) return;
-          await this.transport.send(event.data, meta);
-          if (this.config.mode === "local") {
-            this.progress.chunksSent++;
-            this.progress.bytesSent += event.data.size;
-          }
-        } catch (error) {
-          this.fail(
-            error instanceof Error ? error.message : "Video streaming failed.",
-          );
-        } finally {
-          this.queuedBytes -= event.data.size;
-          this.publish();
-        }
-      });
       if (this.totalBytes >= 150 * 1024 * 1024)
         this.fail(
           "The local recording reached its memory limit. Save this video and start a new session.",
@@ -221,17 +184,36 @@ export class LiveRecorder {
   private async finalize() {
     clearInterval(this.timer);
     this.stream.getTracks().forEach((track) => track.stop());
+    if (this.disposed && !this.stopping) return;
     if (!this.stopping) {
       this.stopping = true;
       this.progress.elapsedMs = Math.max(0, performance.now() - this.startedAt);
       this.progress.phase = "finishing";
     }
-    await this.queue;
-    if (this.disposed) return;
     const video = new Blob(this.chunks, {
       type: this.recorder?.mimeType || "video/webm",
     });
-    if (!this.failed) {
+    this.chunks = [];
+    const recording: LiveRecording = {
+      id: this.id,
+      config: this.config,
+      createdAt: new Date().toISOString(),
+      durationMs: this.progress.elapsedMs,
+      video,
+      videoUrl: URL.createObjectURL(video),
+      mimeType: video.type,
+      feedback: this.progress.feedback,
+      metrics: this.progress.metrics,
+      chunksSent: 0,
+      bytesSent: 0,
+      completion: "interrupted",
+      notice:
+        this.progress.notice ??
+        "Video captured. Analysis is not complete; keep the studio open to finish it.",
+    };
+    // Persist the video before waiting for a network result or leaving the studio.
+    this.onCapture(recording);
+    if (!this.failed && !this.disposed) {
       try {
         await this.transport.finish(this.progress.elapsedMs, video);
         if (this.config.mode === "backend") {
@@ -247,23 +229,17 @@ export class LiveRecorder {
       }
     }
     this.transport.close();
-    if (this.disposed) return;
-    this.chunks = [];
     this.onComplete({
-      id: this.id,
-      config: this.config,
-      createdAt: new Date().toISOString(),
-      durationMs: this.progress.elapsedMs,
-      video,
-      videoUrl: URL.createObjectURL(video),
-      mimeType: video.type,
+      ...recording,
       feedback: this.progress.feedback,
       metrics: this.progress.metrics,
       words: this.transcript?.words,
       chunksSent: this.progress.chunksSent,
       bytesSent: this.progress.bytesSent,
-      completion: this.failed ? "interrupted" : "complete",
-      notice: this.progress.notice,
+      completion: this.failed || this.disposed ? "interrupted" : "complete",
+      notice: this.disposed
+        ? "Analysis was cancelled. Your captured video is available locally."
+        : this.progress.notice,
       transcript: this.transcript,
     });
   }
@@ -274,6 +250,6 @@ export class LiveRecorder {
     if (this.recorder && this.recorder.state !== "inactive")
       this.recorder.stop();
     this.stream.getTracks().forEach((track) => track.stop());
-    this.chunks = [];
+    if (!this.stopping) this.chunks = [];
   }
 }

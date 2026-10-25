@@ -36,16 +36,18 @@ function setup(
     getAudioTracks: () => [],
     getTracks: () => [track],
   } as unknown as MediaStream;
+  const captured = vi.fn<(recording: LiveRecording) => void>();
   const complete = vi.fn<(recording: LiveRecording) => void>();
   const recorder = new LiveRecorder(
     stream,
     { title: "Practice", targetMs: 60000, mode, endpoint: "" },
     transport,
     vi.fn(),
+    captured,
     complete,
     onStart,
   );
-  return { recorder, complete, stopTrack };
+  return { recorder, captured, complete, stopTrack };
 }
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -54,7 +56,6 @@ afterEach(() => {
 it("automatically stops at the recording limit and finalizes captured media", async () => {
   const transport = {
     connect: vi.fn(async () => {}),
-    send: vi.fn(async () => {}),
     finish: vi.fn(async () => {}),
     close: vi.fn(),
   };
@@ -62,10 +63,6 @@ it("automatically stops at the recording limit and finalizes captured media", as
   await recorder.start();
   await vi.advanceTimersByTimeAsync(60000);
   expect(stopTrack).toHaveBeenCalled();
-  expect(transport.send).toHaveBeenCalledWith(
-    expect.any(Blob),
-    expect.objectContaining({ startMs: 0, endMs: 60000, seq: 1 }),
-  );
   expect(transport.finish).toHaveBeenCalledWith(60000, expect.any(Blob));
   expect(complete).toHaveBeenCalledOnce();
   const recording = complete.mock.calls[0][0];
@@ -83,7 +80,6 @@ it("a late backend acknowledgement cannot start recording after disposal", async
       new Promise<void>((resolve) => {
         acknowledge = resolve;
       }),
-    send: vi.fn(async () => {}),
     finish: vi.fn(async () => {}),
     close: vi.fn(),
   };
@@ -94,14 +90,12 @@ it("a late backend acknowledgement cannot start recording after disposal", async
   await start;
   await vi.advanceTimersByTimeAsync(60000);
   expect(stopTrack).toHaveBeenCalled();
-  expect(transport.send).not.toHaveBeenCalled();
   expect(complete).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
 });
 it("preserves captured media when post-recording analysis fails", async () => {
   const { recorder, complete } = setup({
     connect: async () => {},
-    send: async () => {},
     finish: async () => {
       throw new Error("Analysis unavailable");
     },
@@ -118,7 +112,6 @@ it("preserves captured media when post-recording analysis fails", async () => {
 it("requires a microphone for backend analysis before contacting the API", async () => {
   const transport = {
     connect: vi.fn(async () => {}),
-    send: async () => {},
     finish: async () => {},
     close: () => {},
   };
@@ -136,7 +129,6 @@ it("anchors pose capture on the actual recorder start, after connection complete
       new Promise<void>((resolve) => {
         connect = resolve;
       }),
-    send: async () => {},
     finish: async () => {},
     close: () => {},
   };
@@ -148,4 +140,60 @@ it("anchors pose capture on the actual recorder start, after connection complete
   await starting;
   expect(onStart).toHaveBeenCalledExactlyOnceWith(5000);
   recorder.dispose();
+});
+
+it("captures the video before deferred analysis, including when the studio is disposed", async () => {
+  let finish!: () => void;
+  const { recorder, captured, complete } = setup({
+    connect: async () => {},
+    finish: () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+    close: () => {},
+  });
+  await recorder.start();
+  recorder.stop();
+  expect(captured).toHaveBeenCalledOnce();
+  expect(complete).not.toHaveBeenCalled();
+  const saved = captured.mock.calls[0][0];
+  expect(await saved.video.text()).toBe("captured video");
+  recorder.dispose();
+  finish();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(complete).toHaveBeenCalledOnce();
+  expect(complete.mock.calls[0][0]).toMatchObject({
+    videoUrl: saved.videoUrl,
+    completion: "interrupted",
+    notice: "Analysis was cancelled. Your captured video is available locally.",
+  });
+  URL.revokeObjectURL(saved.videoUrl);
+});
+
+it("keeps the final data event when navigation happens immediately after stop", async () => {
+  const { recorder, captured, complete } = setup({
+    connect: async () => {},
+    finish: vi.fn(),
+    close: () => {},
+  });
+  vi.stubGlobal(
+    "MediaRecorder",
+    class extends Recorder {
+      stop() {
+        this.state = "inactive";
+        queueMicrotask(() => {
+          this.ondataavailable?.({ data: new Blob(["last video chunk"]) });
+          this.onstop?.();
+        });
+      }
+    },
+  );
+  await recorder.start();
+  recorder.stop();
+  recorder.dispose();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(captured).toHaveBeenCalledOnce();
+  expect(await captured.mock.calls[0][0].video.text()).toBe("last video chunk");
+  expect(complete.mock.calls[0][0].completion).toBe("interrupted");
+  URL.revokeObjectURL(captured.mock.calls[0][0].videoUrl);
 });

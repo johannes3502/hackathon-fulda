@@ -21,6 +21,13 @@ const claim = (verdict: ClaimResult["verdict"]): ClaimResult => {
     verdict,
     explanation: "Synthetic",
     checked: ["upload"],
+    evidence: {
+      passage: "Synthetic statement",
+      kind: "upload",
+      label: "Synthetic source",
+      quote: "Synthetic statement",
+      quote_verified: "exact",
+    },
   };
 };
 const factCheck = (claims: ClaimResult[]): FactCheckResult => ({
@@ -47,6 +54,13 @@ const review = (verdict: AnswerReview["verdict"]): AnswerReview => ({
   model: "test",
   reply: "",
   checked: ["upload"],
+  evidence: {
+    passage: "Synthetic statement",
+    kind: "upload",
+    label: "Synthetic source",
+    quote: "Synthetic statement",
+    quote_verified: "exact",
+  },
 });
 const answer = (verdict: AnswerReview["verdict"]): QuestionAnswer => ({
   answer: "My answer",
@@ -113,7 +127,7 @@ const poseEvent = (id: string, type: PoseEvent["type"]): PoseEvent => ({
 const words = [{ word: "hello", start_ms: 0, end_ms: 500 }];
 
 describe("performance evaluation", () => {
-  it("scores content from claim verdicts with not-found counting half", () => {
+  it("scores content from claim verdicts with unresolved verdicts excluded", () => {
     const evaluation = evaluatePerformance({
       durationMs: 60000,
       factCheck: factCheck([
@@ -123,8 +137,8 @@ describe("performance evaluation", () => {
         claim("not_found"),
       ]),
     });
-    expect(evaluation.categories[0].score).toBe(63);
-    expect(evaluation.score).toBe(63);
+    expect(evaluation.categories[0].score).toBe(67);
+    expect(evaluation.score).toBe(67);
     expect(evaluation.strengths).toContain(
       "2 of 4 statements were backed by your sources",
     );
@@ -160,12 +174,12 @@ describe("performance evaluation", () => {
         stray: answer("supports"),
       },
     });
-    expect(evaluation.categories[0].score).toBe(67);
+    expect(evaluation.categories[0].score).toBe(75);
     expect(evaluation.strengths).toContain(
       "1 of 2 answers matched the sources",
     );
   });
-  it("deducts voice points per adjustment per minute and keeps the floor", () => {
+  it("scores corrective speech evidence without inventing positive time", () => {
     const evaluation = evaluatePerformance({
       durationMs: 120000,
       words,
@@ -175,7 +189,7 @@ describe("performance evaluation", () => {
         feedback("c", "pace"),
       ],
     });
-    expect(evaluation.categories[1].score).toBe(78);
+    expect(evaluation.categories[1].score).toBe(0);
     const floor = evaluatePerformance({
       durationMs: 60000,
       words,
@@ -183,7 +197,7 @@ describe("performance evaluation", () => {
         feedback(`f${index}`, "filler"),
       ),
     });
-    expect(floor.categories[1].score).toBe(40);
+    expect(floor.categories[1].score).toBe(0);
   });
   it("leaves gesture empty without pose data and renormalizes overall weights", () => {
     const evaluation = evaluatePerformance({
@@ -203,16 +217,16 @@ describe("performance evaluation", () => {
     });
     expect(evaluation.categories[2].score).toBeNull();
     expect(evaluation.categories[2].limitation).toBe(
-      "No pose markers were recorded.",
+      "No assessed pose evidence was recorded.",
     );
-    expect(evaluation.score).toBe(68);
+    expect(evaluation.score).toBe(45);
   });
   it("counts pose events only when feedback has no pose categories", () => {
     const fromEvents = evaluatePerformance({
       durationMs: 120000,
       poseEvents: [poseEvent("p1", "gesture"), poseEvent("p2", "posture")],
     });
-    expect(fromEvents.categories[2].score).toBe(85);
+    expect(fromEvents.categories[2].score).toBeNull();
     const fromFeedback = evaluatePerformance({
       durationMs: 120000,
       feedback: [
@@ -221,7 +235,7 @@ describe("performance evaluation", () => {
         feedback("p3", "Head"),
       ],
     });
-    expect(fromFeedback.categories[2].score).toBe(78);
+    expect(fromFeedback.categories[2].score).toBeNull();
   });
   it("returns no score without measured data", () => {
     const evaluation = evaluatePerformance({ durationMs: 60000 });
@@ -245,4 +259,40 @@ describe("performance evaluation", () => {
       "Answer the remaining questions to sharpen the content evaluation.",
     );
   });
+});
+
+it("positive pauses improve the evidence share and are never counted as adjustments", () => {
+  const positive = {
+    ...feedback("sentence-pause", "pause"),
+    kind: "positive" as const,
+    endMs: 2000,
+  };
+  const corrective = {
+    ...feedback("fast", "pace"),
+    startMs: 2000,
+    endMs: 4000,
+  };
+  const result = evaluatePerformance({
+    durationMs: 60000,
+    feedback: [positive, corrective],
+  });
+  expect(result.categories[1].score).toBe(50);
+  expect(result.categories[1].summary).toContain("1 pace");
+  expect(result.strengths).toContain("sentence-pause");
+});
+
+it("does not infer perfect voice quality from words or absence of warnings", () => {
+  const result = evaluatePerformance({ durationMs: 60000, words });
+  expect(result.categories[1].score).toBeNull();
+  expect(result.strengths).toEqual([]);
+});
+
+it("keeps unverified source verdicts and neutral observations unscored", () => {
+  const result = evaluatePerformance({
+    durationMs: 60000,
+    factCheck: factCheck([{ ...claim("supports"), evidence: null }]),
+    feedback: [feedback("neutral-pause", "pause")],
+  });
+  expect(result.score).toBeNull();
+  expect(result.strengths).toEqual([]);
 });

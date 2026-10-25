@@ -258,7 +258,7 @@ async function main() {
       txt(s, c.d, { x: x + 0.3, y: Y + 1.42, w: W - 0.58, h: 1.2, fontSize: 12.5, color: MUTED, valign: "top" });
     });
     txt(s, "„Nicht gefunden“ ist nicht „falsch“.", { x: 0.62, y: 5.55, w: 12.1, h: 0.45, fontSize: 17, bold: true, color: BRAND, align: "center" });
-    s.addNotes("Die Transkription läuft lokal mit faster-whisper, mit Wort-Timestamps. Das Audio verlässt den Browser nur zum lokalen Server und wird nach der Analyse gelöscht. Der Fact-Check läuft in vier Schritten: Aussagen extrahieren, Quellen per Hybrid-Suche durchsuchen, Urteil mit wörtlichem Zitat — und der Code prüft per String-Match, dass das Zitat wirklich in der Quelle steht. Und wichtig: „Nicht gefunden“ ist nicht „falsch“.");
+    s.addNotes("Die Transkription läuft lokal mit faster-whisper, mit Wort-Timestamps. Die Aufnahme wird temporär zum lokalen Server hochgeladen und nach der Analyse gelöscht. Optionales Deepgram-Live-Streaming sendet Audio nach Einwilligung an Deepgram EU. Der Fact-Check läuft in vier Schritten: Aussagen extrahieren, Quellen per Hybrid-Suche durchsuchen, Urteil mit wörtlichem Zitat — und der Code prüft per String-Match, dass das Zitat wirklich in der Quelle steht. Und wichtig: „Nicht gefunden“ ist nicht „falsch“.");
   }
 
   // ============================================================
@@ -309,7 +309,7 @@ async function main() {
     const rows = [
       { icon: "FiMousePointer", d: "Klick auf einen Marker springt per peak_ms zur Stelle im lokalen Video (±2 s)." },
       { icon: "FiClock", d: "Eine gemeinsame Zeitachse: Haltung, Stimme, Transkript, Fact-Check, Fragen." },
-      { icon: "FiLock", d: "Kein serverseitiger Clip — das Video bleibt beim Nutzer." },
+      { icon: "FiLock", d: "Lokale Wiedergabe; Aufnahme temporär zur Analyse am Server." },
     ];
     rows.forEach((r, i) => {
       const y = 3.85 + i * 0.85;
@@ -317,7 +317,7 @@ async function main() {
       txt(s, r.d, { x: 1.32, y: y + 0.05, w: 11.2, h: 0.4, fontSize: 14.5, color: INK });
     });
     txt(s, "Dazu: evidenzbasierte Kriterien-Scores, Formel und Abdeckung sichtbar. Optional Fortschritt über mehrere Takes — Messreihe mit Lücken, kein Gesamtscore.", { x: 0.62, y: 6.25, w: 12.1, h: 0.38, fontSize: 11.5, color: MUTED, align: "center" });
-    s.addNotes("Das Herzstück für den Wert in unter drei Minuten: eine gemeinsame Timeline. Ein Klick auf einen Marker springt per Peak-Zeitstempel zur Stelle im lokalen Video, plus minus zwei Sekunden. Es gibt bewusst keinen serverseitigen Clip — das Video bleibt beim Nutzer. Dazu kommen evidenzbasierte Kriterien-Scores; Formel und Datenabdeckung stehen direkt im UI. Optional zeigt der Fortschritt eine Messreihe über mehrere Takes, ohne Gesamtscore.");
+    s.addNotes("Das Herzstück für den Wert in unter drei Minuten: eine gemeinsame Timeline. Ein Klick auf einen Marker springt per Peak-Zeitstempel zur Stelle im lokalen Video, plus minus zwei Sekunden. Die Wiedergabe nutzt das lokale Video. Der vollständige Aufnahme-Container wird temporär zur Analyse hochgeladen; es gibt keinen serverseitigen Review-Clip. Dazu kommen evidenzbasierte Kriterien-Scores; Formel und Datenabdeckung stehen direkt im UI. Optional zeigt der Fortschritt eine Messreihe über mehrere Takes, ohne Gesamtscore.");
   }
 
   // ============================================================
@@ -391,7 +391,7 @@ async function main() {
     const s = pres.addSlide({ masterName: "LIGHT", sectionTitle: "Technik & Zahlen" });
     s.addText("Privat by design — ehrlich by design", { placeholder: "title" });
     const items = [
-      { icon: "FiVideo", h: "Video bleibt beim Client", d: "keine Server-Clips, keine Snapshots" },
+      { icon: "FiVideo", h: "Wiedergabe bleibt lokal", d: "Aufnahme temporär zur Server-Analyse" },
       { icon: "FiTrash2", h: "Audio wird gelöscht", d: "Original nach der Analyse — auch bei Fehlern" },
       { icon: "FiShield", h: "Keine Pose-Frames zu Anbietern", d: "Landmarks bleiben im Browser" },
       { icon: "FiCheckCircle", h: "Cloud nur mit Einwilligung", d: "Anbieter werden vorab benannt" },
@@ -407,7 +407,7 @@ async function main() {
       txt(s, c.d, { x: x + 0.95, y: y + 0.85, w: W - 1.2, h: 0.9, fontSize: 12, color: MUTED, valign: "top" });
     });
     txt(s, "Evidenzbasierte Prototyp-Scores, keine Noten, keine Emotionsanalyse.", { x: 0.62, y: 6.2, w: 12.1, h: 0.42, fontSize: 16, bold: true, color: BRAND, align: "center" });
-    s.addNotes("Datenschutz war für uns ein Feature, kein Anhängsel. Das Video verlässt den Client nie, das Original-Audio wird nach der Analyse gelöscht — auch bei Fehlern —, Pose-Frames gehen zu keinem Anbieter. Heuristiken kennzeichnen wir offen als unvalidiert. Die Auswertung zeigt evidenzbasierte Prototyp-Scores, aber keine Noten und keine Emotionsanalyse.");
+    s.addNotes("Datenschutz war für uns ein Feature, kein Anhängsel. Das Review spielt die lokale Aufnahme ab. Der vollständige Aufnahme-Container geht temporär an den Analyse-Server und wird nach terminaler Verarbeitung gelöscht; bei Speicherfehlern wird die Löschung erneut versucht. Pose-Frames gehen zu keinem Anbieter. Optionales Deepgram-Streaming sendet Audio nach Einwilligung an Deepgram EU. Heuristiken kennzeichnen wir offen als unvalidiert. Die Auswertung zeigt evidenzbasierte Prototyp-Scores, aber keine Noten und keine Emotionsanalyse.");
   }
 
   // ============================================================
@@ -476,7 +476,7 @@ async function main() {
     const s = pres.addSlide({ masterName: "DARK", sectionTitle: "Reflection & Abschluss" });
     logoCard(s, 6.667, 0.8, 1.8);
     txt(s, "Übe den Vortrag, nicht die Folien.", { x: 0.5, y: 3.05, w: 12.333, h: 0.95, fontSize: 40, bold: true, color: WHITE, align: "center" });
-    txt(s, "Prototyp läuft lokal: localhost:3000 — kein Login; Cloud nur für Quellencheck und Fragen.", { x: 0.5, y: 4.15, w: 12.333, h: 0.5, fontSize: 18, color: LIGHTV, align: "center" });
+    txt(s, "Prototyp läuft lokal: localhost:3000 — kein Login; Cloud: Quellencheck, Fragen und optional Live-ASR.", { x: 0.5, y: 4.15, w: 12.333, h: 0.5, fontSize: 18, color: LIGHTV, align: "center" });
     txt(s, "Produktreview willkommen — zeigen Sie uns drei Minuten Ihrer Zeit, wir zeigen Ihnen jeden Moment zurück.", { x: 0.5, y: 4.85, w: 12.333, h: 0.45, fontSize: 14, color: DIM, align: "center" });
     txt(s, "Team 418 · 8. Hackathon Fulda · Future Education 2026", { x: 0.5, y: 6.4, w: 12.333, h: 0.35, fontSize: 13, color: DIM, align: "center" });
     s.addNotes("Zum Schluss: Übe den Vortrag, nicht die Folien. Der Prototyp läuft lokal auf localhost 3000, ohne Login; Quellencheck und Fragen nutzen optional Gemini. Wir laden herzlich zum Produktreview ein. Danke.");

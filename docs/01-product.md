@@ -271,15 +271,15 @@ Nutzerauftrag: Nach den Agenten-Fragen eine Auswertung des Vortrags. Sobald
 jede Frage der getippten Runde beantwortet ist, zeigt der Web-Review unten eine
 Zusammenfassung mit Score 0–100 und drei Kategorien: **Inhalt** (Fakten und
 Wissen, Gewicht 0,5 — Anteil quellengestützter Aussagen und Antwort-Urteile),
-**Stimme** (0,25) und **Gestik** (0,25 — Abzug je Marker pro Minute). Dazu
+**Stimme** (0,25) und **Gestik** (0,25 — positive Zeit gegen positive + kritische Zeit). Dazu
 evidenzbasierte Stärken, Übungsvorschläge und ein aufklappbarer
 Methoden-/Grenzen-Hinweis. Der Score ist eine transparente Client-Heuristik aus
-bereits gemessenen Events (`evidence-count-heuristic.v1`), keine Note und keine
-Personenbewertung; Details: `docs/07-review-and-agent.md`. Diese Auswertung ist
-**getrennt** von den drei Review-Scores (`evidence-share-v1`): andere Formel,
-andere Bezugsgröße, kein gemeinsamer Gesamtscore. Die UI soll die beiden
-Ergebnisse entsprechend benennen; eine Vereinheitlichung ist offen
-(`docs/14-open-todos.md`).
+bereits gemessenen Events (`evidence-share-v1`), keine Note und keine
+Personenbewertung; Details: `docs/07-review-and-agent.md`. Review und Fragerunde
+nutzen dieselbe Evidenz-Formel. Die Fragerunde ergänzt zitateverifizierte
+Antwort-Urteile und gewichtet die vorhandenen Kategorien; fehlende Evidenz
+bleibt unbewertet. Positive Hinweise und fehlende Warnungen werden nicht als
+Korrekturen oder erfundene Stärken gezählt.
 
 ## Deep Research (24.10.2026)
 

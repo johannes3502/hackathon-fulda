@@ -5,7 +5,7 @@ import { COLORS, FONT } from "../theme";
 
 const ROWS = [
   "Pose, Whisper und Embeddings laufen lokal.",
-  "Dein Video bleibt auf deinem Gerät.",
+  "Aufnahme temporär zur Server-Analyse.",
   "Cloud nur mit deiner Einwilligung.",
 ];
 

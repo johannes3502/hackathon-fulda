@@ -1,7 +1,15 @@
-import type { ClaimResult, FactCheckResult } from "../factcheck/api";
+import { evidenceVerdict, type FactCheckResult } from "../factcheck/api";
 import type { LiveFeedback, LiveMetric, Word } from "../live/contracts";
 import type { PoseEvent } from "../pose/evaluation";
 import type { QuestionAnswer, QuestionResult } from "../questions/api";
+
+import {
+  reviewScores,
+  REVIEW_SCORE_VERSION,
+  type ScoreMoment,
+} from "../live/review-scores";
+import { needsPractice } from "../live/review";
+import { poseFeedback } from "../pose/feedback";
 
 export type EvaluationCategory = "content" | "voice" | "gesture";
 export type PoseKind = "posture" | "gesture" | "gaze";
@@ -23,7 +31,7 @@ export type PerformanceEvaluation = {
   strengths: string[];
   improvements: string[];
   limitations: string[];
-  method: "evidence-count-heuristic.v1";
+  method: typeof REVIEW_SCORE_VERSION;
 };
 
 export type PerformanceInput = {
@@ -37,38 +45,6 @@ export type PerformanceInput = {
   metrics?: LiveMetric[];
 };
 
-/**
- * Scoring formulas for "evidence-count-heuristic.v1" — a transparent
- * aggregation of moments the prototype already measured, not a validated
- * grade and never a claim about the person.
- *
- * Content (weight 0.5)
- *   Every fact-check claim and every answered question (an answer counts only
- *   when its key is the id of a question in questions.questions) adds points
- *   by verdict: supports = 1, contradicts = 0, not_found/unchecked = 0.5.
- *   score = round(100 * points / items); null without claims and answers.
- * Voice (weight 0.25)
- *   events = feedback items with category pace/volume/pitch/filler/pause
- *   (case-insensitive). eventsPerMin = events / max(0.5, durationMs / 60000).
- *   score = round(max(40, 100 - eventsPerMin * 15)).
- *   Null when there are no words and no such events.
- * Gesture (weight 0.25)
- *   events = feedback items with category posture/gesture/gaze (case-
- *   insensitive, browser labels "Posture"/"Gestures"/"Head" included);
- *   poseEvents are counted only when feedback has no pose category — one
- *   source consistently. Same formula as voice; null without any pose events.
- * Overall
- *   Weighted mean over non-null categories with weights renormalized
- *   (content + voice only -> 2/3 and 1/3); null when all categories are null.
- *   Labels: >= 85 "Strong", >= 70 "Solid", >= 55 "Fair", else "Keep practicing".
- */
-
-const VERDICT_POINTS: Record<ClaimResult["verdict"], number> = {
-  supports: 1,
-  contradicts: 0,
-  not_found: 0.5,
-  unchecked: 0.5,
-};
 const VOICE_CATEGORIES = ["pace", "volume", "pitch", "filler", "pause"];
 const GESTURE_KINDS: Record<string, PoseKind> = {
   posture: "posture",
@@ -89,17 +65,14 @@ const ADJUSTMENT_LABELS: Record<string, string> = {
 };
 const LIMITATIONS = [
   "This is a heuristic summary from measured moments, not a validated grade.",
-  "It counts events from prototype rules; it does not compare you with other speakers.",
+  "Voice and gesture use positive time divided by positive plus corrective time. Unmeasured time is excluded.",
   "“Not found in sources” does not mean a statement is wrong.",
   "The content score reflects coverage by your uploaded sources, not general knowledge.",
 ];
 
 const categoryKey = (category: string) => category.trim().toLowerCase();
 const plural = (count: number) => (count === 1 ? "" : "s");
-const minutesOf = (durationMs: number) =>
-  Math.max(0.5, durationMs / 60000);
-const deductionScore = (events: number, durationMs: number) =>
-  Math.round(Math.max(40, 100 - (events / minutesOf(durationMs)) * 15));
+const minutesOf = (durationMs: number) => Math.max(0.5, durationMs / 60000);
 const overallLabel = (score: number | null) =>
   score === null
     ? "Not enough data"
@@ -125,23 +98,32 @@ type ContentStats = {
 };
 
 function contentStats(input: PerformanceInput): ContentStats {
-  const claims = input.factCheck?.claims ?? [];
+  const claims = (input.factCheck?.claims ?? []).map((claim) => ({
+    ...claim,
+    verdict: evidenceVerdict(claim),
+  }));
   const questions = input.questions?.questions ?? [];
   const answers = input.answers ?? {};
   const answered = questions
     .map((question) => answers[question.id])
-    .filter((answer): answer is QuestionAnswer => !!answer);
+    .filter((answer): answer is QuestionAnswer => !!answer)
+    .map((answer) => ({
+      ...answer,
+      review: { ...answer.review, verdict: evidenceVerdict(answer.review) },
+    }));
   const verdicts = [
     ...claims.map((claim) => claim.verdict),
     ...answered.map((answer) => answer.review.verdict),
   ];
-  const points = verdicts.reduce(
-    (sum, verdict) => sum + VERDICT_POINTS[verdict],
-    0,
+  const decided = verdicts.filter(
+    (verdict) => verdict === "supports" || verdict === "contradicts",
   );
   return {
-    score: verdicts.length
-      ? Math.round((100 * points) / verdicts.length)
+    score: decided.length
+      ? Math.round(
+          (100 * decided.filter((verdict) => verdict === "supports").length) /
+            decided.length,
+        )
       : null,
     claims: claims.length,
     claimSupports: claims.filter((claim) => claim.verdict === "supports")
@@ -149,8 +131,7 @@ function contentStats(input: PerformanceInput): ContentStats {
     claimContradicts: claims.filter((claim) => claim.verdict === "contradicts")
       .length,
     claimUnresolved: claims.filter(
-      (claim) =>
-        claim.verdict === "not_found" || claim.verdict === "unchecked",
+      (claim) => claim.verdict === "not_found" || claim.verdict === "unchecked",
     ).length,
     answers: answered.length,
     answerSupports: answered.filter(
@@ -168,18 +149,6 @@ function contentStats(input: PerformanceInput): ContentStats {
   };
 }
 
-function poseKindsFrom(
-  feedback: LiveFeedback[],
-  poseEvents: PoseEvent[],
-): PoseKind[] {
-  const fromFeedback = feedback.flatMap((item) => {
-    const kind = GESTURE_KINDS[categoryKey(item.category)];
-    return kind ? [kind] : [];
-  });
-  if (fromFeedback.length) return fromFeedback;
-  return poseEvents.map((event) => event.type);
-}
-
 function countEvidence(
   kinds: string[],
   labels: Record<string, string>,
@@ -195,20 +164,35 @@ export function evaluatePerformance(
   input: PerformanceInput,
 ): PerformanceEvaluation {
   const durationMs = Number.isFinite(input.durationMs) ? input.durationMs : 0;
-  const feedback = input.feedback ?? [];
+  const feedback = [...(input.feedback ?? [])];
+  if (!feedback.some((item) => GESTURE_KINDS[categoryKey(item.category)]))
+    feedback.push(...(input.poseEvents ?? []).map(poseFeedback));
   const content = contentStats(input);
-
-  const voice = feedback.filter((item) =>
+  const moments: ScoreMoment[] = feedback.map((item) => ({
+    criterion: VOICE_CATEGORIES.includes(categoryKey(item.category))
+      ? "flow"
+      : GESTURE_KINDS[categoryKey(item.category)]
+        ? "gesture"
+        : null,
+    kind:
+      item.kind === "positive"
+        ? "positive"
+        : needsPractice(item)
+          ? "attention"
+          : "note",
+    tMs: item.startMs,
+    durationMs: item.endMs - item.startMs,
+  }));
+  const scores = reviewScores(moments, durationMs);
+  const voiceScore = scores.flow.value;
+  const gestureScore = scores.gesture.value;
+  const corrective = feedback.filter(needsPractice);
+  const voice = corrective.filter((item) =>
     VOICE_CATEGORIES.includes(categoryKey(item.category)),
   );
-  const hasWords = (input.words ?? []).length > 0;
-  const voiceScore =
-    hasWords || voice.length ? deductionScore(voice.length, durationMs) : null;
-
-  const poseKinds = poseKindsFrom(feedback, input.poseEvents ?? []);
-  const gestureScore = poseKinds.length
-    ? deductionScore(poseKinds.length, durationMs)
-    : null;
+  const poseKinds = corrective.flatMap(
+    (item) => GESTURE_KINDS[categoryKey(item.category)] ?? [],
+  );
 
   const settled = content.claimSupports + content.answerSupports;
   const differs = content.claimContradicts + content.answerContradicts;
@@ -241,11 +225,7 @@ export function evaluatePerformance(
     ADJUSTMENT_LABELS,
     "adjustment",
   );
-  const gestureEvidence = countEvidence(
-    poseKinds,
-    ADJUSTMENT_LABELS,
-    "marker",
-  );
+  const gestureEvidence = countEvidence(poseKinds, ADJUSTMENT_LABELS, "marker");
 
   const categories: PerformanceCategory[] = [
     {
@@ -255,7 +235,7 @@ export function evaluatePerformance(
       score: content.score,
       summary:
         content.score === null
-          ? "No checked statements or answered questions were available."
+          ? "No source-verified, decidable statements or answers were available."
           : `${settled} of ${items} checked statements and answers fit the sources; ${differs} differed, ${unresolved} were not settled by the checked sources.`,
       evidence: contentEvidence,
       ...(content.score === null
@@ -272,13 +252,16 @@ export function evaluatePerformance(
       score: voiceScore,
       summary:
         voiceScore === null
-          ? "No transcript or speech adjustments were recorded."
+          ? "No assessed speech evidence was recorded."
           : `${voice.length} pace, volume, pitch, filler or pause adjustment${plural(voice.length)} — about ${(voice.length / minutesOf(durationMs)).toFixed(1)} per minute.`,
-      evidence: voiceEvidence,
+      evidence: [
+        ...voiceEvidence,
+        `${Math.round(scores.flow.coverage * 100)}% of the recording assessed; ${scores.flow.positiveMs / 1000} s positive, ${scores.flow.attentionMs / 1000} s corrective.`,
+      ],
       ...(voiceScore === null
         ? {
             limitation:
-              "Without words or speech feedback no voice score is calculated.",
+              "A transcript alone does not establish voice quality. Missing evidence stays unscored.",
           }
         : {}),
     },
@@ -291,9 +274,12 @@ export function evaluatePerformance(
         gestureScore === null
           ? "Posture was not evaluated."
           : `${poseKinds.length} posture, gesture or head-direction marker${plural(poseKinds.length)} — about ${(poseKinds.length / minutesOf(durationMs)).toFixed(1)} per minute.`,
-      evidence: gestureEvidence,
+      evidence: [
+        ...gestureEvidence,
+        `${Math.round(scores.gesture.coverage * 100)}% of the recording assessed; ${scores.gesture.positiveMs / 1000} s positive, ${scores.gesture.attentionMs / 1000} s corrective.`,
+      ],
       ...(gestureScore === null
-        ? { limitation: "No pose markers were recorded." }
+        ? { limitation: "No assessed pose evidence was recorded." }
         : {}),
     },
   ];
@@ -321,19 +307,17 @@ export function evaluatePerformance(
     strengths.push(
       `${content.answerSupports} of ${content.answers} answers matched the sources`,
     );
-  if (voiceScore !== null && voiceScore >= 85)
-    strengths.push("Few pacing, volume or pitch adjustments were detected");
-  if (gestureScore !== null && gestureScore >= 85)
-    strengths.push("Few posture or gesture adjustments were detected");
+  strengths.push(
+    ...feedback
+      .filter((item) => item.kind === "positive")
+      .map((item) => item.title),
+  );
 
   const adjustments = new Map<string, number>();
-  for (const item of feedback) {
+  for (const item of corrective) {
     const key = categoryKey(item.category);
-    const mapped = VOICE_CATEGORIES.includes(key)
-      ? key
-      : GESTURE_KINDS[key];
-    if (mapped)
-      adjustments.set(mapped, (adjustments.get(mapped) ?? 0) + 1);
+    const mapped = VOICE_CATEGORIES.includes(key) ? key : GESTURE_KINDS[key];
+    if (mapped) adjustments.set(mapped, (adjustments.get(mapped) ?? 0) + 1);
   }
   let mostAdjusted: { label: string; count: number } | null = null;
   for (const [key, count] of adjustments)
@@ -361,6 +345,6 @@ export function evaluatePerformance(
     strengths: strengths.slice(0, 3),
     improvements: improvements.slice(0, 3),
     limitations: LIMITATIONS,
-    method: "evidence-count-heuristic.v1",
+    method: REVIEW_SCORE_VERSION,
   };
 }

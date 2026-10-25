@@ -39,7 +39,7 @@ Ohne ausreichende Evidenz bleibt der jeweilige Score offen.
 2. **Aufnahme:** Kamera und Mikro laufen. Im Browser erzeugt MediaPipe live Pose-Landmarks und einen Kopforientierungs-Proxy, daraus entstehen Events; das Mikro liefert den Pegel.
 3. **Übergabe:** Session/Take-Metadaten und abgeleitete Pose-Events gehen ans Backend. Audio oder Aufnahme für ASR/Sprechanalyse nur optional und temporär hochladen.
 4. **Analyse (Backend):** Transkription mit Wort-Timestamps, Sprechmerkmale, Fact-Check. Timestamp-Daten und Review bleiben in Postgres; der Upload wird auch bei Analysefehlern gelöscht.
-5. **Review:** Timeline über alle finalen Events; `peakMs` ist das Sprungziel im lokalen Video. Das Frontend speichert abgeschlossene Takes inklusive Video, Analyse und Fragenverlauf lokal in IndexedDB und stellt sie nach Reload wieder her. Lokales Löschen im Review; kein Geräte-Sync, Backend-Daten bleiben separat.
+5. **Review:** Timeline über alle finalen Events; `peakMs` ist das Sprungziel im lokalen Video. Das Frontend speichert gestoppte Takes inklusive Video sofort lokal in IndexedDB, ergänzt Analyse und Fragenverlauf danach und stellt sie nach Reload wieder her. Lokales Löschen im Review; kein Geräte-Sync, Backend-Daten bleiben separat.
 6. **Frage-Simulator:** Der Agent stellt gezielte Rückfragen, vor allem zu Widersprüchen und Lücken aus dem Fact-Check, und vergleicht die Antworten mit den Quellen.
 
 ## 3. Tech-Stack
@@ -225,13 +225,14 @@ vollständig beantworteten getippten Runde zeigt der Web-Review eine Auswertung
 (`frontend/src/features/evaluation/performance.ts`, Panel
 `PerformanceEvaluation.tsx`): transparenter Heuristik-Score 0–100 aus bereits
 gemessenen Events — Inhalt (Gewicht 0,5; Fact-Check- und Antwort-Urteile),
-Stimme (0,25) und Gestik (0,25; je 15 Punkte Abzug pro Marker/Minute, Floor 40,
-Gewichte renormalisiert wenn Daten fehlen) — mit Belegen, Stärken,
+Stimme (0,25) und Gestik (0,25; `evidence-share-v1`: positive Zeit gegen
+positive + kritische Zeit, Inhalt nur aus zitateverifizierten entscheidbaren
+Urteilen; Gewichte renormalisiert wenn Daten fehlen) — mit Belegen, Stärken,
 Übungsvorschlägen und Methodenhinweis; keine Personenbewertung. Voice-Agent: Rolle `student` (neugieriger Erstsemester) oder
-`tutor` (Professor/Tutor) wählbar; der Browser liest Fragen und Reaktionen per
-`speechSynthesis` vor, gesprochene Antworten gehen über
-`POST /questions/answers/voice` an den konfigurierten Transcriber (standardmäßig lokales Whisper) und werden danach wie getippte
-Antworten gegen die Quellen geprüft. Im Live-Studio lässt sich die
+`tutor` (Professor/Tutor) wählbar. Der Web-Sprachdialog nutzt ElevenLabs;
+der alte Browser-TTS-Client ist entfernt. Der kompatible Backend-Endpunkt
+`POST /questions/answers/voice` bleibt für ASR und zitateverifizierten
+Antwortvergleich verfügbar. Im Live-Studio lässt sich die
 Transkription (lokales Whisper) vor der Aufnahme zuschalten; die Wörter sind Eingabe
 für den Fact-Check. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
@@ -262,8 +263,8 @@ Handreferenzen bleiben im Payload `null`; Gesten nutzen dann Schultergeometrie.
 Alle Pose-Regeln halten einheitlich 2 s (`POSE_RULES.stabilizeHoldMs`); Arme
 verschränkt behalten 20 s Cooldown. Die Live-Hinweisblase (Pose und Stimme)
 zeigt jeden Hinweis mindestens 3 s und lässt danach 2 s Lücke
-(`minDisplayMs`/`minDisplayGapMs`). `praiseAfterMs` wirkt seit Entfernen der
-Pose-lab-Coach-Ansicht nicht mehr sichtbar. Alle Werte sind unter `/admin`
+(`minDisplayMs`/`minDisplayGapMs`). Die wirkungslose Einstellung `praiseAfterMs`
+ist entfernt; alte Browser-Einstellungen bleiben lesbar. Alle Werte sind unter `/admin`
 (Navbar, noch ohne Login) pro Browser in `localStorage` einstellbar. Dort lässt
 sich auch jede der 13 Live-Pose-Regeln (7 kalibrierte + 6 aus Pose lab) auf On
 (Hinweis + Review), Review only (nur Timeline) oder Off stellen, wirksam sofort im

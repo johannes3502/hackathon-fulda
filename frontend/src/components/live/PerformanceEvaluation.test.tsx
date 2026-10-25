@@ -7,7 +7,7 @@ it("explains a missing overall score instead of displaying an empty scale", () =
     <PerformanceEvaluation input={{ durationMs: 60000 }} />,
   );
   expect(html).toContain("No overall score available");
-  expect(html).toContain("Create a transcript or run a source check");
+  expect(html).toContain("Record feedback or run a source check");
   expect(html).not.toContain('class="performance-score"');
 });
 
@@ -31,6 +31,13 @@ it.each([
                 verdict,
                 explanation: "Synthetic comparison",
                 checked: ["upload"],
+                evidence: {
+                  passage: "Synthetic statement",
+                  kind: "upload",
+                  label: "Synthetic source",
+                  quote: "Synthetic statement",
+                  quote_verified: "exact",
+                },
               },
             ],
             config: {

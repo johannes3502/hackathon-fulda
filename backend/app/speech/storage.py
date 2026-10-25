@@ -4,9 +4,10 @@
 """
 
 import json
+import logging
 import os
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
 from app.connections import s3_client
 
@@ -34,4 +35,15 @@ def write_json(job_id: str, name: str, value: dict, prefix: str = "speech-jobs")
 
 
 def delete_input(job_id: str):
-    s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=key(job_id, "recording"))
+    for name in ("recording", "request.json"):
+        s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=key(job_id, name))
+
+
+def discard_job(job_id: str, prefix: str = "speech-jobs"):
+    """Remove partially stored, unaccepted jobs, including any voice upload."""
+    for name in ("recording", "request.json", "status.json"):
+        try:
+            s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=key(job_id, name, prefix))
+        except (BotoCoreError, ClientError):
+            # shortcut: simultaneous queue/storage outages need the retention sweeper in docs/14-open-todos.md.
+            logging.getLogger(__name__).warning("Could not discard %s/%s/%s", prefix, job_id, name)

@@ -39,8 +39,6 @@ export const POSE_RULES = Object.freeze({
   minDisplayMs: 3000,
   // Blank bubble between two consecutive hints; 0 swaps back-to-back.
   minDisplayGapMs: 2000,
-  // Pose lab praise needs this long without a correction.
-  praiseAfterMs: 10000,
 });
 export const POSE_RULE_IDS = [
   "hand_raised",

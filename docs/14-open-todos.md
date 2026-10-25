@@ -1,8 +1,8 @@
 # Offene TODOs — Stand 25.10.2026
 
-Diese Liste hält Punkte fest, die bewusst nicht in diesem Change umgesetzt
-wurden. Erledigt wurden nur Pitch-Korrekturen, der reproduzierbare
-Pitch-Generator und der Doku-Abgleich.
+Diese Liste trennt offene Produktarbeit von verifizierten Korrekturen.
+Der Cleanup vom 25.10.2026 aktualisiert erledigte Punkte; historische
+Entscheidungslogs bleiben erhalten.
 
 ## P0 — vor Jury/Feature Freeze entscheiden
 
@@ -14,15 +14,15 @@ Pitch-Generator und der Doku-Abgleich.
   Daten. Checkliste in `13-long-term-progress-frontend-contract.md` §2
   abarbeiten, inklusive `profileId`, `deviceKey`, `takeId`-Zuordnung und
   lokalem Video-Link.
-- [ ] **Retention/Cleanup der 12-Monats-Frist.** Die UI nennt 12 Monate
-  (`ProgressDashboard.tsx:911`), aber es gibt keinen Löschjob. Benötigt:
+- [ ] **Retention/Cleanup der 12-Monats-Frist.** Die UI benennt jetzt
+  die Zugriffssperre nach 12 Monaten und die fehlende automatische Löschung. Benötigt:
   täglicher Celery-Cleanup für abgelaufene Profile (Progress-Daten, Ziele,
   Snapshots, Change-Points, `take_metrics`/`take_quality`; Sessions/Takes
   dabei entkoppeln, nicht automatisch löschen), konfigurierbare Frist und
   Tests für idempotente Wiederholung. S3-Analyseergebnisse und Jobs brauchen
-  eine eigene TTL/Cleanup-Regel. Bis dahin die UI-Formulierung auf
-  „Zugriff gesperrt; automatische Löschung folgt“ ändern oder die Frist
-  entfernen.
+  eine eigene TTL/Cleanup-Regel, auch für gleichzeitig ausgefallene Queue und
+  Storage bei abgelehnten Jobs. Fehler beim Löschen terminaler Job-Inputs
+  werden bereits mit dem gespeicherten Ergebnis erneut versucht.
 - [ ] **Session-/Take-Löschung serverseitig.** Lokal ist Löschen bereits
   umgesetzt (IndexedDB, `LiveReview` → „Delete saved session“). Das Backend
   `DELETE /sessions/{id}` kaskadiert, wird vom Web-Frontend aber nicht
@@ -37,12 +37,11 @@ Pitch-Generator und der Doku-Abgleich.
   serverseitige Zähler/Validator. Voice/ElevenLabs: Client-Timer,
   Turn-Zähler, sichtbarer Stop und `endSession`, Abschlussgrund loggen.
   Automatisches Antwortende per Stille bleibt separat.
-- [ ] **Zwei Score-Systeme klar trennen.** Review nutzt
-  `evidence-share-v1` (drei Kriterien, Zeitanteile/Quellenurteile), die
-  Auswertung nach der Fragerunde `evidence-count-heuristic.v1` (drei
-  Kategorien, Marker/Urteile). Nicht addieren oder vergleichen; im UI als
-  „Review-Evidenz“ vs. „Auswertung nach der Fragerunde“ benennen. Später
-  entscheiden, ob beide bleiben oder vereinheitlicht werden.
+- [x] **Score-Formel vereinheitlichen.** Review und Auswertung nach der
+  Fragerunde verwenden `evidence-share-v1`: positive Zeit gegen positive +
+  kritische Zeit; nur zitateverifizierte, entscheidbare Quellenurteile.
+  Die Fragerunde ergänzt Antwort-Urteile und behält ihre sichtbare Gewichtung.
+  Transkript allein und fehlende Warnungen erzeugen weder Score noch Lob.
 - [ ] **Demo-Härtung.** Der Compose-Frontend läuft im Dev-Modus
   (`frontend/Dockerfile:19`). Nach Merges kann Turbopack neue Module nicht
   finden (beobachtet: `/review-preview` 500; Restart behob es). Vor der Jury
@@ -67,8 +66,8 @@ Pitch-Generator und der Doku-Abgleich.
   Deepgram/ElevenLabs im Demo-Setup bewusst aktivieren oder ausschalten und
   im Pitch nicht als aktiv behaupten.
 - [ ] Automatisches Antwortende per Stille (VAD) und Sitzungstimer.
-- [ ] Root-Checks für den Mobile-Workspace wiederherstellen
-  (`npm ci` oder Mobile aus den Workspaces nehmen).
+- [x] Root-Checks für den Mobile-Workspace sind eingerichtet; `lint`,
+  `typecheck` und Tests laufen über die npm-Workspaces.
 - [ ] Backend-Testpackaging: `templates/` wird nicht ins Backend-Image kopiert;
   `test_web_search_tool_uses_server_secret_and_bounded_results` schlägt nur im
   Container fehl. `COPY templates/ /templates/` ergänzen oder den Test
@@ -84,7 +83,7 @@ Pitch-Generator und der Doku-Abgleich.
 - [ ] Hydration-Warnung auf `/demo` beseitigen.
 - [ ] OpenAPI-Schemas `FactCheckRequest` und `FactcheckRequest` unterscheiden
   nur in Groß-/Kleinschreibung; für generierte Clients umbenennen.
-- [ ] Untracked Demo-Material (`test-presentations/`,
-  `scripts/make_test_presentations.py`) committen oder entfernen.
+- [x] Demo-Material (`test-presentations/`,
+  `scripts/make_test_presentations.py`) ist bereits versioniert.
 - [ ] README-/Doc-Reste nach dem Score-Update regelmäßig gegen den Code
   prüfen (historische Entscheidungslogs nicht rückwirkend ändern).

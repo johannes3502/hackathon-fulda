@@ -130,48 +130,6 @@ export function reviewAnswer(
   );
 }
 
-/** Upload a spoken answer; the backend transcribes it, then compares it like a typed one. */
-export function reviewVoiceAnswer(
-  endpoint: string,
-  input: {
-    question: Question;
-    recording: Blob;
-    collectionId: string | null;
-    persona: Persona;
-    presentationMode?: PresentationMode;
-  },
-  signal: AbortSignal,
-  pollMs = 1000,
-): Promise<AnswerReview> {
-  const body = new FormData();
-  body.append(
-    "recording",
-    input.recording,
-    input.recording.type.includes("mp4") ? "answer.mp4" : "answer.webm",
-  );
-  body.append(
-    "request",
-    JSON.stringify({
-      question: input.question,
-      collection_id: input.collectionId,
-      persona: input.persona,
-      presentation_mode: input.presentationMode ?? "thesis",
-    }),
-  );
-  return runBackendJob(
-    endpoint,
-    {
-      path: "/questions/answers/voice",
-      statusPath: "/questions/answers",
-      body,
-      label: "spoken answer",
-      valid: validReview,
-    },
-    signal,
-    pollMs,
-  );
-}
-
 /** Insert a follow-up right after the question it was asked about. */
 export function withFollowUp(
   questions: Question[],

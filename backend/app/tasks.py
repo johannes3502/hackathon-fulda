@@ -8,6 +8,7 @@ from pathlib import Path
 from uuid import UUID
 
 from celery.exceptions import SoftTimeLimitExceeded
+from botocore.exceptions import BotoCoreError, ClientError
 
 from app.celery_app import celery_app
 from app.connections import s3_client
@@ -107,6 +108,8 @@ def analyze_speech(self, job_id: str) -> dict[str, str]:
         storage.write_json(job_id, "status.json", status.model_dump(mode="json"))
         storage.delete_input(job_id)
         return {"job_id": job_id, "status_key": storage.key(job_id, "status.json")}
+    except (BotoCoreError, ClientError) as failure:
+        raise self.retry(countdown=30) from failure
     finally:
         lock.release()
 
@@ -146,6 +149,8 @@ def _model_job(task, job_id: str, prefix: str, job_model, run, error: str,
         for name in inputs:
             s3_client().delete_object(Bucket=os.environ["S3_BUCKET"], Key=storage.key(job_id, name, prefix))
         return {"job_id": job_id, "status_key": storage.key(job_id, "status.json", prefix)}
+    except (BotoCoreError, ClientError) as failure:
+        raise task.retry(countdown=30) from failure
     finally:
         lock.release()
 

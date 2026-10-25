@@ -95,8 +95,10 @@ liefert und keine Frage den Validator verletzt.
 - Cache im Browser (Blob-URLs), Fallback auf Browser-TTS, wenn der Proxy
   ausfällt.
 
-**Dateien:** neuer TTS-Proxy, `frontend/src/features/questions/voice.ts`,
-`frontend/src/components/live/VoiceConversation.tsx`.
+**Historischer Plan:** Der Browser-TTS-Client ist inzwischen entfernt.
+Aktiver Web-Sprachdialog: `frontend/src/components/live/QuestionPractice.tsx`
+mit ElevenLabs SDK; siehe `07-review-and-agent.md`. Dieser Abschnitt beschreibt
+keinen aktuellen Implementierungsauftrag.
 
 **Fertig, wenn:** „Fragerunde starten“ die erste Frage aus dem Cache abspielt
 und bei fehlendem Cache ein Filler hörbar ist.

@@ -1,4 +1,4 @@
-/** Backend calls and Celery job polling shared by the fact-check and question simulator. */
+/** Backend calls and Celery job polling shared by audio, fact-check and questions. */
 
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export const isObject = (v: unknown): v is Record<string, unknown> =>
@@ -12,19 +12,21 @@ export async function callBackend(
 ): Promise<unknown> {
   const response = await fetch(`${endpoint}${path}`, {
     ...init,
-    signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]),
+    signal: AbortSignal.any([signal, AbortSignal.timeout(120000)]),
     cache: "no-store",
   });
   if (!response.ok) {
     let detail = "";
     try {
       const body = (await response.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") detail = `: ${body.detail}`;
+      if (typeof body.detail === "string")
+        detail = `: ${body.detail.slice(0, 250)}`;
     } catch {}
     throw new Error(
       `Backend ${path} failed (HTTP ${response.status})${detail}`,
     );
   }
+  if (response.status === 204) return undefined;
   return response.json();
 }
 
@@ -57,6 +59,20 @@ export async function runBackendJob<T>(
           body: JSON.stringify(job.body),
         },
   );
+  return waitForBackendJob(endpoint, accepted, job, signal, pollMs);
+}
+
+export async function waitForBackendJob<T>(
+  endpoint: string,
+  accepted: unknown,
+  job: {
+    statusPath: string;
+    label: string;
+    valid: (result: unknown) => result is T;
+  },
+  signal: AbortSignal,
+  pollMs = 1500,
+): Promise<T> {
   if (
     !isObject(accepted) ||
     typeof accepted.job_id !== "string" ||
@@ -96,6 +112,7 @@ export async function runBackendJob<T>(
         resolve();
       }, pollMs);
       active.addEventListener("abort", abort, { once: true });
+      if (active.aborted) abort();
     });
   }
 }

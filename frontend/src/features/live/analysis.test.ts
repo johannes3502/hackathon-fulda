@@ -217,7 +217,6 @@ it("uploads a complete recording only after stopping and maps real feedback", as
   const transport = new AnalysisTransport("http://localhost:8000");
   const receive = vi.fn();
   await transport.connect({ sessionId: "test" }, receive);
-  await transport.send();
   expect(fetcher).toHaveBeenCalledTimes(1);
   await transport.finish(
     1000,
@@ -288,7 +287,7 @@ it("reports failed jobs and cancels polling when the transport closes", async ()
   const receive = vi.fn();
   await transport.connect({ sessionId: "test" }, receive);
   await expect(transport.finish(1000, new Blob(["bad"]))).rejects.toThrow(
-    "local recording is preserved",
+    "analysis failed",
   );
   expect(receive).not.toHaveBeenCalled();
   transport.close();
