@@ -1,6 +1,9 @@
 {
   "name": "hackathon-fulda",
   "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "workspaces": [
     "frontend"
   ],
@@ -13,6 +16,7 @@
     "test": "npm run test --workspaces --if-present",
     "test:compose": "node --test scripts/compose.test.mjs",
     "test:e2e": "npm run test:e2e --workspace frontend",
+    "test:smoke": "node scripts/smoke-web.mjs",
     "api:export": "node scripts/export-openapi.mjs",
     "api:types": "openapi-typescript api/openapi.json -o api/schema.d.ts",
     "api:generate": "npm run api:export && npm run api:types",

@@ -3,7 +3,7 @@
 Status: Backend-P0 und technische P1/P2-Anbindung implementiert (24.10.2026).
 Frontend-Anbindung bleibt ein separater Team-Change. Menschlich gelabelte
 Evaluation und Geräte-/Browser-Abnahme stehen aus; Prüfumfang in §13.
-Bezug: `docs/03-architecture.md`, `docs/04-pose-tracking-requirements.md`, `docs/05-frontend-review-ux.md`, `AGENTS.md`.
+Bezug: `docs/03-architecture.md`, `docs/04-pose-tracking-requirements.md`, `frontend/DESIGN.md`, `AGENTS.md`.
 
 ## Ergänzung 25.10.2026: Runden und Löschung
 

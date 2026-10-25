@@ -1,7 +1,9 @@
 # Offene TODOs — Stand 25.10.2026
 
 Diese Liste trennt erledigte Änderungen und offene Abnahme. Stand nach dem
-reviewten Merge von `feature/structure-safety-scores`, 25.10.2026.
+Jury-Cleanup auf `main`, 25.10.2026. Die aktive Web-Aufnahme, Beispielpfade und
+separaten APIs bleiben erhalten; unverbundene alte Fragepanels und der
+wirkungslos gewordene Pose-Lob-Timer sind entfernt.
 
 ## P0 — vor Jury/Feature Freeze entscheiden
 
@@ -44,9 +46,10 @@ reviewten Merge von `feature/structure-safety-scores`, 25.10.2026.
 - [x] **Demo-Härtung.** Das Compose-Frontend baut seit 25.10.2026 als
   Production-Build (`frontend/Dockerfile`); Turbopack/HMR-Hydrationfehler des
   Dev-Containers sind damit nicht mehr der Jury-Pfad. `docker compose up
-  --build -d --wait` und danach `/stage` prüfen. Der Healthcheck deckt
-  `/review-preview`, `/demo`, `/gestures`, `/sources`, `/progress`, `/admin`
-  und `/api/health/ready` ab; `/stage` wird im Preflight geprüft.
+  --build -d --wait` und danach `/stage` prüfen. Der Healthcheck prüft
+  `/` und `/api/health/ready`; `npm run test:smoke` deckt die Produktrouten,
+  Stage sowie Pose-/Audio-/Video-Assets ab. API, Worker und Beat nutzen seit
+  dem Cleanup ebenfalls das gebaute Image ohne Hot Reload oder Source-Mounts.
 - [x] **Pitch Mode / Stage.** `/stage` mit Preflight, lokalem Sofortpfad als
   Default, optionalem Live-Pfad, 90-s-Wartefrist auf Analyse und frühem lokalen
   Speichern. `GET /questions/pitch` liefert genau eine feste Datenschutzfrage
@@ -62,10 +65,10 @@ reviewten Merge von `feature/structure-safety-scores`, 25.10.2026.
   ohne VAD blockierte ein synthetischer Ton den Job bis zum 600-s-Limit.
   `WHISPER_VAD_FILTER=true` ist daher der Compose-Default; deutsche Sprache
   wurde mit dem Test-Fixture transkribiert.
-- [ ] **Localhost/QR/Smartphone entscheiden.** `compose.yaml` bindet nur
-  `127.0.0.1`; ein Jury-Gerät oder QR-Code ist damit nicht erreichbar. Wenn
-  nötig: HTTPS-Tunnel, `0.0.0.0`-Bind und CORS anpassen. Sonst in der
-  Demo-Anleitung ausdrücklich „nur Demo-Laptop“ festhalten.
+- [x] **Lokaler Demo-Pfad festgelegt.** Nutzerentscheidung: vorbereiteter
+  Laptop auf `localhost`, kein öffentliches Deployment oder Smartphone-Pfad.
+  README und Jury-Anleitung benennen diesen Umfang; Compose bleibt an
+  `127.0.0.1` gebunden.
 - [ ] **Demo-Backup.** Es gibt kein Screen-Recording und kein gerendertes
   Promo-Video (`promo/out` fehlt). Vor der Jury Screenshots/Video des
   Sample-Demos und des Live-Review-Pfads ablegen.
@@ -81,10 +84,9 @@ reviewten Merge von `feature/structure-safety-scores`, 25.10.2026.
   im Pitch nicht als aktiv behaupten.
 - [ ] Automatisches Antwortende per Stille (VAD); Browser-Sitzungstimer ist umgesetzt.
 - [x] Mobile-Workspace ist bereits auf `main` entfernt; Root-Checks nutzen nur das Web-Frontend.
-- [ ] Backend-Testpackaging: `templates/` wird nicht ins Backend-Image kopiert;
-  `test_web_search_tool_uses_server_secret_and_bounded_results` schlägt nur im
-  Container fehl. `COPY templates/ /templates/` ergänzen oder den Test
-  überspringen, wenn die Vorlage fehlt.
+- [x] Backend-Packaging: Repository-Root als Build-Kontext; `templates/`
+  wird nach `/templates/` kopiert. API, Worker und Scheduler teilen dasselbe
+  Image. Modelldownloads bleiben bei gewöhnlichen Codeänderungen gecacht.
 
 ## P2 — Kleinigkeiten
 
@@ -92,10 +94,11 @@ reviewten Merge von `feature/structure-safety-scores`, 25.10.2026.
 - [x] Favicon und App-Icons vorhanden.
 - [ ] Sprachkonsistenz: Start/Progress deutsch, Studio/Review englisch;
   `html lang="en"` für deutsche Startseite prüfen.
-- [ ] Hydration-Warnung auf `/demo` beseitigen.
+- [x] `/demo` im Production-Build ohne Hydration-Fehler: Browser-Regression
+  `simple-ui.spec.ts` und direkter Chromium-Check beim Jury-Cleanup bestanden.
 - [x] Take-Optionen heißen `TakeFactcheckRequest`; kein nur durch Großschreibung
   abweichendes OpenAPI-Modell mehr.
-- [ ] Untracked Demo-Material (`test-presentations/`,
-  `scripts/make_test_presentations.py`) committen oder entfernen.
+- [x] Synthetisches Demo-Material (`test-presentations/`,
+  `scripts/make_test_presentations.py`) ist versioniert.
 - [ ] README-/Doc-Reste nach dem Score-Update regelmäßig gegen den Code
   prüfen (historische Entscheidungslogs nicht rückwirkend ändern).

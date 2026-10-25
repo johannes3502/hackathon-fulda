@@ -1,4 +1,4 @@
-"""Small connection helpers; no product schema or recording persistence yet."""
+"""Infrastructure connections shared by API routes and background workers."""
 
 import os
 from functools import lru_cache

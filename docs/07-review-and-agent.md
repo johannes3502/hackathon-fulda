@@ -1,9 +1,10 @@
 # Review und ElevenLabs-Fragerunde
 
-Nutzerentscheidung, 24.10.2026: zwei Review-Schritte, Fragen passend zu
-Startup-Pitch, Thesis-Verteidigung oder Schulvortrag. Nonprofit wird nicht mehr
-zur Auswahl angeboten; bestehende Aufnahmen bleiben kompatibel.
-Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
+Zwei Review-Schritte: zeitgenaue Anmerkungen und anschließende Fragen.
+Seit der Bildungsfokussierung am 25.10.2026 sind Schulvortrag und
+Thesis-Verteidigung auswählbar. Startup und Nonprofit bleiben für vorhandene
+Aufnahmen kompatibel. Der Web-Dialog braucht die ElevenLabs-Zugangsdaten;
+die lokale Jury-Frage unter `/stage` funktioniert ohne Anbieter.
 
 ## Ablauf
 

@@ -6,13 +6,11 @@ import { disabledLabTests, loadPoseFeedback } from "../admin/pose-feedback";
 // Dispatched by the admin pose switches in the same tab.
 const SETTINGS_CHANGED = "pitchcoach:pose-feedback";
 
-// Pose lab follows the admin hold; praise lasts one minimum display time.
+// Pose lab follows the same hold and disabled-test settings as live capture.
 const labTiming = () => {
   const s = loadLiveHintSettings();
   return {
     alertHoldMs: s.stabilizeHoldMs,
-    praiseAfterMs: s.praiseAfterMs,
-    praiseShowMs: s.minDisplayMs,
     disabled: disabledLabTests(loadPoseFeedback()),
   };
 };

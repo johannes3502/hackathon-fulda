@@ -1,7 +1,7 @@
 import type { ClaimResult, FactCheckResult } from "../factcheck/api";
 import type { LiveFeedback, LiveMetric, Word } from "../live/contracts";
 import type { PoseEvent } from "../pose/evaluation";
-import type { QuestionAnswer, QuestionResult } from "../questions/api";
+import type { QuestionAnswer, QuestionResult } from "../questions/contracts";
 
 export type EvaluationCategory = "content" | "voice" | "gesture";
 export type PoseKind = "posture" | "gesture" | "gaze";

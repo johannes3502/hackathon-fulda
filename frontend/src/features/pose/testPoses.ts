@@ -576,22 +576,16 @@ export type PoseTestResult = {
   display: string;
   values: Record<string, PoseValue>;
   failing: string[];
-  // Neutral only: a positive coach message is due after a quiet period.
-  praise: boolean;
 };
 
 export type PoseTestTiming = {
   alertHoldMs: number;
-  praiseAfterMs: number;
-  praiseShowMs: number;
   // Tests switched off in the admin page always report "off".
   disabled: readonly PoseTestId[];
 };
-// Defaults keep the lab instant: alerts without hold, praise while neutral.
+// The standalone lab is instant; capture supplies the configured hold.
 const LAB_TIMING: PoseTestTiming = {
   alertHoldMs: 0,
-  praiseAfterMs: 0,
-  praiseShowMs: Infinity,
   disabled: [],
 };
 
@@ -604,8 +598,6 @@ type Track = {
 export class PoseTestTracker {
   private tracks = new Map<PoseTestId, Track>();
   private timing: PoseTestTiming;
-  private quietSince: number | null = null;
-  private praiseUntil = -Infinity;
   // Alerts also wait for the admin hold; baseline and framing stay instant.
   constructor(timing: Partial<PoseTestTiming> = {}) {
     this.timing = { ...LAB_TIMING, ...timing };
@@ -614,8 +606,6 @@ export class PoseTestTracker {
   reset(timing: Partial<PoseTestTiming> = {}) {
     this.tracks.clear();
     this.timing = { ...this.timing, ...timing };
-    this.quietSince = null;
-    this.praiseUntil = -Infinity;
   }
 
   update(
@@ -639,7 +629,6 @@ export class PoseTestTracker {
           display: "disabled",
           values: {},
           failing: [],
-          praise: false,
         };
       }
       const holdMs =
@@ -701,32 +690,8 @@ export class PoseTestTracker {
         display: evaluation.display,
         values: evaluation.values,
         failing: evaluation.failing,
-        praise: false,
       };
     });
-    // A held or pending correction restarts the quiet period. Praise shows
-    // once per quiet period, then the period starts again after it.
-    const alerting = results.some(
-      (r) =>
-        r.kind === "alert" &&
-        (r.state === "recognized" || r.state === "watching"),
-    );
-    const neutral = results.find((r) => r.id === "neutral")!;
-    if (alerting || this.quietSince === null) {
-      this.quietSince = now;
-      if (alerting) this.praiseUntil = -Infinity;
-    }
-    if (
-      !alerting &&
-      neutral.state === "recognized" &&
-      now >= this.praiseUntil &&
-      now - this.quietSince >= this.timing.praiseAfterMs
-    ) {
-      this.praiseUntil = now + this.timing.praiseShowMs;
-      this.quietSince = this.praiseUntil;
-    }
-    neutral.praise =
-      !alerting && neutral.state === "recognized" && now < this.praiseUntil;
     return results;
   }
 }
@@ -739,11 +704,7 @@ export type PoseFeedback = {
   failing: string[];
 };
 
-// The coach shows neutral only when praise is due; status shows it raw.
-export function poseFeedback(
-  results: PoseTestResult[],
-  coach = false,
-): PoseFeedback {
+export function poseFeedback(results: PoseTestResult[]): PoseFeedback {
   const alerts = results.filter(
     (result) => result.kind === "alert" && result.state === "recognized",
   );
@@ -757,7 +718,7 @@ export function poseFeedback(
       failing: top.failing,
     };
   const neutral = results.find((result) => result.id === "neutral");
-  if (neutral?.state === "recognized" && (!coach || neutral.praise))
+  if (neutral?.state === "recognized")
     return {
       state: "ok",
       id: "neutral",

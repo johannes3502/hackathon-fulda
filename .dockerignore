@@ -5,6 +5,15 @@
 !frontend/**
 !api/
 !api/**
+!backend/
+!backend/Dockerfile
+!backend/requirements.txt
+!backend/app/
+!backend/app/**
+!backend/scripts/
+!backend/scripts/**
+!templates/
+!templates/**
 **/node_modules
 **/.next*
 **/.env
@@ -14,4 +23,6 @@
 **/playwright-report
 **/*.tsbuildinfo
 **/.DS_Store
+**/__pycache__
+**/*.pyc
 frontend/public/pose/runtime

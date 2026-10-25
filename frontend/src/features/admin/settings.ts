@@ -4,7 +4,6 @@ export type LiveHintSettings = {
   stabilizeHoldMs: number;
   minDisplayMs: number;
   minDisplayGapMs: number;
-  praiseAfterMs: number;
 };
 
 export const DEFAULT_LIVE_HINT_SETTINGS: Readonly<LiveHintSettings> =
@@ -12,7 +11,6 @@ export const DEFAULT_LIVE_HINT_SETTINGS: Readonly<LiveHintSettings> =
     stabilizeHoldMs: POSE_RULES.stabilizeHoldMs,
     minDisplayMs: POSE_RULES.minDisplayMs,
     minDisplayGapMs: POSE_RULES.minDisplayGapMs,
-    praiseAfterMs: POSE_RULES.praiseAfterMs,
   });
 
 // Bounds keep a typo from disabling or flooding the live hints.
@@ -37,13 +35,6 @@ export const LIVE_HINT_FIELDS = [
     hint: "Blank gap between two consecutive hints. 0 swaps hints back to back.",
     min: 0,
     max: 15000,
-  },
-  {
-    key: "praiseAfterMs",
-    label: "Praise after calm period",
-    hint: "Time without any corrective hint before a positive message such as “Nice, open posture.” appears once.",
-    min: 1000,
-    max: 60000,
   },
 ] as const satisfies readonly {
   key: keyof LiveHintSettings;

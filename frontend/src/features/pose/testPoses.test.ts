@@ -349,34 +349,9 @@ it("reports admin-disabled lab tests as off without checking them", () => {
     state: "off",
     display: "disabled",
   });
-  expect(
-    poseFeedback(tracker.update(sample(base()), 100), true).state,
-  ).not.toBe("ok");
-});
-
-it("praises neutral posture once per quiet period without corrections", () => {
-  const tracker = new PoseTestTracker({
-    praiseAfterMs: 10000,
-    praiseShowMs: 3000,
-  });
-  const detected = [hand(0.25, 0.75, 0.05), hand(0.75, 0.75, 0.05)];
-  const coach = (points: Landmark[], t: number, hands = detected) =>
-    poseFeedback(tracker.update(sample(points, hands), t, hands), true).state;
-  expect(coach(base(), 0)).toBe("idle");
-  expect(coach(base(), 9900)).toBe("idle");
-  expect(coach(base(), 10000)).toBe("ok");
-  expect(coach(base(), 12900)).toBe("ok");
-  expect(coach(base(), 13000)).toBe("idle");
-  // A correction restarts the quiet period.
-  expect(coach(lean(), 15000)).toBe("alert");
-  expect(coach(base(), 16000)).toBe("idle");
-  expect(coach(base(), 24900)).toBe("idle");
-  expect(coach(base(), 25000)).toBe("ok");
-  // The status view still reports neutral on every frame.
-  expect(
-    poseFeedback(tracker.update(sample(base(), detected), 30000, detected))
-      .state,
-  ).toBe("ok");
+  expect(poseFeedback(tracker.update(sample(base()), 100)).state).not.toBe(
+    "ok",
+  );
 });
 
 it("marks missing data as not evaluable after the unknown grace period", () => {

@@ -3,6 +3,44 @@
 > Grafische Darstellung des Projekts als Mermaid-Diagramme.
 > Generiert aus der Codeanalyse: `frontend/`, `backend/`, `api/`, `compose.yaml`.
 
+## Code-Einstieg für die Jury
+
+Die Anwendung ist ein modularer Python-Service mit einem separaten Worker.
+Die Verzeichnisse `speech`, `transcription`, `sources`, `factcheck`, `questions`
+und `review` trennen Fachlogik, Router und Datenverträge. Sie sind keine eigenen
+Microservices. Gemeinsame Infrastruktur liegt in `connections.py`, `jobs.py`
+und `job_storage.py`; Fachmodule hängen für Job-Speicherung nicht von `speech` ab.
+
+| Dienst | Aufgabe und Grund |
+| --- | --- |
+| `frontend` | Next.js-Standalone-Server mit statischen Assets; Kamera, Pose und Wiedergabe laufen im Browser |
+| `backend` | FastAPI: validiert Requests, liefert Status und stellt Jobs in die Queue |
+| `worker` | Führt ASR, Embeddings und Quellenprüfung aus, ohne HTTP-Requests zu blockieren |
+| `beat` | Ein einzelner Scheduler für die tägliche Retention; nutzt dasselbe Backend-Image |
+| `redis` | Celery-Broker, kurzlebige Ergebnisse und begrenzte Fragerunden |
+| `postgres` | Strukturierte Daten und Quellen-Chunks mit pgvector; zusätzliche persistente Review-/Progress-API |
+| `storage` | SeaweedFS: Quellen-Originale, temporäre Analyse-Uploads, Job-Requests und Ergebnisse; aktiv benötigt |
+
+**Datenfluss im aktuellen Web:** `features/live/recorder.ts` →
+`transport.ts` → `/speech/analyze` → Worker → Review-Adapter.
+`LiveSessionProvider.tsx` und `recording-storage.ts` speichern das lokale Video
+und die Ergebnisse in IndexedDB. Quellen und Quellenprüfung sind angebunden.
+Neue Web-Aufnahmen schreiben noch nicht in die persistente Session-/Take-API;
+`/progress` bleibt eine separate API- und Beispielansicht ohne diese Verbindung.
+Ein lokales Löschen entfernt deshalb keine separaten Backend-Daten.
+
+**Jury-Betrieb:** Alle Anwendungskomponenten laufen aus gebauten Images, ohne
+Source-Mounts oder Hot Reload. Nach Backend-Änderungen API, Worker und Beat
+zusammen neu bauen. Der Frontend-Healthcheck prüft `/` und die API-Bereitschaft;
+`npm run test:smoke` prüft zusätzlich Produktrouten, Stage und Medien-Assets.
+`/stage` nutzt standardmäßig eine lokale Aufnahme ohne Medien-Upload.
+
+**Lesereihenfolge:** [Produktumfang](01-product.md) →
+[Integration](04-integration.md) → diese Diagramme →
+[Grenzen und offene Abnahme](14-open-todos.md).
+Research-Dokumente 07–09 beschreiben auch untersuchte Alternativen; der
+implementierte Dialog steht in [Review und Agent](07-review-and-agent.md).
+
 ## 1. Systemübersicht
 
 ```mermaid
@@ -61,11 +99,11 @@ flowchart TB
 
     WEB -- "Kamera/Mikro" --> MP_W
     WEB -- "Aufnahme" --> MR
-    WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>Live-Sprechfeedback für jede Web-Aufnahme"]
+    WEB --> PCM["AudioWorklet: 16 kHz mono Int16<br/>Live-Sprechfeedback im normalen Studio; Stage lokal ohne Stream"]
     PCM -- "WS /api/speech/live: PCM" --> SP
     FLAGS["FeatureFlags pro Take<br/>Modell, Modus, Pose Lab,<br/>Sprachfeedback pro Typ"] --> MP_W
     MP_W -. "Track fingers, bis 5 Hz" .-> HAND["Hand Landmarker: 21 Punkte pro Hand<br/>auch ohne Torso, kein Upload"]
-    HAND -. "Pose Lab" .-> LAB["T1–T12, Pocket<br/>lokale Diagnose, keine Events"]
+    HAND -. "Pose Lab" .-> LAB["T1–T12, lokale Diagnose<br/>6 zusätzliche Live-Regeln mit Events"]
 
     SP -- "finale Wörter + Text; vorher vorläufiger Text" --> WEB
     SP -- "nur bei provider=deepgram; PCM, serverseitiger Schlüssel" --> DG["Deepgram EU Nova-3<br/>Deutsch, live + Wort-Timestamps"]
@@ -152,8 +190,8 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph Host["docker compose (localhost only)"]
-        FE["frontend<br/>Next.js Production-Build :3000, kein Source-Mount<br/>Stage-Flags und API-Rewrite zur Build-Zeit<br/>Health: Produkt-Routen + Backend"]
-        BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, --reload"]
+        FE["frontend<br/>Next.js Production-Build :3000, kein Source-Mount<br/>Stage-Flags und API-Rewrite zur Build-Zeit<br/>Standalone-Runtime; Health: Startseite + Backend"]
+        BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, gebaute Quellen und Templates<br/>kein Source-Mount, kein Hot Reload"]
         WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Default-Concurrency 1"]
         BT["beat: ein Scheduler<br/>gemeinsames Backend-Image<br/>03:15 UTC -> retention_sweep"]
         PG[("postgres<br/>pgvector :5432<br/>Volume: postgres_data")]
@@ -161,7 +199,7 @@ flowchart LR
         ST[("storage<br/>SeaweedFS :8333<br/>Volume: media_data")]
     end
 
-    User(("Browser /<br/>Smartphone")) -->|"Port 3000"| FE
+    User(("Browser am<br/>Demo-Laptop")) -->|"Port 3000"| FE
     FE -->|"healthy"| BE
     BE -->|"postgres healthy"| PG
     BE -->|"storage healthy"| ST
@@ -196,7 +234,7 @@ sequenceDiagram
     BE-->>FE: Bereit, oder Abbruch vor Aufnahme mit Retry-Hinweis
     FE->>FE: FeatureFlags im Take festhalten (Lite/Heavy, VIDEO/IMAGE)
     FE->>FE: Pose-Worker GPU-first/CPU-Fallback, Fingertracking separat bis 5 Hz
-    Note over FE,BE: Jede Web-Aufnahme mit Mikrofon, Live-Feedback und vollständigem Upload, kein Modus-Schalter
+    Note over FE,BE: Normales Studio mit Mikrofon, Live-Feedback und vollständigem Upload; Stage lokal ohne Upload
 
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>BE: WS /speech/feedback: start, PCM nach ready
@@ -371,8 +409,8 @@ sequenceDiagram
     FE->>FE: fact-Momente in der Timeline, Klick spielt die Stelle ab
 ```
 
-`FactCheckPanel` und der kompatible API-Fragen-Client nutzen denselben
-`evidenceHint` für `quote_verified`, `similarity` und `weak`. Er benennt auch
+`FactCheckPanel` nutzt `evidenceHint` für `quote_verified`, `similarity`
+und `weak`. Der Hinweis benennt auch
 ungeprüfte Alt-Zitate und möglichen Kontext bei Kurz-Zitaten. Diese Angaben sind
 keine Konfidenz- oder Wahrscheinlichkeitsanzeige; `retrieval_score` bleibt ein
 Ordnungssignal. Der Web-Fragepfad bleibt der ElevenLabs-Sprachdialog.
@@ -381,12 +419,13 @@ Ordnungssignal. Der Web-Fragepfad bleibt der ElevenLabs-Sprachdialog.
 
 Der Web-Review hat zwei Ansichten: **Review moments** (begrenzte Wiedergabe-
 Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
-Auf `/sources` wird `presentationMode` (startup/thesis/school) neben
-dem Upload gewählt und im Browser gespeichert. Vor der Aufnahme werden Modus
-und `sourceCollectionId` im Take eingefroren. Im Web-Sprachdialog und im kompatiblen Fragen-API-Pfad steuert
-derselbe Modus Rolle und fachliche Schwerpunkte: Investor, Hochschullehrkraft
-oder Schullehrkraft; ohne Scores oder Noten. `nonprofit` bleibt für alte
-Aufnahmen kompatibel, ist aber nicht mehr auswählbar. Nach der
+Auf `/sources` wird `presentationMode` (school/thesis) neben dem Upload
+gewählt und im Browser gespeichert. Vor der Aufnahme werden Modus und
+`sourceCollectionId` im Take eingefroren. Im Web-Sprachdialog und der
+Fragen-API steuert derselbe Modus Rolle und fachliche Schwerpunkte:
+Schul- oder Hochschullehrkraft; ohne Noten für gesprochene Antworten.
+`startup` und `nonprofit` bleiben für alte Aufnahmen kompatibel, sind aber
+nicht mehr auswählbar. Nach der
 beendeten Sprachrunde zeigt der Client zusätzlich eine
 Auswertung mit transparentem Heuristik-Score aus gemessenen Events; siehe
 `docs/07-review-and-agent.md`.
@@ -422,7 +461,7 @@ sequenceDiagram
         BE->>E: Signed URL anfordern (API-Key bleibt serverseitig)
         BE-->>FE: Signed URL, Cache-Control no-store
         Note over E: Gespeicherte First message fragt nach Bereitschaft
-        FE->>E: SDK-WebSocket mit Kontext im Prompt-Override und first_message mit [rushed]
+        FE->>E: SDK-WebSocket mit Kontext im Prompt-Override und fester first_message
         E-->>FE: Verbindung bestätigt
         E->>FE: Ich habe noch ein paar Fragen. Bist du bereit? (Audio + Text)
         U->>FE: Bereitschaft bestätigen
@@ -545,7 +584,7 @@ flowchart TD
 
     SRC -->|"collection_id aus localStorage"| UPLOAD["GET/POST /sources<br/>DELETE /sources/id"]
 
-    subgraph Transport["VideoTransport: LiveStudio fest auf backend<br/>(Modus-Schalter entfernt)"]
+    subgraph Transport["VideoTransport: normales Studio auf backend<br/>(Modus-Schalter entfernt)"]
         ANA["AnalysisTransport<br/>Backend-Upload + Polling, jede Web-Aufnahme"]
         DEMO["LocalVideoTransport<br/>Stage-Fallback; sofort lokal, kein Upload"]
     end
@@ -960,7 +999,9 @@ Live-Analyse soll **ereignisgetrieben auf finalisierten ASR-Segmenten** laufen
 (nicht auf einem festen 20–30-s-Takt), der finale Fact-Check ist
 **quellengebunden, aber nicht autoritativ** (keine Live-Urteile,
 „nicht gefunden“ ≠ „falsch“), und das Gespräch soll **harte Grenzen** haben
-(3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop). Im Code ist bisher nur
-das Maximum von fünf Anfangsfragen im getippten Pfad umgesetzt, kein
-Sitzungstimer oder globales Follow-up-Limit. Gemini ist Cloud ohne
-EU-Region-Pinning; nur synthetische Demo-Daten oder Vertex AI mit EU-Region.
+(3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop). Die separate
+LLM-/TTS-Pipeline wurde nicht übernommen. Aktuell begrenzt die Fragen-API
+Runden über Redis-TTL, reservierte Turns und ein globales Follow-up-Budget;
+der ElevenLabs-Browserdialog endet nach 600 s oder 12 Nutzerbeiträgen.
+Anbieter-Limits bleiben separat. Gemini ist Cloud ohne EU-Region-Pinning;
+für den Prototyp nur synthetische Demo-Daten verwenden.

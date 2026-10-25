@@ -10,7 +10,7 @@ import httpx
 from botocore.exceptions import ClientError
 
 from app.connections import s3_client
-from app.speech.storage import key
+from app.job_storage import key
 
 
 def main():

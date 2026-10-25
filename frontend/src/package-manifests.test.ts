@@ -27,7 +27,7 @@ test("the frontend Docker build does not depend on deleted workspace files", () 
   );
   for (const line of dockerfile
     .split("\n")
-    .filter((line) => line.startsWith("COPY "))) {
+    .filter((line) => line.startsWith("COPY ") && !line.includes("--from="))) {
     const sources = line
       .split(/\s+/)
       .slice(1, -1)

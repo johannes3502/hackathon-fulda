@@ -1,8 +1,9 @@
 # Integration & Quickstart
 
-Gemeinsamer Einstieg für Web, Mobile und Backend. Implementierte Verträge stehen
-in `api/openapi.json` / `api/schema.d.ts`; künftige Review-Verträge in
-`docs/05-frontend-review-ux.md` und `docs/06-backend-review-api.md` sind Zielentwürfe.
+Einstieg für das Web-Frontend und Backend. `api/openapi.json` und
+`api/schema.d.ts` werden aus FastAPI generiert. Die persistente Review-API ist
+in [06-backend-review-api.md](06-backend-review-api.md) beschrieben; die
+Aufnahme im Web nutzt derzeit die separate Audio-Job-API und IndexedDB.
 
 ## Stack starten
 
@@ -13,7 +14,8 @@ docker compose up --build -d --wait
 
 Frontend: <http://localhost:3000>, API: <http://localhost:8000>,
 HTTP-Verträge: <http://localhost:8000/docs>. Der Browser nutzt den `/api`-Proxy;
-`NEXT_PUBLIC_API_URL` und `API_INTERNAL_URL` sind in Compose gesetzt.
+Compose übergibt dessen `API_INTERNAL_URL` als Build-Argument. Die Runtime
+benötigt keine zweite API-Konfiguration.
 
 Ohne Docker: Node.js 22.12+, `npm ci` und `npm run dev` im Repo; Python 3.12 mit
 `backend/requirements.txt`, dann `uvicorn app.main:app` aus `backend/`.
@@ -23,10 +25,11 @@ Nach HTTP-API-Änderungen `npm run api:generate`, danach `npm run api:check`.
 
 ## Kamera, lokale Hinweise und Aufnahme
 
-`/` und `/live` öffnen dasselbe Studio. **Live · in browser** nutzt Kamera und
-Mikro lokal: Pose/Finger im MediaPipe-Worker, Stimme im AudioWorklet. **Off ·
-gestures only** benötigt kein Mikro. **Live + full backend analysis** aktiviert
-den Server-Signalstream und den vollständigen Upload nach Stop.
+`/` zeigt Einstieg und gespeicherte Aufnahmen. Das Studio unter `/live` nutzt
+Kamera, Mikro, lokale Pose-Regeln, den Server-Signalstream und den vollständigen
+Analyse-Upload nach Stop. Es gibt dort keinen Modus-Schalter mehr.
+`/stage` bietet zusätzlich die lokale Sofortaufnahme ohne Medien-Upload;
+Backend-Analyse ist auf der Bühne ein separater, optionaler Pfad.
 
 - Modell/Modus: Lite oder Heavy, VIDEO (Standard) oder IMAGE, GPU mit CPU-Fallback.
 - `Track fingers`: separat schaltbar, maximal 5 Hz; Pose Lab bleibt Dev-only.
@@ -48,11 +51,14 @@ den Server-Signalstream und den vollständigen Upload nach Stop.
 | `POST /speech/analyze` | Vollständige Aufnahme nach Stop; 202 mit `job_id` und `status_url` |
 | `GET /speech/jobs/{job_id}` | `queued`, `running`, `completed` oder `failed` |
 | `WS /speech/feedback` | Kalibrierte Signalhinweise während der Backend-Aufnahme |
-| `WS /speech/live` | Optionale Whisper-Textvorschau |
+| `WS /speech/live` | Optionale Whisper-Vorschau oder Deepgram EU live (Opt-in) |
 | `POST /transcription/analyze-words` | Wort-Timestamps aus demselben Take auswerten, kein ASR-Aufruf |
-| `/sources` | Upload, Status und Retrieval; Collection-ID wird von Web/Native geteilt |
+| `/sources` | Upload, Status und Retrieval; Collection-ID bleibt im Browser |
 | `/factcheck`, `/questions`, `/questions/answers` | Quellenvergleich und Fragerunde über getrennte Jobs |
-| `/questions/answers/voice` | Gesprochene Antwort transkribieren und mit Quellen vergleichen |
+| `/questions/answers/voice` | Gesprochene Antwort transkribieren und mit Quellen vergleichen (API) |
+| `/questions/agent`, `/questions/agent/session` | Kontext und signierte Verbindung für den ElevenLabs-Webdialog |
+| `GET /questions/pitch` | Feste Jury-Frage ohne Provider oder Retrieval |
+| `/sessions`, `/takes`, `/profiles` | Persistente API; neue Web-Aufnahmen sind noch nicht angebunden |
 
 Die HTTP-Helfer validieren Antworten, begrenzen einzelne Requests auf zwei
 Minuten und Job-Polling auf elf Minuten. Ein Analysefehler erhält die lokale
@@ -101,8 +107,9 @@ wendet die Feedback-Flags an. Mehr als 15 s Rückstand beendet nur die Vorschau.
 **Captions:** `/speech/live` hat einen unabhängigen Whisper-Slot, maximal 600 s
 Audio und 30 s Leerlauf. `words` enthält `final` und kumulative Wörter, `text`
 einen Vorschautext. Startbar unter **Recording options → Show live captions**.
-Die vollständige Analyse nach Stop bleibt die Review-Zeitbasis.
-`WHISPER_LIVE_*` ist in `.env.example` und im Backend-README beschrieben.
+Whisper-Vorschautext ersetzt die Batch-Wörter nicht. Finale Deepgram-Wörter
+werden dagegen ohne erneuten ASR-Aufruf übernommen; bei Ausfall bleibt der
+lokale Batch-Pfad. `WHISPER_LIVE_*` ist in `.env.example` und im Backend-README beschrieben.
 
 Zeitstempel beziehen sich zunächst auf den PCM-Stream. Der Browser verschiebt
 sie zur MediaRecorder-Zeitbasis. Verbindungsfrist (20 s), Ausfall oder Rückstau
@@ -116,7 +123,7 @@ docker compose cp backend/tests/fixtures/speech-de.wav backend:/tmp/v.wav
 docker compose exec -T backend python -m scripts.smoke_live /tmp/v.wav
 ```
 
-## Review, Demo und Native
+## Review und getrennte Beispielpfade
 
 Review spielt das komplette lokale Video mit ±2 s Kontext um Marker ab.
 Video und lokale Review-Historie bleiben in IndexedDB im Browser; ein Download

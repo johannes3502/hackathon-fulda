@@ -1,6 +1,6 @@
 import type { PoseEvent } from "../pose/evaluation";
 import type { FeatureFlags } from "./feature-flags";
-import type { QuestionAnswer, QuestionResult } from "../questions/api";
+import type { QuestionAnswer, QuestionResult } from "../questions/contracts";
 import type { components } from "../../../../api/schema";
 import type { PresentationMode } from "../questions/presentation";
 export type Word = components["schemas"]["Word"];

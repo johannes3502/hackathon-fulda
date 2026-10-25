@@ -126,20 +126,22 @@ gezählte Versuche und dokumentierte Bedingungen, die noch nicht vorliegen.
 ## Abgrenzung zur Zielarchitektur
 
 Der Kamerapfad erzeugt lokale Gesten-/Haltungsereignisse und spielt das komplette
-Video im Browser ab. Er erstellt noch keine dauerhaft gespeicherten Server-Clips.
-Audioanalyse, lokale Whisper-Transkription, Quellen-Ingest/Hybrid-Retrieval,
-Gemini-Quellenvergleich und Text-Frage-/Antwortanalyse sind im Web angebunden.
-Optionale Live-Captions liefern während der Aufnahme eine Textvorschau;
-die vollständige Transkription nach dem Stoppen bleibt die Review-Zeitbasis.
-Web-Fetch, Blickkontakt-Auswertung und dauerhafte Server-Clips sind nicht Teil
-des aktuellen vorführbaren Pfads. Die native App ist entfernt; die lokale
-Fragerunde ist nur im Web verfügbar.
+Video im Browser ab; Server-Clips sind nicht vorgesehen. Audioanalyse,
+lokale Whisper-Transkription, Quellen-Ingest/Hybrid-Retrieval und
+Gemini-Quellenvergleich sind im Web angebunden. Der normale Web-Dialog nutzt
+ElevenLabs; getippte und einzeln aufgenommene Antworten bleiben über die
+separate Fragen-API verfügbar. Die Stage nutzt ihre feste Datenschutzfrage.
+Optionale Whisper-Captions sind eine Textvorschau; finale Deepgram-Live-Wörter
+werden ohne zweite ASR übernommen. Deepgram bleibt Opt-in.
+Web-Fetch ist standardmäßig aus, Blickkontakt wird nicht gemessen. Die native
+App ist entfernt. Neue Web-Aufnahmen sind noch nicht mit den persistenten
+Backend-Takes und Progress-Profilen verknüpft.
 Die bestehende Sample-Session zeigt den angestrebten Gesamtfluss mit vorbereiteten
 Daten. Das Team darf sie nicht als Analyse der Live-Aufnahme vorstellen.
 
-## Analyse-Schalter im Integrationsbranch
+## Analyse-Schalter
 
-Im Studio **Options → Analysis features** öffnen. VIDEO und Lite sind
+Unter **Admin → Analysis features** öffnen. VIDEO und Lite sind
 Standard. IMAGE verarbeitet Frames unabhängig; VIDEO nutzt Tracking und
 zeitliche Modell-Glättung. Heavy ist auswählbar, sein Qualitätsvorteil ist
 nicht gemessen. Alle Assets sind lokal. GPU wird bevorzugt, CPU-Fallback
@@ -148,7 +150,8 @@ Konfiguration und Fallback-Gründe.
 
 **Speech feedback** schaltet alle Sprachmarker; **Pauses**, **Speaking pace**,
 **Filler words**, **Volume**, **Pitch variation** wählen einzelne Typen.
-Jede Aufnahme verwendet **Live + full backend analysis**, ohne Modus-Auswahl:
+Das normale Studio verwendet Live-Feedback und vollständige Backend-Analyse,
+ohne Modus-Auswahl; die lokale Stage-Aufnahme lädt keine Medien hoch:
 Mikrofon-Audio geht live an den Server, die vollständige Aufnahme nach dem Stoppen.
 Backend vor der Aufnahme starten; 3 s normal sprechen, dann Lautstärke,
 längere Pause oder Tonhöhenvariation testen.
@@ -158,15 +161,18 @@ entfernt dessen Marker, nicht die Messwerte der vollständigen Analyse. Importie
 beachten dieselben Schalter der jeweiligen Aufnahme. Pose-/Fact-Check- und
 Frage-Ergebnisse bleiben unabhängig davon.
 
-Schalter gelten für neue Aufnahmen, werden mit dem Take festgehalten und sind
-während Aufnahme/Analyse gesperrt. Im Workspace bleiben sie bis zum Reload.
-Ein Wechsel von Modell, Modus oder **Pose lab** startet Pose und Kalibrierung neu.
-**Pose lab** ist standardmäßig aus. **Track fingers** ist unabhängig davon
+Analyse-Schalter bleiben pro Browser in `localStorage`, gelten für neue
+Aufnahmen und werden mit dem Take festgehalten. Live-Regeln können unter
+Admin zusätzlich sofort auf On / Review only / Off gesetzt werden.
+Modell-/Modus-Wechsel starten Pose und Kalibrierung neu. Die Pose-lab-Regeln
+laufen mit; das Diagnosepanel ist ein separates Dev-Werkzeug. **Track fingers** ist unabhängig davon
 standardmäßig an: bis 5 Hz, auch ohne Torso. Finger werden pink eingezeichnet;
 „Hands detected“ und der Live-Sprachstatus helfen bei der Diagnose. Die Haltungsreferenz
 kalibriert ohne Hand-Stillhaltepflicht. Im Nutzertest funktionierte die Korrektur;
 dies ist eine informelle Rückmeldung ohne gezählte Versuche oder Genauigkeitsmessung.
-T12, Pocket und Kopforientierung erzeugen keine Produktions-Events.
+Sechs zusätzliche Pose-lab-Regeln erzeugen nach 2 s Halten Live-Hinweise und
+Review-Events (5 s Cooldown). Kalibrierte Hinweise haben Vorrang. Die
+Kopforientierung bleibt ein Proxy, keine Blickkontaktmessung.
 
 Vor Ort weiter offen: echtes GPU-Verhalten, Heavy-Durchsatz unter Kamera-/Audio-
 Last, Verzögerung durch VIDEO-Glättung und Erkennungsqualität. Automatisierte
@@ -182,12 +188,11 @@ Tests mit synthetischen Bildern belegen Start und Datenfluss, keine Genauigkeit.
 - **Datenschutz:** Gemini ist Cloud ohne EU-Region-Pinning. Für die Jury nur
   synthetische Inhalte verwenden; keine echten Personenaufnahmen an das LLM
   senden.
-- **Fragegrenzen:** Im normalen Voice-Pfad 3–5 Hauptfragen, ein Follow-up,
-  10 Minuten Hard Stop; die Begründung und Zitate stehen in
-  `docs/11-deep-research-validation.md`. Im Voice-Pfad sind sie derzeit
-  Prompt-Vorgaben, nicht hart erzwungen. Die Stage fragt stattdessen genau eine
-  feste Datenschutzfrage ohne Nachfrage; der Kontext kommt aus
-  `backend/app/questions/pitch.py`.
+- **Fragegrenzen:** Der Browser beendet den ElevenLabs-Dialog nach 600 s
+  ab Start oder 12 Nutzerbeiträgen. Inhaltliche Frage-/Nachfragegrenzen sind
+  weiterhin Prompt-Vorgaben; Anbieter-Limits müssen separat geprüft werden.
+  Die Stage fragt genau eine feste Datenschutzfrage ohne Nachfrage; der
+  Kontext kommt aus `backend/app/questions/pitch.py`.
 - **Scores:** Der Live-Review zeigt drei `evidence-share-v1`-Kriterien
   (Gestik, Fachwissen, Flow); ohne Evidenz bleibt das jeweilige Kriterium „–“.
   Die Auswertung nach der Fragerunde (`evidence-count-heuristic.v1`) ist ein

@@ -12,7 +12,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 app
 
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN pip install --default-timeout=120 --retries=5 -r requirements.txt
 
 ARG WHISPER_MODEL=small
@@ -22,11 +22,16 @@ ENV WHISPER_MODEL=${WHISPER_MODEL}
 RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('jinaai/jina-embeddings-v2-base-de', revision='3f9eede875721714945b6a99a3198299243cf2be', local_dir='/app/models/embedding', allow_patterns=['onnx/model.onnx', '*.json'])" \
     && rm -rf /app/models/embedding/.cache
 
-COPY --chown=app:app app ./app
-COPY --chown=app:app scripts ./scripts
+# Keep model downloads cached when routes, UI or documentation change.
+COPY backend/scripts/install_silero.py backend/scripts/install_whisper.py ./scripts/
+COPY backend/app/speech/config.py backend/app/speech/vad.py ./app/speech/
 RUN python -m scripts.install_silero /app/models \
     && python -m scripts.install_whisper /app/models/whisper ${WHISPER_MODEL} \
     && chown -R app:app /app/models
+
+COPY --chown=app:app backend/app ./app
+COPY --chown=app:app backend/scripts ./scripts
+COPY --chown=app:app templates /templates
 
 USER app
 

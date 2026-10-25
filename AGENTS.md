@@ -267,22 +267,22 @@ ElevenLabs-Sprachreaktionen bleiben davon ausdrücklich ausgenommen.
 `retrieval_score`, `similarity`, `matched_by` und `weak` sind Signale, keine Konfidenz.
 Details und Grenzen stehen in `docs/15-grounding-hardening.md`.
 Der Frage-Simulator ist umgesetzt (`backend/app/questions/`, `POST /questions`,
-`POST /questions/answers`, Panel in `/live/[id]/review`): Fragen aus
+`POST /questions/answers`; der Web-Review nutzt den separaten ElevenLabs-Dialog): Fragen aus
 Fact-Check-Funden (Widerspruch, nicht belegt), Lücken gegenüber den Quellen und
 unklaren Stellen; `t_ms` und Evidenz kommen aus Verweisen, nicht vom Modell.
 Getippte Antworten werden mit den Quellen verglichen (Zitat-Prüfung, optionale
-Nachfrage); Fragen mit gesprochener Stelle sind `question`-Events. Nach der
-vollständig beantworteten getippten Runde zeigt der Web-Review eine Auswertung
+Nachfrage); Fragen mit gesprochener Stelle sind `question`-Events. Nach dem Ende des ElevenLabs-Dialogs zeigt der Web-Review eine Auswertung
 (`frontend/src/features/evaluation/performance.ts`, Panel
 `PerformanceEvaluation.tsx`): transparenter Heuristik-Score 0–100 aus bereits
 gemessenen Events — Inhalt (Gewicht 0,5; Fact-Check- und Antwort-Urteile),
 Stimme (0,25) und Gestik (0,25; je 15 Punkte Abzug pro Marker/Minute, Floor 40,
 Gewichte renormalisiert wenn Daten fehlen) — mit Belegen, Stärken,
-Übungsvorschlägen und Methodenhinweis; keine Personenbewertung. Voice-Agent: Rolle `student` (neugieriger Erstsemester) oder
-`tutor` (Professor/Tutor) wählbar; der Browser liest Fragen und Reaktionen per
-`speechSynthesis` vor, gesprochene Antworten gehen über
-`POST /questions/answers/voice` an den konfigurierten Transcriber (standardmäßig lokales Whisper) und werden danach wie getippte
-Antworten gegen die Quellen geprüft. Im Live-Studio lässt sich die
+Übungsvorschlägen und Methodenhinweis; keine Personenbewertung. Der Web-Dialog nutzt `QuestionPractice` und den ElevenLabs-Agenten;
+seine gesprochenen Antworten werden nicht durch die deterministischen Zitat-/Zahlen-Gates
+bewertet. Die separate Fragen-API unterstützt `student` und `tutor`, getippte
+Antworten und `POST /questions/answers/voice` mit dem konfigurierten Transcriber
+(standardmäßig lokales Whisper). Entfernte, nicht mehr eingebundene
+Frontend-Panels werden nicht als aktive Oberfläche dokumentiert. Im Live-Studio lässt sich die
 Transkription (lokales Whisper) vor der Aufnahme zuschalten; die Wörter sind Eingabe
 für den Fact-Check. Das Next.js-Frontend läuft in einem
 eigenen Compose-Container; `/api/...` wird intern an FastAPI weitergeleitet.
@@ -313,8 +313,8 @@ Handreferenzen bleiben im Payload `null`; Gesten nutzen dann Schultergeometrie.
 Alle Pose-Regeln halten einheitlich 2 s (`POSE_RULES.stabilizeHoldMs`); Arme
 verschränkt behalten 20 s Cooldown. Die Live-Hinweisblase (Pose und Stimme)
 zeigt jeden Hinweis mindestens 3 s und lässt danach 2 s Lücke
-(`minDisplayMs`/`minDisplayGapMs`). `praiseAfterMs` wirkt seit Entfernen der
-Pose-lab-Coach-Ansicht nicht mehr sichtbar. Alle Werte sind unter `/admin`
+(`minDisplayMs`/`minDisplayGapMs`). Der ungenutzte Pose-lab-Lob-Timer und
+sein Admin-Feld sind entfernt. Alle aktiven Werte sind unter `/admin`
 (Navbar, noch ohne Login) pro Browser in `localStorage` einstellbar. Dort lässt
 sich auch jede der 13 Live-Pose-Regeln (7 kalibrierte + 6 aus Pose lab) auf On
 (Hinweis + Review), Review only (nur Timeline) oder Off stellen, wirksam sofort im
@@ -334,8 +334,8 @@ sind nicht vollständig implementiert und überschreiben diese Entscheidung nich
 Der Aufnahme-Pfad nutzt die Audio-Job-API
 mit lokaler Signalanalyse und Status-Polling. Im Backend-Modus ist lokales
 Whisper standardmäßig eingeschaltet und abschaltbar; `local_only=true` blockiert
-einen unbeabsichtigten Cloud-/JSON-Anbieter. Transkript, Quellenvergleich und
-Text-Fragerunde sind ins Web-Review eingebunden. Umgesetzt sind zwei getrennte
+einen unbeabsichtigten Cloud-/JSON-Anbieter. Transkript und Quellenvergleich sind ins Web-Review eingebunden; der aktuelle
+Web-Fragedialog nutzt ElevenLabs, getippte Antworten bleiben über die API verfügbar. Umgesetzt sind zwei getrennte
 Analyse-Pipelines mit S3-Persistenz für kombinierte Jobs, beide mit `t_ms` ab Aufnahmestart im
 gemeinsamen Event-Schema (`backend/app/events.py`): Audiosignal-Analyse als
 Zeitreihe (`backend/app/speech/`) und wortbasierte Analyse der Transkription
@@ -369,6 +369,19 @@ Start, Smoke-Test und IDE-Einrichtung: `backend/README.md`. Persistente Volumes
 sind derzeit nur für synthetische Entwicklungsdaten vorgesehen. Die
 Zielarchitektur muss bei der Umsetzung auch mit `docs/01-product.md`
 abgeglichen werden; dort stehen die Features und offenen Entscheidungen.
+
+### Jury-Build und Codepflege (25.10.2026)
+
+Compose baut Frontend und Backend aus dem Repository-Root. Das Frontend-Image
+enthält nur die Next.js-Standalone-Runtime samt Assets. API, Worker und Beat
+verwenden dasselbe gebaute Backend-Image inklusive `templates/`, ohne Source-Mounts
+oder `--reload`; nach Codeänderungen alle betroffenen Dienste neu bauen.
+SeaweedFS ist aktiv: Quellen, temporäre Analyse-Uploads und Job-Requests/-Ergebnisse
+liegen dort. Gemeinsame Job-Speicherung steht in `backend/app/job_storage.py`.
+Checks im Checkout: `npm run typecheck`, `npm run lint`, `npm test`,
+`npm run test:compose`, `npm run api:check`. Gegen den laufenden Stack:
+`npm run test:smoke` und `PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e`.
+Node.js 22.12+ ist in den Workspace-Manifests festgehalten.
 
 ## 7. Git-Workflow
 

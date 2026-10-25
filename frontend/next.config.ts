@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   experimental: {
     // The /api rewrite buffers bodies (default 10 MB). Recordings up to 5 min

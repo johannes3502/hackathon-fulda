@@ -65,7 +65,7 @@ export function PoseDevMode({
             ? `Hands detected: ${hands}`
             : `Hand model unavailable${handError ? `: ${handError}` : ""}`}
       </span>
-      <small>Dev only · heuristics, not validated · no events</small>
+      <small>Dev only · heuristics, not validated</small>
     </div>
   );
 }

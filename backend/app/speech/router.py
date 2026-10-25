@@ -8,7 +8,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.connections import s3_client
 from app.jobs import QueueUnavailable, enqueue_task
-from app.speech import storage
+from app import job_storage as storage
 from app.speech.config import AudioConfig
 from app.speech.job_models import AcceptedJob, AnalysisJob, AnalysisOptions, StreamedTranscript
 from app.tasks import analyze_speech
