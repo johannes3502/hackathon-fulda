@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  STAGE_ANSWER_MS,
-  stageAnalysisMode,
-  stageModeEnabled,
-} from "./config";
+import { STAGE_ANSWER_MS, stageAnalysisMode, stageModeEnabled } from "./config";
 import { formatAnswerCountdown } from "./timing";
 
 describe("stage configuration", () => {
@@ -16,10 +12,11 @@ describe("stage configuration", () => {
     expect(stageModeEnabled(" 0 ")).toBe(false);
   });
 
-  it("treats only local as the local primary path and defaults to live", () => {
-    expect(stageAnalysisMode(undefined)).toBe("live");
+  it("defaults to local and requires an explicit live opt-in", () => {
+    expect(stageAnalysisMode(undefined)).toBe("local");
     expect(stageAnalysisMode("live")).toBe("live");
-    expect(stageAnalysisMode("other")).toBe("live");
+    expect(stageAnalysisMode(" LIVE ")).toBe("live");
+    expect(stageAnalysisMode("other")).toBe("local");
     expect(stageAnalysisMode("local")).toBe("local");
     expect(stageAnalysisMode(" LOCAL ")).toBe("local");
   });

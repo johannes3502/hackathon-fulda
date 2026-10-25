@@ -21,6 +21,7 @@ export function useCameraPreview() {
   };
   const enable = async (audio = false) => {
     release();
+    setAudioAvailable(null);
     const request = generation.current;
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
       setStatus("unavailable");
@@ -41,6 +42,7 @@ export function useCameraPreview() {
         audio: audio ? audioConstraints : false,
       });
     } catch (error) {
+      if (request !== generation.current) return;
       // A denied or busy microphone must not take the camera and pose preview
       // down with it. Retry video-only; backend recording still refuses to
       // start without audio, but the local fallback can record the picture.
@@ -56,10 +58,10 @@ export function useCameraPreview() {
           audio: false,
         });
         audioReady = false;
-      } catch {
+      } catch (videoError) {
         if (request !== generation.current) return;
         setAudioAvailable(null);
-        setStatus(mediaError(error));
+        setStatus(mediaError(videoError));
         return;
       }
     }

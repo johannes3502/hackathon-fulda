@@ -46,6 +46,7 @@ import type {
   LiveConfig,
   LiveProgress,
   LiveFeedback,
+  LiveRecording,
 } from "@/features/live/contracts";
 import { time } from "@/lib/utils";
 import { usePoseCapture } from "@/features/pose/usePoseCapture";
@@ -104,6 +105,7 @@ export function LiveStudio({
     initialLocal || (stage && stageAnalysis === "local"),
   );
   const [captured, setCaptured] = useState<string | null>(null);
+  const capturedRecording = useRef<LiveRecording | null>(null);
   const pose = usePoseCapture(
     videoRef,
     cameraStatus === "active",
@@ -143,6 +145,7 @@ export function LiveStudio({
     process.env.NEXT_PUBLIC_API_URL ?? "/api",
   );
   const [progress, setProgress] = useState<LiveProgress | null>(null);
+  const recordingActive = progress !== null;
   const [health, setHealth] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCues, setShowCues] = useState(true);
@@ -172,15 +175,16 @@ export function LiveStudio({
     [],
   );
   useEffect(() => {
-    if (!progress) return;
+    if (!recordingActive) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [progress]);
+  }, [recordingActive]);
   useEffect(() => {
+    if (localFallback) return;
     const controller = new AbortController();
     let destination: string;
     try {
@@ -200,7 +204,52 @@ export function LiveStudio({
           );
       });
     return () => controller.abort();
-  }, [endpoint]);
+  }, [endpoint, localFallback]);
+  function withObservations(recording: LiveRecording): LiveRecording {
+    const poseEvents = pose
+      .recordingEvents()
+      .filter((event) => event.t_ms < recording.durationMs)
+      .map((event) => ({
+        ...event,
+        duration_ms: Math.min(
+          event.duration_ms,
+          recording.durationMs - event.t_ms,
+        ),
+      }));
+    return {
+      ...recording,
+      poseLog: pose.recordingBlob(),
+      poseEvents,
+      feedback: [
+        ...mergeSpeechFeedback(recording.feedback, serverEvents.current)
+          .filter((item) => item.startMs < recording.durationMs)
+          .map((item) => ({
+            ...item,
+            endMs: Math.min(item.endMs, recording.durationMs),
+          })),
+        ...poseEvents.map(poseFeedback),
+        ...(pauseRate.current?.events ?? [])
+          .filter(
+            (item) => isPauseRate(item) && item.startMs < recording.durationMs,
+          )
+          .map((item) => ({
+            ...item,
+            endMs: Math.min(item.endMs, recording.durationMs),
+          })),
+      ].sort((a, b) => a.startMs - b.startMs),
+    };
+  }
+  function openCapturedReview() {
+    const recording = capturedRecording.current;
+    if (!recording) return;
+    owner.current?.dispose();
+    save({
+      ...recording,
+      notice:
+        "Backend analysis was stopped. The local video and recorded live observations remain available; an already queued job may still finish in the backend.",
+    });
+    router.push(`/live/${recording.id}/review?stage=1`);
+  }
   const start = async () => {
     if (busy.current) return;
     setError(null);
@@ -211,10 +260,11 @@ export function LiveStudio({
     }
     let destination = endpoint;
     try {
-      destination = apiEndpoint(
-        endpoint,
-        window.location.protocol === "https:",
-      );
+      if (!localFallback)
+        destination = apiEndpoint(
+          endpoint,
+          window.location.protocol === "https:",
+        );
     } catch (e) {
       setError((e as Error).message);
       return;
@@ -265,6 +315,7 @@ export function LiveStudio({
         return; // Cancelled during connection setup.
     }
     setCaptured(null);
+    capturedRecording.current = null;
     const recorder = new LiveRecorder(
       stream,
       config,
@@ -283,44 +334,8 @@ export function LiveStudio({
         setProgress(next);
       },
       (recording) => {
-        const poseEvents = pose
-          .recordingEvents()
-          .filter((event) => event.t_ms < recording.durationMs)
-          .map((event) => ({
-            ...event,
-            duration_ms: Math.min(
-              event.duration_ms,
-              recording.durationMs - event.t_ms,
-            ),
-          }));
-        save({
-          ...recording,
-          poseLog: pose.recordingBlob(),
-          poseEvents,
-          feedback: [
-            ...mergeSpeechFeedback(recording.feedback, serverEvents.current)
-              .filter((item) => item.startMs < recording.durationMs)
-              .map((item) => ({
-                ...item,
-                endMs: Math.min(item.endMs, recording.durationMs),
-              })),
-            ...poseEvents.map(poseFeedback),
-            // Not merged: a recorded pause must not hide the pause-rate window.
-            // Single pauses come from the recorded analysis instead.
-            ...(pauseRate.current?.events ?? [])
-              .filter(
-                (item) =>
-                  isPauseRate(item) && item.startMs < recording.durationMs,
-              )
-              .map((item) => ({
-                ...item,
-                endMs: Math.min(item.endMs, recording.durationMs),
-              })),
-          ].sort((a, b) => a.startMs - b.startMs),
-        });
-        router.push(
-          `/live/${recording.id}/review${stage ? "?stage=1" : ""}`,
-        );
+        save(withObservations(recording));
+        router.push(`/live/${recording.id}/review${stage ? "?stage=1" : ""}`);
       },
       (timestamp) => {
         pose.beginRecording(timestamp, recorder.id);
@@ -402,15 +417,18 @@ export function LiveStudio({
         }
         liveTranscript?.beginRecording();
       },
-      (captured) => {
-        save(captured);
-        setCaptured(captured.id);
-      },
+      config.mode === "backend"
+        ? (recording) => {
+            const observed = withObservations(recording);
+            capturedRecording.current = observed;
+            save(observed);
+            setCaptured(observed.id);
+          }
+        : undefined,
     );
     owner.current = recorder;
     try {
       await recorder.start();
-      busy.current = false;
     } catch (e) {
       if (owner.current !== recorder) return;
       recorder.dispose();
@@ -437,6 +455,7 @@ export function LiveStudio({
     stopCamera();
     setProgress(null);
     setCaptured(null);
+    capturedRecording.current = null;
   };
   const evaluation =
     cameraStatus === "active" && pose.state?.phase === "running"
@@ -516,7 +535,11 @@ export function LiveStudio({
                   {localFallback ? "Backend-Modus" : "Lokaler Modus"}
                 </button>
               )}
-              <Link href="/stage">Stage</Link>
+              {progress ? (
+                <span aria-disabled="true">Stage</span>
+              ) : (
+                <Link href="/stage">Stage</Link>
+              )}
             </div>
           </div>
         )}
@@ -542,22 +565,23 @@ export function LiveStudio({
             {error}
           </p>
         )}
-        {stage &&
-          cameraStatus === "active" &&
-          audioAvailable === false &&
-          !localFallback && (
-            <p className="status-warning" role="status">
-              Das Mikrofon ist nicht verfügbar. Die Kamera und Pose-Erkennung
-              laufen weiter.{" "}
+        {stage && cameraStatus === "active" && audioAvailable === false && (
+          <p className="status-warning" role="status">
+            Das Mikrofon ist nicht verfügbar. Die Kamera und Pose-Erkennung
+            laufen weiter.{" "}
+            {localFallback ? (
+              "Die Aufnahme enthält kein Audio."
+            ) : (
               <button
                 type="button"
                 className="text-button"
                 onClick={() => setLocalFallback(true)}
               >
-                Lokale Videoaufnahme starten
+                Zum lokalen Videomodus wechseln
               </button>
-            </p>
-          )}
+            )}
+          </p>
+        )}
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <div className="live-control-bar" aria-hidden={fullscreen}>
@@ -569,14 +593,15 @@ export function LiveStudio({
                 </Button>
               )}
               <p className="field-hint live-audio-hint">
-                Microphone audio is sent to your server for live feedback. The
-                full take is uploaded after stopping.
+                {localFallback
+                  ? "Video und Mikrofon bleiben im Browser. Kein Analyse-Upload."
+                  : "Microphone audio is sent to your server for live feedback. The full take is uploaded after stopping."}
               </p>
               {!progress ? (
                 cameraStatus === "active" && (
                   <>
                     <Button onClick={() => void start()}>
-                          <Radio size={17} /> {startLabel}
+                      <Radio size={17} /> {startLabel}
                     </Button>
                     <Button variant="ghost" onClick={stopCamera}>
                       <CameraOff size={17} /> Turn camera off
@@ -594,18 +619,14 @@ export function LiveStudio({
                 >
                   <Square size={14} fill="currentColor" />
                   {progress.phase === "finishing"
-                    ? "Analyse läuft…"
+                    ? stage
+                      ? "Analyse läuft…"
+                      : "Preparing video & feedback…"
                     : finishLabel}
                 </Button>
               )}
               {stage && captured && progress?.phase === "finishing" && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    owner.current?.dispose();
-                    router.push(`/live/${captured}/review?stage=1`);
-                  }}
-                >
+                <Button variant="outline" onClick={openCapturedReview}>
                   Review jetzt öffnen
                 </Button>
               )}
@@ -800,9 +821,11 @@ export function LiveStudio({
                     )}
                     {!progress && (
                       <p className="fullscreen-consent">
-                        Starting sends microphone audio to your server live and
-                        uploads the full take after stopping.
-                        {transcribe &&
+                        {localFallback
+                          ? "Video und Mikrofon bleiben im Browser. Kein Analyse-Upload."
+                          : "Starting sends microphone audio to your server live and uploads the full take after stopping."}
+                        {!localFallback &&
+                          transcribe &&
                           liveCaptions &&
                           " Live transcription uses Deepgram EU."}
                       </p>
@@ -832,7 +855,7 @@ export function LiveStudio({
                         </Button>
                       ) : !progress ? (
                         <Button onClick={() => void start()}>
-                      <Radio size={17} /> {startLabel}
+                          <Radio size={17} /> {startLabel}
                         </Button>
                       ) : progress.phase === "connecting" ? (
                         <Button variant="outline" onClick={cancel}>
@@ -845,41 +868,37 @@ export function LiveStudio({
                         >
                           <Square size={14} fill="currentColor" />
                           {progress.phase === "finishing"
-                            ? "Analyse läuft…"
+                            ? stage
+                              ? "Analyse läuft…"
+                              : "Preparing video & feedback…"
                             : finishLabel}
                         </Button>
                       )}
-                      {stage &&
-                        captured &&
-                        progress?.phase === "finishing" && (
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              owner.current?.dispose();
-                              router.push(
-                                `/live/${captured}/review?stage=1`,
-                              );
-                            }}
-                          >
-                            Review jetzt öffnen
-                          </Button>
-                        )}
+                      {stage && captured && progress?.phase === "finishing" && (
+                        <Button variant="outline" onClick={openCapturedReview}>
+                          Review jetzt öffnen
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <>
                     <span>
                       <Video size={14} />
-                      {progress?.phase === "recording"
-                        ? "Recording saved locally"
-                        : "Camera stays local until Start"}
+                      {localFallback
+                        ? "Lokale Aufnahme · kein Analyse-Upload"
+                        : progress?.phase === "recording"
+                          ? "Recording saved locally"
+                          : "Camera stays local until Start"}
                     </span>
                     <span>
-                      {progress?.phase === "recording"
-                        ? liveCaptions && transcribe
-                          ? "Live speech feedback + captions"
-                          : "Live speech feedback · audio sent to server"
-                        : "Live + full backend analysis"}
+                      {localFallback
+                        ? "Lokale Hinweise · Review nach Stopp"
+                        : progress?.phase === "recording"
+                          ? liveCaptions && transcribe
+                            ? "Live speech feedback + captions"
+                            : "Live speech feedback · audio sent to server"
+                          : "Live + full backend analysis"}
                     </span>
                   </>
                 )}
@@ -892,21 +911,29 @@ export function LiveStudio({
             >
               {progress
                 ? (progress.notice ??
-                  `${serverStatus} Speak normally for the first 3 seconds. Full analysis follows after stopping.`)
+                  (localFallback
+                    ? "Lokale Aufnahme. Hinweise und Video sind nach dem Stoppen im Review verfügbar."
+                    : `${serverStatus} Speak normally for the first 3 seconds. Full analysis follows after stopping.`))
                 : cameraCopy[cameraStatus]}
               {!progress && (
                 <span className="recording-consent">
-                  By starting, you agree to send your video and microphone audio
-                  to <strong>{consentTarget(endpoint)}</strong> after stopping.
-                  Microphone audio is also sent during recording for live speech
-                  feedback when enabled.
-                  {transcribe &&
-                    liveCaptions &&
-                    " Live transcription streams microphone audio through this server to Deepgram’s EU endpoint during recording."}
-                  {transcribe &&
-                    " If live transcription is off or fails, Whisper transcribes locally after stopping."}{" "}
-                  The original is removed after processing; analysis results
-                  remain stored.
+                  {localFallback ? (
+                    "Mit dem Start stimmst du der lokalen Aufnahme von Kamera und Mikrofon zu. Video und Hinweise werden in diesem Browser gespeichert, bis du sie im Review löschst. Es gibt keinen Analyse-Upload."
+                  ) : (
+                    <>
+                      By starting, you agree to send your video and microphone
+                      audio to <strong>{consentTarget(endpoint)}</strong> after
+                      stopping. Microphone audio is also sent during recording
+                      for live speech feedback when enabled.
+                      {transcribe &&
+                        liveCaptions &&
+                        " Live transcription streams microphone audio through this server to Deepgram’s EU endpoint during recording."}
+                      {transcribe &&
+                        " If live transcription is off or fails, Whisper transcribes locally after stopping."}{" "}
+                      The original is removed after processing; analysis results
+                      remain stored.
+                    </>
+                  )}
                 </span>
               )}
             </p>
@@ -1010,262 +1037,264 @@ export function LiveStudio({
             </aside>
           )}
         </div>
-        <section
-          id="live-options"
-          className="live-options"
-          aria-label="Studio options"
-          aria-hidden={fullscreen}
-          tabIndex={-1}
-        >
-          <PresentationSetup
-            mode={presentationMode}
-            onMode={setPresentationMode}
-            endpoint={endpoint}
-            disabled={!!progress}
-            prepared={transcribe}
-            onPrepare={() => {
-              stopCamera();
-              setTranscribe(true);
-            }}
-          />
-          <details className="live-settings recording-settings">
-            <summary>Recording options</summary>
-            <fieldset disabled={!!progress}>
-              <details className="connection-settings">
-                <summary>Title and duration</summary>
-                <div className="form-row">
-                  <div className="field">
-                    <label htmlFor="live-title">Recording title</label>
-                    <Input
-                      id="live-title"
-                      value={title}
-                      maxLength={100}
-                      onChange={(e) => setTitle(e.target.value)}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="live-duration">Recording limit</label>
-                    <NativeSelect
-                      id="live-duration"
-                      value={targetMs}
-                      onChange={(e) => setTargetMs(Number(e.target.value))}
-                    >
-                      <option value={60000}>1 minute</option>
-                      <option value={180000}>3 minutes</option>
-                      <option value={300000}>5 minutes</option>
-                    </NativeSelect>
-                  </div>
-                </div>
-              </details>
-              <div className="field">
+        {!stage && (
+          <section
+            id="live-options"
+            className="live-options"
+            aria-label="Studio options"
+            aria-hidden={fullscreen}
+            tabIndex={-1}
+          >
+            <PresentationSetup
+              mode={presentationMode}
+              onMode={setPresentationMode}
+              endpoint={endpoint}
+              disabled={!!progress}
+              prepared={transcribe}
+              onPrepare={() => {
+                stopCamera();
+                setTranscribe(true);
+              }}
+            />
+            <details className="live-settings recording-settings">
+              <summary>Recording options</summary>
+              <fieldset disabled={!!progress}>
                 <details className="connection-settings">
-                  <summary>Server connection</summary>
-                  <label htmlFor="live-endpoint">Backend API URL</label>
-                  <Input
-                    id="live-endpoint"
-                    value={endpoint}
-                    placeholder="http://localhost:8000"
-                    onChange={(e) => setEndpoint(e.target.value)}
-                  />
+                  <summary>Title and duration</summary>
+                  <div className="form-row">
+                    <div className="field">
+                      <label htmlFor="live-title">Recording title</label>
+                      <Input
+                        id="live-title"
+                        value={title}
+                        maxLength={100}
+                        onChange={(e) => setTitle(e.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="live-duration">Recording limit</label>
+                      <NativeSelect
+                        id="live-duration"
+                        value={targetMs}
+                        onChange={(e) => setTargetMs(Number(e.target.value))}
+                      >
+                        <option value={60000}>1 minute</option>
+                        <option value={180000}>3 minutes</option>
+                        <option value={300000}>5 minutes</option>
+                      </NativeSelect>
+                    </div>
+                  </div>
                 </details>
-                {health && (
-                  <p className="field-hint" role="status">
-                    {health}
-                  </p>
-                )}
-                <label className="live-transcribe">
-                  <input
-                    type="checkbox"
-                    checked={transcribe}
-                    onChange={(e) => setTranscribe(e.target.checked)}
-                  />
-                  Create a transcript
-                </label>
-                {transcribe && (
+                <div className="field">
+                  <details className="connection-settings">
+                    <summary>Server connection</summary>
+                    <label htmlFor="live-endpoint">Backend API URL</label>
+                    <Input
+                      id="live-endpoint"
+                      value={endpoint}
+                      placeholder="http://localhost:8000"
+                      onChange={(e) => setEndpoint(e.target.value)}
+                    />
+                  </details>
+                  {health && (
+                    <p className="field-hint" role="status">
+                      {health}
+                    </p>
+                  )}
                   <label className="live-transcribe">
                     <input
                       type="checkbox"
-                      checked={liveCaptions}
-                      onChange={(e) => setLiveCaptions(e.target.checked)}
+                      checked={transcribe}
+                      onChange={(e) => setTranscribe(e.target.checked)}
                     />
-                    Stream transcription with Deepgram (EU)
+                    Create a transcript
                   </label>
+                  {transcribe && (
+                    <label className="live-transcribe">
+                      <input
+                        type="checkbox"
+                        checked={liveCaptions}
+                        onChange={(e) => setLiveCaptions(e.target.checked)}
+                      />
+                      Stream transcription with Deepgram (EU)
+                    </label>
+                  )}
+                  <p className="field-hint">
+                    {transcribe
+                      ? "Local Whisper transcribes after stopping. Optional Deepgram streaming needs DEEPGRAM_API_KEY and drops German filler words. Review recognition errors before checking claims against your sources."
+                      : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
+                  </p>
+                </div>
+              </fieldset>
+            </details>
+            <p className="field-hint">
+              Pose model, finger tracking and feedback types are set in{" "}
+              <Link href="/admin">Admin</Link>.
+            </p>
+            <details className="live-settings gesture-settings">
+              <summary>Gesture guide and calibration</summary>
+              <GestureGuide evaluation={evaluation ?? null} />
+              <Button
+                variant="outline"
+                disabled={
+                  cameraStatus !== "active" ||
+                  pose.state?.phase !== "running" ||
+                  !!progress
+                }
+                onClick={pose.recalibrate}
+              >
+                Recalibrate neutral position
+              </Button>
+              <Link href="/gestures">Try synthetic walkthrough</Link>
+            </details>
+            <details
+              className="live-settings studio-diagnostics"
+              aria-label="Local pose capture"
+            >
+              <summary>Camera diagnostics</summary>
+              <p role="status">
+                {backendLabel(
+                  pose.state?.backend ?? null,
+                  pose.state?.handModel ?? null,
                 )}
-                <p className="field-hint">
-                  {transcribe
-                    ? "Local Whisper transcribes after stopping. Optional Deepgram streaming needs DEEPGRAM_API_KEY and drops German filler words. Review recognition errors before checking claims against your sources."
-                    : "Off: no speech recognition request is made. You can still import a timestamped transcript in the review."}
-                </p>
-              </div>
-            </fieldset>
-          </details>
-          <p className="field-hint">
-            Pose model, finger tracking and feedback types are set in{" "}
-            <Link href="/admin">Admin</Link>.
-          </p>
-          <details className="live-settings gesture-settings">
-            <summary>Gesture guide and calibration</summary>
-            <GestureGuide evaluation={evaluation ?? null} />
-            <Button
-              variant="outline"
-              disabled={
-                cameraStatus !== "active" ||
-                pose.state?.phase !== "running" ||
-                !!progress
-              }
-              onClick={pose.recalibrate}
-            >
-              Recalibrate neutral position
-            </Button>
-            <Link href="/gestures">Try synthetic walkthrough</Link>
-          </details>
-          <details
-            className="live-settings studio-diagnostics"
-            aria-label="Local pose capture"
-          >
-            <summary>Camera diagnostics</summary>
-            <p role="status">
-              {backendLabel(
-                pose.state?.backend ?? null,
-                pose.state?.handModel ?? null,
-              )}
-            </p>
-            {fallbackLabel(pose.state?.backend ?? null) && (
-              <p className="field-hint">
-                CPU fallback: {fallbackLabel(pose.state?.backend ?? null)}
               </p>
-            )}
-            <Button
-              variant="outline"
-              aria-pressed={poseLab}
-              disabled={!!progress}
-              onClick={() => {
-                setPoseLab(!poseLab);
-                setPoseDebug(false);
-              }}
-            >
-              Pose lab
-            </Button>
-            <Button
-              variant="outline"
-              aria-pressed={poseDebug}
-              disabled={poseLab}
-              onClick={() => {
-                setPoseDebug(!poseDebug);
-              }}
-            >
-              <Eye size={18} />
-              Pose debug
-            </Button>
+              {fallbackLabel(pose.state?.backend ?? null) && (
+                <p className="field-hint">
+                  CPU fallback: {fallbackLabel(pose.state?.backend ?? null)}
+                </p>
+              )}
+              <Button
+                variant="outline"
+                aria-pressed={poseLab}
+                disabled={!!progress}
+                onClick={() => {
+                  setPoseLab(!poseLab);
+                  setPoseDebug(false);
+                }}
+              >
+                Pose lab
+              </Button>
+              <Button
+                variant="outline"
+                aria-pressed={poseDebug}
+                disabled={poseLab}
+                onClick={() => {
+                  setPoseDebug(!poseDebug);
+                }}
+              >
+                <Eye size={18} />
+                Pose debug
+              </Button>
 
-            <p>
-              Landmarks appear automatically while the camera is on. No pose
-              data is uploaded or used to score your presentation.
-            </p>
-            <p className="field-hint">
-              Gesture and posture observations are prototype heuristics. Eye
-              contact, emotion and presentation quality are not measured.
-            </p>
-            <div className="live-control-bar">
-              {pose.state?.phase === "error" && (
-                <Button
-                  variant="outline"
-                  disabled={cameraStatus !== "active" || !!progress}
-                  onClick={pose.start}
-                >
-                  Retry landmarks
-                </Button>
-              )}
-              <PoseDownload blob={pose.download} />
-            </div>
-            <p role="status">
-              {pose.state?.message ?? "Enable your camera to see landmarks."}
-            </p>
-            <p>
-              {pose.state?.count ?? 0} pose samples ·{" "}
-              {pose.state?.latest?.quality.legs_visible
-                ? "Legs visible"
-                : pose.state?.latest?.quality.thighs_visible
-                  ? "Thighs visible"
-                  : pose.state?.latest?.quality.thighs_available
-                    ? "Thighs visible · lower legs estimated"
-                    : "Legs not confirmed visible"}
-            </p>
-            <p className="field-hint">
-              Turn the camera off to download preview JSONL. Starting a take
-              resets the preview log and aligns timestamps to the video.
-              Download preview samples first if you need them. Logs are released
-              when you leave.
-            </p>
-            <div className="stream-summary">
-              <span>
-                {progress?.chunksSent ?? 0} recording parts uploaded after
-                stopping
-              </span>
-              <span>
-                {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
-              </span>
-            </div>
-          </details>
-          <SessionStorageNotice />
-          <details className="live-settings">
-            <summary>Session observations</summary>
-            <section className="panel live-events">
-              <div className="panel-title-row">
-                <h2>Session observations</h2>
-                <span className="badge">{feedback.length}</span>
+              <p>
+                Landmarks appear automatically while the camera is on. No pose
+                data is uploaded or used to score your presentation.
+              </p>
+              <p className="field-hint">
+                Gesture and posture observations are prototype heuristics. Eye
+                contact, emotion and presentation quality are not measured.
+              </p>
+              <div className="live-control-bar">
+                {pose.state?.phase === "error" && (
+                  <Button
+                    variant="outline"
+                    disabled={cameraStatus !== "active" || !!progress}
+                    onClick={pose.start}
+                  >
+                    Retry landmarks
+                  </Button>
+                )}
+                <PoseDownload blob={pose.download} />
               </div>
-              {feedback.length ? (
-                <div className="event-feed">
-                  {feedback.toReversed().map((item) => (
-                    <div key={item.id}>
-                      <span className={`feedback-kind ${item.kind}`}>
-                        {item.category} · {time(item.startMs)}
-                      </span>
-                      <strong>{item.title}</strong>
-                      <p>{item.detail}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="live-empty">
-                  <CheckCircle2 size={24} />
-                  <p>No observations yet.</p>
-                  <span>
-                    Start a take to save observations for replay. No
-                    observations does not imply a perfect performance.
-                  </span>
-                </div>
-              )}
-            </section>
-            {!!progress?.metrics.length && (
+              <p role="status">
+                {pose.state?.message ?? "Enable your camera to see landmarks."}
+              </p>
+              <p>
+                {pose.state?.count ?? 0} pose samples ·{" "}
+                {pose.state?.latest?.quality.legs_visible
+                  ? "Legs visible"
+                  : pose.state?.latest?.quality.thighs_visible
+                    ? "Thighs visible"
+                    : pose.state?.latest?.quality.thighs_available
+                      ? "Thighs visible · lower legs estimated"
+                      : "Legs not confirmed visible"}
+              </p>
+              <p className="field-hint">
+                Turn the camera off to download preview JSONL. Starting a take
+                resets the preview log and aligns timestamps to the video.
+                Download preview samples first if you need them. Logs are
+                released when you leave.
+              </p>
+              <div className="stream-summary">
+                <span>
+                  {progress?.chunksSent ?? 0} recording parts uploaded after
+                  stopping
+                </span>
+                <span>
+                  {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
+                </span>
+              </div>
+            </details>
+            <SessionStorageNotice />
+            <details className="live-settings">
+              <summary>Session observations</summary>
               <section className="panel live-events">
-                <h2>Backend metrics</h2>
-                <dl className="backend-metrics">
-                  {progress.metrics.map((metric) => (
-                    <div key={metric.id}>
-                      <dt>{metric.label}</dt>
-                      <dd>
-                        {metric.value ?? "Not enough data"}{" "}
-                        {metric.value !== null && metric.unit}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <div className="panel-title-row">
+                  <h2>Session observations</h2>
+                  <span className="badge">{feedback.length}</span>
+                </div>
+                {feedback.length ? (
+                  <div className="event-feed">
+                    {feedback.toReversed().map((item) => (
+                      <div key={item.id}>
+                        <span className={`feedback-kind ${item.kind}`}>
+                          {item.category} · {time(item.startMs)}
+                        </span>
+                        <strong>{item.title}</strong>
+                        <p>{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="live-empty">
+                    <CheckCircle2 size={24} />
+                    <p>No observations yet.</p>
+                    <span>
+                      Start a take to save observations for replay. No
+                      observations does not imply a perfect performance.
+                    </span>
+                  </div>
+                )}
               </section>
-            )}
-            <div className="stream-summary">
-              <span>
-                {progress?.chunksSent ?? 0} recording parts uploaded after
-                stopping
-              </span>
-              <span>
-                {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
-              </span>
-            </div>
-          </details>
-        </section>
-        {Object.values(recordings).length > 0 && (
+              {!!progress?.metrics.length && (
+                <section className="panel live-events">
+                  <h2>Backend metrics</h2>
+                  <dl className="backend-metrics">
+                    {progress.metrics.map((metric) => (
+                      <div key={metric.id}>
+                        <dt>{metric.label}</dt>
+                        <dd>
+                          {metric.value ?? "Not enough data"}{" "}
+                          {metric.value !== null && metric.unit}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              )}
+              <div className="stream-summary">
+                <span>
+                  {progress?.chunksSent ?? 0} recording parts uploaded after
+                  stopping
+                </span>
+                <span>
+                  {((progress?.bytesSent ?? 0) / 1024 / 1024).toFixed(1)} MB
+                </span>
+              </div>
+            </details>
+          </section>
+        )}
+        {!stage && Object.values(recordings).length > 0 && (
           <section className="recent-recordings">
             <h2>Past sessions</h2>
             {Object.values(recordings)

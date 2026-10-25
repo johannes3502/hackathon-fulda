@@ -38,7 +38,10 @@ function germanVoice(synth: SpeechSynthesis) {
   try {
     return synth
       .getVoices()
-      .find((voice) => voice.lang.toLowerCase().startsWith("de"));
+      .find(
+        (voice) =>
+          voice.localService && voice.lang.toLowerCase().startsWith("de"),
+      );
   } catch {
     return undefined;
   }
@@ -132,14 +135,18 @@ export function StageQuestion({
     const synth = window.speechSynthesis;
     stopSpeech();
     setSpeechNotice(null);
-    try {
-      const next = new SpeechSynthesisUtterance(
-        context.question.question,
+    const voice = germanVoice(synth);
+    if (!voice) {
+      setSpeechNotice(
+        "Keine lokale deutsche Stimme verfügbar. Die Frage steht als Text bereit.",
       );
+      return;
+    }
+    try {
+      const next = new SpeechSynthesisUtterance(context.question.question);
       next.lang = "de-DE";
       next.rate = 0.95;
-      const voice = germanVoice(synth);
-      if (voice) next.voice = voice;
+      next.voice = voice;
       next.onstart = () => {
         if (utterance.current === next) setSpeaking(true);
       };
@@ -152,6 +159,9 @@ export function StageQuestion({
         if (utterance.current !== next) return;
         utterance.current = null;
         setSpeaking(false);
+        setSpeechNotice(
+          "Die Sprachausgabe ist fehlgeschlagen. Die Frage steht als Text bereit.",
+        );
       };
       utterance.current = next;
       setSpeaking(true);
@@ -177,10 +187,7 @@ export function StageQuestion({
     answerEndAt.current = end;
     setAnswerRemainingMs(STAGE_ANSWER_MS);
     countdown.current = setInterval(() => {
-      const remaining = Math.max(
-        0,
-        (answerEndAt.current ?? end) - Date.now(),
-      );
+      const remaining = Math.max(0, (answerEndAt.current ?? end) - Date.now());
       if (remaining <= 0) {
         clearAnswerTimer();
         setAnswerRemainingMs(0);
@@ -306,9 +313,7 @@ export function StageQuestion({
                 <Quote size={14} aria-hidden="true" />
                 {evidence.label}
               </span>
-              <blockquote className={styles.quote}>
-                {evidence.quote}
-              </blockquote>
+              <blockquote className={styles.quote}>{evidence.quote}</blockquote>
             </div>
           )}
           <h3 className={styles.pointsTitle}>Kernpunkte</h3>

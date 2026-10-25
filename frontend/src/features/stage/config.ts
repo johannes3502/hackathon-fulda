@@ -16,9 +16,9 @@ export function stageModeEnabled(value: string | undefined): boolean {
   return value?.trim() !== "0";
 }
 
-/** `local` makes the instant local recording the primary action. */
+/** Backend analysis is opt-in; a missing setting keeps the instant local path. */
 export function stageAnalysisMode(
   value: string | undefined,
 ): StageAnalysisMode {
-  return value?.trim().toLowerCase() === "local" ? "local" : "live";
+  return value?.trim().toLowerCase() === "live" ? "live" : "local";
 }

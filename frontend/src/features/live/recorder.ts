@@ -35,6 +35,7 @@ export class LiveRecorder {
   private failed = false;
   private latestMetricMs = -1;
   private transcript?: LiveTranscript;
+  private cancelFinish?: () => void;
   private progress: LiveProgress = {
     phase: "connecting",
     elapsedMs: 0,
@@ -201,20 +202,18 @@ export class LiveRecorder {
           { once: true },
         ),
       );
-    this.stream
-      .getAudioTracks()
-      .forEach((track) =>
-        track.addEventListener(
-          "ended",
-          () => {
-            if (!this.stopping)
-              this.fail(
-                "Microphone capture ended. Recording stopped; the video is ready to review.",
-              );
-          },
-          { once: true },
-        ),
-      );
+    this.stream.getAudioTracks().forEach((track) =>
+      track.addEventListener(
+        "ended",
+        () => {
+          if (!this.stopping)
+            this.fail(
+              "Microphone capture ended. Recording stopped; the video is ready to review.",
+            );
+        },
+        { once: true },
+      ),
+    );
     recorder.start(500);
   }
   stop() {
@@ -234,7 +233,11 @@ export class LiveRecorder {
     this.stream.getTracks().forEach((track) => track.stop());
   }
   private createdAt = new Date().toISOString();
-  private snapshot(video: Blob, videoUrl: string, final: boolean): LiveRecording {
+  private snapshot(
+    video: Blob,
+    videoUrl: string,
+    final: boolean,
+  ): LiveRecording {
     return {
       id: this.id,
       config: this.config,
@@ -252,7 +255,7 @@ export class LiveRecorder {
       notice:
         this.progress.notice ??
         (!final && this.config.mode === "backend"
-          ? "Video saved locally. Analysis is still running; you can open the review now."
+          ? "Video captured locally. Analysis is still running; you can open the review now."
           : null),
       transcript: this.transcript,
       analysisUploaded:
@@ -264,26 +267,29 @@ export class LiveRecorder {
   private async finishWithTimeout(video: Blob) {
     const finish = this.transport.finish(this.progress.elapsedMs, video);
     const timeoutMs = this.config.analysisTimeoutMs;
-    if (!timeoutMs) {
-      await finish;
-      return;
-    }
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const outcome = await Promise.race([
         finish.then(() => "done" as const),
-        new Promise<"timeout">((resolve) => {
-          timer = setTimeout(() => resolve("timeout"), timeoutMs);
+        new Promise<"cancelled">((resolve) => {
+          this.cancelFinish = () => resolve("cancelled");
         }),
+        ...(timeoutMs && Number.isFinite(timeoutMs) && timeoutMs > 0
+          ? [
+              new Promise<"timeout">((resolve) => {
+                timer = setTimeout(() => resolve("timeout"), timeoutMs);
+              }),
+            ]
+          : []),
       ]);
       if (outcome === "timeout") {
-        finish.catch(() => {});
         throw new Error(
-          "Analysis is taking too long. The video is saved locally; open the review now.",
+          "Analysis is taking too long. The local video and live observations remain available; an already queued backend job may still finish.",
         );
       }
     } finally {
       if (timer) clearTimeout(timer);
+      this.cancelFinish = undefined;
     }
   }
   private async finalize() {
@@ -317,12 +323,16 @@ export class LiveRecorder {
       }
     }
     this.transport.close();
-    if (this.disposed) return;
+    if (this.disposed) {
+      if (!this.onCaptured) URL.revokeObjectURL(videoUrl);
+      return;
+    }
     this.chunks = [];
     this.onComplete(this.snapshot(video, videoUrl, true));
   }
   dispose() {
     this.disposed = true;
+    this.cancelFinish?.();
     clearInterval(this.timer);
     this.transport.close();
     if (this.recorder && this.recorder.state !== "inactive")

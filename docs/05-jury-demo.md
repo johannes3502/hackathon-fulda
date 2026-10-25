@@ -17,7 +17,7 @@ reicht alternativ Node.js 22.12+: `npm ci`, `npm run build`, `npm run start`.
 zeigt Backend, Quellencheck, Kamera/Mikrofon und IndexedDB. **Lokale
 Sofortaufnahme** ist der Standard und funktioniert ohne
 Backend. **Live-Demo starten** nutzt die Backend-Analyse und ist nur nach einem
-Warmlauf sinnvoll; die Stage bricht die Analyse nach 90 s ab und behält das
+Warmlauf sinnvoll; die Stage beendet das Warten nach 90 s und behält das
 lokale Video. Nach dem Stopp öffnet das Stage-Review mit den drei
 `evidence-share-v1`-Kriterien und genau einer vorbereiteten Datenschutzfrage
 (90-s-Antwortfenster, keine Nachfrage, keine Bewertung). Die normale

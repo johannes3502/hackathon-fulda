@@ -48,14 +48,14 @@ reviewten Merge von `feature/structure-safety-scores`, 25.10.2026.
   `/review-preview`, `/demo`, `/gestures`, `/sources`, `/progress`, `/admin`
   und `/api/health/ready` ab; `/stage` wird im Preflight geprüft.
 - [x] **Pitch Mode / Stage.** `/stage` mit Preflight, lokalem Sofortpfad als
-  Default, optionalem Live-Pfad, 90-s-Analyse-Abbruch und frühem lokalen
+  Default, optionalem Live-Pfad, 90-s-Wartefrist auf Analyse und frühem lokalen
   Speichern. `GET /questions/pitch` liefert genau eine feste Datenschutzfrage
   und einen hardcodierten Agent-Kontext ohne LLM/Redis/Provider. Der normale
-  `/live`-Pfad bleibt parallel bestehen; `PITCH_MODE=0` bzw.
-  `NEXT_PUBLIC_STAGE_MODE=0` deaktivieren die Stage-Surface.
+  `/live`-Pfad bleibt parallel bestehen. `PITCH_MODE=0` deaktiviert nur den
+  Backend-Endpunkt; `NEXT_PUBLIC_STAGE_MODE=0` verbirgt die Stage-Einstiege.
 - [ ] **Live-ASR-Warmlauf.** Der erste Whisper-Job kann auf dem Demo-Laptop
-  deutlich länger dauern; die Stage bricht nach 90 s ab und behält das lokale
-  Video. Vor der Jury einen synthetischen Take warmlaufen lassen,
+  deutlich länger dauern; die Stage beendet nach 90 s das Warten und behält
+  das lokale Video. Vor der Jury einen synthetischen Take warmlaufen lassen,
   `CELERY_WORKER_CONCURRENCY=1` setzen und die Live-Dauer messen. Bei
   unklarer Latenz bleibt die lokale Sofortaufnahme der Bühnenpfad. Gemessen am
   25.10. auf dem Demo-Laptop: kalter 4-s-Job ca. 6 min, warmer 4-s-Job ca. 29 s;

@@ -14,7 +14,7 @@ Demo-Laptop deutlich länger dauern kann.
 - **Lokale Sofortaufnahme** ist der Default: `LocalVideoTransport`, sofortiges
   Speichern in IndexedDB, Review ohne Backend-Wartezeit.
 - **Live-Pfad** (`/live?stage=1`): Backend-Analyse mit frühem lokalen Speichern
-  und 90-s-Abbruch; dabei bleibt das Video erhalten und „Review jetzt öffnen“
+  und 90-s-Wartefrist; dabei bleibt das Video erhalten und „Review jetzt öffnen“
   ist verfügbar.
 - `GET /questions/pitch` liefert genau eine feste Datenschutzfrage und den
   hardcodierten Agent-Kontext (`backend/app/questions/pitch.py`) ohne LLM,
@@ -42,7 +42,7 @@ kein Ersatz für echte Aufnahmen.
 ## 2. Ablauf der Präsentation
 
 1. **Preflight** (`/stage`, vor dem Auftritt): Kamera/Mikro, IndexedDB,
-   Backend/Worker und Quellencheck prüfen. Jede Zeile
+   Backend-Dienste und Quellencheck prüfen. Der Worker wird dabei nicht geprüft. Jede Zeile
    zeigt `Bereit | Optional | Nicht bereit` mit Klartext-Grund.
 2. **Pitch**: Aufnahme mit festem 60-s-Preset, ohne Produkt-Navigation.
    Standard ist der lokale Sofortpfad; der Live-Pfad ist opt-in.
@@ -80,7 +80,7 @@ Enum-Wert, keine DB-Migration). Stattdessen:
 
 - `PITCH_MODE` in `.env` (Default an, `0` deaktiviert `GET /questions/pitch`).
 - `backend/app/questions/pitch.py`: feste kanonische Datenschutzfrage,
-  Antwortpunkte, geprüfte Demo-Evidenz und hardcodierter Agent-Prompt.
+  Antwortpunkte, vorbereitete Referenz und hardcodierter Agent-Prompt; kein verifiziertes Quellenzitat.
 - Kein `pitch_mode`-Feld in `QuestionRequest`; der normale Fragenpfad bleibt
   unverändert.
 
@@ -172,7 +172,7 @@ Bühne zeigt nur das Review-Score-System.
 | ElevenLabs-Key/Agent fehlt | feste Frage als Text und per Browser-Vorlesen; keine Abhängigkeit |
 | Agent-Session scheitert | kein Fake-Dialog; die feste Frage bleibt verfügbar |
 | Worker/Backend weg | lokaler Sofortpfad, Review aus Browser-Events; Live-Analyse optional |
-| Transkription zu langsam | 90-s-Abbruch, lokales Video bleibt, „Review jetzt öffnen“ |
+| Transkription zu langsam | 90-s-Wartefrist, lokales Video bleibt, „Review jetzt öffnen“ |
 | Fact-Check ohne Treffer | Fachwissen „–“ mit sichtbarer Abdeckung, kein 0 |
 | Aufnahme zu kurz/leer | lokale Aufnahme + Review; kein Score erfinden |
 | Netzwerk im Auftritt | lokale Aufnahme aus IndexedDB (`presentation-recordings`) |
@@ -198,7 +198,7 @@ Kein Fallback erfindet Sprache, Zitate oder Scores.
 - `/stage` führt in unter 3 Minuten vom Preflight bis zum sichtbaren Review.
 - Die Stage-Aufnahme ist auf 60 s begrenzt; der lokale Pfad öffnet das Review
   ohne Backend-Wartezeit.
-- Der Live-Pfad ist opt-in und bricht die Analyse nach 90 s ab, ohne das lokale
+- Der Live-Pfad ist opt-in und beendet das Warten nach 90 s, ohne das lokale
   Video zu verlieren.
 - Genau eine vorbereitete Datenschutzfrage wird gezeigt; keine Nachfrage.
 - Die Frage und der Agent-Kontext kommen ohne LLM, Redis und Provider aus.
@@ -227,3 +227,20 @@ Kein Fallback erfindet Sprache, Zitate oder Scores.
 - Keine Emotions-, Persönlichkeits- oder Genauigkeitsbewertung.
 - Keine serverseitigen Videos/Clips; die Aufnahme bleibt lokal.
 - Kein zweites Score-System auf der Bühne.
+
+## 13. Branch-Review (25.10.2026)
+
+- Früher Review und Timeout erhalten auch Pose-Log und Live-Ereignisse.
+  Der Browser beendet das Warten; ein bereits eingereihter Backend-Job kann
+  weiterlaufen. Lokale Takes werden nur einmal gespeichert.
+- Der lokale Pfad fragt keine Backend-Bereitschaft ab und zeigt seinen eigenen
+  Einwilligungstext. Ohne Mikrofon ist die stumme Aufnahme sichtbar markiert.
+- `config.stage` erhält den Bühnenmodus bei Reload und in vergangenen Aufnahmen.
+  Compose reicht die Stage-Build-Flags und das Backend-Flag tatsächlich weiter.
+- Preflight-Fristen gelten auch für stockende Antwort-Bodies. Der Health-Check
+  prüft Dienste, nicht den Worker; IndexedDB wird nur als Browser-API erkannt.
+- Die vorbereitete Referenz nennt lokale Speicherung, temporäre Uploads und
+  Gemini, Deepgram sowie ElevenLabs. Sie wird nicht als geprüfter Upload-Beleg
+  ausgegeben. Browser-Vorlesen wählt ausschließlich eine lokale deutsche Stimme.
+- Automatisierte Regressionen verwenden synthetisches Video, Audio und
+  Landmarks. Echter Kamera-/Mikrofon-/Stimmen-Test und Safari bleiben Geräte-Abnahme.

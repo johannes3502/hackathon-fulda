@@ -85,6 +85,7 @@ flowchart TB
     MAIN --> SO
     MAIN --> FC
     MAIN --> QR
+    QR -->|"GET /questions/pitch; PITCH_MODE"| FIXED["Feste Jury-Frage + vorbereitete Referenz<br/>kein Retrieval, kein geprüftes Quellenzitat"]
     MAIN --> RV
     MAIN --> PR
     RV -- "Session/Take/Event/Review/Job" --> PG
@@ -151,9 +152,9 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph Host["docker compose (localhost only)"]
-        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000<br/>Health: alle Demo-Routen + Backend"]
+        FE["frontend<br/>Next.js Production-Build :3000, kein Source-Mount<br/>Stage-Flags und API-Rewrite zur Build-Zeit<br/>Health: Produkt-Routen + Backend"]
         BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, --reload"]
-        WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Concurrency 2"]
+        WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Default-Concurrency 1"]
         BT["beat: ein Scheduler<br/>gemeinsames Backend-Image<br/>03:15 UTC -> retention_sweep"]
         PG[("postgres<br/>pgvector :5432<br/>Volume: postgres_data")]
         RD[("redis :6379<br/>AOF, noeviction<br/>Volume: redis_data")]
@@ -503,9 +504,9 @@ flowchart TD
     RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ausdrücklich markierte Beispiel-Scores"]
     STAGE["/stage - Pitch Mode<br/>Preflight: Backend, Quellencheck,<br/>Kamera/Mikro, Storage; feste Datenschutzfrage<br/>NEXT_PUBLIC_STAGE_MODE=0 blendet die Route aus"]
     STAGE -->|"Lokal (Default)"| STAGELOCAL["/live?stage=1&local=1<br/>sofortige lokale Aufnahme + Review"]
-    STAGE -->|"Live (optional)"| STAGELIVE["/live?stage=1<br/>Backend-Analyse mit 90-s-Abbruch"]
+    STAGE -->|"Live (optional)"| STAGELIVE["/live?stage=1<br/>max. 90 s auf Backend-Analyse warten"]
     STAGE -->|"Beispiel"| RP
-    STAGELOCAL --> SREVIEW["/live/sessionId/review?stage=1<br/>ReviewScores; feste Jury-Frage am Ende<br/>kein Post-Round-Score"]
+    STAGELOCAL --> SREVIEW["/live/sessionId/review?stage=1<br/>ReviewScores; feste Jury-Frage am Ende<br/>config.stage bleibt beim Wiederöffnen erhalten"]
     STAGELIVE --> SREVIEW
     SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
@@ -561,8 +562,10 @@ Berechtigungen vorab anzufragen.
 Der Stage-Pfad startet standardmäßig **lokal** (`/live?stage=1&local=1`): Der
 `LocalVideoTransport` speichert die Aufnahme sofort in IndexedDB, das Review
 öffnet ohne Backend-Wartezeit. Der Live-Pfad (`/live?stage=1`) bleibt parallel
-verfügbar und ist opt-in; die Stage-Analyse bricht nach 90 s ab und behält das
-lokale Video. Der normale `/live`-Pfad bleibt unverändert.
+verfügbar und ist opt-in; die Stage beendet nach 90 s das Warten auf Analyse.
+Früher Review und Timeout behalten Video, Pose-Log und Live-Ereignisse.
+Bereits eingereihte Backend-Jobs können weiterlaufen. Der normale `/live`-Pfad
+bleibt unverändert.
 
 `GET /questions/pitch` liefert die feste Datenschutzfrage und den Agent-Kontext
 aus `backend/app/questions/pitch.py`, ohne LLM, Redis, Quellenabruf oder

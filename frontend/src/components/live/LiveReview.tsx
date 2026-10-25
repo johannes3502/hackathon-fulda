@@ -36,7 +36,7 @@ import "./stage-live.css";
 
 export function LiveReview({
   sessionId,
-  stage = false,
+  stage: requestedStage = false,
 }: {
   sessionId: string;
   stage?: boolean;
@@ -46,6 +46,7 @@ export function LiveReview({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const recording = recordings[sessionId];
+  const stage = requestedStage || recording?.config.stage === true;
   const [selected, setSelected] = useState<LiveFeedback | null>(null);
   const [view, setView] = useState<"moments" | "questions">("moments");
   const [all, setAll] = useState(true);
@@ -88,7 +89,9 @@ export function LiveReview({
         <div className="workspace-heading">
           <div>
             <h1>
-              {stage ? "Dein Auftritt, eine Frage." : "Make your next take stronger."}
+              {stage
+                ? "Dein Auftritt, eine Frage."
+                : "Make your next take stronger."}
             </h1>
             <p>
               {recording.config.title} · {mode.label} ·{" "}

@@ -15,7 +15,8 @@ def test_pitch_context_is_fixed_and_has_exactly_one_question(monkeypatch):
     assert body["question"]["id"] == "pitch-privacy"
     assert body["question"]["question"] == pitch.PITCH_QUESTION
     assert body["question"]["question"].count("?") == 1
-    assert body["question"]["evidence"]["quote_verified"] == "exact"
+    assert "quote_verified" not in body["question"]["evidence"]
+    assert "Vorbereitete Referenz" in body["question"]["evidence"]["label"]
     assert body["question"]["answer_points"] == pitch.PITCH_ANSWER_POINTS
     assert pitch.PITCH_QUESTION in body["prompt"]
     assert "keine Nachfrage" in body["prompt"]

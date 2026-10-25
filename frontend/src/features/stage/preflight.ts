@@ -32,7 +32,7 @@ const check = (
 async function checkBackend(signal: AbortSignal): Promise<StageCheck> {
   try {
     const response = await stageFetch(HEALTH_PATH, signal);
-    const body = await response.json().catch(() => null);
+    const body = response.body;
     const unavailable = Object.entries(SERVICE_LABELS)
       .filter(([key]) => !isObject(body) || body[key] !== "ok")
       .map(([, label]) => label);
@@ -65,9 +65,8 @@ async function checkBackend(signal: AbortSignal): Promise<StageCheck> {
 async function checkFactCheck(signal: AbortSignal): Promise<StageCheck> {
   try {
     const response = await stageFetch(FACTCHECK_PATH, signal);
-    if (!response.ok)
-      throw new Error(`HTTP ${response.status}`);
-    const body = await response.json();
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = response.body;
     if (!isObject(body) || typeof body.available !== "boolean")
       throw new Error("Ungültige Einstellungen");
     if (body.available) {
@@ -75,12 +74,7 @@ async function checkFactCheck(signal: AbortSignal): Promise<StageCheck> {
         typeof body.model === "string" && body.model.trim()
           ? body.model.trim()
           : "konfiguriert";
-      return check(
-        "factcheck",
-        "Quellencheck",
-        "ready",
-        `Modell: ${model}.`,
-      );
+      return check("factcheck", "Quellencheck", "ready", `Modell: ${model}.`);
     }
     return check(
       "factcheck",
@@ -121,8 +115,10 @@ async function checkPitchQuestion(signal: AbortSignal): Promise<StageCheck> {
   }
 }
 
-/** Fetch the four service checks in parallel; each failure has its own copy. */
-export async function loadPreflight(signal: AbortSignal): Promise<StageCheck[]> {
+/** Fetch service checks in parallel; each failure has its own copy. */
+export async function loadPreflight(
+  signal: AbortSignal,
+): Promise<StageCheck[]> {
   return Promise.all([
     checkBackend(signal),
     checkFactCheck(signal),
@@ -169,7 +165,7 @@ export function browserPreflightChecks(): StageCheck[] {
       "Lokaler Speicher",
       localStore ? "ready" : "blocked",
       localStore
-        ? "IndexedDB ist verfügbar; Aufnahmen bleiben lokal."
+        ? "IndexedDB-API vorhanden. Ob Speichern möglich ist, zeigt sich beim Sichern der Aufnahme."
         : "IndexedDB fehlt; Aufnahmen können nicht lokal gespeichert werden.",
     ),
   ];

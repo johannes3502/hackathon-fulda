@@ -14,10 +14,7 @@ import {
   Play,
   RefreshCw,
 } from "lucide-react";
-import {
-  STAGE_LINKS,
-  type StageAnalysisMode,
-} from "@/features/stage/config";
+import { STAGE_LINKS, type StageAnalysisMode } from "@/features/stage/config";
 import {
   browserPreflightChecks,
   loadPreflight,
@@ -91,10 +88,13 @@ export function StageConsole({ analysis }: { analysis: StageAnalysisMode }) {
   }, []);
 
   useEffect(() => {
-    const pending = Promise.resolve().then(runPreflight);
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) void runPreflight();
+    });
     return () => {
+      active = false;
       controller.current?.abort();
-      void pending;
     };
   }, [runPreflight]);
 

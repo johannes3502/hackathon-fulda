@@ -35,7 +35,7 @@ describe("fixed jury question", () => {
     expect(PITCH_FALLBACK.question.id).toBe("pitch-privacy");
     expect(PITCH_FALLBACK.question.reason).toContain("Datenschutz");
     expect(PITCH_FALLBACK.question.evidence?.label).toBe(
-      "418 Pitch · Datenschutz",
+      "Vorbereitete Referenz · Datenfluss der Demo",
     );
     expect(PITCH_FALLBACK.question.answer_points.length).toBeGreaterThan(0);
     expect(PITCH_FALLBACK.prompt).toContain(PITCH_QUESTION_TEXT);

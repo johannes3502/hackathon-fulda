@@ -40,16 +40,18 @@ export const PITCH_FALLBACK: StagePitchContext = {
     question: PITCH_QUESTION_TEXT,
     reason: "Die Frage prüft die Datenschutz-Aussage der Demo.",
     evidence: {
-      label: "418 Pitch · Datenschutz",
+      label: "Vorbereitete Referenz · Datenfluss der Demo",
       quote:
-        "Die Aufnahme bleibt im Browser. Für die Analyse geht der Take an den lokalen Backend-Server; die Originaldatei wird nach der Verarbeitung gelöscht.",
+        "Im lokalen Stage-Pfad bleiben Video und Audio im Browser. Der optionale Live-Pfad lädt den Take zur Analyse auf das lokale Backend; dort wird die temporäre Originaldatei nach der Verarbeitung gelöscht.",
     },
     answer_points: [
-      "Das Review-Video bleibt lokal im Browser und wird nicht als Server-Clip gespeichert.",
-      "Der Take geht für die Analyse an den lokalen Backend-Server; die Originaldatei wird nach der Verarbeitung gelöscht.",
-      "Transkript, Events und geprüfte Quellen bleiben in Postgres bzw. im lokalen Objektspeicher.",
-      "Deepgram und ElevenLabs sind optionale Cloud-Anbieter und standardmäßig aus; ohne Schlüssel bleibt Whisper lokal.",
-      "Für die Jury werden nur synthetische Demo-Daten verwendet, keine echten Personenaufnahmen an Cloud-APIs.",
+      "Im lokalen Stage-Pfad gibt es keinen Analyse-Upload. Das Review-Video bleibt in IndexedDB, bis es im Browser gelöscht wird.",
+      "Nur der optionale Live-Pfad lädt den vollständigen Take zum lokalen Backend. Die temporäre Originaldatei wird nach der Verarbeitung gelöscht; es gibt keine Server-Clips.",
+      "MediaPipe, Signalanalyse und Whisper arbeiten lokal. Analyseergebnisse und Quellen bleiben im lokalen Backend gespeichert; der Browser speichert den Take mit seinen Review-Daten.",
+      "Ein manuell gestarteter Quellencheck sendet Transkript- und Quellenauszüge an Gemini (Cloud, ohne EU-Region-Pinning).",
+      "Deepgram kann nach Opt-in Audio zur Transkription empfangen; ElevenLabs empfängt Audio und Kontext bei einem separat gestarteten Sprachdialog. Die Stage nutzt beide nicht.",
+      "Die feste Stage-Frage braucht keinen Anbieter. Vorgelesen wird sie nur mit einer lokalen Browser-Stimme, falls verfügbar.",
+      "Für Cloud-Analysen sind nur synthetische Demo-Daten vorgesehen. Eine echte Kamera- oder Mikrofonaufnahme bleibt auch mit synthetischem Vortrag personenbezogen.",
     ],
   },
   prompt: [
@@ -126,7 +128,7 @@ export async function loadPitchContext(
     try {
       const response = await stageFetch(endpoint, signal, 5_000);
       if (!response.ok) continue;
-      const context = parsePitchContext(await response.json().catch(() => null));
+      const context = parsePitchContext(response.body);
       if (context) return { context, source: "backend" };
     } catch (error) {
       if (signal.aborted) throw error;

@@ -6,7 +6,7 @@ after changing source or configuration, rebuild it with
 `docker compose up --build -d frontend`. For local development use
 `npm run dev --workspace frontend` and open the printed URL.
 
-The frontend healthcheck compiles `/demo`, `/gestures`, `/sources`,
+The frontend healthcheck requests `/demo`, `/gestures`, `/sources`,
 `/progress`, `/admin`, `/review-preview`, `/live` and
 `/live/healthcheck/review`; `/stage` is checked by its own preflight. The
 review probe opens the missing-recording state; it does not create a take or
@@ -24,6 +24,17 @@ privacy question; it does not show the post-round score system. Set
 `NEXT_PUBLIC_STAGE_MODE=0` to hide `/stage`, and
 `NEXT_PUBLIC_STAGE_ANALYSIS=live` to make the backend path primary at build
 time. The normal `/live` path remains available in parallel.
+
+Compose forwards these flags from the root `.env` as build arguments; rebuild
+the frontend after changing them. `PITCH_MODE=0` disables the backend's fixed
+question endpoint independently. The local question remains available as a
+prepared fallback. Its reference is explanatory copy, not a verified source
+quote, and includes the optional Gemini data flow. Narration uses a local
+German browser voice when available; otherwise the question stays readable.
+
+Opening a review early preserves the video, pose log and live observations.
+The 90-second limit cancels the browser's wait, not an already queued backend
+job. Saved takes keep their stage review even when reopened without `?stage=1`.
 
 ## Use
 
@@ -51,7 +62,7 @@ time. The normal `/live` path remains available in parallel.
 - **See gestures in 22 seconds** (`/gestures`): synthetic walkthrough using the real observation rules.
 - **Speech analysis:** the normal `/live` recording uses live backend feedback and full
   analysis after stopping; the backend must be ready before recording starts.
-  `/stage` defaults to a local camera-only take without an upload. The microphone is
+  `/stage` defaults to a local camera-and-microphone take without an upload; if microphone access fails, a labelled video-only fallback is available. The microphone is
   enabled for the normal path and the complete take is uploaded; there is no
   recording-mode selector in the normal studio. Calibration
   waits for about three seconds of voiced speech; startup silence and unpitched
