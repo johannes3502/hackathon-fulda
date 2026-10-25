@@ -166,7 +166,8 @@
   top: 50%;
   transform: translateY(-50%);
   z-index: 6;
-  width: min(220px, calc(100% - 32px));
+  /* Readable from a standing distance: scales with the screen. */
+  width: min(clamp(240px, 24vw, 440px), calc(100% - 32px));
   pointer-events: none;
 }
 .fullscreen-cue {
@@ -174,9 +175,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 16px 12px;
-  border: 1px solid var(--signal);
+  gap: clamp(10px, 1.2vw, 20px);
+  padding: clamp(16px, 2vw, 32px) clamp(12px, 1.5vw, 24px);
+  border: 2px solid var(--signal);
   border-radius: 20px;
   color: white;
   background: #111827ed;
@@ -193,12 +194,16 @@
 .fullscreen-cue-symbol {
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: clamp(64px, 7vw, 128px);
+  height: clamp(64px, 7vw, 128px);
   border-radius: 50%;
   border: 3px solid var(--signal);
   color: var(--signal);
   background: color-mix(in srgb, var(--signal) 15%, #111827);
+}
+.fullscreen-cue-symbol svg {
+  width: 56%;
+  height: 56%;
 }
 .fullscreen-cue-copy {
   display: grid;
@@ -244,7 +249,7 @@
 }
 .recording-fullscreen .live-captions {
   left: 16px;
-  right: 260px;
+  right: calc(clamp(240px, 24vw, 440px) + 32px);
   bottom: 90px;
 }
 @media (max-width: 600px) {

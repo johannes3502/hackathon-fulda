@@ -76,6 +76,30 @@ export function FeatureOptions({
             onChange={(handTracking) => change({ ...flags, handTracking })}
           />
         </SettingRow>
+        <SettingRow
+          label="Show “Check framing”"
+          htmlFor="framing-cue"
+          description="Studio status while your upper body is not yet in view and no hint is active."
+        >
+          <Switch
+            id="framing-cue"
+            describedBy="framing-cue-description"
+            checked={flags.framingCue}
+            onChange={(framingCue) => change({ ...flags, framingCue })}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Show “Tracking ready”"
+          htmlFor="ready-cue"
+          description="Studio status after calibration while no hint is active."
+        >
+          <Switch
+            id="ready-cue"
+            describedBy="ready-cue-description"
+            checked={flags.readyCue}
+            onChange={(readyCue) => change({ ...flags, readyCue })}
+          />
+        </SettingRow>
       </AdminSection>
       <AdminSection
         id="speech-hints"
