@@ -1,6 +1,12 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { Conversation } from "@elevenlabs/client";
 import { AudioLines, Mic, MicOff, RotateCcw, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +20,12 @@ import {
   type AgentSettings,
 } from "@/features/questions/agent";
 import { PRESENTATION_MODES } from "@/features/questions/presentation";
+import { VoiceMicrophone } from "@/features/questions/microphone";
+import {
+  storeVoiceProtection,
+  subscribeVoiceProtection,
+  voiceProtectionSnapshot,
+} from "@/features/questions/voice-settings";
 import {
   MAX_VOICE_USER_TURNS,
   canStartVoiceRound,
@@ -32,6 +44,12 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     "idle" | "preparing" | "connecting" | "listening" | "speaking"
   >("idle");
   const [muted, setMuted] = useState(false);
+  const protectAgentSpeech = useSyncExternalStore(
+    subscribeVoiceProtection,
+    voiceProtectionSnapshot,
+    () => false,
+  );
+  const [microphone] = useState(() => new VoiceMicrophone());
   const [finished, setFinished] = useState(false);
   const [error, setError] = useState("");
   const [notices, setNotices] = useState<string[]>([]);
@@ -55,6 +73,10 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   const lastUser = messages.findLast((item) => item.role === "user");
   const userTurns = messages.filter((item) => item.role === "user").length;
 
+  useEffect(() => {
+    microphone.setProtectAgentSpeech(protectAgentSpeech);
+  }, [microphone, protectAgentSpeech]);
+
   const endForLimit = useCallback(() => {
     setLimitReached(true);
     setError(
@@ -63,11 +85,12 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     controller.current?.abort();
     const current = session.current;
     session.current = null;
+    microphone.detach();
     setPhase("idle");
     setMuted(false);
     setStartedAt(null);
     void endSessionIfActive(current).catch(() => {});
-  }, []);
+  }, [microphone]);
 
   useEffect(() => {
     if (!active) return;
@@ -100,8 +123,9 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
       controller.current?.abort();
       void endSessionIfActive(session.current).catch(() => {});
       session.current = null;
+      microphone.detach();
     },
-    [],
+    [microphone],
   );
 
   useEffect(() => {
@@ -117,6 +141,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     pending?.abort();
     const current = session.current;
     session.current = null;
+    microphone.detach();
     setPhase("idle");
     setMuted(false);
     setStartedAt(null);
@@ -134,6 +159,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     if (!canStartVoiceRound(limitReached, !!settings?.available)) return;
     const pending = new AbortController();
     controller.current = pending;
+    microphone.setProtectAgentSpeech(protectAgentSpeech);
     setError("");
     setNotices([]);
     update(recording.id, (take) => ({ ...take, conversation: [] }));
@@ -161,14 +187,16 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
         overrides: {
           agent: {
             prompt: { prompt: context.prompt },
-            firstMessage:
-              "Ich habe noch ein paar Fragen. Bist du bereit?",
+            firstMessage: "Ich habe noch ein paar Fragen. Bist du bereit?",
           },
         },
         onConversationCreated: (created) => {
           if (pending.signal.aborted)
             void endSessionIfActive(created).catch(() => {});
-          else session.current = created;
+          else {
+            session.current = created;
+            microphone.attach(created);
+          }
         },
         onConnect: () => {
           if (!pending.signal.aborted) {
@@ -176,7 +204,10 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
           }
         },
         onModeChange: ({ mode }) => {
-          if (!pending.signal.aborted) setPhase(mode);
+          if (!pending.signal.aborted) {
+            microphone.setMode(mode);
+            setPhase(mode);
+          }
         },
         onMessage: ({ role, message }) => {
           if (!pending.signal.aborted) {
@@ -195,6 +226,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
           if (!pending.signal.aborted) {
             pending.abort();
             session.current = null;
+            microphone.detach();
             setPhase("idle");
             setMuted(false);
             setStartedAt(null);
@@ -215,6 +247,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
         return;
       }
       session.current = current;
+      microphone.attach(current);
     } catch (failure) {
       if (!pending.signal.aborted) {
         setError(
@@ -225,6 +258,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
         pending.abort();
         const current = session.current;
         session.current = null;
+        microphone.detach();
         void endSessionIfActive(current).catch(() => {});
         setPhase("idle");
         setStartedAt(null);
@@ -338,7 +372,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
                 : phase === "connecting"
                   ? "Connecting your microphone…"
                   : phase === "speaking"
-                    ? `Your ${mode.listener.toLowerCase()} is speaking`
+                    ? `Your ${mode.listener.toLowerCase()} is speaking${muted ? " · microphone muted" : protectAgentSpeech ? " · microphone automatically muted" : ""}`
                     : phase === "listening"
                       ? muted
                         ? "Microphone muted"
@@ -364,7 +398,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
                     variant="ghost"
                     aria-pressed={muted}
                     onClick={() => {
-                      session.current?.setMicMuted(!muted);
+                      microphone.setMuted(!muted);
                       setMuted(!muted);
                     }}
                   >
@@ -389,6 +423,24 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
               </Button>
             )}
           </div>
+          <label className="field-hint">
+            <input
+              type="checkbox"
+              checked={protectAgentSpeech}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                microphone.setProtectAgentSpeech(enabled);
+                storeVoiceProtection(enabled);
+              }}
+            />{" "}
+            Protect agent speech
+          </label>
+          <p className="field-hint">
+            Automatically mute while the agent speaks and resume listening
+            afterwards. Turn off to interrupt. Manual mute stays on until you
+            unmute. Background voices can still be heard during your answer.{" "}
+            Saved in this browser; also available under Admin → Voice questions.
+          </p>
           {(active || limitReached) && (
             <p className="field-hint" role="status">
               {formatCountdown(
