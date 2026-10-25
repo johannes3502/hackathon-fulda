@@ -2005,3 +2005,13 @@ body:has(.live-workspace-large) .app-footer {
 .review-cue-icon.positive {
   color: var(--success);
 }
+
+.hold-to-talk {
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.hold-to-talk[aria-pressed="true"] {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}

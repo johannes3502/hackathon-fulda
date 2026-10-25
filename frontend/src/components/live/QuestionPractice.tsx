@@ -31,7 +31,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   const [phase, setPhase] = useState<
     "idle" | "preparing" | "connecting" | "listening" | "speaking"
   >("idle");
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [finished, setFinished] = useState(false);
   const [error, setError] = useState("");
   const [notices, setNotices] = useState<string[]>([]);
@@ -41,6 +41,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   const [now, setNow] = useState(0);
   const [limitReached, setLimitReached] = useState(false);
   const session = useRef<Conversation | null>(null);
+  const heldInput = useRef<string | null>(null);
   const turnCount = useRef(0);
   const controller = useRef<AbortController | null>(null);
   const [collection] = useState(
@@ -55,19 +56,45 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   const lastUser = messages.findLast((item) => item.role === "user");
   const userTurns = messages.filter((item) => item.role === "user").length;
 
+  const releaseTalk = useCallback(() => {
+    heldInput.current = null;
+    session.current?.setMicMuted(true);
+    setMuted(true);
+  }, []);
+
+  function holdTalk(input: string) {
+    if (!connected || !session.current || heldInput.current) return;
+    heldInput.current = input;
+    session.current.setMicMuted(false);
+    setMuted(false);
+  }
+
+  useEffect(() => {
+    const hide = () => {
+      if (document.hidden) releaseTalk();
+    };
+    window.addEventListener("blur", releaseTalk);
+    document.addEventListener("visibilitychange", hide);
+    return () => {
+      window.removeEventListener("blur", releaseTalk);
+      document.removeEventListener("visibilitychange", hide);
+    };
+  }, [releaseTalk]);
+
   const endForLimit = useCallback(() => {
     setLimitReached(true);
     setError(
       "The 10-minute / 12-answer voice session is over. The conversation was ended.",
     );
     controller.current?.abort();
+    releaseTalk();
     const current = session.current;
     session.current = null;
     setPhase("idle");
-    setMuted(false);
+    setMuted(true);
     setStartedAt(null);
     void endSessionIfActive(current).catch(() => {});
-  }, []);
+  }, [releaseTalk]);
 
   useEffect(() => {
     if (!active) return;
@@ -98,6 +125,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   useEffect(
     () => () => {
       controller.current?.abort();
+      session.current?.setMicMuted(true);
       void endSessionIfActive(session.current).catch(() => {});
       session.current = null;
     },
@@ -115,10 +143,11 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   async function stop(showStats = false) {
     const pending = controller.current;
     pending?.abort();
+    releaseTalk();
     const current = session.current;
     session.current = null;
     setPhase("idle");
-    setMuted(false);
+    setMuted(true);
     setStartedAt(null);
     try {
       await endSessionIfActive(current);
@@ -161,11 +190,11 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
         overrides: {
           agent: {
             prompt: { prompt: context.prompt },
-            firstMessage:
-              "Ich habe noch ein paar Fragen. Bist du bereit?",
+            firstMessage: "Ich habe noch ein paar Fragen. Bist du bereit?",
           },
         },
         onConversationCreated: (created) => {
+          created.setMicMuted(true);
           if (pending.signal.aborted)
             void endSessionIfActive(created).catch(() => {});
           else session.current = created;
@@ -194,9 +223,10 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
         onDisconnect: ({ reason }) => {
           if (!pending.signal.aborted) {
             pending.abort();
+            heldInput.current = null;
             session.current = null;
             setPhase("idle");
-            setMuted(false);
+            setMuted(true);
             setStartedAt(null);
             if (reason === "agent") setFinished(true);
           }
@@ -341,7 +371,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
                     ? `Your ${mode.listener.toLowerCase()} is speaking`
                     : phase === "listening"
                       ? muted
-                        ? "Microphone muted"
+                        ? "Hold to talk when you’re ready"
                         : "Listening to your answer"
                       : "A conversation about your ideas"}
             </p>
@@ -361,15 +391,34 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
                 </Button>
                 {connected && (
                   <Button
-                    variant="ghost"
-                    aria-pressed={muted}
-                    onClick={() => {
-                      session.current?.setMicMuted(!muted);
-                      setMuted(!muted);
+                    type="button"
+                    className="hold-to-talk"
+                    aria-label="Hold to talk"
+                    aria-pressed={!muted}
+                    aria-describedby="hold-to-talk-help"
+                    onPointerDown={(event) => {
+                      if (event.button !== 0 || !event.isPrimary) return;
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      holdTalk(`pointer:${event.pointerId}`);
                     }}
+                    onPointerUp={releaseTalk}
+                    onPointerCancel={releaseTalk}
+                    onLostPointerCapture={releaseTalk}
+                    onKeyDown={(event) => {
+                      if (event.key !== " " && event.key !== "Enter") return;
+                      event.preventDefault();
+                      if (!event.repeat) holdTalk(event.key);
+                    }}
+                    onKeyUp={(event) => {
+                      if (event.key !== " " && event.key !== "Enter") return;
+                      event.preventDefault();
+                      releaseTalk();
+                    }}
+                    onBlur={releaseTalk}
+                    onContextMenu={(event) => event.preventDefault()}
                   >
                     {muted ? <MicOff size={17} /> : <Mic size={17} />}
-                    {muted ? "Unmute microphone" : "Mute microphone"}
+                    {muted ? "Hold to talk" : "Talking… release to mute"}
                   </Button>
                 )}
               </div>
@@ -389,6 +438,12 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
               </Button>
             )}
           </div>
+          {connected && (
+            <p id="hold-to-talk-help" className="field-hint">
+              Hold the button, or focus it and hold Space or Enter, while
+              speaking. Release to mute your microphone.
+            </p>
+          )}
           {(active || limitReached) && (
             <p className="field-hint" role="status">
               {formatCountdown(
@@ -416,8 +471,8 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
           <p className="field-hint">
             This browser ends the session after 10 minutes or{" "}
             {MAX_VOICE_USER_TURNS} spoken answers. Starting shares your
-            transcript, matching material and live microphone audio with
-            ElevenLabs. When materials are insufficient, the agent sends focused
+            transcript and matching material with ElevenLabs. Microphone audio
+            is shared while you hold the talk button. When materials are insufficient, the agent sends focused
             search queries to Tavily to check public web sources. Spoken
             feedback is an AI suggestion; use source checks to verify factual
             claims. You can end the conversation at any time.

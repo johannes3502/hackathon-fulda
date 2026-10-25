@@ -1850,6 +1850,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   const closed = new Set<WebSocketRoute>();
   let override = "";
   let kickoffs = 0;
+  const audioChunks: boolean[] = [];
   let endFromAgent = () => {};
   let sendUserAnswer = () => {};
   await page.routeWebSocket("wss://api.elevenlabs.io/**", (socket) => {
@@ -1867,6 +1868,9 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     socket.onMessage((raw) => {
       if (typeof raw !== "string") return;
       const message = JSON.parse(raw);
+      if (message.user_audio_chunk) {
+        audioChunks.push(Buffer.from(message.user_audio_chunk, "base64").some((byte) => byte !== 0));
+      }
       if (message.type === "conversation_initiation_client_data") {
         override = message.conversation_config_override.agent.prompt.prompt;
         expect(message.conversation_config_override.agent.first_message).toBe(
@@ -1941,12 +1945,66 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     }),
   ).toBeVisible();
   expect(kickoffs).toBe(0);
-  await page
-    .getByRole("button", { name: "Mute microphone", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Unmute microphone", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  const talk = page.getByRole("button", {
+    name: "Hold to talk",
+    exact: true,
+  });
+  const expectMic = async (open: boolean) => {
+    await expect(talk).toHaveAttribute("aria-pressed", String(open));
+    audioChunks.length = 0;
+    await expect.poll(() => audioChunks.length).toBeGreaterThanOrEqual(10);
+    await expect
+      .poll(() => audioChunks.slice(-10).every((chunk) => chunk === open))
+      .toBe(true);
+  };
+  await expect.poll(() => audioChunks.length).toBeGreaterThanOrEqual(10);
+  expect(audioChunks.every((chunk) => !chunk)).toBe(true);
+  await expectMic(false);
+  await talk.hover();
+  await page.mouse.down();
+  await expectMic(true);
+  // Pointer capture also handles release outside the button.
+  await page.mouse.move(1, 1);
+  await page.mouse.up();
+  await expectMic(false);
+  for (const key of ["Space", "Enter"]) {
+    await talk.focus();
+    await page.keyboard.down(key);
+    await expectMic(true);
+    await page.keyboard.up(key);
+    await expectMic(false);
+  }
+  await talk.focus();
+  await page.keyboard.down("Space");
+  await expectMic(true);
+  await page.getByRole("button", { name: "End conversation" }).focus();
+  await expectMic(false);
+  await page.keyboard.up("Space");
+  await talk.hover();
+  await page.mouse.down();
+  await expectMic(true);
+  await talk.dispatchEvent("pointercancel");
+  await expectMic(false);
+  await page.mouse.up();
+  await talk.hover();
+  await page.mouse.down();
+  await expectMic(true);
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await expectMic(false);
+  await page.mouse.up();
+  const touch = await page.context().newCDPSession(page);
+  const box = (await talk.boundingBox())!;
+  await touch.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }],
+  });
+  await expectMic(true);
+  await touch.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expectMic(false);
+  await touch.detach();
   await noOverflow(page);
   await page.screenshot({
     path: info.outputPath("professor-question.png"),

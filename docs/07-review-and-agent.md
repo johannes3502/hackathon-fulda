@@ -342,3 +342,10 @@ Offizielle Referenzen: [JavaScript SDK](https://elevenlabs.io/docs/eleven-agents
 [Workspace-Secrets](https://elevenlabs.io/docs/api-reference/workspace/secrets/create),
 [Signed URLs](https://elevenlabs.io/docs/api-reference/conversations/get-signed-url),
 [Prompt overrides](https://elevenlabs.io/docs/eleven-agents/customization/personalization/overrides).
+
+### Push-to-talk im Web
+
+Die ElevenLabs-Fragerunde startet stumm. „Hold to talk“ öffnet das Mikrofon
+nur während des Haltens (Maus/Touch oder Space/Enter bei fokussiertem Button).
+Loslassen, Pointer-Abbruch, Fokusverlust und Tabwechsel schalten es wieder stumm.
+Die Agentenstimme bleibt hörbar. Die bisherige Mute/Unmute-Umschaltung entfällt.
