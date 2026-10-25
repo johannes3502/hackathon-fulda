@@ -1370,7 +1370,9 @@ test("transcribed take is fact-checked against sources and links back to the vid
     }),
   );
   let request: Record<string, unknown> | null = null;
+  let checks = 0;
   await page.route("**/api/factcheck", async (route) => {
+    checks++;
     request = route.request().postDataJSON();
     await route.fulfill({
       status: 202,
@@ -1425,6 +1427,10 @@ test("transcribed take is fact-checked against sources and links back to the vid
   await backend(page, true);
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
+  const knowledge = page.getByRole("article", { name: "Bewertung Fachwissen" });
+  // The source check must run before the collapsed details are opened.
+  await expect(knowledge.locator(".review-score-value")).toHaveText("0/100");
+  expect(checks).toBe(1);
   await page.getByText("Transcript and source checks", { exact: true }).click();
   const factCheck = page.locator('[aria-labelledby="fact-check-title"]');
   const inputs = factCheck.locator(".fact-check-inputs");
@@ -1433,7 +1439,7 @@ test("transcribed take is fact-checked against sources and links back to the vid
   await expect(
     factCheck.getByText("llm.example", { exact: false }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Check facts" }).click();
+
   await expect(page.locator(".fact-verdict")).toHaveText(
     "Source says otherwise",
   );
@@ -1459,6 +1465,17 @@ test("transcribed take is fact-checked against sources and links back to the vid
   await factCheck.screenshot({
     path: `test-results/fact-check-${info.project.name}.png`,
   });
+  const savedReview = page.url();
+  await page.goto(savedReview.replace(/review$/, "analysis"));
+  await expect(
+    page
+      .locator(".review-score-card")
+      .filter({ hasText: "Fachwissen" })
+      .locator(".review-score-value"),
+  ).toHaveText("0/100");
+  await page.goto(savedReview);
+  await expect(knowledge.locator(".review-score-value")).toHaveText("0/100");
+  expect(checks).toBe(1);
   await page
     .getByRole("group", { name: "Review steps" })
     .getByRole("button", { name: "Practice questions" })
@@ -1474,6 +1491,107 @@ test("transcribed take is fact-checked against sources and links back to the vid
   ).toBeVisible();
   await noOverflow(page);
 });
+
+for (const missing of ["sources", "transcript", "failed check"] as const) {
+  test(`Fachwissen explains ${missing} without inventing a score`, async ({
+    page,
+  }) => {
+    const jobId = "12345678-1234-1234-1234-123456789abc";
+    let checks = 0;
+    await page.route("**/api/speech/analyze", (route) =>
+      route.fulfill({ status: 202, json: { job_id: jobId } }),
+    );
+    await page.route("**/api/speech/jobs/*", (route) =>
+      route.fulfill({
+        json: {
+          job_id: jobId,
+          status: "completed",
+          result: {
+            audio: { summary: {} },
+            events: [],
+            notices: [],
+            asr_provider: "whisper",
+            synthetic_demo: true,
+            words:
+              missing === "transcript"
+                ? []
+                : [{ word: "Synthetic fact.", start_ms: 0, end_ms: 500 }],
+          },
+        },
+      }),
+    );
+    await page.route("**/api/factcheck/settings", (route) =>
+      route.fulfill({
+        json: {
+          available: true,
+          model: "test",
+          llm_host: "synthetic.example",
+          web_provider: null,
+        },
+      }),
+    );
+    await page.route("**/api/sources?*", (route) =>
+      route.fulfill({
+        json:
+          missing === "sources"
+            ? []
+            : [
+                {
+                  id: "00000000-0000-4000-8000-000000000001",
+                  collection_id: "00000000-0000-4000-8000-000000000002",
+                  filename: "synthetic.txt",
+                  status: "ready",
+                  chunk_count: 1,
+                  size_bytes: 10,
+                  content_type: "text/plain",
+                  created_at: "2026-10-25T00:00:00Z",
+                },
+              ],
+      }),
+    );
+    await page.route("**/api/factcheck", (route) => {
+      checks++;
+      return route.fulfill({
+        status: 503,
+        json: { detail: "Synthetic source-check failure" },
+      });
+    });
+    await backend(page, true);
+    await page.getByRole("button", { name: "Finish & review" }).click();
+    await expect(page).toHaveURL(/\/review$/);
+    await expect(
+      page
+        .getByRole("article", { name: "Bewertung Fachwissen" })
+        .locator(".review-score-value"),
+    ).toHaveText("–");
+    const message =
+      missing === "sources"
+        ? "Fachwissen benötigt fertig verarbeitete Quellen."
+        : missing === "transcript"
+          ? "Fachwissen benötigt ein Transkript."
+          : "Synthetic source-check failure";
+    await expect(
+      page.getByRole("status").filter({ hasText: message }),
+    ).toBeVisible();
+    expect(checks).toBe(missing === "failed check" ? 1 : 0);
+    await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
+    await page.getByRole("link", { name: "Quellencheck anzeigen" }).click();
+    await expect(page.locator("#source-checks")).toHaveAttribute("open", "");
+    if (missing === "failed check") {
+      await page
+        .getByRole("button", { name: "Check facts", exact: true })
+        .click();
+      await expect.poll(() => checks).toBe(2);
+      await expect(
+        page.getByRole("button", { name: "Check facts", exact: true }),
+      ).toBeEnabled();
+    }
+    await page.goto(page.url().replace(/review.*$/, "analysis"));
+    await expect(
+      page.getByRole("link", { name: "Quellencheck in der Aufnahmeübersicht" }),
+    ).toBeVisible();
+  });
+}
 
 test("live captions send PCM only during recording and a disconnect keeps the take usable", async ({
   page,

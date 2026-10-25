@@ -384,7 +384,9 @@ sequenceDiagram
     participant WS as Wikipedia / Tavily
 
     FE->>BE: GET /factcheck/settings (Modell, LLM-Host, Web-Anbieter)
-    U->>FE: Check facts (Wörter aus ASR oder Import, collection_id, use_web)
+    FE->>BE: GET /sources (Collection der Aufnahme)
+    Note over FE: Normaler Review startet fehlenden Check automatisch bei Transkript,<br/>bereiten Quellen und verfügbarem Modell; Stage bleibt explizit
+    U->>FE: Optional: Check facts / Check again (Wörter, collection_id, use_web)
     FE->>BE: POST /factcheck
     BE->>BE: URL, Schlüssel und Optionen prüfen (sonst 503 vor Speicherung)
     BE->>S3: factcheck-jobs/id/request.json

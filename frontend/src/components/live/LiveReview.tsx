@@ -50,9 +50,15 @@ export function LiveReview({
   const [selected, setSelected] = useState<LiveFeedback | null>(null);
   const [view, setView] = useState<"moments" | "questions">("moments");
   const [all, setAll] = useState(true);
+  const [knowledgeStatus, setKnowledgeStatus] = useState("");
   if (!recording) return <MissingRecording />;
   const moments = recordingFeedback(recording);
   const reviewData = recordingReviewData(recording);
+  const scores = reviewScores(
+    reviewData.moments,
+    reviewData.durationMs,
+    reviewData.claims,
+  );
   const practice = moments.filter(needsPractice);
   const strengths = moments.filter((item) => item.kind === "positive");
   const visible = all || !practice.length ? moments : practice;
@@ -137,14 +143,25 @@ export function LiveReview({
         {view === "moments" ? (
           <>
             <ReviewScores
-              scores={reviewScores(
-                reviewData.moments,
-                reviewData.durationMs,
-                reviewData.claims,
-              )}
+              scores={scores}
               demo={recording.transcript?.synthetic ?? false}
               recordingTitle={reviewData.title}
             />
+            {!stage && scores.knowledge.value === null && knowledgeStatus && (
+              <p className="field-hint" role="status">
+                {knowledgeStatus}{" "}
+                <a
+                  href="#source-checks"
+                  onClick={() => {
+                    const details = document.getElementById("source-checks");
+                    if (details instanceof HTMLDetailsElement)
+                      details.open = true;
+                  }}
+                >
+                  Quellencheck anzeigen
+                </a>
+              </p>
+            )}
             <div className="review-stage-grid">
               <VideoPlayback
                 recording={{ ...recording, feedback: moments }}
@@ -286,10 +303,15 @@ export function LiveReview({
                 </Button>
               </div>
             )}
-            <details className="review-details">
+            <details id="source-checks" className="review-details">
               <summary>Transcript and source checks</summary>
               <RecordedTranscript recording={recording} onSelect={jump} />
-              <FactCheckPanel recording={recording} onSelect={jump} />
+              <FactCheckPanel
+                recording={recording}
+                onSelect={jump}
+                autoCheck={!stage}
+                onStatus={setKnowledgeStatus}
+              />
             </details>
             <details className="review-details">
               <summary>Recording details and exports</summary>
