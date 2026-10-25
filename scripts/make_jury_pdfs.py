@@ -132,7 +132,7 @@ def features():
         ("2", "Transkript und Quellencheck", "Gesprochene Wörter erhalten Zeitmarken. Aussagen werden mit hochgeladenen PDF-, Folien- oder Textquellen verglichen. Das Ergebnis zeigt ein Quellenzitat und ein Urteil: gestützt, widersprochen oder in den Quellen nicht gefunden."),
         ("3", "Sprechmerkmale", "Die App erfasst Tempo, Pausen, Füllwörter, Lautstärke und Tonhöhenvariation. Ein Teil der Hinweise erscheint live. Wortbasiertes Tempo und Füllwörter werden nach dem Stoppen aus dem Transkript ausgewertet."),
         ("4", "Review mit Zeitmarken", "Ein Klick auf einen Hinweis springt an die zugehörige Stelle im eigenen Video. Zu den Beobachtungen stehen Erklärungen und Übungsvorschläge. Aufnahme, Analyse und Gespräch bleiben in diesem Browser gespeichert."),
-        ("5", "Frage-Simulator", "Ein ElevenLabs-Sprachdialog fragt zu Vortrag und Material nach. Je nach Präsentationstyp übernimmt er die Rolle von Investor, Hochschullehrkraft oder Lehrkraft. Der Dialog benötigt einen konfigurierten Anbieterzugang."),
+        ("5", "Frage-Simulator", "Im normalen Review kann ein ElevenLabs-Sprachdialog zu Vortrag und Material nachfragen und je nach Präsentationstyp eine Rolle übernehmen. Die Jury-Stage stellt genau eine vorbereitete Datenschutzfrage ohne Anbieterzugriff."),
     ]
     for i, (n, title, body) in enumerate(rows):
         y = 318+i*81
@@ -146,13 +146,13 @@ def features():
 
     d.page_start("Bedienung und Scores")
     d.title("Jury-Demo", "Aufnahme und Auswertung",
-            "Für einen eigenen Durchlauf reichen eine kurze Präsentation und synthetisches Quellenmaterial. Kamera und Mikrofon sind erforderlich; der Quellencheck und die Fragerunde benötigen die eingerichteten Cloud-Dienste.")
+            "Für die Jury-Stage reichen eine kurze Präsentation sowie Kamera und Mikrofon. Der lokale Standardpfad braucht kein Backend; Quellencheck und optionale Live-Analyse benötigen die eingerichteten Dienste. Die feste Stage-Frage funktioniert ohne Anbieterzugriff.")
 
     d.text("Eine kurze Probeaufnahme", M, 218, 12, CW, INK, "Bold")
     for i, (title, body) in enumerate([
-        ("Material vorbereiten", "Unter Your sources den Präsentationstyp wählen und Dateien hochladen. Sobald das Material Ready ist, mit Continue to recording ins Studio wechseln."),
-        ("Aufnehmen", "Kamera und Mikrofon erlauben, die Kalibrierung abwarten und kurz präsentieren. Finish & review beendet die Aufnahme und öffnet die Auswertung."),
-        ("Review und Fragen", "Einen Hinweis anklicken und die Stelle ansehen. Practice questions startet den Sprachdialog zur aufgenommenen Präsentation."),
+        ("Jury-Stage öffnen", "Auf /stage den Preflight ausführen und Lokale Sofortaufnahme wählen. Sie braucht kein Backend und lädt keine Medien hoch."),
+        ("Aufnehmen", "Kamera und Mikrofon erlauben, kurz präsentieren und die Aufnahme beenden. Live-Demo starten nutzt optional die Backend-Analyse."),
+        ("Review und Frage", "Im Review die drei Kriterien ansehen und einen Hinweis anklicken. Danach stellt die Stage genau eine vorbereitete Datenschutzfrage."),
     ]):
         y=247+i*52
         d.text(str(i+1), M, y, 10, 20, PURPLE)
@@ -172,13 +172,16 @@ def features():
     d.text("Der Marker öffnet die Stelle im lokalen Video. Dort lässt sich prüfen, ob die Geste zur Aussage passt.", M+203, 504, 9.4, CW-203, INK, max_h=29)
 
     d.text("Scores im Review", M, 555, 12, CW, INK, "Bold")
-    d.text("Gestik und Flow", M, 582, 10, 160, INK, "Bold")
-    d.text("100 × positive / (positive + kritische) Zeitanteile. Überlappungen derselben Art werden nur einmal gezählt.", M+185, 582, 9.4, CW-185, INK, max_h=29)
-    d.line(M, 621, W-M, 621)
-    d.text("Fachwissen", M, 633, 10, 160, INK, "Bold")
-    d.text("Bevorzugt: 100 × gestützte / (gestützte + widersprochene) Aussagen. Es zählen nur Urteile mit geprüftem Quellenzitat.", M+185, 633, 9.4, CW-185, INK, max_h=42)
-    d.text("Alle drei Werte liegen zwischen 0 und 100. Ohne bewertbare Daten bleibt der jeweilige Score offen. Formel und Datenabdeckung sind sichtbar. Neutrale Beobachtungen und unbekannte Zeit werden ausgeschlossen; die Werte sind keine validierten Noten.", M, 690, 9.4, CW, MUTED, max_h=42)
-    d.text("Ohne eigene Aufnahme: /gestures zeigt einen 22-sekündigen synthetischen Ablauf. /review-preview ist als Beispiel markiert. Für Cloud-Aufrufe werden ausschließlich synthetische Demo-Inhalte verwendet.", M, 745, 8.8, CW, MUTED, max_h=26)
+    d.text("Gestik", M, 582, 10, 160, INK, "Bold")
+    d.text("100 × positive / (positive + kritische) bewertete Zeitanteile. Überlappungen gleicher Bewertung zählen zeitlich nur einmal.", M+185, 582, 9.2, CW-185, INK, max_h=29)
+    d.line(M, 613, W-M, 613)
+    d.text("Flow", M, 621, 10, 160, INK, "Bold")
+    d.text("Dieselbe Zeitanteil-Formel, getrennt von Gestik.", M+185, 621, 9.2, CW-185, INK, max_h=25)
+    d.line(M, 649, W-M, 649)
+    d.text("Fachwissen", M, 657, 10, 160, INK, "Bold")
+    d.text("Mit Quellencheck: 100 × gestützt / (gestützt + widersprochen), nur mit geprüftem Quellenzitat. Ohne Quellencheck nutzt es bewertete Zeitanteile.", M+185, 657, 9.0, CW-185, INK, max_h=39)
+    d.text("Alle drei Prototyp-Scores liegen zwischen 0 und 100. Ohne bewertbare Evidenz bleibt ein Score offen. Formel und Datenabdeckung sind sichtbar; neutrale Beobachtungen und unbekannte Zeit bleiben außen vor. Keine validierten Noten.", M, 704, 9.0, CW, MUTED, max_h=39)
+    d.text("Ohne eigene Aufnahme: /gestures zeigt einen 22-sekündigen synthetischen Ablauf. /review-preview ist ein markiertes Beispiel. Für Cloud-Aufrufe nur synthetische Demo-Inhalte verwenden.", M, 751, 8.5, CW, MUTED, max_h=26)
     d.save()
 
 
@@ -186,21 +189,21 @@ def architecture():
     d = Document("418-Pitch-Practice-Architektur.pdf", "Architektur und Datenfluss", 3)
     d.page_start("Systemübersicht")
     d.title("Technische Dokumentation", "Systemübersicht",
-            "Next.js im Browser, FastAPI und Celery im lokalen Docker-Compose-Stack. Pose-Regeln laufen im Browser; Sprach- und Quellenanalysen im Backend. Das Wiedergabevideo wird lokal im Browser gespeichert.")
+            "Next.js im Browser, FastAPI und Celery im lokalen Docker-Compose-Stack. Pose-Regeln laufen im Browser. Die Jury-Stage speichert Video und Review lokal; ihr Standardpfad lädt keine Medien hoch. Der optionale Live-Pfad nutzt das Backend.")
 
     d.box(M, 222, CW, 108, PALE, stroke=LINE)
     d.text("Browser · Next.js / TypeScript", M+14, 234, 10.5, CW-28, INK, "Bold")
     bw=(CW-48)/3
     for i,(title,body) in enumerate([
         ("Kamera", "MediaPipe + lokale Regeln<br/>Körper- und Handpunkte"),
-        ("Mikrofon", "AudioWorklet / PCM<br/>Live-Sprechfeedback"),
+        ("Mikrofon", "AudioWorklet / PCM<br/>lokal; optional Live-Backend"),
         ("Aufnahme / Review", "MediaRecorder + IndexedDB<br/>Wiedergabe, Analyse, Gespräch"),
     ]):
         x=M+12+i*(bw+12)
         d.text(title,x,263,9.7,bw,INK,"Bold")
         d.text(body,x,286,8.5,bw,MUTED,max_h=30)
     d.arrow(W/2,330,W/2,374)
-    d.text("HTTP /api und WebSocket; Upload nach Stop", M, 344, 8.5, 235, MUTED)
+    d.text("HTTP /api und WebSocket; optionaler Upload nach Stop", M, 344, 8.5, 260, MUTED)
 
     d.box(M,375,CW,53,PALE,stroke=LINE)
     d.text("FastAPI · Python 3.12",M+14,385,10.5,CW-28,INK,"Bold")
@@ -223,12 +226,12 @@ def architecture():
     d.node(M+dw+12,578,dw,80,"SeaweedFS / S3","Quellen und temporäre Analyse-Uploads;<br/>keine Video-Wiedergabe aus dem Backend")
 
     d.text("Externe Dienste",M,685,11,CW,INK,"Bold")
-    d.text("Gemini erstellt Quellenurteile. Der ElevenLabs-Dialog verbindet sich aus dem Browser per Signed WebSocket. Deepgram EU liefert optional Live-Transkripte; Websuche ist ebenfalls optional.",M,709,9.5,CW,INK,max_h=42)
+    d.text("Ein manuell gestarteter Quellencheck sendet Transkript- und Quellenauszüge an Gemini (Cloud, ohne EU-Region-Pinning). Der normale Review kann ElevenLabs nutzen; Deepgram EU ist Opt-in. Die Jury-Stage-Frage benötigt keinen Anbieter.",M,709,9.5,CW,INK,max_h=42)
     d.text("Vereinfachtes Diagramm. Die Web-App nutzt derzeit die Audio-Job-API und lokalen Review. Die persistente Session-/Take-API ist separat implementiert. Basis: compose.yaml, docs/03-architecture.md, transport.ts.",M,762,7.9,CW,MUTED,leading=10.5,max_h=29)
 
     d.page_start("Analyseabläufe")
     d.title("Verarbeitung", "Analyseabläufe",
-            "Material und Aufnahme werden getrennt verarbeitet. Der Quellenvergleich nutzt die Aussagen aus dem Transkript. Zeitmarken verbinden die Ergebnisse mit dem lokalen Aufnahmevideo.")
+            "Im optionalen Live-Pfad werden Material und Aufnahme getrennt verarbeitet. Die lokale Jury-Stage kann ohne Backend aufzeichnen und reviewen. Zeitmarken verbinden Hinweise mit dem lokalen Video.")
     gap=19
     bw=(CW-gap)/2
     d.tag("Quellen und Aussagen",M,226,bw)
@@ -240,8 +243,8 @@ def architecture():
         ("4 / Urteil prüfen","Code prüft Zitat und Zahlen. Gestützt,<br/>widersprochen oder nicht gefunden."),
     ]
     right=[
-        ("1 / Während der Aufnahme","Pose-Regeln im Browser; PCM zum Server.<br/>Live-Pausen zusätzlich im Browser."),
-        ("2 / Nach dem Stoppen","Temporärer Upload; FFmpeg, RMS,<br/>YIN-Pitch und Silero-Sprachaktivität."),
+        ("1 / Während der Aufnahme","Pose-Regeln im Browser; optional PCM zum Server.<br/>Live-Pausen zusätzlich im Browser."),
+        ("2 / Nach dem Stoppen","Im Live-Pfad temporärer Upload; FFmpeg, RMS,<br/>YIN-Pitch und Silero-Sprachaktivität."),
         ("3 / Transkription","Lokales faster-whisper mit Wort-Zeitmarken.<br/>Finale Deepgram-Wörter wiederverwendbar."),
         ("4 / Wortbasierte Merkmale","Tempo, Pausen und Füllwörter;<br/>Zusammenführung mit Signal-Events."),
     ]
@@ -268,13 +271,13 @@ def architecture():
 
     d.page_start("Speicherung und Betrieb")
     d.title("Daten und Integrationsstand", "Speicherung und Betrieb",
-            "Video und Review bleiben im lokalen Browser-Arbeitsbereich. Der Server speichert Quellen und Analyseergebnisse. Die zusätzliche Session-/Take- und Progress-API ist noch nicht mit neuen Web-Aufnahmen verbunden.")
+            "Bei der lokalen Jury-Stage bleiben Video und Review im Browser; dieser Standardpfad lädt keine Medien hoch. Der optionale Live-Pfad lädt zur Analyse ans lokale Backend. Neue Web-Aufnahmen sind noch nicht mit der Session-/Take- und Progress-API verbunden.")
     d.text("Daten",M,220,10,160,INK,"Bold")
     d.text("Speicher und Lebensdauer",M+175,220,10,CW-175,INK,"Bold")
     d.line(M,243,W-M,243)
     rows=[
         ("Video, Pose-Log, Review","IndexedDB im Browser, einschließlich Transkript und Gespräch. Nach Reload wieder verfügbar; lokales Löschen im Review."),
-        ("Analyse-Upload","Vollständige Aufnahme temporär in SeaweedFS. Nach der Verarbeitung wird das Original gelöscht, auch bei Analysefehlern."),
+        ("Analyse-Upload","Nur im optionalen Live-Pfad: Aufnahme temporär in SeaweedFS. Nach der Verarbeitung wird das Original gelöscht, auch bei Analysefehlern. Die lokale Stage lädt keine Medien hoch."),
         ("Quellen","Originaldateien in SeaweedFS, Chunks und Embeddings in Postgres. Automatischer Quellen-Cleanup ist noch offen."),
         ("Persistente Takes / Progress","Separate API mit Daten in Postgres. Session-Löschung und Profil-Löschung sind getrennt; Profil-Löschung entkoppelt Takes."),
     ]
@@ -285,10 +288,10 @@ def architecture():
         d.line(M,y+43,W-M,y+43)
 
     d.text("Anbindung und Fehlerbehandlung",M,474,12,CW,INK,"Bold")
-    d.text("Die Web-App lädt über /speech/analyze hoch und fragt den Job-Status ab. Lange Arbeiten laufen in Celery; Redis enthält IDs und Status, keine Medien. Kamera- und Sprachhinweise können ohne LLM aus den erhobenen Events erklärt werden. Ein fehlendes Quellenurteil bleibt offen.",M,499,9.5,CW,INK,max_h=56)
+    d.text("Der normale Live-Pfad lädt über /speech/analyze hoch und fragt den Job-Status ab. Lange Arbeiten laufen in Celery; Redis enthält IDs und Status, keine Medien. Die lokale Stage kann ohne Backend aufzeichnen und reviewen. Kamera- und Sprachhinweise entstehen aus gemessenen Events; ein fehlendes Quellenurteil bleibt offen.",M,499,9.5,CW,INK,max_h=56)
 
     d.text("Modelle und externe Dienste",M,573,12,CW,INK,"Bold")
-    d.text("MediaPipe, Whisper und Embeddings laufen lokal. Gemini erhält für den Quellencheck Transkript und Quellenauszüge; es gibt kein EU-Region-Pinning. ElevenLabs verarbeitet den Sprachdialog, dessen Reaktionen nicht zitateverifiziert sind. Deepgram EU ist für Live-Transkripte optional und standardmäßig aus.",M,598,9.5,CW,INK,max_h=56)
+    d.text("MediaPipe, Whisper und Embeddings laufen lokal. Ein Quellencheck sendet Transkript und Quellenauszüge an Gemini; es gibt kein EU-Region-Pinning. Der optionale ElevenLabs-Dialog verarbeitet Audio und Kontext; Antworten sind nicht zitateverifiziert. Deepgram EU ist für Live-Transkripte Opt-in. Die Jury-Stage nutzt diese Anbieter nicht.",M,598,9.5,CW,INK,max_h=56)
 
     d.text("Grenzen des Prototyps",M,672,12,CW,INK,"Bold")
     d.text("Demo-Inhalte für Cloud-Aufrufe sind synthetisch. Zitat-, Zahlen- und Schema-Prüfungen reduzieren Modellfehler, bieten aber keinen vollständigen Prompt-Injection-Schutz. Die Qualität auf echten Geräten und die Lernwirksamkeit sind nicht validiert. Lokales Löschen entfernt keine separaten Backend-Daten; Legacy-Ergebnis-Cleanup bleibt offen.",M,697,9.2,CW,MUTED,max_h=54)
