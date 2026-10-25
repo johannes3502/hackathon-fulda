@@ -129,7 +129,7 @@ test("local stage records without analysis traffic, restores its review, and end
   });
 });
 
-test("early review retains pose observations and their evidence across reload", async ({
+test("early review retains hidden-overlay pose observations and their evidence across reload", async ({
   page,
 }) => {
   await page.route("**/api/speech/analyze", (route) =>
@@ -149,6 +149,10 @@ test("early review retains pose observations and their evidence across reload", 
       }),
   );
   await record(page, false);
+  await page.getByRole("button", { name: "Hide landmarks" }).click();
+  await expect(
+    page.getByRole("button", { name: "Show landmarks" }),
+  ).toHaveAttribute("aria-pressed", "false");
   await page.evaluate(() =>
     (window as unknown as { poseWorker: Worker }).poseWorker.postMessage({
       type: "test-start",
@@ -160,6 +164,9 @@ test("early review retains pose observations and their evidence across reload", 
     "Arms crossed in front of torso",
     { timeout: 15000 },
   );
+  await expect(
+    page.getByRole("img", { name: "Live pose and hand landmarks" }),
+  ).toHaveCount(0);
   await page
     .getByRole("button", { name: "Demo beenden & Review", exact: true })
     .click();

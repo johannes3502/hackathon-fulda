@@ -1870,7 +1870,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
       if (message.type === "conversation_initiation_client_data") {
         override = message.conversation_config_override.agent.prompt.prompt;
         expect(message.conversation_config_override.agent.first_message).toBe(
-          "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?",
+          "Ich habe noch ein paar Fragen. Bist du bereit?",
         );
         socket.send(
           JSON.stringify({
@@ -1886,6 +1886,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
           JSON.stringify({
             type: "agent_response",
             agent_response_event: {
+              // Provider-supplied tags must still be hidden in the transcript.
               agent_response:
                 "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?",
             },
