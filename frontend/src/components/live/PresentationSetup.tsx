@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { NativeSelect } from "@/components/ui/input";
+import { PresentationModeSelect } from "./PresentationModeSelect";
 import {
   PRESENTATION_MODES,
   type PresentationMode,
@@ -94,21 +94,7 @@ export function PresentationSetup({
         <span className="muted">· {PRESENTATION_MODES[mode].label}</span>
       </summary>
       <fieldset disabled={disabled} className="presentation-setup-fields">
-        <div className="field">
-          <label htmlFor="presentation-mode">What are you preparing for?</label>
-          <NativeSelect
-            id="presentation-mode"
-            value={mode}
-            onChange={(event) => onMode(event.target.value as PresentationMode)}
-          >
-            {Object.entries(PRESENTATION_MODES).map(([key, item]) => (
-              <option key={key} value={key}>
-                {item.label}
-              </option>
-            ))}
-          </NativeSelect>
-          <p className="field-hint">{PRESENTATION_MODES[mode].focus}</p>
-        </div>
+        <PresentationModeSelect mode={mode} onMode={onMode} />
         <div className="presentation-materials">
           <div className="panel-title-row">
             <strong>Your presentation material</strong>

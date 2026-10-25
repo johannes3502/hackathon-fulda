@@ -11,6 +11,12 @@ import {
 } from "react";
 import type { LiveRecording } from "./contracts";
 import {
+  presentationModeSnapshot,
+  storePresentationMode,
+  subscribePresentationMode,
+  type PresentationMode,
+} from "../questions/presentation";
+import {
   deleteRecording,
   loadRecordings,
   storeRecording,
@@ -23,6 +29,8 @@ import {
   type FeatureFlags,
 } from "./feature-flags";
 type LiveContext = {
+  presentationMode: PresentationMode;
+  setPresentationMode: (mode: PresentationMode) => void;
   featureFlags: FeatureFlags;
   setFeatureFlags: (flags: FeatureFlags) => void;
   recordings: Record<string, LiveRecording>;
@@ -39,6 +47,11 @@ type LiveContext = {
 };
 const Context = createContext<LiveContext | null>(null);
 export function LiveSessionProvider({ children }: { children: ReactNode }) {
+  const presentationMode = useSyncExternalStore(
+    subscribePresentationMode,
+    presentationModeSnapshot,
+    () => "startup" as const,
+  );
   // Defaults on the server and during hydration; saved options afterwards.
   const featureFlags = useSyncExternalStore(
     subscribeFeatureFlags,
@@ -151,6 +164,8 @@ export function LiveSessionProvider({ children }: { children: ReactNode }) {
   return (
     <Context.Provider
       value={{
+        presentationMode,
+        setPresentationMode: storePresentationMode,
         recordings,
         save,
         update,

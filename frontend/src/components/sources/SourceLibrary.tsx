@@ -12,6 +12,8 @@ import { AppShell } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiEndpoint } from "@/features/live/analysis";
+import { useLiveSessions } from "@/features/live/LiveSessionProvider";
+import { PresentationModeSelect } from "@/components/live/PresentationModeSelect";
 import {
   ACCEPT,
   checkFile,
@@ -74,6 +76,7 @@ function clientConfig(): Config {
 const subscribe = () => () => {};
 
 export function SourceLibrary() {
+  const { presentationMode, setPresentationMode } = useLiveSessions();
   const [selectedCollection, setSelectedCollection] = useState<string>();
   const [collectionDraft, setCollectionDraft] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
@@ -188,6 +191,10 @@ export function SourceLibrary() {
               <h2>Source library</h2>
               <span className="badge">{sources.length} files</span>
             </div>
+            <PresentationModeSelect
+              mode={presentationMode}
+              onMode={setPresentationMode}
+            />
             <label
               className={dragging ? "source-drop dragging" : "source-drop"}
               onDragOver={(event) => {

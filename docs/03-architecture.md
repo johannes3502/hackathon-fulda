@@ -369,10 +369,11 @@ sequenceDiagram
 
 Der Web-Review hat zwei Ansichten: **Review moments** (begrenzte Wiedergabe-
 Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
-Vor der Aufnahme werden `presentationMode` (startup/thesis/school/nonprofit)
-und `sourceCollectionId` im Take eingefroren. Im getippten Fragepfad steuert der
-Modus Rolle und fachliche Schwerpunkte. Der Sprachagent ist immer eine
-Lehrkraft, die Verständnis des Vortrags prüft, ohne Scores oder Noten. Nach der
+Auf `/sources` wird `presentationMode` (startup/thesis/school/nonprofit) neben
+dem Upload gewählt und im Browser gespeichert. Vor der Aufnahme werden Modus
+und `sourceCollectionId` im Take eingefroren. In beiden Fragepfaden steuert
+derselbe Modus Rolle und fachliche Schwerpunkte: Investor, Hochschullehrkraft,
+Schullehrkraft oder potenzielle Unterstützung; ohne Scores oder Noten. Nach der
 vollständig beantworteten getippten Runde zeigt der Client zusätzlich eine
 Auswertung mit transparentem Heuristik-Score aus gemessenen Events; siehe
 `docs/07-review-and-agent.md`.
@@ -483,8 +484,8 @@ flowchart TD
     EVIDENCE --> LA
     DEMOPAGE["/demo<br/>Optionales Beispiel + Setup"]
     DEMOPAGE -->|"Demo starten / konfigurieren"| PRAC["/practice/sessionId<br/>PracticeStudio (Mock-Gateway)"]
-    LIVE -->|"Back to sources vor Aufnahmestart"| SRC["/sources<br/>SourceLibrary: Upload, Status und Löschen"]
-    SRC -->|"Weiter zur Aufnahme"| LIVE
+    LIVE -->|"Back to sources vor Aufnahmestart"| SRC["/sources<br/>SourceLibrary: Vortragstyp neben Datei-Upload,<br/>Status und Löschen"]
+    SRC -->|"Weiter zur Aufnahme<br/>Vortragstyp aus localStorage"| LIVE
     LIVE --> WALK["/gestures: synthetischer 22-s-Rundgang<br/>gleiche Regeln, keine Genauigkeitsvalidierung"]
     WALK --> LIVE
     ADMIN["/admin (Navbar, ohne Login)<br/>AdminPanel: Pose-Haltezeit,<br/>Hinweis-Mindestdauer + Lücke,<br/>Pose feedback: On/Review/Off je Regel,<br/>Analysis features: Modell/Modus/Feedback"] -->|"localStorage, ab nächster<br/>Kalibrierung/Aufnahme"| LIVE

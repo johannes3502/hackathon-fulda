@@ -29,3 +29,30 @@ export const PRESENTATION_MODES: Record<
     focus: "Mission, credible impact and how people can help.",
   },
 };
+
+const STORAGE_KEY = "pitchcoach.presentationMode";
+let current: PresentationMode | undefined;
+const listeners = new Set<() => void>();
+
+export function presentationModeSnapshot(): PresentationMode {
+  if (current) return current;
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved && Object.hasOwn(PRESENTATION_MODES, saved))
+      return (current = saved as PresentationMode);
+  } catch {}
+  return (current = "startup");
+}
+
+export function subscribePresentationMode(listener: () => void) {
+  listeners.add(listener);
+  return () => void listeners.delete(listener);
+}
+
+export function storePresentationMode(mode: PresentationMode) {
+  current = mode;
+  try {
+    localStorage.setItem(STORAGE_KEY, mode);
+  } catch {}
+  listeners.forEach((listener) => listener());
+}

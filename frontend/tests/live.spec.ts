@@ -355,11 +355,15 @@ test("camera setup hides global navigation and full-size recording preserves the
   await expect(
     page.getByRole("link", { name: "Back to sources", exact: true }),
   ).toHaveAttribute("href", "/sources");
-  const previewWorkspace = (await page.locator(".live-workspace").boundingBox())!;
+  const previewWorkspace = (await page
+    .locator(".live-workspace")
+    .boundingBox())!;
   expect(previewWorkspace.width).toBeGreaterThanOrEqual(
     page.viewportSize()!.width - 40,
   );
-  const previewCamera = (await page.locator(".live-camera-stage").boundingBox())!;
+  const previewCamera = (await page
+    .locator(".live-camera-stage")
+    .boundingBox())!;
   if (info.project.name === "desktop") {
     expect(previewCamera.height).toBeGreaterThan(480);
     await expect(
@@ -1974,18 +1978,17 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
       if (message.type === "user_message") kickoffs++;
     });
   });
-  await backend(page, true, async () => {
-    await page.getByText("Presentation & material", { exact: false }).click();
-    await page.getByLabel("What are you preparing for?").selectOption("thesis");
-    await page.getByLabel("Upload presentation material").setInputFiles({
-      name: "thesis.txt",
-      mimeType: "text/plain",
-      buffer: Buffer.from("Synthetic thesis notes"),
-    });
-    await expect(
-      page.getByLabel("Presentation material", { exact: true }),
-    ).toContainText("Ready");
+  await page.goto("/sources");
+  await page.getByLabel("What are you preparing for?").selectOption("thesis");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "thesis.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Synthetic thesis notes"),
   });
+  await expect(
+    page.getByRole("region", { name: "Uploaded sources" }),
+  ).toContainText("Ready");
+  await backend(page, true);
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
   // A later browser collection choice must not retarget an already recorded take.
@@ -1995,12 +1998,15 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
       "00000000-0000-4000-8000-000000000099",
     ),
   );
+  await page.evaluate(() =>
+    localStorage.setItem("pitchcoach.presentationMode", "school"),
+  );
   await page
     .getByRole("group", { name: "Review steps" })
     .getByRole("button", { name: "Practice questions" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Meet your teacher." }),
+    page.getByRole("heading", { name: "Meet your university professor." }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Start voice questions" }).click();
   await expect(
@@ -2047,7 +2053,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     fullPage: true,
   });
   await expect(
-    page.getByRole("heading", { name: "Meet your teacher." }),
+    page.getByRole("heading", { name: "Meet your university professor." }),
   ).not.toBeVisible();
   await expect(
     page.getByText(
@@ -2060,7 +2066,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     .click();
   await expect(stats).not.toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Meet your teacher." }),
+    page.getByRole("heading", { name: "Meet your university professor." }),
   ).toBeFocused();
   await page
     .getByRole("button", { name: "Start a new conversation", exact: true })

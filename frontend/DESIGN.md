@@ -116,7 +116,10 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   leaving the question view disconnects the agent. Missing configuration,
   unavailable services and missing transcripts have visible recovery paths.
 - **Sources:** show a full-width document library with supported formats, upload
-  state and errors. Continue to recording is the main action.
+  state and errors. Choose the presentation type alongside the upload, with the
+  questioner's role and focus visible. The choice persists across navigation and
+  reloads; the studio can adjust it before recording. Both voice and typed
+  questions use the take's frozen mode. Continue to recording is the main action.
 - **Sample:** retain explicit synthetic-data labels for the walkthrough and
   example annotations. Review scores use the disclosed rubric on the synthetic
   example evidence; the qualitative event graph uses only the

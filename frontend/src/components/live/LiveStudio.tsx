@@ -57,7 +57,6 @@ import { PoseDebug } from "./PoseDebug";
 import { PoseOverlay } from "./PoseOverlay";
 import { backendLabel, fallbackLabel } from "@/features/pose/backend";
 import { PresentationSetup } from "./PresentationSetup";
-import type { PresentationMode } from "@/features/questions/presentation";
 import { collectionId } from "@/features/sources/api";
 import "./record-accessibility.css";
 
@@ -75,7 +74,14 @@ const cameraCopy = {
 export function LiveStudio() {
   const router = useRouter();
   const { stageRef, toggleRef, fullscreen, toggle } = useStageFullscreen();
-  const { save, recordings, featureFlags, setFeatureFlags } = useLiveSessions();
+  const {
+    save,
+    recordings,
+    featureFlags,
+    setFeatureFlags,
+    presentationMode,
+    setPresentationMode,
+  } = useLiveSessions();
   const {
     status: cameraStatus,
     videoRef,
@@ -89,8 +95,6 @@ export function LiveStudio() {
     featureFlags,
   );
   const [title, setTitle] = useState("My pitch rehearsal");
-  const [presentationMode, setPresentationMode] =
-    useState<PresentationMode>("startup");
   const [targetMs, setTargetMs] = useState(180000);
   const serverSpeech = useRef<LiveCaptions | null>(null);
   // Browser microphone measurements for the pause rules only: a pause shows
