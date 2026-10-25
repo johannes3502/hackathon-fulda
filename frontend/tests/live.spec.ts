@@ -354,6 +354,25 @@ test("camera setup hides global navigation and full-size recording preserves the
   await expect(
     page.getByRole("link", { name: "Back to sources", exact: true }),
   ).toHaveAttribute("href", "/sources");
+  const previewWorkspace = (await page.locator(".live-workspace").boundingBox())!;
+  expect(previewWorkspace.width).toBeGreaterThanOrEqual(
+    page.viewportSize()!.width - 40,
+  );
+  const previewCamera = (await page.locator(".live-camera-stage").boundingBox())!;
+  if (info.project.name === "desktop") {
+    expect(previewCamera.height).toBeGreaterThan(480);
+    await expect(
+      page.getByRole("button", { name: "Start recording", exact: true }),
+    ).toBeInViewport();
+  } else {
+    expect(previewCamera.height).toBeGreaterThanOrEqual(
+      page.viewportSize()!.height / 2,
+    );
+  }
+  await page.screenshot({
+    path: info.outputPath("enabled-camera-preview.png"),
+    fullPage: true,
+  });
   const video = page.getByLabel("Your local camera feed");
   const originalVideo = await video.elementHandle();
   const startButton = page.getByRole("button", {

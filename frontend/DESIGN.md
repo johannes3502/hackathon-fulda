@@ -50,8 +50,9 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
 
 - **Studio:** camera setup shares the sources page's content width and heading
   layout, with the global header and workflow steps hidden. “Back to sources” returns directly to the
-  upload library, retaining the selected collection and its documents. Starting
-  a take switches to the full-size camera and feedback layout. The
+  upload library, retaining the selected collection and its documents. Enabling
+  the camera switches immediately to the full-size camera and feedback layout;
+  the back link stays in its toolbar until recording starts. The
   camera fills the available width before feedback exists; during preview and
   recording it sits beside an equally wide feedback panel. Below 1001px they
   stack. Shared controls, speech choice and recording timer sit
