@@ -26,7 +26,8 @@
   height: 20px;
   flex-shrink: 0;
 }
-.live-workspace .button-ghost {
+.live-workspace .live-control-bar .button-ghost,
+.live-workspace .live-options .button-ghost {
   color: var(--foreground);
 }
 .live-workspace .text-button,
@@ -91,7 +92,8 @@
   font-size: 1rem;
   line-height: 1.6;
 }
-.live-workspace .live-camera-stage:has(.camera-video.hidden) {
+.live-workspace
+  .live-camera-stage:not(.recording-fullscreen):has(.camera-video.hidden) {
   height: auto;
   min-height: 32rem;
   aspect-ratio: auto;
@@ -107,7 +109,7 @@
   line-height: 1.5;
 }
 .live-workspace .live-pose-status {
-  top: 5rem;
+  top: 7rem;
   max-width: calc(100% - 32px);
   font-size: 0.9375rem;
 }
@@ -118,6 +120,19 @@
 .live-workspace .live-captions small {
   font-size: 0.9375rem;
   line-height: 1.6;
+}
+.live-workspace .fullscreen-consent,
+.live-workspace .fullscreen-notice {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.live-workspace .fullscreen-cue-copy small {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.live-workspace .fullscreen-cue-copy strong {
+  font-size: 1.125rem;
+  line-height: 1.4;
 }
 .live-workspace .live-captions {
   bottom: 6rem;
@@ -130,6 +145,9 @@
   line-height: 1.3;
 }
 @media (max-width: 760px) {
+  .live-workspace .live-pose-status {
+    top: 10rem;
+  }
   .live-workspace .live-control-bar > .button {
     flex-basis: 100%;
   }
