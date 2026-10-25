@@ -196,8 +196,8 @@ Die Auswertung ist rein clientseitig und deterministisch
 kein LLM, Eingaben sind nur Daten, die der Browser ohnehin hat
 (Fact-Check-Urteile, Antwort-Urteile, Wörter, Feedback-Events, Pose-Events).
 
-Formel `evidence-share-v1` wie in den Review-Scores; die Fragerunde ergänzt
-geprüfte Antworten und behält ihre transparente Gewichtung:
+Formel `evidence-share-v1` wie in den Review-Scores. Geprüfte Antworten in
+älteren gespeicherten Takes bleiben enthalten; die Gewichtung ist sichtbar.
 
 - **Inhalt** (Gewicht 0,5): Anteil `supports` an `supports` + `contradicts`,
   nur bei geprüftem Quellenzitat (`exact`/`fuzzy`). `not_found`, `unchecked`

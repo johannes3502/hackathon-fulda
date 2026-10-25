@@ -1,5 +1,7 @@
 // Pitch Practice — Hackathon Fulda 2026 Pitch Deck (14 Folien, 16:9, Open Sans, Violett #3803BF)
 const path = require("path");
+const fs = require("node:fs/promises");
+const JSZip = require("jszip");
 const R = require("react");
 const ReactDOMServer = require("react-dom/server");
 const sharp = require("sharp");
@@ -84,11 +86,9 @@ async function main() {
     background: { color: WHITE },
     objects: [
       { text: { text: "418 presentation studio", options: { x: 0.62, y: 7.05, w: 3.6, h: 0.3, fontSize: 9, color: MUTED, fontFace: FONT, margin: 0, isTextBox: true } } },
+      { placeholder: { options: { name: "title", type: "title", x: 0.62, y: 0.44, w: 12.1, h: 0.95, fontSize: 30, bold: true, color: INK, fontFace: FONT, margin: 0 } } },
     ],
     slideNumber: { x: 12.4, y: 7.05, w: 0.42, h: 0.3, fontSize: 10, color: MUTED, fontFace: FONT },
-    placeholder: [
-      { name: "title", options: { x: 0.62, y: 0.44, w: 12.1, h: 0.95, fontSize: 30, bold: true, color: INK, fontFace: FONT, margin: 0 } },
-    ],
   });
 
   // ---------- Helpers ----------
@@ -328,8 +328,8 @@ async function main() {
     s.addText("Danach fragt der Agent", { placeholder: "title" });
     const steps = [
       { icon: "FiHelpCircle", h: "Fragen aus echten Funden", d: "Widersprüche und Lücken aus dem Fact-Check — nicht aus der Luft gegriffen." },
-      { icon: "FiMic", h: "Tippen oder sprechen", d: "Voice-Agent liest vor und nimmt auf — optional mit ElevenLabs-Stimme." },
-      { icon: "FiBookOpen", h: "Abgleich mit den Quellen", d: "Jede Antwort wird mit Zitat-Prüfung gegen die Unterlagen verglichen." },
+      { icon: "FiMic", h: "Fragen im Sprachdialog", d: "ElevenLabs führt das Gespräch — mit Transkript und Quellen als Kontext." },
+      { icon: "FiBookOpen", h: "Belege bleiben sichtbar", d: "Der Fact-Check prüft Quellenzitate. Die Sprachreaktionen sind nicht zitateverifiziert." },
     ];
     const W = 3.95, H = 2.9, G = 0.35, X0 = 0.62, Y = 1.85;
     steps.forEach((c, i) => {
@@ -344,7 +344,7 @@ async function main() {
       s.addText(t, { shape: pres.ShapeType.roundRect, rectRadius: 0.28, fill: { color: WHITE }, line: { color: BRAND, width: 1.25 }, x: 0.62 + i * 3.6, y: 5.3, w: 3.35, h: 0.56, fontSize: 13.5, bold: true, color: BRAND, align: "center", fontFace: FONT, margin: 0 });
     });
     txt(s, "Prototyp-Score, keine Note.", { x: 8.2, y: 5.42, w: 4.5, h: 0.35, fontSize: 14.5, bold: true, color: INK });
-    s.addNotes("Nach dem Vortrag übernimmt der Frage-Agent. Er fragt gezielt nach Widersprüchen und Lücken aus dem Fact-Check, Antworten können getippt oder gesprochen werden, und jede Antwort wird mit Zitat-Prüfung gegen die Quellen verglichen. Zwei Rollen sind wählbar: neugieriges Erstsemester oder kritischer Professor. Die Auswertung nach der getippten Runde ist ein transparenter Prototyp-Score aus gemessenen Urteilen, keine Note.");
+    s.addNotes("Nach dem Vortrag übernimmt der ElevenLabs-Sprachagent. Er nutzt Transkript, Quellen und Fact-Check-Funde als Kontext. Zwei Rollen sind wählbar: neugieriges Erstsemester oder kritischer Professor. Die Sprachreaktionen sind nicht zitateverifiziert und liefern keine geprüften Antwort-Urteile für den Score. Die Auswertung nutzt die gemessene Evidenz der Aufnahme, keine Note. Der frühere getippte Fragepfad bleibt nur als Backend-Schnittstelle und für gespeicherte Antworten erhalten.");
   }
 
   // ============================================================
@@ -483,7 +483,14 @@ async function main() {
   }
 
   // ---------- Write ----------
-  await pres.writeFile({ fileName: OUT });
+  const zip = await JSZip.loadAsync(await pres.write({ outputType: "nodebuffer" }));
+  const types = await zip.file("[Content_Types].xml").async("string");
+  // PptxGenJS 4 declares one master per slide but writes only the first master.
+  zip.file("[Content_Types].xml", types.replace(
+    /<Override PartName="(\/ppt\/slideMasters\/slideMaster\d+\.xml)"[^>]*\/>/g,
+    (entry, name) => zip.file(name.slice(1)) ? entry : "",
+  ));
+  await fs.writeFile(OUT, await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
   console.log("geschrieben:", OUT);
 
 }

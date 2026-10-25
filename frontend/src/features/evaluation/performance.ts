@@ -241,7 +241,7 @@ export function evaluatePerformance(
       ...(content.score === null
         ? {
             limitation:
-              "Run a fact-check or answer the practice questions to get a content summary.",
+              "Run a fact-check in the review to get a content summary. Voice conversation replies are not source-verified.",
           }
         : {}),
     },

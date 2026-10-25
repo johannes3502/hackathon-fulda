@@ -94,6 +94,24 @@ def test_speech_cleanup_removes_live_transcript_request_too(monkeypatch):
         "speech-jobs/synthetic/recording", "speech-jobs/synthetic/request.json"]
 
 
+def test_speech_cleanup_retries_without_repeating_analysis(monkeypatch):
+    redis = Mock()
+    redis.lock.return_value.acquire.return_value = True
+    monkeypatch.setattr("app.connections.redis_client", lambda: redis)
+    monkeypatch.setattr(storage, "read_json", lambda *args: {"status": "completed"})
+    cleanup = Mock(side_effect=[outage(), None])
+    analysis = Mock()
+    monkeypatch.setattr(storage, "delete_input", cleanup)
+    monkeypatch.setattr(tasks, "run_analysis", analysis)
+    monkeypatch.setattr(tasks.analyze_speech, "retry", Mock(side_effect=Retry()))
+    with pytest.raises(Retry):
+        tasks.analyze_speech.run("synthetic")
+    assert tasks.analyze_speech.run("synthetic")["job_id"] == "synthetic"
+    assert cleanup.call_count == 2
+    assert redis.lock.return_value.release.call_count == 2
+    analysis.assert_not_called()
+
+
 def test_partial_discard_failure_does_not_skip_remaining_objects(monkeypatch, caplog):
     s3 = Mock()
     s3.delete_object.side_effect = [outage(), {}, {}]

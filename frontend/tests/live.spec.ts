@@ -2036,7 +2036,8 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   const stats = page.getByRole("heading", { name: "Your take at a glance" });
   await expect(stats).toBeVisible();
   await expect(stats).toBeFocused();
-  await expect(page.locator(".performance-score")).toHaveText("100/100");
+  await expect(page.getByText("No overall score available")).toBeVisible();
+  await expect(page.locator(".performance-score")).toHaveCount(0);
   await page.screenshot({
     path: info.outputPath("final-overall-score.png"),
     fullPage: true,
@@ -2046,7 +2047,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   ).not.toBeVisible();
   await expect(
     page.getByText(
-      "No checked statements or answered questions were available.",
+      "No source-verified, decidable statements or answers were available.",
     ),
   ).toBeVisible();
   await noOverflow(page);
