@@ -3,7 +3,7 @@ import { type ReactNode } from "react";
 import Link from "next/link";
 import { BrandLogo } from "./BrandLogo";
 import { usePathname } from "next/navigation";
-import { CircleHelp, FlaskConical, ShieldCheck } from "lucide-react";
+import { CircleHelp, FlaskConical, ShieldCheck, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { AppearanceSelect } from "./AppearanceSelect";
@@ -20,10 +20,12 @@ export function DemoBadge() {
 export function AppShell({
   children,
   experience = "sample",
+  journey = true,
 }: {
   children: ReactNode;
   step?: number;
   experience?: "sample" | "live";
+  journey?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -45,10 +47,12 @@ export function AppShell({
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Native hash navigation moves keyboard focus to the recordings section. */}
           <a href="/#past-recordings">Vergangene Aufnahmen</a>
           <Link
-            href="/admin"
-            aria-current={pathname === "/admin" ? "page" : undefined}
+            href="/progress"
+            aria-current={
+              pathname.startsWith("/progress") ? "page" : undefined
+            }
           >
-            Admin
+            Fortschritt
           </Link>
         </nav>
         <div className="header-actions">
@@ -127,9 +131,19 @@ export function AppShell({
               </>
             )}
           </Dialog>
+          <Button asChild variant="ghost" size="icon">
+            <Link
+              href="/admin"
+              aria-label="Admin"
+              title="Admin"
+              aria-current={pathname === "/admin" ? "page" : undefined}
+            >
+              <UserCog size={20} />
+            </Link>
+          </Button>
         </div>
       </header>
-      <PracticeJourney pathname={pathname} />
+      {journey && <PracticeJourney pathname={pathname} />}
       <main id="main" tabIndex={-1}>
         {children}
       </main>

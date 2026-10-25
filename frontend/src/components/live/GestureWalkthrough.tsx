@@ -12,7 +12,7 @@ import { PoseEvidence } from "./PoseEvidence";
 import { GestureGuide } from "./GestureGuide";
 import { PoseEventDownload } from "./PoseEventDownload";
 
-export function GestureWalkthrough() {
+export function GestureWalkthrough({ capture = false }: { capture?: boolean }) {
   const engine = useRef(new PoseEvaluator("synthetic-walkthrough"));
   const elapsed = useRef(0);
   const [running, setRunning] = useState(false);
@@ -45,7 +45,9 @@ export function GestureWalkthrough() {
       <div className="workspace gesture-walkthrough">
         <div className="workspace-back">
           <Link href="/">Back to start</Link>
-          <span className="demo-badge">Synthetic example · no camera</span>
+          {!capture && (
+            <span className="demo-badge">Synthetic example · no camera</span>
+          )}
         </div>
         <div className="workspace-heading">
           <div>
@@ -58,22 +60,24 @@ export function GestureWalkthrough() {
             <Link href="/live">Try with your camera</Link>
           </Button>
         </div>
-        <p className="live-demo-notice">
-          This skeleton is hand-authored synthetic data processed by the same
-          rules as the camera. It demonstrates the feedback flow; it does not
-          test MediaPipe’s recognition accuracy.
-        </p>
+        {!capture && (
+          <p className="live-demo-notice">
+            This skeleton is hand-authored synthetic data processed by the same
+            rules as the camera. It demonstrates the feedback flow; it does not
+            test MediaPipe’s recognition accuracy.
+          </p>
+        )}
         <div className="live-review-grid">
           <div>
             <section
               className="media-stage gesture-example"
-              aria-label="Synthetic gesture example"
+              aria-label={capture ? "Gestenbeispiel" : "Synthetic gesture example"}
             >
               {sample ? (
                 <PoseOverlay
                   sample={sample}
                   largeView
-                  label="Synthetic pose landmarks"
+                  label={capture ? "Pose-Landmarks" : "Synthetic pose landmarks"}
                 />
               ) : (
                 <p>No person visible. No observation inferred.</p>

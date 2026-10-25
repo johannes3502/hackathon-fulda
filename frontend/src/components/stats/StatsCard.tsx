@@ -9,10 +9,12 @@ import {
   Video,
 } from "lucide-react";
 import { AppShell } from "@/components/shared/AppShell";
+import { FeatureTour } from "@/components/landing/FeatureTour";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { time } from "@/lib/utils";
 import { summarizeRecordings } from "./stats";
 import { PresentationIntro } from "./PresentationIntro";
+import { ProgressTeaser } from "./ProgressTeaser";
 import { SessionStorageNotice } from "../live/shared";
 import "./stats-card.css";
 
@@ -28,6 +30,7 @@ export function StatsDashboard() {
     <AppShell experience="live">
       <div className="stats418-dashboard" lang="de">
         <PresentationIntro />
+        <FeatureTour />
         <section className="stats418-hero" aria-label="Deine Aufnahmen">
           <div className="stats418-hero-info">
             <span className="stats418-section-eyebrow">
@@ -94,6 +97,8 @@ export function StatsDashboard() {
             <dd>{summary.transcripts}</dd>
           </div>
         </dl>
+
+        <ProgressTeaser />
 
         <section
           id="past-recordings"

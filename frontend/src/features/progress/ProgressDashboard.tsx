@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  ArrowLeft,
   ArrowRight,
   AudioLines,
   BookOpenCheck,
@@ -532,6 +533,9 @@ function ProgressHeader({
 }) {
   return (
     <header className="progress-header">
+      <Link href="/" className="progress-back">
+        <ArrowLeft size={15} aria-hidden="true" /> Zur Startseite
+      </Link>
       <div className="progress-heading">
         <span className="progress-eyebrow">
           <LineChart size={16} aria-hidden="true" /> Langzeit-Fortschritt

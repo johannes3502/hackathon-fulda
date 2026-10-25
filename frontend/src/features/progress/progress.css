@@ -10,6 +10,19 @@
   display: grid;
   gap: 24px;
 }
+.progress-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+.progress-back:hover {
+  color: var(--foreground);
+}
 .progress-heading {
   max-width: 780px;
   display: grid;

@@ -242,3 +242,102 @@ export const DEMO_REVIEW: ReviewData = {
     },
   ],
 };
+
+const SHOWCASE_CLAIMS: ClaimResult[] = [
+  {
+    claim: "Der erste Pilot startet mit zwölf Teilnehmenden.",
+    transcript: "Unser erster Pilot startet mit zwölf Teilnehmenden.",
+    t_ms: 42_000,
+    duration_ms: 3_000,
+    verdict: "supports",
+    explanation: "Das Pitch-Deck nennt zwölf Teilnehmende für den ersten Pilot.",
+    evidence: {
+      kind: "upload",
+      label: "Pitch-Deck · Folie 9",
+      quote: "Für den ersten Pilot sind 12 Teilnehmende vorgesehen.",
+      passage:
+        "Für den ersten Pilot sind 12 Teilnehmende vorgesehen. Die Rückfragen werden gemeinsam ausgewertet.",
+      quote_verified: "exact",
+      weak: false,
+    },
+    checked: ["upload"],
+  },
+  {
+    claim: "Die Rückfragen werden im Pilot gemeinsam ausgewertet.",
+    transcript: "Die Rückfragen werten wir im Pilot gemeinsam aus.",
+    t_ms: 51_000,
+    duration_ms: 3_000,
+    verdict: "supports",
+    explanation: "Die Quelle beschreibt die gemeinsame Auswertung der Rückfragen.",
+    evidence: {
+      kind: "upload",
+      label: "Pitch-Deck · Folie 9",
+      quote: "Die Rückfragen werden gemeinsam ausgewertet.",
+      passage:
+        "Für den ersten Pilot sind 12 Teilnehmende vorgesehen. Die Rückfragen werden gemeinsam ausgewertet.",
+      quote_verified: "exact",
+      weak: false,
+    },
+    checked: ["upload"],
+  },
+  {
+    claim: "Das Lernlabor begleitet den Pilot mit einer festen Lernaufgabe.",
+    transcript: "Das Lernlabor begleitet den Pilot mit einer festen Lernaufgabe.",
+    t_ms: 63_000,
+    duration_ms: 3_000,
+    verdict: "supports",
+    explanation: "Die Quelle nennt eine feste Lernaufgabe für den Pilot.",
+    evidence: {
+      kind: "upload",
+      label: "Pitch-Deck · Folie 9",
+      quote: "Für den Pilot ist eine feste Lernaufgabe vorgesehen.",
+      passage:
+        "Für den Pilot ist eine feste Lernaufgabe vorgesehen und wird nach jeder Einheit besprochen.",
+      quote_verified: "exact",
+      weak: false,
+    },
+    checked: ["upload"],
+  },
+  {
+    claim: "Der Pilot startet mit zwanzig Teilnehmenden.",
+    transcript: "Unser erster Pilot startet mit zwanzig Teilnehmenden.",
+    t_ms: 43_000,
+    duration_ms: 3_000,
+    verdict: "contradicts",
+    explanation:
+      "Im Pitch-Deck stehen 12 Teilnehmende. Gleiche die Zahl ab und nenne die Quelle.",
+    evidence: {
+      kind: "upload",
+      label: "Pitch-Deck · Folie 9",
+      quote: "Für den ersten Pilot sind 12 Teilnehmende vorgesehen.",
+      passage:
+        "Für den ersten Pilot sind 12 Teilnehmende vorgesehen. Die Rückfragen werden gemeinsam ausgewertet.",
+      quote_verified: "exact",
+      weak: false,
+    },
+    checked: ["upload"],
+  },
+];
+
+/** Presentation asset variant: same fixture without visible demo labels. */
+export const SHOWCASE_REVIEW: ReviewData = {
+  ...DEMO_REVIEW,
+  demo: false,
+  notice: undefined,
+  claims: SHOWCASE_CLAIMS,
+  moments: DEMO_REVIEW.moments.map((moment) =>
+    moment.id === "fact"
+      ? {
+          ...moment,
+          detail:
+            "Im Pitch-Deck stehen 12 Teilnehmende. Gleiche die Zahl ab und nenne die Quelle.",
+          action:
+            "Formuliere: Für den ersten Pilot sind zwölf Teilnehmende vorgesehen.",
+          source: {
+            title: "Pitch-Deck · Folie 9",
+            quote: "Für den ersten Pilot sind 12 Teilnehmende vorgesehen.",
+          },
+        }
+      : moment,
+  ),
+};
