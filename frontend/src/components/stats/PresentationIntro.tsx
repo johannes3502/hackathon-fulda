@@ -37,6 +37,9 @@ export function PresentationIntro() {
         </div>
         <div className="presentation-intro-footnote">
           <span>In deinem Tempo. Ohne Login.</span>
+          <Link href="#feature-tour">
+            So funktioniert’s <ArrowRight size={14} />
+          </Link>
           {latest ? (
             <Link href={`/live/${latest.id}/review`}>
               Letzte Aufnahme ansehen <ArrowRight size={14} />

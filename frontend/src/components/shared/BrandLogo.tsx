@@ -4,10 +4,10 @@ export function BrandLogo() {
   return (
     <span className="brand-logo">
       <Image
-        src="/brand/418-pitch-practice.png"
+        src="/brand/418-pitch-practice-mark.png"
         alt="418 Pitch Practice"
-        width={2000}
-        height={2000}
+        width={1210}
+        height={1210}
         sizes="200px"
         preload
       />

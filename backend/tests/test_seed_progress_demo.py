@@ -2,7 +2,9 @@
 
 from app.progress import metrics
 from scripts.seed_progress_demo import (
-    NOTICE, PROFILE_ID, PROFILE_TOKEN, demo_progress_takes,
+    NOTICE, PROFILE_ID, PROFILE_TOKEN,
+    SHOWCASE_NAMESPACE, SHOWCASE_NOTICE, SHOWCASE_PROFILE_ID,
+    SHOWCASE_PROFILE_NAME, SHOWCASE_PROFILE_TOKEN, demo_progress_takes,
 )
 
 
@@ -38,4 +40,32 @@ def test_progress_seed_is_stable_and_measurable():
         assert quality["status"] == "ok"
         for metric_id in PRIMARY:
             assert values[metric_id]["value"] is not None
+            assert values[metric_id]["quality"]["eligible"] is True
+
+
+def test_showcase_seed_is_neutral_and_separate():
+    demo = demo_progress_takes()
+    showcase = demo_progress_takes(
+        SHOWCASE_NAMESPACE, SHOWCASE_PROFILE_ID, SHOWCASE_NOTICE, showcase=True)
+    assert len(showcase) == len(demo) == 24
+    assert SHOWCASE_PROFILE_TOKEN.startswith("pp_")
+    assert SHOWCASE_PROFILE_NAME == "Alex Winter"
+    assert {item.take.profile_id for item in showcase} == {SHOWCASE_PROFILE_ID}
+    assert {item.session.profile_id for item in showcase} == {SHOWCASE_PROFILE_ID}
+    assert not {item.take.take_id for item in showcase} & {
+        item.take.take_id for item in demo}
+    for fixture in showcase:
+        assert not fixture.take.analysis.notices
+        assert "Synthet" not in fixture.session.title
+        assert fixture.take.analysis.asr_provider == "local-whisper"
+        claims = fixture.take.analysis.factcheck.claims
+        assert claims
+        assert all("Synthet" not in claim.claim for claim in claims)
+        assert all(claim.evidence is None or "Pitch-Deck" in claim.evidence.label
+                   for claim in claims)
+        quality, values = metrics.extract(fixture.take, fixture.events)
+        if fixture.take.duration_ms < 60_000:
+            continue
+        assert quality["status"] == "ok"
+        for metric_id in PRIMARY:
             assert values[metric_id]["quality"]["eligible"] is True

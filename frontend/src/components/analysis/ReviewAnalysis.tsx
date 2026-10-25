@@ -37,10 +37,12 @@ export function ReviewAnalysis({
   data,
   backHref = "/",
   backLabel = "Zur Startseite",
+  capture = false,
 }: {
   data: ReviewData;
   backHref?: string;
   backLabel?: string;
+  capture?: boolean;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const pendingSeek = useRef<number | null>(null);
@@ -110,7 +112,7 @@ export function ReviewAnalysis({
   }
 
   return (
-    <AppShell experience={data.demo ? "sample" : "live"}>
+    <AppShell experience={data.demo ? "sample" : "live"} journey={!capture}>
       <div className="review418-page" lang="de">
         <header className="review418-header">
           <Link href={backHref} className="review418-back">

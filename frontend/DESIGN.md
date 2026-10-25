@@ -37,14 +37,48 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   Below, `StatsDashboard` shows counts, durations and observations from actual
   recordings in the current workspace, with an empty state before the first take.
   No synthetic percentages, monthly histories or performance scores appear.
-  `AppShell` provides the logo, Home, Vergangene Aufnahmen and Admin links,
-  appearance and help controls outside the record screen. Active links use
-  `aria-current`. “Vergangene Aufnahmen” opens `/#past-recordings`, including
-  the empty state. A shared
+  `AppShell` provides the logo, Home, Vergangene Aufnahmen and Fortschritt as
+  text links, plus appearance, help and the Admin profile icon outside the
+  record screen. Active links use `aria-current`; the Admin icon keeps the
+  accessible name “Admin”. “Vergangene Aufnahmen” opens `/#past-recordings`,
+  including the empty state. A shared
   Prepare / Record / Review strip connects sources, studio and reviews; its Review
   link uses the current or latest take, or explicitly offers an example when no
   take exists. The record screen hides this strip during both camera setup and
   recording to preserve camera space.
+
+## Landing, progress and feature tour
+
+- The home page combines the presentation introduction, a four-chapter feature
+  tour, and the working area (`StatsDashboard` with the existing take list).
+  The tour sits between the introduction and the working area and is linked by
+  “So funktioniert’s”; it never replaces the live workflow.
+- The tour uses a vertical tablist on desktop and a horizontally scrollable
+  tablist on phones. Tabs support Arrow keys, Home and End; only the selected
+  chapter is rendered. Chapters cover live feedback, review, source checking
+  (with the question simulator as a small beat) and long-term progress.
+  Motion is a one-time opacity/transform reveal through a lazily imported GSAP
+  plus ScrollTrigger setup, disabled under `prefers-reduced-motion`. The video
+  is manual, muted screen capture with no autoplay.
+- `ProgressTeaser` reads a stored pseudonymous profile and shows real
+  PostgreSQL counts plus one measured sparkline. Without a profile it offers
+  the setup link; when the API fails it shows no substitute numbers. It is a
+  read-only card and does not create profiles or takes. `/progress` keeps its
+  own back link “Zur Startseite”.
+- Landing media is captured from the running prototype, not stock material:
+  `live-review.webp` from `/gestures?capture=1`, `review-timeline.mp4` and its
+  poster from `/review-preview?capture=1`, `factcheck-quote.webp` as a detail
+  crop of the selected source annotation, and `progress-series.webp` from a
+  neutral showcase seed. The `capture=1` query modes hide demo badges and use
+  neutral labels; normal routes keep their transparency labels. Assets carry
+  no demo text. The page footer names the prototype and example data, and no
+  screenshot or video implies accuracy or a grade.
+- The showcase seed (`backend/scripts/seed_progress_demo.py --showcase`) uses
+  the separate profile “Alex Winter” and neutral session titles; the QA seed
+  with its explicit synthetic labels stays unchanged. The live capture is the
+  hand-authored `/gestures` skeleton, so it demonstrates the feedback flow but
+  not MediaPipe recognition accuracy. The remaining English pose-lab UI is
+  pre-existing and intentionally not rewritten here.
 
 ## Screens
 

@@ -31,6 +31,12 @@ NOTICE = ("Synthetische Fortschritts-Testdaten: keine echte Aufnahme, "
 DEVICE_KEY = UUID("a3f1c9e2-4b7a-4c1d-9e2f-5a6b7c8d9e0f")
 TOKEN_ID = uuid5(NAMESPACE, "progress-profile:demo:token")
 
+SHOWCASE_NAMESPACE = UUID("7c5d4f2e-91b8-4a63-8d1f-2e7a9c0b5d34")
+SHOWCASE_PROFILE_ID = uuid5(SHOWCASE_NAMESPACE, "progress-profile:showcase")
+SHOWCASE_PROFILE_TOKEN = "pp_showcase3b8e1f4a6c9d2e5f7a0b3c8d1e4f6a9b"
+SHOWCASE_PROFILE_NAME = "Alex Winter"
+SHOWCASE_NOTICE = None
+
 DATES = [
     (2026, 1, 12), (2026, 1, 24), (2026, 2, 5), (2026, 2, 19),
     (2026, 3, 3), (2026, 3, 16), (2026, 3, 28), (2026, 4, 9),
@@ -183,7 +189,7 @@ def _gesture_events(count: int, start_ms: int, end_ms: int) -> list[ReviewEvent]
 
 
 def _claims(count: int, contradiction_rate: float, start_ms: int, end_ms: int,
-            duration_ms: int) -> list[ClaimResult]:
+            duration_ms: int, *, showcase: bool = False) -> list[ClaimResult]:
     contradictions = round(count * contradiction_rate)
     supports = max(3, round(count * (1 - contradiction_rate) * 0.4))
     claims = []
@@ -195,6 +201,21 @@ def _claims(count: int, contradiction_rate: float, start_ms: int, end_ms: int,
         else:
             verdict = "not_found"
         at = start_ms + (index * max(1, end_ms - start_ms) // count)
+        if showcase:
+            evidence = None if verdict == "not_found" else Evidence(
+                kind="upload", label="Pitch-Deck · Folie 9",
+                quote="Das Lernlabor plant den ersten Pilot mit zwölf Teilnehmenden.",
+                passage=("Das Lernlabor plant den ersten Pilot mit zwölf Teilnehmenden "
+                         "und wertet die Rückfragen gemeinsam aus."),
+                filename="pitch-deck.pdf", quote_verified="exact",
+                location={"kind": "slide", "start": 9, "end": 9})
+            claims.append(ClaimResult(
+                claim=f"Aussage {index + 1} aus dem Training.",
+                transcript="Satz aus dem Training.",
+                t_ms=at, duration_ms=min(2_000, max(1, duration_ms - at)),
+                verdict=verdict, explanation="Quellenbefund aus dem hochgeladenen Material.",
+                evidence=evidence, checked=["upload"]))
+            continue
         evidence = None if verdict == "not_found" else Evidence(
             kind="upload", label="demo-quelle.pdf, Seite 2",
             quote="Das Lernlabor plant den ersten Pilot mit zwölf Teilnehmenden.",
@@ -211,7 +232,14 @@ def _claims(count: int, contradiction_rate: float, start_ms: int, end_ms: int,
     return claims
 
 
-def demo_progress_takes(namespace: UUID = NAMESPACE) -> list[ProgressDemoTake]:
+def demo_progress_takes(
+    namespace: UUID = NAMESPACE,
+    profile_id: UUID = PROFILE_ID,
+    notice: str | None = NOTICE,
+    *,
+    showcase: bool = False,
+) -> list[ProgressDemoTake]:
+    title_prefix = "Pitch-Training" if showcase else "Synthetische Fortschritts-Demo"
     fixtures = []
     for index, duration in enumerate(DURATIONS):
         identifier = lambda kind: uuid5(namespace, f"progress:{index}:{kind}")
@@ -223,7 +251,8 @@ def demo_progress_takes(namespace: UUID = NAMESPACE) -> list[ProgressDemoTake]:
         filler_count = round(FILLER_RATE[index] * word_count / 100)
         gesture_count = round(GESTURE_RATE[index] * duration / 60_000)
         pause_ms = round(PAUSE_SHARE[index] * duration)
-        claims = _claims(20, CONTRADICTION_RATE[index], 4_000, max(5_000, word_end), duration)
+        claims = _claims(20, CONTRADICTION_RATE[index], 4_000, max(5_000, word_end),
+                         duration, showcase=showcase)
 
         events = []
         events += _episodes("posture", "trunk-lateral", round(POSTURE_SHARE[index] * duration),
@@ -251,23 +280,25 @@ def demo_progress_takes(namespace: UUID = NAMESPACE) -> list[ProgressDemoTake]:
                 pause_count=len(pause_events), filler_count=filler_count,
                 repetition_count=0,
                 median_window_wpm=round(word_count / speaking_ms * 60_000, 1)),
-            asr_provider="synthetic-progress-seed", synthetic_demo=False,
-            notices=[NOTICE],
+            asr_provider="local-whisper" if showcase else "synthetic-progress-seed",
+            synthetic_demo=False,
+            notices=[] if notice is None else [notice],
             factcheck=FactCheckResult(
                 claims=claims, events=[], model="synthetic-progress-seed",
                 web_provider=None, sources_checked=True,
-                config=FactCheckConfig(), notices=[NOTICE]))
+                config=FactCheckConfig(),
+                notices=[] if notice is None else [notice]))
         session = Session(
             session_id=identifier("session"),
-            title=f"Synthetische Fortschritts-Demo · Take {index + 1}",
-            profile_id=PROFILE_ID, presentation_mode=MODES[index],
+            title=f"{title_prefix} · Take {index + 1}",
+            profile_id=profile_id, presentation_mode=MODES[index],
             status="review_ready", created_at=created_at,
             capture=Capture(device_key=DEVICE_KEY),
             consent=Consent(granted=True, at=created_at,
                             version="synthetic-progress-seed.v1", scope="local-analysis"))
         take = Take(
             take_id=identifier("take"), session_id=session.session_id,
-            profile_id=PROFILE_ID, status="review_ready", duration_ms=duration,
+            profile_id=profile_id, status="review_ready", duration_ms=duration,
             mime_type="video/webm", timebase=Timebase(onstart_perf_ms=0.0),
             recorded_at=recorded_at, recorded_at_source="client",
             coverage=[CoverageInterval(t_ms=0, duration_ms=duration, evaluable=True)],
@@ -276,25 +307,33 @@ def demo_progress_takes(namespace: UUID = NAMESPACE) -> list[ProgressDemoTake]:
     return fixtures
 
 
-def _reset(connection):
-    session_ids = [uuid5(NAMESPACE, f"progress:{index}:session") for index in range(len(DURATIONS))]
+def _reset(connection, namespace: UUID, profile_id: UUID):
+    session_ids = [uuid5(namespace, f"progress:{index}:session") for index in range(len(DURATIONS))]
     connection.execute("DELETE FROM sessions WHERE id = ANY(%s)", (session_ids,))
-    connection.execute("DELETE FROM speaker_profiles WHERE id=%s", (PROFILE_ID,))
+    connection.execute("DELETE FROM speaker_profiles WHERE id=%s", (profile_id,))
 
 
-def seed_progress_demo(*, reset: bool = False) -> dict:
-    fixtures = demo_progress_takes()
+def seed_progress_demo(*, reset: bool = False, showcase: bool = False) -> dict:
+    namespace = SHOWCASE_NAMESPACE if showcase else NAMESPACE
+    profile_id = SHOWCASE_PROFILE_ID if showcase else PROFILE_ID
+    profile_token = SHOWCASE_PROFILE_TOKEN if showcase else PROFILE_TOKEN
+    profile_name = SHOWCASE_PROFILE_NAME if showcase else PROFILE_NAME
+    notice = SHOWCASE_NOTICE if showcase else NOTICE
+    token_id = uuid5(namespace, "progress-profile:token")
+    fixtures = demo_progress_takes(
+        namespace, profile_id, notice, showcase=showcase)
     manifest = {
-        "seedVersion": "synthetic-progress-seed.v1",
+        "seedVersion": "showcase-progress-seed.v1" if showcase else "synthetic-progress-seed.v1",
+        "variant": "showcase" if showcase else "qa",
         "synthetic": True,
-        "profileId": str(PROFILE_ID),
-        "token": PROFILE_TOKEN,
-        "displayName": PROFILE_NAME,
+        "profileId": str(profile_id),
+        "token": profile_token,
+        "displayName": profile_name,
         "localStorage": {
             "key": "pitchcoach.progress-profile.v1",
             "value": {
-                "profileId": str(PROFILE_ID), "token": PROFILE_TOKEN,
-                "displayName": PROFILE_NAME,
+                "profileId": str(profile_id), "token": profile_token,
+                "displayName": profile_name,
                 "createdAt": _recorded_at(0).isoformat(),
             },
         },
@@ -307,22 +346,24 @@ def seed_progress_demo(*, reset: bool = False) -> dict:
         "scope": "long-term-progress", "retentionUntil": retention.isoformat(),
     }
     with db.connect() as connection, connection.transaction():
-        connection.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", ("progress-seed-demo",))
+        lock_key = "progress-seed-showcase" if showcase else "progress-seed-demo"
+        connection.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (lock_key,))
         if reset:
-            _reset(connection)
+            _reset(connection, namespace, profile_id)
         existing = connection.execute(
-            "SELECT id FROM speaker_profiles WHERE id=%s", (PROFILE_ID,)).fetchone()
+            "SELECT id FROM speaker_profiles WHERE id=%s", (profile_id,)).fetchone()
         if existing:
             manifest["skipped"] = len(fixtures)
             return manifest
         connection.execute(
             "INSERT INTO speaker_profiles(id,display_name,locale,consent,retention_until,"
             "retention_origin,created_at,updated_at) VALUES (%s,%s,'de',%s,%s,'default',%s,%s)",
-            (PROFILE_ID, PROFILE_NAME, Jsonb(consent), retention,
+            (profile_id, profile_name, Jsonb(consent), retention,
              _recorded_at(0), _recorded_at(0)))
         connection.execute(
             "INSERT INTO profile_tokens(id,profile_id,token_hash,label) VALUES (%s,%s,%s,%s)",
-            (TOKEN_ID, PROFILE_ID, db.token_hash(PROFILE_TOKEN), "synthetic-progress-seed"))
+            (token_id, profile_id, db.token_hash(profile_token),
+             "showcase-progress-seed" if showcase else "synthetic-progress-seed"))
         connection.execute(
             "INSERT INTO profile_goals(profile_id,metric_id,metric_version,direction,"
             "target_value,target_min,target_max) VALUES"
@@ -330,22 +371,22 @@ def seed_progress_demo(*, reset: bool = False) -> dict:
             " (%s,'speech.filler_rate_per_100_words',%s,'decrease',2.0,NULL,NULL),"
             " (%s,'speech.pause_share',%s,'target_band',NULL,0.10,0.18),"
             " (%s,'pose.gesture_rate_per_min',%s,'decrease',6.0,NULL,NULL)",
-            (PROFILE_ID, definitions.METRIC_VERSION, PROFILE_ID, definitions.METRIC_VERSION,
-             PROFILE_ID, definitions.METRIC_VERSION, PROFILE_ID, definitions.METRIC_VERSION))
+            (profile_id, definitions.METRIC_VERSION, profile_id, definitions.METRIC_VERSION,
+             profile_id, definitions.METRIC_VERSION, profile_id, definitions.METRIC_VERSION))
         manifest["goals"] = 4
         for fixture in fixtures:
             session, take = fixture.session, fixture.take
             connection.execute(
                 "INSERT INTO sessions(id,title,profile_id,presentation_mode,status,consent,"
                 "capture,created_at) VALUES (%s,%s,%s,%s,'review_ready',%s,%s,%s)",
-                (session.session_id, session.title, PROFILE_ID, session.presentation_mode,
+                (session.session_id, session.title, profile_id, session.presentation_mode,
                  Jsonb(service.json_model(session.consent)),
                  Jsonb(service.json_model(session.capture)), session.created_at))
             connection.execute(
                 "INSERT INTO takes(id,session_id,profile_id,recorded_at,recorded_at_source,"
                 "device_key,status,duration_ms,mime_type,timebase,coverage,analysis,created_at)"
                 " VALUES (%s,%s,%s,%s,'client',%s,'events_ready',%s,%s,%s,%s,%s,%s)",
-                (take.take_id, session.session_id, PROFILE_ID, take.recorded_at, DEVICE_KEY,
+                (take.take_id, session.session_id, profile_id, take.recorded_at, DEVICE_KEY,
                  take.duration_ms, take.mime_type, Jsonb(service.json_model(take.timebase)),
                  Jsonb([service.json_model(item) for item in take.coverage]),
                  Jsonb(service.json_model(take.analysis)), take.created_at))
@@ -355,7 +396,7 @@ def seed_progress_demo(*, reset: bool = False) -> dict:
             manifest["takes"].append({"takeId": str(take.take_id), "sessionId": str(session.session_id),
                                       "recordedAt": take.recorded_at.isoformat()})
             manifest["inserted"] += 1
-    response = service.progress(PROFILE_ID, PROFILE_TOKEN, window="all",
+    response = service.progress(profile_id, profile_token, window="all",
                                 requested_metrics="all", include_exploratory=True)
     manifest["series"] = {
         item.metric_id: {
@@ -372,5 +413,9 @@ def seed_progress_demo(*, reset: bool = False) -> dict:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--reset", action="store_true")
+    parser.add_argument("--showcase", action="store_true",
+                        help="neutral profile and titles for presentation assets")
     arguments = parser.parse_args()
-    print(json.dumps(seed_progress_demo(reset=arguments.reset), ensure_ascii=False, indent=2))
+    print(json.dumps(seed_progress_demo(
+        reset=arguments.reset, showcase=arguments.showcase),
+        ensure_ascii=False, indent=2))
