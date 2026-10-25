@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { AppShell, DemoBadge } from "@/components/shared/AppShell";
 import { Button } from "@/components/ui/button";
-import { Input, NativeSelect, Textarea } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { getGateway } from "@/features/coach/gateway";
 import type { SessionConfig } from "@/features/coach/contracts";
 
@@ -20,8 +20,6 @@ export function SessionSetupForm() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
-  const [audience, setAudience] =
-    useState<SessionConfig["audience"]>("hackathon");
   const [duration, setDuration] = useState(180000);
   const [mode, setMode] = useState<SessionConfig["mode"]>("coach");
   const [criteria, setCriteria] = useState([
@@ -40,7 +38,7 @@ export function SessionSetupForm() {
     if (submitting.current) return;
     if (!sample && (!title.trim() || !context.trim())) {
       setErrors({
-        title: !title.trim() ? "Give your pitch a title." : undefined,
+        title: !title.trim() ? "Give your presentation a title." : undefined,
         context: !context.trim()
           ? "Add a little context for your session."
           : undefined,
@@ -60,7 +58,7 @@ export function SessionSetupForm() {
         : {
             title,
             context,
-            audience,
+            audience: "examiner" as const,
             targetDurationMs: duration,
             mode,
             criteria,
@@ -128,10 +126,10 @@ export function SessionSetupForm() {
           >
             <fieldset disabled={pending} className="form-fields">
               <div className="field">
-                <label htmlFor="pitch-title">Pitch title</label>
+                <label htmlFor="pitch-title">Presentation title</label>
                 <Input
                   id="pitch-title"
-                  placeholder="e.g. A better way to learn"
+                  placeholder="e.g. How learning by explaining works"
                   maxLength={100}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -145,7 +143,7 @@ export function SessionSetupForm() {
                 )}
               </div>
               <div className="field">
-                <label htmlFor="pitch-context">What’s the big idea?</label>
+                <label htmlFor="pitch-context">What will you explain?</label>
                 <Textarea
                   id="pitch-context"
                   placeholder="What are you presenting, and what should your audience take away?"
@@ -172,24 +170,11 @@ export function SessionSetupForm() {
                 <summary>Practice options</summary>
                 <div className="form-fields">
                   <div className="form-row">
-                    <div className="field">
-                      <label htmlFor="audience">Who’s listening?</label>
-                      <NativeSelect
-                        id="audience"
-                        value={audience}
-                        onChange={(e) =>
-                          setAudience(
-                            e.target.value as SessionConfig["audience"],
-                          )
-                        }
-                      >
-                        <option value="hackathon">Hackathon jury</option>
-                        <option value="investor">Investor</option>
-                        <option value="examiner">University examiner</option>
-                      </NativeSelect>
-                    </div>
+                    <p className="field-hint">
+                      Sample audience: University examiner
+                    </p>
                     <fieldset className="field">
-                      <legend>Pitch length</legend>
+                      <legend>Presentation length</legend>
                       <div className="segment-control">
                         {[1, 3, 5].map((minutes) => (
                           <button

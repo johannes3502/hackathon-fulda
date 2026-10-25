@@ -31,7 +31,7 @@ export function StatsDashboard() {
         <section className="stats418-hero" aria-label="Deine Aufnahmen">
           <div className="stats418-hero-info">
             <span className="stats418-section-eyebrow">
-              <BarChart3 size={16} /> Dein Arbeitsbereich
+              <BarChart3 size={16} /> Dein Lernbereich
             </span>
             <h2>Deine Aufnahmen im Überblick.</h2>
             <p>
@@ -57,7 +57,7 @@ export function StatsDashboard() {
           </div>
           <article className="stats418-card" aria-label="Aufnahmeübersicht">
             <span className="stats418-section-eyebrow">
-              {latest ? "Letzte Aufnahme" : "Bereit für deinen ersten Take"}
+              {latest ? "Letzte Aufnahme" : "Bereit für dein erstes Referat"}
             </span>
             <h2>{latest?.config.title ?? "Noch keine Aufnahmen"}</h2>
             <p>
@@ -101,7 +101,7 @@ export function StatsDashboard() {
           aria-labelledby="recordings-heading"
           tabIndex={-1}
         >
-          <h2 id="recordings-heading">Deine Takes</h2>
+          <h2 id="recordings-heading">Deine Übungsaufnahmen</h2>
           <SessionStorageNotice />
           <p>Hinweise sind Beobachtungen zum Nachschauen, keine Bewertung.</p>
           {takes.length ? (
@@ -126,7 +126,7 @@ export function StatsDashboard() {
             </ul>
           ) : (
             <p className="stats418-empty" role="status">
-              Hier erscheinen deine aufgenommenen Präsentationen.
+              Hier erscheinen deine aufgenommenen Referate und Abschlusspräsentationen.
             </p>
           )}
         </section>

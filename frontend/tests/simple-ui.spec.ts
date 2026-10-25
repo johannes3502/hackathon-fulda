@@ -8,6 +8,25 @@ test("home shows an empty recording overview without demo statistics and keeps n
   );
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Verstehen. Erklären.Sicher präsentieren.",
+  );
+  await expect(
+    page.getByRole("link", { name: "Referat üben" }),
+  ).toHaveAttribute("href", "/sources");
+  await expect(
+    page.getByRole("img", { name: "418 Learning practice" }),
+  ).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/pitch|investor/i);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: info.outputPath("education-home.png"),
+    fullPage: true,
+  });
   expect(
     await page.evaluate(
       async () =>
@@ -29,7 +48,9 @@ test("home shows an empty recording overview without demo statistics and keeps n
   await expect(page.locator("main")).not.toContainText("Mai 2026");
   await expect(
     page.getByRole("status").filter({ hasText: "Hier erscheinen" }),
-  ).toContainText("Hier erscheinen deine aufgenommenen Präsentationen.");
+  ).toContainText(
+    "Hier erscheinen deine aufgenommenen Referate und Abschlusspräsentationen.",
+  );
 
   const navigation = page.getByRole("navigation", { name: "Main navigation" });
   await expect(
@@ -115,14 +136,18 @@ test("home shows an empty recording overview without demo statistics and keeps n
   await expect(
     page.getByRole("button", { name: "Try sample demo" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Pitch title")).toBeHidden();
+  await expect(page.getByLabel("Presentation title")).toBeHidden();
   await page
     .getByText("Customize the sample rehearsal", { exact: true })
     .click();
-  await expect(page.getByLabel("Pitch title")).toBeVisible();
-  await expect(page.getByLabel("Who’s listening?")).toBeHidden();
+  await expect(page.getByLabel("Presentation title")).toBeVisible();
+  await expect(
+    page.getByText("Sample audience: University examiner"),
+  ).toBeHidden();
   await page.getByText("Practice options", { exact: true }).click();
-  await expect(page.getByLabel("Who’s listening?")).toBeVisible();
+  await expect(
+    page.getByText("Sample audience: University examiner"),
+  ).toBeVisible();
 
   for (const path of ["/", "/live", "/sources", "/review-preview"]) {
     await page.goto(path);
@@ -213,7 +238,7 @@ test("sources explain their connected purpose and lead into recording", async ({
     page.getByRole("heading", { name: "Your sources", exact: true }),
   ).toBeVisible();
   await expect(page.locator("main")).toContainText(
-    "check claims and prepare questions",
+    "check your explanations and prepare subject questions",
   );
   await expect(page.locator("main")).not.toContainText("not connected yet");
   await page.getByRole("link", { name: "Continue to recording" }).click();

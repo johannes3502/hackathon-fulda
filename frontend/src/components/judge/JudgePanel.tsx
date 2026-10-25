@@ -18,7 +18,7 @@ export function JudgePanel() {
         <h2>
           {state.phase === "report_pending"
             ? "Connecting feedback to the evidence…"
-            : "The judge is considering your pitch…"}
+            : "The examiner is considering your explanation…"}
         </h2>
         <p className="muted">A scripted sample response is on its way.</p>
         <span className="thinking-dots">•••</span>
@@ -32,7 +32,7 @@ export function JudgePanel() {
           <MessageSquare size={23} />
         </span>
         <div>
-          <h2>Your practice judge</h2>
+          <h2>Your practice examiner</h2>
           <span className="muted small">
             {state.config.audience === "investor"
               ? "Investor"

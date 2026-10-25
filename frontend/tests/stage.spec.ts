@@ -102,7 +102,7 @@ test("local stage records without analysis traffic, restores its review, and end
   await expect
     .poll(() =>
       page
-        .getByLabel("Recorded pitch video")
+        .getByLabel("Recorded presentation video")
         .evaluate((video: HTMLVideoElement) => video.readyState),
     )
     .toBeGreaterThanOrEqual(2);
@@ -187,7 +187,7 @@ test("early review retains hidden-overlay pose observations and their evidence a
   await page.reload();
   await expect(moment).toBeVisible();
   await moment.click();
-  await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
+  await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
   await page
     .getByText("Recording details and exports", { exact: true })
     .click();
@@ -227,7 +227,7 @@ test("microphone denial offers a usable video-only stage fallback", async ({
   await expect
     .poll(() =>
       page
-        .getByLabel("Recorded pitch video")
+        .getByLabel("Recorded presentation video")
         .evaluate((video: HTMLVideoElement) => video.readyState),
     )
     .toBeGreaterThanOrEqual(2);

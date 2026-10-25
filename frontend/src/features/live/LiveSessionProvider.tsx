@@ -50,7 +50,7 @@ export function LiveSessionProvider({ children }: { children: ReactNode }) {
   const presentationMode = useSyncExternalStore(
     subscribePresentationMode,
     presentationModeSnapshot,
-    () => "startup" as const,
+    () => "school" as const,
   );
   // Defaults on the server and during hydration; saved options afterwards.
   const featureFlags = useSyncExternalStore(

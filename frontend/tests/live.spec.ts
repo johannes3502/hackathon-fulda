@@ -151,7 +151,7 @@ for (const mode of ["native", "viewport"] as const) {
       .getByRole("button", { name: "Finish & review", exact: true })
       .click();
     await expect(page).toHaveURL(/\/review$/);
-    await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
+    await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
     await expect(
       page
         .locator(".review-clip-list button")
@@ -247,7 +247,7 @@ test("every recording uses microphone, live backend feedback and a full upload w
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
   expect(uploads).toBe(1);
-  await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
+  await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
 });
 
 test("camera setup hides global navigation and full-size recording preserves the camera", async ({
@@ -400,7 +400,7 @@ test("camera setup hides global navigation and full-size recording preserves the
   await expect
     .poll(() =>
       page
-        .getByLabel("Recorded pitch video")
+        .getByLabel("Recorded presentation video")
         .evaluate((el: HTMLVideoElement) => el.readyState),
     )
     .toBeGreaterThanOrEqual(2);
@@ -490,7 +490,7 @@ test("raw camera recording, stats, filtered video sections, download and refresh
   await expect(
     page.getByRole("heading", { name: "Make your next take stronger." }),
   ).toBeVisible();
-  const video = page.getByLabel("Recorded pitch video");
+  const video = page.getByLabel("Recorded presentation video");
   await expect
     .poll(() => video.evaluate((el: HTMLVideoElement) => el.readyState))
     .toBeGreaterThanOrEqual(2);
@@ -1025,7 +1025,7 @@ test("analysis failure preserves playable recording", async ({ page }) => {
   await expect
     .poll(() =>
       page
-        .getByLabel("Recorded pitch video")
+        .getByLabel("Recorded presentation video")
         .evaluate((el: HTMLVideoElement) => el.readyState),
     )
     .toBeGreaterThanOrEqual(2);
@@ -1534,7 +1534,7 @@ test("live captions send PCM only during recording and a disconnect keeps the ta
   await expect
     .poll(() =>
       page
-        .getByLabel("Recorded pitch video")
+        .getByLabel("Recorded presentation video")
         .evaluate((video: HTMLVideoElement) => video.readyState),
     )
     .toBeGreaterThanOrEqual(2);
@@ -1608,7 +1608,7 @@ test("signal feedback appears during recording without captions and failure pres
   await expect
     .poll(() =>
       page
-        .getByLabel("Recorded pitch video")
+        .getByLabel("Recorded presentation video")
         .evaluate((video: HTMLVideoElement) => video.readyState),
     )
     .toBeGreaterThanOrEqual(2);
@@ -1662,7 +1662,7 @@ test("unavailable backend blocks recording until the backend recovers", async ({
   await expect
     .poll(() =>
       page
-        .getByLabel("Recorded pitch video")
+        .getByLabel("Recorded presentation video")
         .evaluate((video: HTMLVideoElement) => video.readyState),
     )
     .toBeGreaterThanOrEqual(2);
@@ -2011,7 +2011,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     .click();
   await expect.poll(() => closed.size).toBe(3);
   expect(kickoffs).toBe(0);
-  await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
+  await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
   await expect(
     page.getByText("Sessions are saved in this browser", { exact: false }),
   ).toBeVisible();
@@ -2103,7 +2103,7 @@ test("past sessions keep video and updated feedback across reload and can be del
     page.getByText("Sessions are saved in this browser", { exact: false }),
   ).toBeVisible();
   const originalUrl = await page
-    .getByLabel("Recorded pitch video")
+    .getByLabel("Recorded presentation video")
     .getAttribute("src");
   await page
     .getByText("Recording details and exports", { exact: true })
@@ -2130,7 +2130,7 @@ test("past sessions keep video and updated feedback across reload and can be del
     page.getByText("Sessions are saved in this browser", { exact: false }),
   ).toBeVisible();
   await page.reload();
-  const video = page.getByLabel("Recorded pitch video");
+  const video = page.getByLabel("Recorded presentation video");
   await expect(video).toBeVisible();
   await expect
     .poll(() => video.evaluate((el: HTMLVideoElement) => el.readyState))
@@ -2193,7 +2193,7 @@ test("failed browser storage keeps the current video playable and shows a warnin
   await expect
     .poll(() =>
       page
-        .getByLabel("Recorded pitch video")
+        .getByLabel("Recorded presentation video")
         .evaluate((el: HTMLVideoElement) => el.readyState),
     )
     .toBeGreaterThanOrEqual(2);

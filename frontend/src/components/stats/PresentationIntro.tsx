@@ -16,23 +16,24 @@ export function PresentationIntro() {
     >
       <div className="presentation-intro-copy">
         <span className="stats418-section-eyebrow">
-          <span className="status-dot" /> Dein nächster Auftritt beginnt hier
+          <span className="status-dot" /> Für Schule und Studium
         </span>
         <h1 id="presentation-intro-title">
-          Deine Idee verdient
+          Verstehen. Erklären.
           <br />
-          <span>einen starken Auftritt.</span>
+          <span>Sicher präsentieren.</span>
         </h1>
         <p>
-          Bereite deine Inhalte vor, übe deine Präsentation und entdecke im
-          Review die Momente, an denen du weiterarbeiten möchtest.
+          Übe dein Referat oder deine Abschlusspräsentation. Erkläre dein Thema,
+          prüfe Aussagen an deinen Lernmaterialien und bereite dich auf
+          Rückfragen vor.
         </p>
         <div className="presentation-intro-actions">
           <Link href="/sources" className="button button-primary">
-            <Video size={18} /> Neue Präsentation <ArrowRight size={17} />
+            <Video size={18} /> Referat üben <ArrowRight size={17} />
           </Link>
           <Link href="/sources" className="button button-outline">
-            <FileText size={17} /> Quellen vorbereiten
+            <FileText size={17} /> Lernmaterial hinzufügen
           </Link>
         </div>
         <div className="presentation-intro-footnote">
@@ -58,10 +59,10 @@ export function PresentationIntro() {
           </span>
           <div>
             <small>01 · Vorbereiten</small>
-            <strong>Gib deinen Ideen eine Grundlage.</strong>
+            <strong>Beginne mit deinem Lernstoff.</strong>
             <p>
-              Folien und Notizen als Quellen für Fakten und Rückfragen
-              hinzufügen.
+              Folien, Fachtexte und Notizen als Grundlage für den Quellencheck
+              und fachliche Rückfragen hinzufügen.
             </p>
           </div>
         </li>
@@ -71,9 +72,10 @@ export function PresentationIntro() {
           </span>
           <div>
             <small>02 · Präsentieren</small>
-            <strong>Mach einen Probedurchlauf.</strong>
+            <strong>Erkläre es in eigenen Worten.</strong>
             <p>
-              Kamera aktivieren und mit Hinweisen zu Haltung und Sprache üben.
+              Übe deinen Vortrag mit Kamera und Mikrofon. Hinweise zu Haltung
+              und Sprache helfen dir beim nächsten Durchlauf.
             </p>
           </div>
         </li>
@@ -83,10 +85,10 @@ export function PresentationIntro() {
           </span>
           <div>
             <small>03 · Reflektieren</small>
-            <strong>Nimm einen nächsten Schritt mit.</strong>
+            <strong>Vertiefe dein Verständnis.</strong>
             <p>
-              Konkrete Stellen wieder ansehen und passende Rückfragen
-              beantworten.
+              Sieh dir konkrete Stellen noch einmal an und übe, fachliche
+              Rückfragen zu beantworten.
             </p>
           </div>
         </li>

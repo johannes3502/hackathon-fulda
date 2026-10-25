@@ -4,10 +4,10 @@ import type {
   SessionConfig,
 } from "../../contracts";
 export const defaults: SessionConfig = {
-  title: "Viva · Understanding beyond the essay",
+  title: "Learning by explaining · seminar presentation",
   context:
-    "A practice space for fair assessment in the age of AI. Viva asks students to explain their work, challenges unsupported claims, and leaves the final decision to a teacher.",
-  audience: "hackathon",
+    "A synthetic seminar presentation about learning by explaining. It explores how oral questions can reveal understanding, why claims need evidence, and how a teacher can guide reflection.",
+  audience: "examiner",
   targetDurationMs: 180000,
   mode: "coach",
   criteria: ["Clarity", "Supporting evidence", "Delivery"],
@@ -65,7 +65,7 @@ export const presentation: { offset: number; payload: EventPayload }[] = [
       2,
     ),
   },
-  { offset: 5000, payload: { type: "coverage.updated", items: ["Problem"] } },
+  { offset: 5000, payload: { type: "coverage.updated", items: ["Topic"] } },
   {
     offset: 6000,
     payload: {
@@ -83,7 +83,7 @@ export const presentation: { offset: number; payload: EventPayload }[] = [
     offset: 10000,
     payload: segment(
       "solution",
-      "Viva asks students to explain their reasoning. The AI asks questions; the teacher decides.",
+      "Explaining a topic reveals how we reason. The AI asks questions; the teacher decides.",
       8000,
       13000,
     ),
@@ -113,13 +113,13 @@ export const presentation: { offset: number; payload: EventPayload }[] = [
   },
   {
     offset: 11000,
-    payload: { type: "coverage.updated", items: ["Problem", "Solution"] },
+    payload: { type: "coverage.updated", items: ["Topic", "Explanation"] },
   },
   {
     offset: 18000,
     payload: segment(
       "claim",
-      "Our approach improves student understanding by 50 percent.",
+      "Explaining a topic improves student understanding by 50 percent.",
       17000,
       21000,
     ),
@@ -159,7 +159,7 @@ export const presentation: { offset: number; payload: EventPayload }[] = [
     offset: 26000,
     payload: segment(
       "close",
-      "We are looking for educators to help us test the prototype in a small pilot.",
+      "To test this claim, we could compare explanations before and after practice using the same rubric.",
       25000,
       29000,
     ),
@@ -179,7 +179,7 @@ export const presentation: { offset: number; payload: EventPayload }[] = [
     offset: 28000,
     payload: {
       type: "coverage.updated",
-      items: ["Problem", "Solution", "Next step"],
+      items: ["Topic", "Explanation", "Conclusion"],
     },
   },
 ];

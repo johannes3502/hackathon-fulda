@@ -164,8 +164,8 @@ export function SourceLibrary() {
           <div>
             <h1>Your sources</h1>
             <p>
-              Add slides, papers or notes to check claims and prepare questions
-              after recording.
+              Add course slides, papers or study notes to check your explanations
+              and prepare subject questions after recording.
             </p>
           </div>
           <Button asChild>

@@ -40,7 +40,7 @@ export function prepareAgent(
         words: recording.words,
         claims: recording.factCheck?.claims ?? [],
         collection_id: collection,
-        presentation_mode: recording.config.presentationMode ?? "startup",
+        presentation_mode: recording.config.presentationMode ?? "school",
       },
       valid: (value): value is AgentContext =>
         isObject(value) &&

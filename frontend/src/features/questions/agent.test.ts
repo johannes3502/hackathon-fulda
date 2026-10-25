@@ -25,28 +25,36 @@ const take = {
   video: new Blob(["synthetic"]),
 } as unknown as LiveRecording;
 
-it("sends the take's mode and frozen collection to a queued agent context job", async () => {
-  const result = {
-    prompt: "Synthetic reference material",
-    source_count: 1,
-    notices: [],
-  };
-  const fetcher = vi
-    .fn()
-    .mockResolvedValueOnce(Response.json({ job_id: collection }))
-    .mockResolvedValueOnce(
-      Response.json({ job_id: collection, status: "completed", result }),
-    );
-  vi.stubGlobal("fetch", fetcher);
-  expect(
-    await prepareAgent(take, take.config.sourceCollectionId!, signal(), 0),
-  ).toEqual(result);
-  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({
-    presentation_mode: "nonprofit",
-    collection_id: collection,
-    words: take.words,
-  });
-});
+it.each(["school", "thesis", "startup", "nonprofit", undefined] as const)(
+  "sends %s context (classroom by default) and the frozen collection to the agent",
+  async (mode) => {
+    const result = {
+      prompt: "Synthetic reference material",
+      source_count: 1,
+      notices: [],
+    };
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ job_id: collection }))
+      .mockResolvedValueOnce(
+        Response.json({ job_id: collection, status: "completed", result }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    expect(
+      await prepareAgent(
+        { ...take, config: { ...take.config, presentationMode: mode } },
+        take.config.sourceCollectionId!,
+        signal(),
+        0,
+      ),
+    ).toEqual(result);
+    expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({
+      presentation_mode: mode ?? "school",
+      collection_id: collection,
+      words: take.words,
+    });
+  },
+);
 
 it("rejects untrusted voice-session URLs and malformed settings", async () => {
   vi.stubGlobal(

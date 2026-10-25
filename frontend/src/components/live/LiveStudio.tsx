@@ -113,7 +113,7 @@ export function LiveStudio({
     featureFlags,
   );
   const [title, setTitle] = useState(
-    stage ? "Jury-Demo · 418" : "My pitch rehearsal",
+    stage ? "Jury-Demo · 418" : "My presentation practice",
   );
   const [targetMs, setTargetMs] = useState(stage ? 60000 : 180000);
   const serverSpeech = useRef<LiveCaptions | null>(null);

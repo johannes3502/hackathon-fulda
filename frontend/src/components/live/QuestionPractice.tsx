@@ -46,7 +46,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     () => recording.config.sourceCollectionId ?? collectionId(),
   );
   const mode =
-    PRESENTATION_MODES[recording.config.presentationMode ?? "startup"];
+    PRESENTATION_MODES[recording.config.presentationMode ?? "school"];
   const active = phase !== "idle";
   const connected = phase === "listening" || phase === "speaking";
   const messages = recording.conversation ?? [];
