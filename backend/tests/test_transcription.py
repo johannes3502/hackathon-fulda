@@ -58,6 +58,29 @@ def test_fillers_case_and_punctuation_insensitive():
     assert custom.summary.filler_count == 1
 
 
+def test_stretched_german_fillers_match_but_ambiguous_words_do_not():
+    words = words_from([
+        ("Ähhh,", 0, 300), ("ähmm", 400, 600), ("Hmmm.", 700, 900), ("ehm", 1000, 1200),
+        ("Äm", 1300, 1500), ("also", 1600, 1800), ("eh", 1900, 2100), ("EM", 2200, 2400),
+    ])
+    result = analyze_words(words)
+    found = [e.payload["word"] for e in result.events if e.payload.get("kind") == "filler"]
+    assert found == ["Ähhh,", "ähmm", "Hmmm.", "ehm", "Äm"]
+
+
+def test_german_whisper_prompt_keeps_hesitations(monkeypatch):
+    from app.transcription.transcriber import DEFAULT_GERMAN_PROMPT, whisper_prompt
+
+    monkeypatch.delenv("WHISPER_INITIAL_PROMPT", raising=False)
+    assert whisper_prompt("de") == DEFAULT_GERMAN_PROMPT
+    assert "ähm" in DEFAULT_GERMAN_PROMPT.casefold()
+    assert whisper_prompt("en") is None
+    monkeypatch.setenv("WHISPER_INITIAL_PROMPT", "Eigener Prompt")
+    assert whisper_prompt("de") == "Eigener Prompt"
+    monkeypatch.setenv("WHISPER_INITIAL_PROMPT", "none")
+    assert whisper_prompt("de") is None
+
+
 def test_repetition_ignores_filler_in_between():
     words = words_from([("ich", 0, 200), ("äh", 300, 500), ("ich", 600, 800), ("denke", 900, 1200)])
     result = analyze_words(words)
