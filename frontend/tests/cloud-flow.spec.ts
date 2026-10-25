@@ -44,7 +44,7 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
       if (message.type === "conversation_initiation_client_data") {
         openingOverridden =
           message.conversation_config_override?.agent?.first_message ===
-          "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?";
+          "Ich habe noch ein paar Fragen. Bist du bereit?";
         const prompt =
           message.conversation_config_override?.agent?.prompt?.prompt;
         promptSent =

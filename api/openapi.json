@@ -2519,6 +2519,83 @@
         "title": "NextAction",
         "type": "object"
       },
+      "PitchContext": {
+        "properties": {
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "question": {
+            "$ref": "#/components/schemas/PitchQuestion"
+          }
+        },
+        "required": [
+          "question",
+          "prompt"
+        ],
+        "title": "PitchContext",
+        "type": "object"
+      },
+      "PitchQuestion": {
+        "properties": {
+          "answer_points": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Answer Points",
+            "type": "array"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/PitchReference"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "reason",
+          "evidence"
+        ],
+        "title": "PitchQuestion",
+        "type": "object"
+      },
+      "PitchReference": {
+        "description": "Prepared explanation of this demo, not a retrieved or verified quote.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "quote": {
+            "title": "Quote",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "quote"
+        ],
+        "title": "PitchReference",
+        "type": "object"
+      },
       "PointContext": {
         "additionalProperties": false,
         "properties": {
@@ -9016,6 +9093,28 @@
           }
         },
         "summary": "Question Status",
+        "tags": [
+          "questions"
+        ]
+      }
+    },
+    "/questions/pitch": {
+      "get": {
+        "description": "The fixed jury question and agent context; no LLM, Redis or provider needed.",
+        "operationId": "pitch_context_questions_pitch_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PitchContext"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Pitch Context",
         "tags": [
           "questions"
         ]

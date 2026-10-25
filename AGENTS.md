@@ -33,6 +33,24 @@ aus dem aktuellen Fact-Check; nur Urteile mit geprüftem Quellenzitat fließen
 in den Fachwissen-Score ein. `/review-preview` bleibt ein markiertes Beispiel.
 Ohne ausreichende Evidenz bleibt der jeweilige Score offen.
 
+Pitch Mode (25.10.2026): `/stage` ist die Jury-Oberfläche mit Preflight und
+genau einer festen Datenschutzfrage. Der Standard ist die lokale
+Sofortaufnahme (`/live?stage=1&local=1`); der Live-Pfad
+(`/live?stage=1`) bleibt parallel und beendet das Warten auf Analyse nach 90 s, ohne
+das lokale Video zu verlieren. `GET /questions/pitch` liefert Frage und
+hardcodierten Agent-Kontext ohne LLM, Redis oder Provider; `PITCH_MODE=0`
+deaktiviert den Endpunkt. `NEXT_PUBLIC_STAGE_MODE=0` blendet `/stage` aus,
+`NEXT_PUBLIC_STAGE_ANALYSIS=live` macht die Backend-Analyse zur primären
+Aktion. Das Compose-Frontend läuft als Production-Build. Der normale
+`/live`-Pfad bleibt unverändert; die Stage-Review zeigt nur
+`evidence-share-v1`, nicht die Post-Round-Auswertung.
+Frühes Öffnen des Reviews bewahrt auch Pose-Logs und Live-Ereignisse; bereits
+eingereihte Backend-Jobs können weiterlaufen. Gespeicherte Stage-Takes behalten
+ihren Modus auch ohne URL-Parameter. Die feste Referenz ist vorbereitet, kein
+verifiziertes Quellenzitat; sie benennt auch Gemini. Browser-Vorlesen nutzt nur
+eine lokale deutsche Stimme. Compose übergibt die Stage-Flags als Build-Argumente
+und `PITCH_MODE` als Backend-Variable; Frontend-Änderungen brauchen einen Rebuild.
+
 ## 2. Ablauf
 
 1. **Vorbereitung:** Nutzer lädt Quellen hoch (PDF, PPTX, Text). Backend zerlegt sie in Chunks mit Quelle und Seite/Folie und legt sie für die Suche ab.

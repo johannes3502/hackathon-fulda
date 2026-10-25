@@ -18,13 +18,14 @@ x-backend: &backend
     CELERY_BROKER_URL: redis://redis:6379/0
     CELERY_RESULT_BACKEND: redis://redis:6379/1
     ASR_PROVIDER: ${ASR_PROVIDER:-whisper}
+    PITCH_MODE: ${PITCH_MODE:-1}
     WHISPER_MODEL: ${WHISPER_MODEL:-small}
     WHISPER_MODEL_PATH: /app/models/whisper
     WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
     WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
     WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-de}
     WHISPER_BEAM_SIZE: ${WHISPER_BEAM_SIZE:-5}
-    WHISPER_VAD_FILTER: ${WHISPER_VAD_FILTER:-false}
+    WHISPER_VAD_FILTER: ${WHISPER_VAD_FILTER:-true}
     WHISPER_INITIAL_PROMPT: ${WHISPER_INITIAL_PROMPT:-}
     DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
     ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
@@ -76,15 +77,16 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        API_INTERNAL_URL: http://backend:8000
+        NEXT_PUBLIC_STAGE_MODE: ${NEXT_PUBLIC_STAGE_MODE:-1}
+        NEXT_PUBLIC_STAGE_ANALYSIS: ${NEXT_PUBLIC_STAGE_ANALYSIS:-local}
     init: true
     environment:
       API_INTERNAL_URL: http://backend:8000
       NEXT_PUBLIC_API_URL: /api
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
-    volumes:
-      - ./frontend/src:/app/frontend/src:ro
-      - ./api:/app/api:ro
     depends_on:
       backend:
         condition: service_healthy
@@ -119,7 +121,7 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=info", "--concurrency=${CELERY_WORKER_CONCURRENCY:-2}"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=info", "--concurrency=${CELERY_WORKER_CONCURRENCY:-1}"]
     restart: unless-stopped
     stop_grace_period: 11m
     healthcheck:

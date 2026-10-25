@@ -63,6 +63,38 @@ test("worker uses the built API image and waits for its local dependencies", () 
   assert.equal(services.worker.depends_on.backend.condition, "service_healthy");
 });
 
+test("pitch controls reach the production build and backend", () => {
+  const { services: configured } = JSON.parse(
+    execFileSync(
+      "docker",
+      ["compose", "--env-file", ".env.example", "config", "--format", "json"],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PITCH_MODE: "0",
+          NEXT_PUBLIC_STAGE_MODE: "0",
+          NEXT_PUBLIC_STAGE_ANALYSIS: "live",
+        },
+      },
+    ),
+  );
+  assert.equal(configured.backend.environment.PITCH_MODE, "0");
+  assert.equal(configured.frontend.build.args.NEXT_PUBLIC_STAGE_MODE, "0");
+  assert.equal(
+    configured.frontend.build.args.NEXT_PUBLIC_STAGE_ANALYSIS,
+    "live",
+  );
+  assert.equal(
+    configured.frontend.build.args.API_INTERNAL_URL,
+    "http://backend:8000",
+  );
+  assert.ok(
+    !configured.frontend.volumes?.length,
+    "Production source must come from the built image",
+  );
+});
+
 test("beat shares the API image and waits for backend and Redis", () => {
   assert.equal(services.beat.image, services.backend.image);
   assert.equal(services.beat.pull_policy, "never");

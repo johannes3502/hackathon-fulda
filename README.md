@@ -35,6 +35,7 @@ docker compose up --build -d --wait
 ```
 
 - [App öffnen](http://localhost:3000)
+- [Pitch Mode für die Jury](http://localhost:3000/stage)
 - [API-Dokumentation](http://localhost:8000/docs)
 
 Compose startet sieben Dienste: Frontend, FastAPI-Backend, Celery-Worker,
@@ -81,11 +82,16 @@ docker compose up -d --wait backend worker beat
 1. Unter [Sources](http://localhost:3000/sources) den Präsentationstyp wählen,
    synthetische PDF-/PPTX-/DOCX-/TXT-/MD-Dateien hochladen und **Ready** abwarten.
 2. Ins Studio wechseln, Kamera und Mikrofon erlauben, Kalibrierung abwarten
-   und aufnehmen. Jede Web-Aufnahme verwendet Live-Feedback und vollständige
+   und aufnehmen. Das normale Studio verwendet Live-Feedback und vollständige
    Backend-Analyse; nach dem Stoppen wird die Aufnahme temporär hochgeladen.
 3. Mit **Finish & review** die Auswertung öffnen. Hinweise anklicken, die
    Videostelle ansehen und mit **Check facts** die Aussagen prüfen.
 4. **Practice questions** startet die konfigurierte ElevenLabs-Fragerunde.
+
+Für die Jury bietet [Pitch Mode](http://localhost:3000/stage) einen Preflight,
+eine lokale Sofortaufnahme und genau eine vorbereitete Datenschutzfrage.
+Die lokale Aufnahme lädt keine Medien hoch. Backend-Analyse ist ein eigener,
+optionaler Pfad mit 90 s Wartefrist; bereits eingereihte Jobs können weiterlaufen.
 
 Ohne eigene Aufnahme stehen getrennte Beispielpfade bereit:
 [22-Sekunden-Gestenbeispiel](http://localhost:3000/gestures),
@@ -125,7 +131,8 @@ npm ci
 npm run dev
 ```
 
-Das startet nur das Frontend; echte Aufnahmen benötigen weiterhin das Backend.
+Das startet nur das Frontend. `/stage` bietet eine lokale Aufnahme ohne
+Analyse-Upload; der normale `/live`-Pfad benötigt das Backend.
 Typecheck, Lint und Tests: `npm run typecheck`, `npm run lint`, `npm test`.
-Wenn nach einem Merge vorhandene Module im laufenden Compose-Frontend nicht
-gefunden werden, hilft `docker compose restart frontend`.
+Das Compose-Frontend verwendet einen Production-Build. Nach Änderungen an
+Quellcode oder Stage-Flags neu bauen: `docker compose up --build -d frontend`.

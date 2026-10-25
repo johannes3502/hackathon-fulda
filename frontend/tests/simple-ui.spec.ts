@@ -254,11 +254,17 @@ test("camera permission is requested only on click, with a clear retry after den
       denyCamera: () => void;
     };
     state.cameraRequests = 0;
+    let denied = false;
     navigator.mediaDevices.getUserMedia = () => {
       state.cameraRequests++;
+      // A browser remembers denial, including a subsequent video-only request.
+      if (denied)
+        return Promise.reject(new DOMException("Denied", "NotAllowedError"));
       return new Promise<MediaStream>((_, reject) => {
-        state.denyCamera = () =>
+        state.denyCamera = () => {
+          denied = true;
           reject(new DOMException("Denied", "NotAllowedError"));
+        };
       });
     };
   });

@@ -35,6 +35,7 @@ export class LiveRecorder {
   private failed = false;
   private latestMetricMs = -1;
   private transcript?: LiveTranscript;
+  private cancelFinish?: () => void;
   private progress: LiveProgress = {
     phase: "connecting",
     elapsedMs: 0,
@@ -52,6 +53,7 @@ export class LiveRecorder {
     private onProgress: (state: LiveProgress) => void,
     private onComplete: (recording: LiveRecording) => void,
     private onRecordingStart?: (timestamp: number) => void,
+    private onCaptured?: (recording: LiveRecording) => void,
   ) {}
   private publish() {
     if (!this.disposed) this.onProgress({ ...this.progress });
@@ -200,6 +202,18 @@ export class LiveRecorder {
           { once: true },
         ),
       );
+    this.stream.getAudioTracks().forEach((track) =>
+      track.addEventListener(
+        "ended",
+        () => {
+          if (!this.stopping)
+            this.fail(
+              "Microphone capture ended. Recording stopped; the video is ready to review.",
+            );
+        },
+        { once: true },
+      ),
+    );
     recorder.start(500);
   }
   stop() {
@@ -218,6 +232,66 @@ export class LiveRecorder {
     this.recorder.stop();
     this.stream.getTracks().forEach((track) => track.stop());
   }
+  private createdAt = new Date().toISOString();
+  private snapshot(
+    video: Blob,
+    videoUrl: string,
+    final: boolean,
+  ): LiveRecording {
+    return {
+      id: this.id,
+      config: this.config,
+      createdAt: this.createdAt,
+      durationMs: this.progress.elapsedMs,
+      video,
+      videoUrl,
+      mimeType: video.type,
+      feedback: this.progress.feedback,
+      metrics: this.progress.metrics,
+      words: this.transcript?.words,
+      chunksSent: this.progress.chunksSent,
+      bytesSent: this.progress.bytesSent,
+      completion: this.failed ? "interrupted" : "complete",
+      notice:
+        this.progress.notice ??
+        (!final && this.config.mode === "backend"
+          ? "Video captured locally. Analysis is still running; you can open the review now."
+          : null),
+      transcript: this.transcript,
+      analysisUploaded:
+        final && this.config.mode === "backend" && !this.failed
+          ? true
+          : undefined,
+    };
+  }
+  private async finishWithTimeout(video: Blob) {
+    const finish = this.transport.finish(this.progress.elapsedMs, video);
+    const timeoutMs = this.config.analysisTimeoutMs;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const outcome = await Promise.race([
+        finish.then(() => "done" as const),
+        new Promise<"cancelled">((resolve) => {
+          this.cancelFinish = () => resolve("cancelled");
+        }),
+        ...(timeoutMs && Number.isFinite(timeoutMs) && timeoutMs > 0
+          ? [
+              new Promise<"timeout">((resolve) => {
+                timer = setTimeout(() => resolve("timeout"), timeoutMs);
+              }),
+            ]
+          : []),
+      ]);
+      if (outcome === "timeout") {
+        throw new Error(
+          "Analysis is taking too long. The local video and live observations remain available; an already queued backend job may still finish.",
+        );
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+      this.cancelFinish = undefined;
+    }
+  }
   private async finalize() {
     clearInterval(this.timer);
     this.stream.getTracks().forEach((track) => track.stop());
@@ -231,9 +305,11 @@ export class LiveRecorder {
     const video = new Blob(this.chunks, {
       type: this.recorder?.mimeType || "video/webm",
     });
+    const videoUrl = URL.createObjectURL(video);
+    this.onCaptured?.(this.snapshot(video, videoUrl, false));
     if (!this.failed) {
       try {
-        await this.transport.finish(this.progress.elapsedMs, video);
+        await this.finishWithTimeout(video);
         if (this.config.mode === "backend") {
           this.progress.chunksSent = 1;
           this.progress.bytesSent = video.size;
@@ -247,28 +323,16 @@ export class LiveRecorder {
       }
     }
     this.transport.close();
-    if (this.disposed) return;
+    if (this.disposed) {
+      if (!this.onCaptured) URL.revokeObjectURL(videoUrl);
+      return;
+    }
     this.chunks = [];
-    this.onComplete({
-      id: this.id,
-      config: this.config,
-      createdAt: new Date().toISOString(),
-      durationMs: this.progress.elapsedMs,
-      video,
-      videoUrl: URL.createObjectURL(video),
-      mimeType: video.type,
-      feedback: this.progress.feedback,
-      metrics: this.progress.metrics,
-      words: this.transcript?.words,
-      chunksSent: this.progress.chunksSent,
-      bytesSent: this.progress.bytesSent,
-      completion: this.failed ? "interrupted" : "complete",
-      notice: this.progress.notice,
-      transcript: this.transcript,
-    });
+    this.onComplete(this.snapshot(video, videoUrl, true));
   }
   dispose() {
     this.disposed = true;
+    this.cancelFinish?.();
     clearInterval(this.timer);
     this.transport.close();
     if (this.recorder && this.recorder.state !== "inactive")

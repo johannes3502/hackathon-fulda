@@ -1,18 +1,40 @@
 # Pitch Coach frontend
 
 Start the full stack using the [root README](../README.md), then open
-<http://localhost:3000>. Changes in `frontend/src/` reload automatically;
-rebuild after changing dependencies or configuration.
+<http://localhost:3000>. The Compose frontend runs as a **production build**;
+after changing source or configuration, rebuild it with
+`docker compose up --build -d frontend`. For local development use
+`npm run dev --workspace frontend` and open the printed URL.
 
-If Turbopack reports a newly merged module as missing although it exists inside
-the container, restart only the frontend with `docker compose restart frontend`
-(`docker --context colima compose restart frontend` when using Colima). The
-file watcher can miss new files across the host mount. This cleared the stale
-`lab-events` and review-component errors without changing source files or data.
-The frontend healthcheck also compiles `/demo`, `/gestures`, `/sources`,
-`/progress`, `/admin`, `/review-preview`, `/live` and `/live/healthcheck/review`,
-so a working homepage cannot conceal a broken studio or review. The review probe
-opens the missing-recording state; it does not create a take or access a recording.
+The frontend healthcheck requests `/demo`, `/gestures`, `/sources`,
+`/progress`, `/admin`, `/review-preview`, `/live` and
+`/live/healthcheck/review`; `/stage` is checked by its own preflight. The
+review probe opens the missing-recording state; it does not create a take or
+access a recording.
+
+## Pitch Mode
+
+`/stage` is the jury console. It runs a preflight for backend, fact-check,
+camera/microphone and IndexedDB. The default
+**Lokale Sofortaufnahme** records locally with `LocalVideoTransport` and opens
+the review without a backend wait. The optional live path uses backend analysis
+and stops waiting after 90 seconds while keeping the local video. The stage
+review shows the three `evidence-share-v1` criteria and exactly one prepared
+privacy question; it does not show the post-round score system. Set
+`NEXT_PUBLIC_STAGE_MODE=0` to hide `/stage`, and
+`NEXT_PUBLIC_STAGE_ANALYSIS=live` to make the backend path primary at build
+time. The normal `/live` path remains available in parallel.
+
+Compose forwards these flags from the root `.env` as build arguments; rebuild
+the frontend after changing them. `PITCH_MODE=0` disables the backend's fixed
+question endpoint independently. The local question remains available as a
+prepared fallback. Its reference is explanatory copy, not a verified source
+quote, and includes the optional Gemini data flow. Narration uses a local
+German browser voice when available; otherwise the question stays readable.
+
+Opening a review early preserves the video, pose log and live observations.
+The 90-second limit cancels the browser's wait, not an already queued backend
+job. Saved takes keep their stage review even when reopened without `?stage=1`.
 
 ## Use
 
@@ -34,20 +56,15 @@ opens the missing-recording state; it does not create a take or access a recordi
   ±2 seconds of context and optional looping. Criterion buttons filter moments.
   Fact-check results supply transcript quotes and source excerpts.
 
-- **418 loading preview** (`/loading-preview`): system typography, a small wordmark
-  and an announced status with a subtle activity dot. The reusable
-  `LoadingScreen` also supplies the App Router loading fallback (`app/loading.tsx`).
-  Mount it during pending work with an optional `label`; no simulated percentage
-  or artificial delay. Appearance follows the system; reduced motion stops the dot.
-
 - **Sample demo** (`/demo`): deterministic rehearsal, sample transcript, judge questions
   and review. Works without camera, microphone or backend credentials.
 - **Monitoring studio** (`/live`): navigation and settings are visible by default; **Large view** is optional. Choose **Enable camera**, then **Start recording**. Local gesture observations replace scripted markers; hold a neutral position for 3 seconds first.
 - **See gestures in 22 seconds** (`/gestures`): synthetic walkthrough using the real observation rules.
-- **Speech analysis:** every recording uses live backend feedback and full
-  analysis after stopping. The microphone is always enabled and the complete
-  take is uploaded; there is no recording-mode selector. The backend must be
-  ready before recording starts. Calibration
+- **Speech analysis:** the normal `/live` recording uses live backend feedback and full
+  analysis after stopping; the backend must be ready before recording starts.
+  `/stage` defaults to a local camera-and-microphone take without an upload; if microphone access fails, a labelled video-only fallback is available. The microphone is
+  enabled for the normal path and the complete take is uploaded; there is no
+  recording-mode selector in the normal studio. Calibration
   waits for about three seconds of voiced speech; startup silence and unpitched
   room noise do not count. The voice reference then adjusts slowly while you speak
   and stays fixed during pauses. A new recording calibrates afresh. Transcription is on by default; Deepgram EU streaming is opt-in (requires a server-side API key).

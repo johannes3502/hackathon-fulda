@@ -5,18 +5,35 @@ Die App-Texte sind überwiegend Englisch; Start, Progress und Review-Scores sind
 teilweise Deutsch. Diese Anleitung ist für das Team.
 **Nutzerentscheidung: lokal reicht.** Keine öffentliche Bereitstellung nötig;
 die Jury nutzt den vorbereiteten Demo-Laptop unter `http://localhost:3000`.
-Start: `docker compose up --build -d --wait` (siehe Root-README). Für reine
-Gesten-/Sample-Demo reicht alternativ Node.js 22.12+: `npm ci`, `npm run dev`.
-Nach Code-Merges vor der Vorführung `docker compose restart frontend` ausführen:
-Turbopack findet neue Module im laufenden Container sonst gelegentlich nicht
-(beobachtet bei `/review-preview`).
+Start: `docker compose up --build -d --wait` (siehe Root-README). Das
+Frontend läuft seit 25.10.2026 als **Production-Build**; der frühere
+Turbopack-/HMR-Dev-Container wird für die Jury nicht mehr verwendet. Nach
+Code-Änderungen neu bauen, nicht nur restarten. Für reine Gesten-/Sample-Demo
+reicht alternativ Node.js 22.12+: `npm ci`, `npm run build`, `npm run start`.
+
+## Pitch Mode (Jury-Bühne, 25.10.2026)
+
+`/stage` ist der vorbereitete Einstieg für die eigene Jury-Demo. Der Preflight
+zeigt Backend, Quellencheck, Kamera/Mikrofon und IndexedDB. **Lokale
+Sofortaufnahme** ist der Standard und funktioniert ohne
+Backend. **Live-Demo starten** nutzt die Backend-Analyse und ist nur nach einem
+Warmlauf sinnvoll; die Stage beendet das Warten nach 90 s und behält das
+lokale Video. Nach dem Stopp öffnet das Stage-Review mit den drei
+`evidence-share-v1`-Kriterien und genau einer vorbereiteten Datenschutzfrage
+(90-s-Antwortfenster, keine Nachfrage, keine Bewertung). Die normale
+`/live`-Aufnahme bleibt parallel erreichbar und ist nicht der Bühnenpfad.
+
+Vor der Jury: `/stage` öffnen, Preflight einmal ausführen, eine kurze lokale
+Aufnahme machen, Review und Frage prüfen. Für den Live-Pfad zuerst einen
+synthetischen Take warmlaufen lassen; ohne Warmlauf lokal bleiben.
 
 ## Ablauf am Stand (ca. 2 Minuten)
 
-1. Startseite öffnen, **See gestures in 22 seconds** wählen, dann **Play
-   22-second example**. Sichtbares Label: synthetisch, keine Kamera. Die drei
-   Bewegungen durchlaufen dieselben Regeln wie im Live-Pfad. Danach verschwindet
-   die Person: „Evaluation paused“ statt erfundener Bewertung.
+1. `/demo` öffnen (nicht die Startseite `/`), **See gestures in 22 seconds**
+   wählen, dann **Play 22-second example**. Sichtbares Label: synthetisch,
+   keine Kamera. Die drei Bewegungen durchlaufen dieselben Regeln wie im
+   Live-Pfad. Danach verschwindet die Person: „Evaluation paused“ statt
+   erfundener Bewertung.
 2. Bei einer Beobachtung **How was this observed?** öffnen. Erklären: Das Modell
    liefert Punkte; unser Code prüft Sichtbarkeit, Neutralstellung, Geometrie und
    Dauer. Kein Score und keine Interpretation von Emotion oder Blickkontakt.
@@ -25,11 +42,13 @@ Turbopack findet neue Module im laufenden Container sonst gelegentlich nicht
    und Hände im Bild. Sitzen ist möglich. Drei Sekunden ruhig halten, Hände
    getrennt neben der Taille. „Ready“ abwarten; bei Bedarf neu kalibrieren.
 4. **Record with gesture feedback** → erneut 3 Sekunden neutral. Hand deutlich
-   über Schulter heben und etwa 1 Sekunde halten. Zurück. Hände vor dem Torso
-   zusammenführen und etwa 2 Sekunden halten. Zurück. Wenn bequem den ganzen Körper
-   bei fester Kamera etwa eine halbe Schulterbreite seitlich versetzen und etwa
-   1 Sekunde halten. Eine Torso-Neigung und verschränkte Arme sind zusätzlich
-   beobachtbar. „Pose debug“ zeigt die Werte bei Problemen. Keine ruckartigen oder unangenehmen Bewegungen.
+   über Schulter heben und **mindestens 2 Sekunden** halten. Zurück. Hände vor
+   dem Torso zusammenführen und **mindestens 2 Sekunden** halten. Zurück. Wenn
+   bequem den ganzen Körper bei fester Kamera etwa eine halbe Schulterbreite
+   seitlich versetzen und **mindestens 2 Sekunden** halten. Eine Torso-Neigung
+   und verschränkte Arme sind zusätzlich beobachtbar. Alle Pose-Regeln nutzen
+   dieselbe 2-s-Haltezeit. „Pose debug“ zeigt die Werte bei Problemen. Keine
+   ruckartigen oder unangenehmen Bewegungen.
 5. **Finish & review** → Beobachtung anklicken → Aufnahme an dieser Stelle ansehen.
    Eine sinnvolle Reflexionsfrage stellen: „Hat diese Bewegung deinen Punkt
    unterstützt?“ Optional Rohdaten oder Gesten-Evidenz herunterladen.
@@ -63,13 +82,13 @@ beibehalten oder ändern möchte.“**
 | Schultern/Hüften fehlen | Aufforderung zum Framing. Keine Posebewertung. Weiter zurück, Kamera neu ausrichten. |
 | Hände fehlen | Keine Handbeobachtungen. Bei nutzbarem Torso bleibt die Haltung auswertbar. |
 | Kalibrierung bleibt stehen | Licht, Abstand und ruhige Haltung prüfen. Hände getrennt neben Taille. Langsames Gerät kann am Zeitkriterium scheitern. |
-| Seitwärts-Hinweis erscheint verzögert | Positionsregel wartet bewusst 0,8 s. „Pose debug“ zeigt zusätzlich Frame-/Modellzeit und Abtastrate. Bei hoher Frame-Zeit andere Browser vergleichen; Safari ist bisher nicht als Ursache belegt. |
+| Seitwärts-Hinweis erscheint verzögert | Positionsregel wartet bewusst 2 s. „Pose debug“ zeigt zusätzlich Frame-/Modellzeit und Abtastrate. Bei hoher Frame-Zeit andere Browser vergleichen; Safari ist bisher nicht als Ursache belegt. |
 | API/Netz fehlt | Lokale Gestenerkennung braucht nach Laden der App/Assets keine Anbieter-API. Synthetischer Rundgang braucht keine Kamera. Kein Service-Worker: erstmaliger Seitenaufruf braucht den App-Server. |
-| Backend-Audio schlägt fehl | Aufnahme und bereits vorhandene lokale Gesten bleiben im Review; Fehlermeldung sichtbar. |
+| Backend-Audio schlägt fehl | Aufnahme und bereits vorhandene lokale Gesten bleiben im Review; bei der Stage ist die lokale Sofortaufnahme der Fallback. Fehlermeldung sichtbar. |
 | Quellenmodell fehlt / Quellen nicht bereit | Gemini-Key und Modellstatus prüfen, Quelle fertig laden lassen, **Refresh status**. Kein stiller Fallback. |
 | Zitat kann nicht geprüft werden | Kein Urteil anzeigen; Passage selbst prüfen. Eine Zahl von Modellurteilen ist keine Genauigkeit. |
 | Kamera bewegt / Person wechselt | Aufnahme beenden. Neue Aufnahme mit neuer Kalibrierung. |
-| Seite wird neu geladen | Lokales Video ist weg. Vorher downloaden; neuen Versuch starten. |
+| Seite wird neu geladen | Eine laufende Aufnahme geht verloren; abgeschlossene Takes werden aus IndexedDB wiederhergestellt. Während Aufnahme/Analyse warnt der Browser vor dem Verlassen. |
 
 ## Vor dem Juryrundgang tatsächlich abhaken
 
@@ -78,8 +97,9 @@ Vor-Ort-Abnahme nicht. Keine echten Juryaufnahmen als Testfixtures einchecken.
 
 | Check | Abnahme | Status |
 | --- | --- | --- |
+| Pitch Mode / Stage | `/stage` öffnen, Preflight, **Lokale Sofortaufnahme**, 60-s-Take, Review und feste Datenschutzfrage | Production-Build geprüft; realer Kamera-/Mikro-Durchlauf vor Ort wiederholen |
 | Lokaler Start ohne Login | Demo-Laptop: `http://localhost:3000`, `/gestures` und `/live` öffnen | Lokale Browser-Tests; am Stand nochmals öffnen |
-| Echter Kameraweg auf Demo-Laptop | Hand hoch, Hände zusammen, seitlicher Versatz; zusätzlich Neigung/Arme verschränkt | Nutzer bestätigt beide Handgesten und seitlichen Versatz. Mindestdauer danach auf 0,8 s reduziert; neue Geschwindigkeit, Neigung und Arme verschränkt noch real prüfen |
+| Echter Kameraweg auf Demo-Laptop | Hand hoch, Hände zusammen, seitlicher Versatz; zusätzlich Neigung/Arme verschränkt | Nutzer bestätigt beide Handgesten und seitlichen Versatz. Mindestdauer ist auf 2 s vereinheitlicht; neue Geschwindigkeit, Neigung und Arme verschränkt noch real prüfen |
 | Hand-/Körperframing | Hinweise bei verdeckten Händen, fehlenden Hüften und Verlassen des Bildes | Offen – vor Ort ausführen |
 | Reale Zeitzuordnung | Marker führt zur tatsächlich gezeigten Bewegung, einschließlich Anfang/Ende der Aufnahme | Offen – vor Ort ausführen |
 | Safari/iPhone (optional) | Berechtigung, Modell, MP4-Aufnahme, Stop, Replay und Download | Nicht qualifiziert; für die lokale Laptop-Demo nicht vorausgesetzt |
@@ -112,8 +132,8 @@ Gemini-Quellenvergleich und Text-Frage-/Antwortanalyse sind im Web angebunden.
 Optionale Live-Captions liefern während der Aufnahme eine Textvorschau;
 die vollständige Transkription nach dem Stoppen bleibt die Review-Zeitbasis.
 Web-Fetch, Blickkontakt-Auswertung und dauerhafte Server-Clips sind nicht Teil
-des aktuellen vorführbaren Pfads. Die native App behält ihren
-bisherigen Funktionsumfang; die neue lokale Fragerunde ist im Web verfügbar.
+des aktuellen vorführbaren Pfads. Die native App ist entfernt; die lokale
+Fragerunde ist nur im Web verfügbar.
 Die bestehende Sample-Session zeigt den angestrebten Gesamtfluss mit vorbereiteten
 Daten. Das Team darf sie nicht als Analyse der Live-Aufnahme vorstellen.
 
@@ -162,11 +182,15 @@ Tests mit synthetischen Bildern belegen Start und Datenfluss, keine Genauigkeit.
 - **Datenschutz:** Gemini ist Cloud ohne EU-Region-Pinning. Für die Jury nur
   synthetische Inhalte verwenden; keine echten Personenaufnahmen an das LLM
   senden.
-- **Fragegrenzen:** 3–5 Hauptfragen, ein Follow-up, 10 Minuten Hard Stop; die
-  Begründung und Zitate stehen in `docs/11-deep-research-validation.md`.
-  Im Voice-Pfad sind sie derzeit Prompt-Vorgaben, nicht hart erzwungen (TODO).
-- **Scores:** Struktur hat im Live-Pfad keine Evidenzquelle und bleibt „–“;
-  Struktur-Momente im Demo-Review sind synthetisch. Die vier Review-Scores und
-  die Auswertung nach der Fragerunde sind getrennte Heuristiken (TODO).
+- **Fragegrenzen:** Im normalen Voice-Pfad 3–5 Hauptfragen, ein Follow-up,
+  10 Minuten Hard Stop; die Begründung und Zitate stehen in
+  `docs/11-deep-research-validation.md`. Im Voice-Pfad sind sie derzeit
+  Prompt-Vorgaben, nicht hart erzwungen. Die Stage fragt stattdessen genau eine
+  feste Datenschutzfrage ohne Nachfrage; der Kontext kommt aus
+  `backend/app/questions/pitch.py`.
+- **Scores:** Der Live-Review zeigt drei `evidence-share-v1`-Kriterien
+  (Gestik, Fachwissen, Flow); ohne Evidenz bleibt das jeweilige Kriterium „–“.
+  Die Auswertung nach der Fragerunde (`evidence-count-heuristic.v1`) ist ein
+  getrenntes System und wird auf der Stage nicht angezeigt.
 - **Was die Demo nicht verspricht:** keine Genauigkeits-, Latenz- oder
   Lernwirksamkeitsgarantie; keine Noten oder Personenbewertung.

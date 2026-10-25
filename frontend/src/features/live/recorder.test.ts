@@ -23,6 +23,11 @@ function setup(
   transport: VideoTransport,
   mode: LiveConfig["mode"] = "local",
   onStart?: (timestamp: number) => void,
+  options: {
+    audio?: boolean;
+    config?: Partial<LiveConfig>;
+    onCaptured?: (recording: LiveRecording) => void;
+  } = {},
 ) {
   vi.useFakeTimers();
   vi.stubGlobal("MediaRecorder", Recorder);
@@ -31,21 +36,34 @@ function setup(
     readyState: "live",
     stop: stopTrack,
   });
+  const audioTrack = options.audio
+    ? Object.assign(new EventTarget(), {
+        readyState: "live",
+        stop: stopTrack,
+      })
+    : undefined;
   const stream = {
     getVideoTracks: () => [track],
-    getAudioTracks: () => [],
-    getTracks: () => [track],
+    getAudioTracks: () => (audioTrack ? [audioTrack] : []),
+    getTracks: () => (audioTrack ? [track, audioTrack] : [track]),
   } as unknown as MediaStream;
   const complete = vi.fn<(recording: LiveRecording) => void>();
   const recorder = new LiveRecorder(
     stream,
-    { title: "Practice", targetMs: 60000, mode, endpoint: "" },
+    {
+      title: "Practice",
+      targetMs: 60000,
+      mode,
+      endpoint: "",
+      ...options.config,
+    },
     transport,
     vi.fn(),
     complete,
     onStart,
+    options.onCaptured,
   );
-  return { recorder, complete, stopTrack };
+  return { recorder, complete, stopTrack, track, audioTrack };
 }
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -148,4 +166,89 @@ it("anchors pose capture on the actual recorder start, after connection complete
   await starting;
   expect(onStart).toHaveBeenCalledExactlyOnceWith(5000);
   recorder.dispose();
+});
+
+it("captures media before a stalled analysis and completes with it at the deadline", async () => {
+  const captured = vi.fn();
+  const transport = {
+    connect: async () => {},
+    send: async () => {},
+    finish: () => new Promise<void>(() => {}),
+    close: vi.fn(),
+  };
+  const { recorder, complete } = setup(transport, "backend", undefined, {
+    audio: true,
+    config: { stage: true, analysisTimeoutMs: 90000 },
+    onCaptured: captured,
+  });
+  await recorder.start();
+  await vi.advanceTimersByTimeAsync(1000);
+  recorder.stop();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(captured).toHaveBeenCalledOnce();
+  expect(complete).not.toHaveBeenCalled();
+  expect(await captured.mock.calls[0][0].video.text()).toBe("captured video");
+  await vi.advanceTimersByTimeAsync(90000);
+  expect(complete).toHaveBeenCalledOnce();
+  const recording = complete.mock.calls[0][0];
+  expect(recording.videoUrl).toBe(captured.mock.calls[0][0].videoUrl);
+  expect(recording.durationMs).toBe(1000);
+  expect(recording.notice).toContain("taking too long");
+  expect(recording.analysisUploaded).not.toBe(true);
+  expect(transport.close).toHaveBeenCalled();
+  expect(vi.getTimerCount()).toBe(0);
+  URL.revokeObjectURL(recording.videoUrl);
+});
+
+it("opening an early review cancels the deadline without revoking its captured video", async () => {
+  const captured = vi.fn();
+  const { recorder, complete } = setup(
+    {
+      connect: async () => {},
+      send: async () => {},
+      finish: () => new Promise<void>(() => {}),
+      close: vi.fn(),
+    },
+    "backend",
+    undefined,
+    {
+      audio: true,
+      config: { analysisTimeoutMs: 90000 },
+      onCaptured: captured,
+    },
+  );
+  await recorder.start();
+  recorder.stop();
+  await vi.advanceTimersByTimeAsync(0);
+  const { videoUrl } = captured.mock.calls[0][0];
+  recorder.dispose();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(vi.getTimerCount()).toBe(0);
+  expect(complete).not.toHaveBeenCalled();
+  expect(await (await fetch(videoUrl)).text()).toBe("captured video");
+  URL.revokeObjectURL(videoUrl);
+});
+
+it("preserves video when the microphone ends during a recording", async () => {
+  const { recorder, complete, audioTrack } = setup(
+    {
+      connect: async () => {},
+      send: async () => {},
+      finish: async () => {},
+      close: () => {},
+    },
+    "local",
+    undefined,
+    { audio: true },
+  );
+  await recorder.start();
+  audioTrack!.dispatchEvent(new Event("ended"));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(complete).toHaveBeenCalledOnce();
+  expect(complete.mock.calls[0][0].completion).toBe("interrupted");
+  expect(complete.mock.calls[0][0].notice).toContain(
+    "Microphone capture ended",
+  );
+  expect(await complete.mock.calls[0][0].video.text()).toBe("captured video");
+  URL.revokeObjectURL(complete.mock.calls[0][0].videoUrl);
 });

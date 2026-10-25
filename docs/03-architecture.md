@@ -85,6 +85,7 @@ flowchart TB
     MAIN --> SO
     MAIN --> FC
     MAIN --> QR
+    QR -->|"GET /questions/pitch; PITCH_MODE"| FIXED["Feste Jury-Frage + vorbereitete Referenz<br/>kein Retrieval, kein geprüftes Quellenzitat"]
     MAIN --> RV
     MAIN --> PR
     RV -- "Session/Take/Event/Review/Job" --> PG
@@ -151,9 +152,9 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph Host["docker compose (localhost only)"]
-        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000<br/>Health: alle Demo-Routen + Backend"]
+        FE["frontend<br/>Next.js Production-Build :3000, kein Source-Mount<br/>Stage-Flags und API-Rewrite zur Build-Zeit<br/>Health: Produkt-Routen + Backend"]
         BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, --reload"]
-        WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Concurrency 2"]
+        WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Default-Concurrency 1"]
         BT["beat: ein Scheduler<br/>gemeinsames Backend-Image<br/>03:15 UTC -> retention_sweep"]
         PG[("postgres<br/>pgvector :5432<br/>Volume: postgres_data")]
         RD[("redis :6379<br/>AOF, noeviction<br/>Volume: redis_data")]
@@ -501,9 +502,17 @@ flowchart TD
     SP -->|"Quellen vorbereiten"| SRC
     SP -->|"Letzte Aufnahme, falls vorhanden"| LREV
     RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ausdrücklich markierte Beispiel-Scores"]
+    STAGE["/stage - Pitch Mode<br/>Preflight: Backend, Quellencheck,<br/>Kamera/Mikro, Storage; feste Datenschutzfrage<br/>NEXT_PUBLIC_STAGE_MODE=0 blendet die Route aus"]
+    STAGE -->|"Lokal (Default)"| STAGELOCAL["/live?stage=1&local=1<br/>sofortige lokale Aufnahme + Review"]
+    STAGE -->|"Live (optional)"| STAGELIVE["/live?stage=1<br/>max. 90 s auf Backend-Analyse warten"]
+    STAGE -->|"Beispiel"| RP
+    STAGELOCAL --> SREVIEW["/live/sessionId/review?stage=1<br/>ReviewScores; feste Jury-Frage am Ende<br/>config.stage bleibt beim Wiederöffnen erhalten"]
+    STAGELIVE --> SREVIEW
     SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
     LIVE["/live - LiveStudio<br/>Vor Kamera-Aktivierung: gleiche Seitenbreite wie Upload, ohne Header und Schrittleiste<br/>Back to sources vor Aufnahmestart<br/>Ab Kamera-Aktivierung: Vollbild mit Pose-Overlay<br/>Back-Link in der Toolbar bis Aufnahmestart<br/>Immer Live + Backend-Analyse,<br/>Options: Vortragstyp, Material und Transkript,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
+    STAGEMODE["Stage-Preset: /live?stage=1 blendet Optionen aus<br/>local=1 nutzt LocalVideoTransport ohne Upload<br/>Default: lokaler Sofortpfad; Live nur opt-in"]
+    LIVE -.-> STAGEMODE
     STORE["Root-Layout: LiveSessionProvider + IndexedDB<br/>Video, Analyse und Fragen je Aufnahme<br/>Wiederherstellung nach Reload"] -.-> LIVE
     STORE --> EVIDENCE["recordingReviewData + recordingFeedback<br/>Video, Dauer und Events der gewählten Aufnahme<br/>Quellen-Marker aus aktuellem Fact-Check<br/>Fragen zählen nicht als Präsentationsevidenz"]
     EVIDENCE --> LREV
@@ -538,10 +547,32 @@ flowchart TD
 
     subgraph Transport["VideoTransport: LiveStudio fest auf backend<br/>(Modus-Schalter entfernt)"]
         ANA["AnalysisTransport<br/>Backend-Upload + Polling, jede Web-Aufnahme"]
-        DEMO["LocalVideoTransport<br/>nur noch Tests; kein Upload"]
+        DEMO["LocalVideoTransport<br/>Stage-Fallback; sofort lokal, kein Upload"]
     end
     LIVE --> Transport
 ```
+
+### Pitch Mode / Stage (25.10.2026)
+
+`/stage` ist die schlanke Jury-Oberfläche. Sie ist standardmäßig über
+`NEXT_PUBLIC_STAGE_MODE` aktiv und wird nur mit `0` ausgeblendet. Der Preflight
+prüft Backend, Quellencheck, Kamera/Mikrofon und IndexedDB, ohne
+Berechtigungen vorab anzufragen.
+
+Der Stage-Pfad startet standardmäßig **lokal** (`/live?stage=1&local=1`): Der
+`LocalVideoTransport` speichert die Aufnahme sofort in IndexedDB, das Review
+öffnet ohne Backend-Wartezeit. Der Live-Pfad (`/live?stage=1`) bleibt parallel
+verfügbar und ist opt-in; die Stage beendet nach 90 s das Warten auf Analyse.
+Früher Review und Timeout behalten Video, Pose-Log und Live-Ereignisse.
+Bereits eingereihte Backend-Jobs können weiterlaufen. Der normale `/live`-Pfad
+bleibt unverändert.
+
+`GET /questions/pitch` liefert die feste Datenschutzfrage und den Agent-Kontext
+aus `backend/app/questions/pitch.py`, ohne LLM, Redis, Quellenabruf oder
+Anbieter. `PITCH_MODE=0` deaktiviert den Endpunkt. Die Stage-Review zeigt genau
+diese eine Frage mit 90-s-Antwortfenster und blendet die Auswertung nach der
+Fragerunde aus; das getrennte `evidence-count-heuristic.v1`-System bleibt damit
+außerhalb der Bühne. Die normale Review bleibt unverändert.
 
 ## 7. Demo-Plattform
 
@@ -875,6 +906,7 @@ flowchart LR
         Q7["POST /questions/agent (202)"]
         Q8["GET /questions/agent/jobs/{job_id}"]
         Q9["POST /questions/agent/session"]
+        Q10["GET /questions/pitch<br/>feste Jury-Frage + Agent-Kontext<br/>ohne LLM, Redis oder Provider"]
         V1["POST /sessions<br/>GET / DELETE /sessions/id"]
         V2["POST /sessions/id/takes<br/>GET /takes/id"]
         V3["POST /takes/id/events<br/>POST /takes/id/audio"]
@@ -886,7 +918,7 @@ flowchart LR
         P3["GET/PUT/DELETE /profiles/id/goals/metricId<br/>GET /profiles/id/takes<br/>GET /profiles/id/export"]
     end
 
-    WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5 & Q6 & Q7 & Q8 & Q9
+    WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5 & Q6 & Q7 & Q8 & Q9 & Q10
     CLIENT["Neuer Take-Client-Vertrag<br/>Frontend-Integration separat"] -.-> V1 & V2 & V3 & V4 & V5 & V6
     PROGRESS["Progress-Client<br/>X-Profile-Token"] -.-> P1 & P2 & P3
 ```

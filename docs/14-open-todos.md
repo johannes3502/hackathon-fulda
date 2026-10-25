@@ -37,15 +37,31 @@ reviewten Merge von `feature/structure-safety-scores`, 25.10.2026.
 - [ ] **Zwei Score-Systeme klar trennen.** Review nutzt
   `evidence-share-v1` (drei Kriterien, Zeitanteile/Quellenurteile), die
   Auswertung nach der Fragerunde `evidence-count-heuristic.v1` (drei
-  Kategorien, Marker/Urteile). Nicht addieren oder vergleichen; im UI als
-  „Review-Evidenz“ vs. „Auswertung nach der Fragerunde“ benennen. Später
-  entscheiden, ob beide bleiben oder vereinheitlicht werden.
-- [ ] **Demo-Härtung.** Der Compose-Frontend läuft im Dev-Modus
-  (`frontend/Dockerfile:19`). Nach Merges kann Turbopack neue Module nicht
-  finden (beobachtet: `/review-preview` 500; Restart behob es). Vor der Jury
-  frisch bauen/restarten und/oder auf Production-Build wechseln. Der Healthcheck
-  deckt inzwischen auch `/review-preview`, `/demo`, `/gestures`, `/sources`,
-  `/progress` und `/admin` ab; das persistente Next-Volume entfällt.
+  Kategorien, Marker/Urteile). Nicht addieren oder vergleichen. Die Stage
+  zeigt nur das Review-System und blendet die Post-Round-Auswertung aus; der
+  normale Pfad bleibt getrennt. Später entscheiden, ob beide bleiben oder
+  vereinheitlicht werden.
+- [x] **Demo-Härtung.** Das Compose-Frontend baut seit 25.10.2026 als
+  Production-Build (`frontend/Dockerfile`); Turbopack/HMR-Hydrationfehler des
+  Dev-Containers sind damit nicht mehr der Jury-Pfad. `docker compose up
+  --build -d --wait` und danach `/stage` prüfen. Der Healthcheck deckt
+  `/review-preview`, `/demo`, `/gestures`, `/sources`, `/progress`, `/admin`
+  und `/api/health/ready` ab; `/stage` wird im Preflight geprüft.
+- [x] **Pitch Mode / Stage.** `/stage` mit Preflight, lokalem Sofortpfad als
+  Default, optionalem Live-Pfad, 90-s-Wartefrist auf Analyse und frühem lokalen
+  Speichern. `GET /questions/pitch` liefert genau eine feste Datenschutzfrage
+  und einen hardcodierten Agent-Kontext ohne LLM/Redis/Provider. Der normale
+  `/live`-Pfad bleibt parallel bestehen. `PITCH_MODE=0` deaktiviert nur den
+  Backend-Endpunkt; `NEXT_PUBLIC_STAGE_MODE=0` verbirgt die Stage-Einstiege.
+- [ ] **Live-ASR-Warmlauf.** Der erste Whisper-Job kann auf dem Demo-Laptop
+  deutlich länger dauern; die Stage beendet nach 90 s das Warten und behält
+  das lokale Video. Vor der Jury einen synthetischen Take warmlaufen lassen,
+  `CELERY_WORKER_CONCURRENCY=1` setzen und die Live-Dauer messen. Bei
+  unklarer Latenz bleibt die lokale Sofortaufnahme der Bühnenpfad. Gemessen am
+  25.10. auf dem Demo-Laptop: kalter 4-s-Job ca. 6 min, warmer 4-s-Job ca. 29 s;
+  ohne VAD blockierte ein synthetischer Ton den Job bis zum 600-s-Limit.
+  `WHISPER_VAD_FILTER=true` ist daher der Compose-Default; deutsche Sprache
+  wurde mit dem Test-Fixture transkribiert.
 - [ ] **Localhost/QR/Smartphone entscheiden.** `compose.yaml` bindet nur
   `127.0.0.1`; ein Jury-Gerät oder QR-Code ist damit nicht erreichbar. Wenn
   nötig: HTTPS-Tunnel, `0.0.0.0`-Bind und CORS anpassen. Sonst in der
@@ -53,7 +69,7 @@ reviewten Merge von `feature/structure-safety-scores`, 25.10.2026.
 - [ ] **Demo-Backup.** Es gibt kein Screen-Recording und kein gerendertes
   Promo-Video (`promo/out` fehlt). Vor der Jury Screenshots/Video des
   Sample-Demos und des Live-Review-Pfads ablegen.
-- [ ] **Kamera-Abnahme.** Framing, reale Zeitzuordnung, Mindestdauern und
+- [ ] **Kamera-Abnahme.** Framing, reale Zeitzuordnung, 2-s-Mindestdauern und
   Safari/iPhone aus `05-jury-demo.md` mit gezählten Versuchen prüfen.
 
 ## P1 — nach dem Hackathon

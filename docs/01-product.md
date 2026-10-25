@@ -9,6 +9,13 @@ Review-Scores aggregieren nur erfasste Evidenz, siehe unten):
 [Jury-Ablauf und offene Abnahme](05-jury-demo.md). Das lokale technische
 Grundgerüst ist festgelegt (Abschnitt 3, Technik).
 
+Jury-Pfad (25.10.2026): `/stage` bündelt diese Features für die lokale Demo.
+Standard ist eine 60-s-Aufnahme ohne Analyse-Upload; optional läuft dieselbe
+Backend-Analyse mit höchstens 90 s Wartezeit. Video und Live-Ereignisse bleiben
+bei frühem Review erhalten. Eine vorbereitete Datenschutzfrage ersetzt auf
+der Bühne den offenen Sprachdialog; sie ist als Beispiel markiert und erzeugt
+keine Bewertung. Details: [Pitch Mode](16-pitch-mode-plan.md).
+
 > **Regel:** Keine zusätzlichen Features erfinden. Alles, was unten nicht steht,
 > ist offen und muss entschieden werden.
 
