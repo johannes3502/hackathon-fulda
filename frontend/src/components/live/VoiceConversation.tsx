@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { LiveRecording } from "@/features/live/contracts";
 import {
   PERSONA_LABELS,
+  questionErrorMessage,
   reviewVoiceAnswer,
   withFollowUp,
   type AnswerReview,
@@ -12,11 +13,18 @@ import {
   type Question,
 } from "@/features/questions/api";
 import {
+  MAX_FOLLOW_UPS_PER_MAIN,
+  MAX_VOICE_USER_TURNS,
+  canAddFollowUp,
   canRecordAnswers,
   canSpeak,
+  canStartVoiceRound,
+  formatCountdown,
   nextQuestion,
   recordAnswer,
+  remainingSeconds,
   speak,
+  voiceSessionExpired,
 } from "@/features/questions/voice";
 
 type Phase = "idle" | "speaking" | "listening" | "thinking";
@@ -64,16 +72,61 @@ export function VoiceConversation({
   const [heard, setHeard] = useState<string | null>(null);
   const [reply, setReply] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(0);
+  const [turns, setTurns] = useState(0);
+  const [limitRoundId, setLimitRoundId] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
   const finish = useRef<((action: "done" | "skip") => void) | null>(null);
+  const turnCount = useRef(0);
+  const roundId = recording.questions?.roundId ?? recording.questions?.round_id;
+  const limitReached = limitRoundId !== null && limitRoundId === roundId;
   useEffect(() => () => controller.current?.abort(), []);
   // The server render assumes support.
   const supported = {
     speak: useSyncExternalStore(noSubscription, canSpeak, () => true),
     record: useSyncExternalStore(noSubscription, canRecordAnswers, () => true),
   };
+  const running = phase !== "idle";
+
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(() => {
+      const value = Date.now();
+      setNow(value);
+      if (!voiceSessionExpired(startedAt, turns, value)) return;
+      controller.current?.abort();
+      controller.current = null;
+      finish.current = null;
+      setPhase("idle");
+      setCurrent(null);
+      setStartedAt(null);
+      setLimitRoundId(roundId ?? null);
+      setError(
+        "The 10-minute / 12-answer voice round is over. Generate a new round or type your answers.",
+      );
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [running, startedAt, turns, roundId]);
+
+  function stopForLimit() {
+    controller.current?.abort();
+    controller.current = null;
+    finish.current = null;
+    setPhase("idle");
+    setCurrent(null);
+    setStartedAt(null);
+    setLimitRoundId(roundId ?? null);
+    setError(
+      "The 10-minute / 12-answer voice round is over. Generate a new round or type your answers.",
+    );
+  }
 
   async function converse() {
+    if (!roundId) {
+      setError("This saved round has no server id. Start a new round.");
+      return;
+    }
     const active = new AbortController();
     controller.current?.abort();
     controller.current = active;
@@ -82,11 +135,20 @@ export function VoiceConversation({
     const done = new Set(Object.keys(recording.answers ?? {}));
     let opening = OPENING[persona];
     let repeat = false;
+    const began = Date.now();
+    turnCount.current = 0;
+    setStartedAt(began);
+    setNow(began);
+    setTurns(0);
     setError(null);
     setHeard(null);
     setReply(null);
     try {
       while (true) {
+        if (voiceSessionExpired(began, turnCount.current)) {
+          stopForLimit();
+          break;
+        }
         const question = nextQuestion(questions, done);
         setCurrent(question ?? null);
         if (!question) {
@@ -121,7 +183,13 @@ export function VoiceConversation({
         setPhase("thinking");
         const review = await reviewVoiceAnswer(
           recording.config.endpoint,
-          { question, recording: audio, collectionId: collection, persona },
+          {
+            roundId: roundId ?? "",
+            questionId: question.id,
+            recording: audio,
+            collectionId: collection,
+            persona,
+          },
           signal,
         );
         setReply(review.reply ?? null);
@@ -133,7 +201,9 @@ export function VoiceConversation({
           continue;
         }
         done.add(question.id);
-        if (review.follow_up)
+        turnCount.current += 1;
+        setTurns(turnCount.current);
+        if (review.follow_up && canAddFollowUp(questions, question.id))
           questions = withFollowUp(questions, question.id, review.follow_up);
         setHeard(review.answer);
         onAnswered(question, review.answer, review);
@@ -145,15 +215,14 @@ export function VoiceConversation({
         setError(
           failure instanceof DOMException && failure.name === "NotAllowedError"
             ? "Microphone access was blocked. Allow it in the browser to answer by voice."
-            : failure instanceof Error
-              ? failure.message
-              : "The voice conversation stopped.",
+            : questionErrorMessage(failure),
         );
     } finally {
       finish.current = null;
       if (controller.current === active) {
         setPhase("idle");
         setCurrent(null);
+        setStartedAt(null);
       }
     }
   }
@@ -164,9 +233,10 @@ export function VoiceConversation({
     finish.current = null;
     setPhase("idle");
     setCurrent(null);
+    setStartedAt(null);
   }
 
-  const running = phase !== "idle";
+  const startAllowed = canStartVoiceRound(limitReached, supported.record);
   return (
     <div className="voice-conversation" aria-live="polite">
       <div className="question-actions">
@@ -177,10 +247,12 @@ export function VoiceConversation({
         ) : (
           <Button
             onClick={() => void converse()}
-            disabled={disabled || !supported.record}
+            disabled={disabled || !startAllowed}
           >
-            <Mic size={14} /> Talk with the{" "}
-            {PERSONA_LABELS[persona].name.toLowerCase()}
+            <Mic size={14} />{" "}
+            {limitReached
+              ? "Round limit reached"
+              : `Talk with the ${PERSONA_LABELS[persona].name.toLowerCase()}`}
           </Button>
         )}
         {!supported.record && (
@@ -194,6 +266,18 @@ export function VoiceConversation({
           </span>
         )}
       </div>
+      <p className="field-hint">
+        Up to 10:00 and {MAX_VOICE_USER_TURNS} spoken answers per round, with at
+        most {MAX_FOLLOW_UPS_PER_MAIN} follow-ups per main question.
+      </p>
+      {(running || limitReached) && (
+        <p className="field-hint" role="status">
+          {startedAt !== null
+            ? formatCountdown(remainingSeconds(startedAt, now))
+            : "00:00"}{" "}
+          left · {turns}/{MAX_VOICE_USER_TURNS} answers
+        </p>
+      )}
       {running && (
         <div className={`voice-stage ${phase}`}>
           <p className="voice-phase">

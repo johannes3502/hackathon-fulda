@@ -269,15 +269,18 @@ export function ProgressDashboard({ demo = false }: { demo?: boolean }) {
     hasData.current = false;
   }, []);
 
-  const removeProfile = useCallback(async () => {
-    if (!profile) return;
-    await deleteProfile(profile);
-    clearStoredProfile();
-    setResponse(null);
-    setError(null);
-    setLoading(false);
-    hasData.current = false;
-  }, [profile]);
+  const removeProfile = useCallback(
+    async (deleteSessions: boolean) => {
+      if (!profile) return;
+      await deleteProfile(profile, { deleteSessions });
+      clearStoredProfile();
+      setResponse(null);
+      setError(null);
+      setLoading(false);
+      hasData.current = false;
+    },
+    [profile],
+  );
 
   const exportProgress = useCallback(
     async (format: "json" | "csv") => {
@@ -525,7 +528,7 @@ function ProgressHeader({
   onQuery: (query: Query) => void;
   onShowExcluded: (value: boolean) => void;
   onExport: (format: "json" | "csv") => void;
-  onDeleteProfile: () => Promise<void>;
+  onDeleteProfile: (deleteSessions: boolean) => Promise<void>;
 }) {
   return (
     <header className="progress-header">
@@ -702,17 +705,19 @@ function ProfileMenu({
 }: {
   response: ProgressResponse;
   profile: StoredProfile | null;
-  onDelete: () => Promise<void>;
+  onDelete: (deleteSessions: boolean) => Promise<void>;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [deleteSessions, setDeleteSessions] = useState(false);
+  const linked = response.profile.totalTakes > 0;
 
   async function remove() {
     setBusy(true);
     setFailure(null);
     try {
-      await onDelete();
+      await onDelete(deleteSessions);
     } catch (caught) {
       setFailure(
         caught instanceof Error
@@ -739,7 +744,11 @@ function ProfileMenu({
           <dd>
             {response.profile.consent.retentionUntil
               ? `bis ${formatDate(response.profile.consent.retentionUntil)}`
-              : "bis zur Löschung"}
+              : "keine automatische Frist"}
+            <small>
+              Nach Ablauf ist der Zugriff gesperrt; die automatische Löschung
+              läuft täglich.
+            </small>
           </dd>
         </div>
       </dl>
@@ -747,6 +756,19 @@ function ProfileMenu({
         Profil löschen entfernt Messwerte, Ziele und Trends auf dem Server.
         Lokale Videos bleiben im Browser und müssen separat gelöscht werden.
       </p>
+      {linked && (
+        <label className="progress-check">
+          <input
+            type="checkbox"
+            checked={deleteSessions}
+            onChange={(event) => setDeleteSessions(event.target.checked)}
+          />
+          <span>
+            Auch serverseitige Analyse löschen (verknüpfte Sessions, Events und
+            temporäre Uploads)
+          </span>
+        </label>
+      )}
       {failure && (
         <p className="progress-inline-error" role="alert">
           {failure}
@@ -756,8 +778,9 @@ function ProfileMenu({
         <div className="progress-confirm" role="alert">
           <strong>Profil endgültig löschen?</strong>
           <p>
-            Ohne den Token sind die serverseitigen Fortschrittsdaten danach
-            nicht mehr erreichbar.
+            {deleteSessions
+              ? "Fortschrittsdaten und die verknüpfte serverseitige Analyse werden gelöscht. Lokale Videos bleiben im Browser."
+              : "Ohne den Token sind die serverseitigen Fortschrittsdaten danach nicht mehr erreichbar. Verknüpfte Sessions bleiben erhalten."}
           </p>
           <div>
             <button
@@ -908,8 +931,9 @@ function ConsentScreen({
             <span>
               Ich willige ein, abgeleitete Messwerte und Qualitätsmerkmale
               meiner Aufnahmen für den Fortschritt zu speichern. Die
-              Aufbewahrung beträgt zunächst 12 Monate und kann durch Löschen
-              beendet werden.
+              Aufbewahrung beträgt zunächst 12 Monate. Nach Ablauf wird der
+              Zugriff gesperrt; eine automatische Löschung läuft täglich.
+              Löschen kannst du das Profil jederzeit selbst.
             </span>
           </label>
           <dl className="progress-consent-facts">
@@ -2176,7 +2200,7 @@ function ProfileError({
           : error.status === 404
             ? "Die Daten sind auf dem Server nicht mehr vorhanden. Lege bei Bedarf ein neues Profil an."
             : error.status === 410
-              ? "Die eingestellte Aufbewahrungsfrist ist vorbei. Die Fortschrittsdaten werden nicht mehr ausgeliefert."
+              ? "Die eingestellte Aufbewahrungsfrist ist vorbei. Der Zugriff ist gesperrt; die serverseitigen Fortschrittsdaten werden durch die tägliche automatische Löschung entfernt."
               : error.message}
       </p>
       <div className="progress-empty-actions">

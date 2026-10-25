@@ -41,6 +41,7 @@ import {
 import { LiveRecorder } from "@/features/live/recorder";
 import { createVideoTransport } from "@/features/live/transport";
 import { apiEndpoint, request } from "@/features/live/analysis";
+import { consentTarget } from "@/features/live/consent";
 import type {
   LiveConfig,
   LiveProgress,
@@ -790,9 +791,9 @@ export function LiveStudio() {
               {!progress && (
                 <span className="recording-consent">
                   By starting, you agree to send your video and microphone audio
-                  to <strong>{endpoint}</strong> after stopping. Microphone
-                  audio is also sent during recording for live speech feedback
-                  when enabled.
+                  to <strong>{consentTarget(endpoint)}</strong> after stopping.
+                  Microphone audio is also sent during recording for live speech
+                  feedback when enabled.
                   {transcribe &&
                     liveCaptions &&
                     " Live transcription streams microphone audio through this server to Deepgram’s EU endpoint during recording."}

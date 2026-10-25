@@ -1387,3 +1387,15 @@ schwergewichtige Dashboard-Suite für sechs Sparklines einführen.
   <https://www.postgresql.org/docs/current/ddl-partitioning.html>
 - OpenAPI Specification: <https://spec.openapis.org/oas/latest.html>
 - Bestehendes Designsystem: [`frontend/DESIGN.md`](../frontend/DESIGN.md)
+
+
+## Ergänzung 25.10.2026: Aufbewahrung und ausdrückliche Session-Löschung
+
+`profile.consent.retentionUntil` zeigt die effektive Serverfrist. Standard:
+365 Tage, verlängert durch neue verknüpfte Takes; explizite Fristen einschließlich
+`null` werden nicht implizit verlängert. Nach Ablauf ist der Zugriff gesperrt;
+der tägliche Beat-Sweep entfernt Progress-Daten und entkoppelt Sessions/Takes.
+Verknüpfte Sessions haben keine automatische Session-Frist. `DELETE /profiles/{id}`
+löscht weiterhin nur Progress-Daten. Die optionale, standardmäßig abgewählte
+UI-Checkbox sendet `?deleteSessions=true` zum ausdrücklichen Löschen der
+verknüpften serverseitigen Analyse. Lokale Videos bleiben separat.

@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -39,6 +40,7 @@ def test_voice_modes_change_the_role_and_question_focus(mode):
     assert PRESENTATION_STYLES[mode] in prompt
     assert all(style not in prompt for key, style in PRESENTATION_STYLES.items() if key != mode)
     assert "Do not act as an investor" not in prompt
+    assert "Return only the requested JSON object" not in prompt
 
 
 def test_context_uses_only_the_requested_collection_and_includes_source_locations(monkeypatch):
@@ -80,7 +82,10 @@ def test_voice_retrieval_samples_the_end_of_long_talks(monkeypatch):
 @pytest.mark.parametrize("mode", PRESENTATION_STYLES)
 def test_questioner_receives_the_spoken_content_and_waits_for_readiness(mode):
     result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode))
-    context = json.loads(result.prompt.splitlines()[-1])
+    block = re.search(r"<untrusted-reference-[0-9a-f]{32}>\n(.*)\n</untrusted-reference-[0-9a-f]{32}>",
+                      result.prompt, re.S)
+    assert block is not None
+    context = json.loads(block.group(1))
     assert context["transcript"] == " ".join(word.word for word in TRANSCRIPT)
     assert "Do not greet" in result.prompt
     assert PRESENTATION_STYLES[mode] in result.prompt

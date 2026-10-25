@@ -17,6 +17,7 @@ not backed by a verified quote, so the voice never states unchecked content.
 Spoken answers are transcribed first with the configured ASR.
 """
 
+import hashlib
 import logging
 import tempfile
 from pathlib import Path
@@ -25,14 +26,17 @@ from uuid import UUID
 
 import httpx
 import psycopg
+from pydantic import ValidationError
 
 from app.events import Event, merge_timeline
 from app.factcheck.llm import ChatModel, LLMError, structured_json
-from app.factcheck.drafts import AnswerJudgment, QuestionDrafts
+from app.factcheck.drafts import AnswerJudgment, QuestionDraft, QuestionDrafts
 from app.factcheck.models import ClaimResult, Evidence
 from app.factcheck.pipeline import Passage, numeric_gate, upload_passages, verified_evidence
 from app.factcheck.transcript import Sentence, clock, sentences
 from app.factcheck.web import WebPassage
+from app.prompt_safety import untrusted_block
+from app.questions import rounds
 from app.questions.models import (
     AnswerRequest, AnswerReview, Persona, Question, QuestionKind, QuestionRequest, QuestionResult,
     VoiceAnswerRequest,
@@ -143,10 +147,6 @@ def _numbered_findings(claims: list[ClaimResult]) -> str:
     return "\n".join(lines) or "(kein Faktencheck vorhanden)"
 
 
-def _int_list(value: object) -> list[int]:
-    return [n for n in value if isinstance(n, int)] if isinstance(value, list) else []
-
-
 def _text(item: dict, name: str, limit: int) -> str:
     value = item.get(name)
     return value.strip()[:limit] if isinstance(value, str) else ""
@@ -177,16 +177,19 @@ def parse_questions(answer: dict, items: list[Sentence], claims: list[ClaimResul
     seen: set[str] = set()
     dropped_numbers = 0
     for item in raw:
-        if not isinstance(item, dict):
+        # Strict per-item validation rejects unknown control fields while a
+        # malformed entry is skipped instead of steering the whole result.
+        try:
+            draft = QuestionDraft.model_validate(item)
+        except ValidationError:
             continue
-        text = _text(item, "question", 500)
+        text = draft.question.strip()[:500]
         if not text or text.casefold() in seen:
             continue
-        kind: QuestionKind = item.get("kind") if item.get("kind") in PRIORITY else "clarification"
-        finding_no = item.get("finding")
+        kind: QuestionKind = draft.kind if draft.kind in PRIORITY else "clarification"
+        finding_no = draft.finding
         finding = claims[finding_no - 1] if isinstance(finding_no, int) and 1 <= finding_no <= len(claims) else None
-        refs = sorted({by_number[n] for n in _int_list(item.get("sentences")) if n in by_number},
-                      key=lambda s: s.number)
+        refs = sorted({by_number[n] for n in draft.sentences if n in by_number}, key=lambda s: s.number)
         evidence: Evidence | None = None
         claim: str | None = None
         if kind in ("contradiction", "unsupported"):
@@ -195,7 +198,7 @@ def parse_questions(answer: dict, items: list[Sentence], claims: list[ClaimResul
             else:
                 kind = "clarification"  # No matching finding: the model's label is not trusted.
         elif kind == "gap":
-            evidence = verified_evidence(item.get("quote"), item.get("passage"), passages, min_quote_chars)
+            evidence = verified_evidence(draft.quote, draft.passage, passages, min_quote_chars)
             if evidence is None:
                 kind = "clarification"
         elif kind == "follow_up":
@@ -217,8 +220,8 @@ def parse_questions(answer: dict, items: list[Sentence], claims: list[ClaimResul
         seen.add(text.casefold())
         questions.append(Question(
             id="", kind=kind, question=text, reason=reason, t_ms=t_ms,
-            duration_ms=duration_ms, transcript=transcript, claim=claim, evidence=evidence,
-            query=_text(item, "query", 300) or claim or text,
+            duration_ms=duration_ms, transcript=transcript[:4000] if transcript else None, claim=claim, evidence=evidence,
+            query=(_text(item, "query", 300) or claim or text)[:300],
         ))
     questions.sort(key=lambda q: (PRIORITY[q.kind], q.t_ms if q.t_ms is not None else 1 << 62))
     questions = questions[:limit]
@@ -259,12 +262,17 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
     elif not has_sources:
         notices.append("Keine fertig verarbeiteten Quellen: keine Fragen zu fehlenden Inhalten.")
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1)) or "(keine Auszüge)"
-    answer = structured_json(llm,
+    user = "\n\n".join([
+        "Transkript (Satznummer, Zeit, Satz):\n" + untrusted_block("transcript", transcript),
+        "Faktencheck-Befunde (Nummer, Zeit, Urteil, Behauptung):\n"
+        + untrusted_block("findings", _numbered_findings(request.claims)),
+        "Quellenauszüge (Nummer, Quelle, Text):\n" + untrusted_block("source-passages", context),
+    ])
+    answer = structured_json(
+        llm,
         QUESTION_PROMPT.replace("{persona}", role_prompt(request.persona, request.presentation_mode))
                        .replace("{limit}", str(config.max_questions)),
-        f"Transkript (Satznummer, Zeit, Satz):\n{transcript}\n\n"
-        f"Faktencheck-Befunde (Nummer, Zeit, Urteil, Behauptung):\n{_numbered_findings(request.claims)}\n\n"
-        f"Quellenauszüge:\n{context}", QuestionDrafts,
+        user, QuestionDrafts,
     )
     questions, dropped_numbers = parse_questions(answer, items, request.claims, passages, config.max_questions,
                                                   config.min_quote_chars)
@@ -275,8 +283,10 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
         notices.append(f"{dropped_numbers} Frage(n) mit Zahlen ohne Beleg im zitierten Befund verworfen.")
     if not questions:
         notices.append("Das Modell hat keine belastbaren Rückfragen vorgeschlagen.")
-    return QuestionResult(questions=questions, events=merge_timeline(events), persona=request.persona,
-                          presentation_mode=request.presentation_mode,
+    state = rounds.create_round(questions=questions, config=config, collection_id=request.collection_id,
+                                persona=request.persona, presentation_mode=request.presentation_mode)
+    return QuestionResult(round_id=state.round_id, questions=questions, events=merge_timeline(events),
+                          persona=request.persona, presentation_mode=request.presentation_mode,
                           model=llm.model, sources_used=bool(passages), config=config, notices=notices)
 
 
@@ -294,19 +304,34 @@ def evidence_passage(evidence: Evidence) -> Passage:
     return Passage(evidence.kind, evidence.label, evidence.passage, hit=hit, web=web)
 
 
-def review_answer(request: AnswerRequest, llm: ChatModel,
-                  retrieve: Callable[[UUID, str, int], list[SourceHit]] | None = retrieval.search) -> AnswerReview:
-    """Compare the answer with the question's evidence and upload passages; no score."""
-    question = request.question
+def _question_and_round(request: AnswerRequest | VoiceAnswerRequest) -> tuple[Question, rounds.QuestionRound | None]:
+    """Canonical question from the server-issued round, or the internal take path."""
+    if request.round_id is not None:
+        state = rounds.get_round(request.round_id)
+        return rounds.find_question(state, request.question_id), state
+    if request.question is not None:
+        # Internal take-review worker only; the HTTP API rejects this shape.
+        return request.question, None
+    raise ValueError("Answer review needs a server-issued round_id and question_id")
+
+
+def _answer_hash(answer: str) -> str:
+    return hashlib.sha256(answer.encode("utf-8")).hexdigest()
+
+
+def _review_impl(question: Question, answer: str, *, config, persona: Persona, presentation_mode: PresentationMode,
+                 collection_id: UUID | None, llm: ChatModel,
+                 retrieve: Callable[[UUID, str, int], list[SourceHit]] | None) -> tuple[AnswerReview, bool]:
+    """Return the review and whether the model call failed technically."""
     passages: list[Passage] = []
     checked = []
     notes: list[str] = []
     if question.evidence is not None:
         passages.append(evidence_passage(question.evidence))
         checked.append(question.evidence.kind)
-    if request.collection_id is not None and retrieve is not None:
+    if collection_id is not None and retrieve is not None:
         try:
-            hits = retrieve(request.collection_id, f"{question.query} {request.answer[:500]}", request.config.top_k)
+            hits = retrieve(collection_id, f"{question.query} {answer[:500]}", config.top_k)
             known = {retrieval.normalize(p.text) for p in passages}
             passages += [p for p in upload_passages(hits) if retrieval.normalize(p.text) not in known]
             if "upload" not in checked:
@@ -314,40 +339,50 @@ def review_answer(request: AnswerRequest, llm: ChatModel,
         except (psycopg.Error, ValueError) as error:
             log.warning("Answer source lookup failed (%s)", type(error).__name__)
             notes.append("Abruf der Quellen fehlgeschlagen.")
-    fallback = FALLBACK_REPLY[request.persona]
+    fallback = FALLBACK_REPLY[persona]
     if not passages:
         return AnswerReview(verdict="unchecked", explanation="", checked=checked, reply=fallback, model=llm.model,
-                            notes=notes + ["Keine Quellenauszüge zum Vergleich vorhanden."])
+                            notes=notes + ["Keine Quellenauszüge zum Vergleich vorhanden."]), False
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1))
-    said = f"\nGesagt im Vortrag: {question.transcript}" if question.transcript else ""
+    user = "\n\n".join([
+        "Server-issued question (reference only):\n"
+        + untrusted_block("question", f"{question.question}\nAnlass: {question.reason}"),
+        *(["Spoken passage in the talk (reference only):\n"
+           + untrusted_block("transcript", question.transcript)] if question.transcript else []),
+        "Answer to evaluate (untrusted):\n" + untrusted_block("answer", answer),
+        "Source passages (untrusted):\n" + untrusted_block("source-passages", context),
+    ])
     try:
-        answer = structured_json(llm, ANSWER_PROMPT.replace("{persona}", role_prompt(request.persona, request.presentation_mode)), f"Frage: {question.question}\nAnlass: {question.reason}{said}\n\n"
-                                                  f"Antwort: {request.answer}\n\nAuszüge:\n{context}", AnswerJudgment)
+        raw = structured_json(llm, ANSWER_PROMPT.replace(
+            "{persona}", role_prompt(persona, presentation_mode)), user, AnswerJudgment)
     except (LLMError, httpx.HTTPError) as error:
         log.warning("Answer review failed (%s)", type(error).__name__)
         return AnswerReview(verdict="unchecked", explanation="", checked=checked, reply=fallback, model=llm.model,
-                            notes=notes + ["Sprachmodell nicht erreichbar."])
-    verdict = answer.get("verdict")
-    explanation = _text(answer, "explanation", 500)
-    reply = _text(answer, "reply", 500) or fallback
+                            notes=notes + ["Sprachmodell nicht erreichbar."]), True
+    try:
+        answer_judgment = AnswerJudgment.model_validate(raw)
+    except ValidationError:
+        log.warning("Answer review returned an invalid schema")
+        return AnswerReview(verdict="unchecked", explanation="", checked=checked, reply=fallback, model=llm.model,
+                            notes=notes + ["Modellantwort entsprach nicht dem Schema."]), False
+    verdict = answer_judgment.verdict
+    explanation = answer_judgment.explanation.strip()[:500]
+    reply = answer_judgment.reply.strip()[:500] or fallback
     evidence = None
-    if verdict not in ("supports", "contradicts", "not_found"):
-        verdict, explanation, reply = "unchecked", "", fallback
-        notes.append("Modellantwort ohne gültiges Urteil verworfen.")
-    elif verdict != "not_found":
-        evidence = verified_evidence(answer.get("quote"), answer.get("passage"), passages,
-                                     request.config.min_quote_chars)
+    if verdict != "not_found":
+        evidence = verified_evidence(answer_judgment.quote, answer_judgment.passage, passages,
+                                     config.min_quote_chars)
         if evidence is None:
             verdict, explanation, reply = "unchecked", "", fallback
             notes.append("Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen.")
         else:
-            note = numeric_gate(request.answer, evidence.quote, verdict)
+            note = numeric_gate(answer, evidence.quote, verdict)
             if note:
                 verdict, explanation, reply = "unchecked", "", fallback
                 evidence = None
                 notes.append(note)
-    follow_text = _text(answer, "follow_up", 500) if verdict != "unchecked" else ""
-    allowed = (_allowed_numbers(None, evidence, request.answer)
+    follow_text = answer_judgment.follow_up.strip()[:500] if verdict != "unchecked" else ""
+    allowed = (_allowed_numbers(None, evidence, answer)
                | _allowed_numbers(None, question.evidence, question.transcript)
                | numbers_in(question.claim or ""))
     if verdict != "unchecked" and numbers_in(f"{explanation} {reply}") - allowed:
@@ -363,18 +398,76 @@ def review_answer(request: AnswerRequest, llm: ChatModel,
         evidence=evidence or question.evidence, query=question.query,
     ) if follow_text else None
     return AnswerReview(verdict=verdict, explanation=explanation, evidence=evidence, checked=checked,
-                        follow_up=follow_up, reply=reply, model=llm.model, notes=notes)
+                        follow_up=follow_up, reply=reply, model=llm.model, notes=notes), False
+
+
+def review_answer(request: AnswerRequest, llm: ChatModel,
+                  retrieve: Callable[[UUID, str, int], list[SourceHit]] | None = retrieval.search) -> AnswerReview:
+    """Compare the answer with the canonical question's evidence and upload passages; no score."""
+    question, state = _question_and_round(request)
+    if state is None:
+        # Internal take path: the question was loaded by the server from the take.
+        review, _ = _review_impl(
+            question, request.answer, config=request.config, persona=request.persona,
+            presentation_mode=request.presentation_mode, collection_id=request.collection_id,
+            llm=llm, retrieve=retrieve,
+        )
+        return review
+
+    answer_hash = _answer_hash(request.answer)
+    cached = rounds.claim_turn(state.round_id, question.id, answer_hash)
+    if cached is not None:
+        return cached
+    try:
+        review, model_failed = _review_impl(
+            question, request.answer, config=state.config, persona=state.persona,
+            presentation_mode=state.presentation_mode, collection_id=state.collection_id,
+            llm=llm, retrieve=retrieve,
+        )
+        if model_failed:
+            rounds.fail_turn(state.round_id, question.id, answer_hash)
+            return review
+        return rounds.complete_turn(state.round_id, question.id, answer_hash, review)
+    except BaseException:
+        rounds.fail_turn(state.round_id, question.id, answer_hash)
+        raise
 
 
 def review_voice_answer(request: VoiceAnswerRequest, recording: Path, transcriber: Transcriber, llm: ChatModel,
                         retrieve: Callable[[UUID, str, int], list[SourceHit]] | None = retrieval.search
                         ) -> AnswerReview:
     """Transcribe a spoken answer, then review it like a typed one."""
-    with tempfile.TemporaryDirectory() as workdir:
-        words = transcriber.transcribe(extract_audio(recording, Path(workdir) / "answer.wav"))
-    text = " ".join(w.word for w in words).strip()[:4000]
-    if not text:
-        return AnswerReview(verdict="unchecked", explanation="", checked=[], reply=UNHEARD_REPLY[request.persona],
-                            answer="", model=llm.model, notes=["Keine Sprache in der Antwort erkannt."])
-    review = review_answer(AnswerRequest(answer=text, **request.model_dump()), llm, retrieve)
-    return review.model_copy(update={"answer": text})
+    question, state = _question_and_round(request)
+    input_hash = request.audio_sha256 or f"voice:{question.id}"
+    if state is not None:
+        cached = rounds.claim_turn(state.round_id, question.id, input_hash)
+        if cached is not None:
+            return cached
+    try:
+        with tempfile.TemporaryDirectory() as workdir:
+            words = transcriber.transcribe(extract_audio(recording, Path(workdir) / "answer.wav"))
+        text = " ".join(w.word for w in words).strip()[:4000]
+        if not text:
+            if state is not None:
+                rounds.fail_turn(state.round_id, question.id, input_hash)
+            return AnswerReview(verdict="unchecked", explanation="", checked=[], reply=UNHEARD_REPLY[state.persona if state is not None else request.persona],
+                                answer="", model=llm.model, notes=["Keine Sprache in der Antwort erkannt."])
+        review, model_failed = _review_impl(
+            question, text,
+            config=state.config if state is not None else request.config,
+            persona=state.persona if state is not None else request.persona,
+            presentation_mode=state.presentation_mode if state is not None else request.presentation_mode,
+            collection_id=state.collection_id if state is not None else request.collection_id,
+            llm=llm, retrieve=retrieve,
+        )
+        review = review.model_copy(update={"answer": text})
+        if state is not None:
+            if model_failed:
+                rounds.fail_turn(state.round_id, question.id, input_hash)
+                return review
+            return rounds.complete_turn(state.round_id, question.id, input_hash, review)
+        return review
+    except BaseException:
+        if state is not None:
+            rounds.fail_turn(state.round_id, question.id, input_hash)
+        raise

@@ -11,6 +11,7 @@ from psycopg.types.json import Jsonb
 
 from app.connections import connect_db
 from app.progress.schema import PROGRESS_SCHEMA
+from app.retention import outbox, policy
 from app.review.errors import ReviewError
 from app.review.models import Job, ReviewEvent, Session, SessionCreate, Take, TakeCreate
 
@@ -149,12 +150,42 @@ def require_take(connection, take_id, *, lock=False):
 
 
 def create_session(connection, request: SessionCreate) -> Session:
-    row = connection.execute("INSERT INTO sessions(id,title,collection_id,profile_id,presentation_mode,status,consent,capture)"
-        " VALUES (%s,%s,%s,%s,%s,'created',%s,%s) RETURNING *", (uuid4(), request.title, request.collection_id,
+    now = datetime.now(timezone.utc)
+    retention = policy.session_until(None, now)
+    if request.profile_id is not None:
+        # Profile expiry removes progress data only. Linked recordings have no
+        # automatic session deadline, even after the profile is unlinked.
+        retention = None
+    row = connection.execute("INSERT INTO sessions(id,title,collection_id,profile_id,presentation_mode,status,consent,capture,retention_until)"
+        " VALUES (%s,%s,%s,%s,%s,'created',%s,%s,%s) RETURNING *", (uuid4(), request.title, request.collection_id,
         request.profile_id, request.presentation_mode,
         Jsonb(request.consent.model_dump(mode="json", by_alias=True)),
-        Jsonb(request.capture.model_dump(mode="json", by_alias=True)))).fetchone()
+        Jsonb(request.capture.model_dump(mode="json", by_alias=True)), retention)).fetchone()
     return session_from(row)
+
+
+def _extend_default_profile_retention(connection, session_id, profile_id, recorded_at):
+    """A new linked take keeps a default profile alive.
+
+    A profile whose retention was set by the user is never extended implicitly.
+    Anonymous sessions still get the documented rolling session period.
+    """
+    candidate = policy.extend_until(None, recorded_at)
+    if profile_id is None:
+        candidate = policy.session_until(None, recorded_at)
+        connection.execute(
+            "UPDATE sessions SET retention_until=GREATEST(COALESCE(retention_until,%s),%s)"
+            " WHERE id=%s AND retention_until IS NOT NULL",
+            (candidate, candidate, session_id))
+        return
+    origin = connection.execute(
+        "SELECT retention_origin FROM speaker_profiles WHERE id=%s", (profile_id,)).fetchone()
+    if origin is None or origin["retention_origin"] != "default":
+        return
+    connection.execute(
+        "UPDATE speaker_profiles SET retention_until=GREATEST(COALESCE(retention_until,%s),%s),"
+        " updated_at=now() WHERE id=%s AND (retention_until IS NULL OR retention_until < %s)",
+        (candidate, candidate, profile_id, candidate))
 
 
 def create_take(connection, session_id, request: TakeCreate) -> Take:
@@ -174,7 +205,26 @@ def create_take(connection, session_id, request: TakeCreate) -> Take:
         parent["profile_id"], recorded_at, source, (parent["capture"] or {}).get("deviceKey"),
         request.duration_ms, request.mime_type, Jsonb(request.timebase.model_dump(mode="json", by_alias=True, exclude_unset=True)),
         Jsonb([item.model_dump(mode="json", by_alias=True) for item in request.coverage]), Jsonb(warnings))).fetchone()
+    _extend_default_profile_retention(connection, session_id, parent["profile_id"], recorded_at)
     return take_from(row)
+
+
+def delete_session_rows(connection, session_id, *, now=None):
+    """Delete session data and queue S3 keys; the caller commits and flushes."""
+    row = connection.execute("SELECT id FROM sessions WHERE id=%s FOR UPDATE",
+                             (session_id,)).fetchone()
+    if row is None:
+        return {"deleted": False, "sessions": 0, "takes": 0, "blobsQueued": 0}
+    take_ids = [item["id"] for item in connection.execute(
+        "SELECT id FROM takes WHERE session_id=%s", (session_id,)).fetchall()]
+    blobs = 0
+    if take_ids:
+        keys = connection.execute(
+            "SELECT object_key FROM jobs WHERE take_id = ANY(%s) AND object_key IS NOT NULL",
+            (take_ids,)).fetchall()
+        blobs = outbox.enqueue(connection, (item["object_key"] for item in keys), now=now)
+    connection.execute("DELETE FROM sessions WHERE id=%s", (session_id,))
+    return {"deleted": True, "sessions": 1, "takes": len(take_ids), "blobsQueued": blobs}
 
 
 def events(connection, take_id) -> list[ReviewEvent]:

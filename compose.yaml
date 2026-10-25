@@ -55,8 +55,14 @@ x-backend: &backend
     WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-none}
     WEB_SEARCH_LANGUAGE: ${WEB_SEARCH_LANGUAGE:-de}
     TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+    RETENTION_PROFILE_DAYS: ${RETENTION_PROFILE_DAYS:-365}
+    RETENTION_SESSION_DAYS: ${RETENTION_SESSION_DAYS:-365}
+    RETENTION_JOB_DAYS: ${RETENTION_JOB_DAYS:-30}
+    RETENTION_STALE_JOB_HOURS: ${RETENTION_STALE_JOB_HOURS:-2}
+    RETENTION_BATCH: ${RETENTION_BATCH:-100}
   volumes:
     - ./backend/app:/app/app:ro
+    - ./templates:/templates:ro
   depends_on:
     postgres:
       condition: service_healthy
@@ -79,16 +85,16 @@ services:
     volumes:
       - ./frontend/src:/app/frontend/src:ro
       - ./api:/app/api:ro
-      - frontend_next:/app/frontend/.next
     depends_on:
       backend:
         condition: service_healthy
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "Promise.all(['/', '/live', '/live/healthcheck/review', '/api/health/ready'].map(path => fetch('http://127.0.0.1:3000' + path, {signal: AbortSignal.timeout(5000)}))).then(responses => process.exit(responses.every(response => response.ok) ? 0 : 1)).catch(() => process.exit(1))"]
-      interval: 10s
-      timeout: 10s
-      retries: 12
-      start_period: 30s
+      test: ["CMD", "node", "-e", "const paths=['/','/demo','/gestures','/sources','/progress','/admin','/live','/live/healthcheck/review','/review-preview','/api/health/ready'];(async()=>{for(const path of paths){const response=await fetch('http://127.0.0.1:3000'+path,{signal:AbortSignal.timeout(10000)});if(!response.ok)process.exit(1)}})().then(()=>process.exit(0)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 150s
+      retries: 10
+      start_period: 120s
 
   backend:
     <<: *backend
@@ -122,6 +128,18 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+  beat:
+    <<: *backend
+    # Exactly one scheduler. Do not use the worker's -B flag.
+    pull_policy: never
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["celery", "-A", "app.celery_app:celery_app", "beat", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
+    restart: unless-stopped
 
   redis:
     image: redis:8.2.10-alpine
@@ -176,4 +194,3 @@ volumes:
   postgres_data:
   media_data:
   redis_data:
-  frontend_next:

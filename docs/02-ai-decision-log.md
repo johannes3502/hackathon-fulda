@@ -1096,3 +1096,28 @@ Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
   Drei synthetische Decks real lokal ingestiert und mit Jina/pgvector durchsucht,
   danach Testquellen gelöscht. Keine neuen Cloud-Modellaufrufe.
 - Details und verbleibende Grenzen: [15-grounding-hardening.md](15-grounding-hardening.md).
+
+
+## 25.10.2026 — Review von structure-safety-scores
+
+- Drei Review-Kriterien und `evidence-share-v1` bleiben gemäß aktueller
+  Nutzerentscheidung erhalten; Aufbau-Rubrik und geglättete v2-Scores entfallen.
+- Nonce-Blöcke, strikte JSON-Ausgaben und HTTP-URL-Prüfung ergänzen die
+  vorhandenen Zitat-/Zahlen-Gates. Client-Befunde sind weiter untrusted Eingaben.
+- Ein Redis-Wert pro Fragenrunde enthält Fragen, reservierte Turns und Reviews;
+  kurze Locks serialisieren Änderungen, Provider-Aufrufe liegen außerhalb.
+  API- und Take-Pfad teilen die feste TTL und die Wiederholungsregeln.
+- Profilablauf darf keine Session-Löschung auslösen. Verknüpfte Sessions behalten
+  keine automatische Frist; Migrationen dürfen NULL-Fristen nicht erneut füllen.
+  Explizite Profilfristen bleiben explizit; neue Takes verlängern nur Defaults.
+- Täglicher Beat und transaktionale Blob-Outbox; Legacy-S3-Ergebnisse/Quellen,
+  echte Geräte und Anbieter-Abnahme bleiben separat offen.
+- Prüfung: 418 Backend-Tests bestanden, zwei opt-in Prüfungen übersprungen;
+  isolierte PostgreSQL-Datenbank und echte Redis-Concurrency geprüft. 298
+  Frontend-Unit-Tests, Typecheck, Lint, Production-Build, API-Vertrag, 16
+  Compose-Checks und 12 gerenderte Architektur-Diagramme bestanden.
+  Browser: 126 Fälle im Gesamtlauf bestanden; vier veraltete Assertions
+  korrigiert und danach alle sechs betroffenen/erweiterten Fälle (Desktop und
+  schmaler Chromium-Viewport) bestanden. Damit 130 verschiedene Fälle geprüft;
+  zwei optionale Cloud-Fälle blieben aus. Das ist keine echte Safari-,
+  Mikrofon- oder Anbieter-Abnahme.

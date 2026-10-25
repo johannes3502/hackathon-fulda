@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Conversation } from "@elevenlabs/client";
 import { AudioLines, Mic, MicOff, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,14 @@ import {
   type AgentSettings,
 } from "@/features/questions/agent";
 import { PRESENTATION_MODES } from "@/features/questions/presentation";
+import {
+  MAX_VOICE_USER_TURNS,
+  canStartVoiceRound,
+  endSessionIfActive,
+  formatCountdown,
+  remainingSeconds,
+  voiceSessionExpired,
+} from "@/features/questions/voice";
 import { collectionId } from "@/features/sources/api";
 import { PerformanceEvaluation } from "./PerformanceEvaluation";
 
@@ -28,7 +36,11 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   const [notices, setNotices] = useState<string[]>([]);
   const [transcribing, setTranscribing] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(0);
+  const [limitReached, setLimitReached] = useState(false);
   const session = useRef<Conversation | null>(null);
+  const turnCount = useRef(0);
   const controller = useRef<AbortController | null>(null);
   const [collection] = useState(
     () => recording.config.sourceCollectionId ?? collectionId(),
@@ -40,6 +52,32 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   const messages = recording.conversation ?? [];
   const lastAgent = messages.findLast((item) => item.role === "agent");
   const lastUser = messages.findLast((item) => item.role === "user");
+  const userTurns = messages.filter((item) => item.role === "user").length;
+
+  const endForLimit = useCallback(() => {
+    setLimitReached(true);
+    setError(
+      "The 10-minute / 12-answer voice session is over. The conversation was ended.",
+    );
+    controller.current?.abort();
+    const current = session.current;
+    session.current = null;
+    setPhase("idle");
+    setMuted(false);
+    setStartedAt(null);
+    void endSessionIfActive(current).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => {
+      const value = Date.now();
+      setNow(value);
+      if (voiceSessionExpired(startedAt, turnCount.current, value))
+        endForLimit();
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [active, startedAt, endForLimit]);
 
   useEffect(() => {
     const pending = new AbortController();
@@ -59,7 +97,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   useEffect(
     () => () => {
       controller.current?.abort();
-      void session.current?.endSession();
+      void endSessionIfActive(session.current).catch(() => {});
       session.current = null;
     },
     [],
@@ -74,25 +112,34 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   }, [finished]);
 
   async function stop(showStats = false) {
-    controller.current?.abort();
+    const pending = controller.current;
+    pending?.abort();
     const current = session.current;
     session.current = null;
     setPhase("idle");
     setMuted(false);
+    setStartedAt(null);
     try {
-      await current?.endSession();
-      if (showStats) setFinished(true);
+      await endSessionIfActive(current);
+      if (showStats && controller.current === pending) setFinished(true);
     } catch {
-      setError("The connection ended unexpectedly. You can start again.");
+      if (controller.current === pending)
+        setError("The connection ended unexpectedly. You can start again.");
     }
   }
 
   async function start() {
     if (controller.current && !controller.current.signal.aborted) return;
+    if (!canStartVoiceRound(limitReached, !!settings?.available)) return;
     const pending = new AbortController();
     controller.current = pending;
     setError("");
     setNotices([]);
+    update(recording.id, (take) => ({ ...take, conversation: [] }));
+    const began = Date.now();
+    turnCount.current = 0;
+    setStartedAt(began);
+    setNow(began);
     setPhase("preparing");
     try {
       const context = await prepareAgent(recording, collection, pending.signal);
@@ -118,20 +165,21 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
           },
         },
         onConversationCreated: (created) => {
-          if (pending.signal.aborted) void created.endSession();
+          if (pending.signal.aborted)
+            void endSessionIfActive(created).catch(() => {});
           else session.current = created;
         },
         onConnect: () => {
           if (!pending.signal.aborted) {
             setPhase("listening");
-            update(recording.id, (take) => ({ ...take, conversation: [] }));
           }
         },
         onModeChange: ({ mode }) => {
           if (!pending.signal.aborted) setPhase(mode);
         },
         onMessage: ({ role, message }) => {
-          if (!pending.signal.aborted)
+          if (!pending.signal.aborted) {
+            if (role === "user") turnCount.current++;
             update(recording.id, (take) => ({
               ...take,
               conversation: [
@@ -139,6 +187,8 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
                 { role: role === "user" ? "user" : "agent", text: message },
               ],
             }));
+            if (voiceSessionExpired(began, turnCount.current)) endForLimit();
+          }
         },
         onDisconnect: ({ reason }) => {
           if (!pending.signal.aborted) {
@@ -146,6 +196,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
             session.current = null;
             setPhase("idle");
             setMuted(false);
+            setStartedAt(null);
             if (reason === "agent") setFinished(true);
           }
         },
@@ -159,7 +210,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
         },
       });
       if (pending.signal.aborted) {
-        await current.endSession();
+        await endSessionIfActive(current);
         return;
       }
       session.current = current;
@@ -171,7 +222,11 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
             : "Voice practice could not start. Please retry.",
         );
         pending.abort();
+        const current = session.current;
+        session.current = null;
+        void endSessionIfActive(current).catch(() => {});
         setPhase("idle");
+        setStartedAt(null);
       }
     }
   }
@@ -212,6 +267,15 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
         pending.abort();
       }
     }
+  }
+
+  function resetConversation() {
+    setLimitReached(false);
+    setStartedAt(null);
+    setFinished(false);
+    setError("");
+    setPhase("idle");
+    update(recording.id, (take) => ({ ...take, conversation: [] }));
   }
 
   if (finished)
@@ -303,16 +367,33 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
               </div>
             ) : (
               <Button
-                disabled={!settings?.available}
+                disabled={
+                  !canStartVoiceRound(limitReached, !!settings?.available)
+                }
                 onClick={() => void start()}
               >
                 <Mic size={17} />{" "}
-                {messages.length
-                  ? "Start a new conversation"
-                  : "Start voice questions"}
+                {limitReached
+                  ? "Session limit reached"
+                  : messages.length
+                    ? "Start a new conversation"
+                    : "Start voice questions"}
               </Button>
             )}
           </div>
+          {(active || limitReached) && (
+            <p className="field-hint" role="status">
+              {formatCountdown(
+                limitReached ? 0 : remainingSeconds(startedAt, now),
+              )}{" "}
+              left · {userTurns}/{MAX_VOICE_USER_TURNS} spoken answers
+            </p>
+          )}
+          {limitReached && (
+            <Button variant="outline" onClick={resetConversation}>
+              Start a new round
+            </Button>
+          )}
           {settings && !settings.available && (
             <p className="status-warning" role="status">
               {settings.reason}{" "}
@@ -325,11 +406,13 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
             </p>
           )}
           <p className="field-hint">
-            Starting shares your transcript, matching material and live
-            microphone audio with ElevenLabs. When materials are insufficient,
-            the agent sends focused search queries to Tavily to check public web
-            sources. Spoken feedback is an AI suggestion; use source checks to
-            verify factual claims. You can end the conversation at any time.
+            This browser ends the session after 10 minutes or{" "}
+            {MAX_VOICE_USER_TURNS} spoken answers. Starting shares your
+            transcript, matching material and live microphone audio with
+            ElevenLabs. When materials are insufficient, the agent sends focused
+            search queries to Tavily to check public web sources. Spoken
+            feedback is an AI suggestion; use source checks to verify factual
+            claims. You can end the conversation at any time.
           </p>
           {notices.map((notice) => (
             <p className="field-hint" key={notice}>

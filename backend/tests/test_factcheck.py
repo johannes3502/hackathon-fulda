@@ -1,6 +1,7 @@
 """Fact-check pipeline with scripted model answers. Synthetic data only."""
 
 import json
+import re
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
@@ -54,11 +55,12 @@ class ScriptedModel:
         ]
         self.prompts = []
 
-    def complete_json(self, system, user):
+    def complete_json(self, system, user, *, max_tokens=None):
         self.prompts.append((system, user))
         if system.startswith(EXTRACT_PROMPT[:40]):
             return {"claims": self.claims}
-        claim = user.split("\n", 1)[0].removeprefix("Behauptung: ")
+        block = re.search(r"<untrusted-claim-[0-9a-f]{32}>\n(.*?)\n</untrusted-claim-", user, re.S)
+        claim = block.group(1) if block else ""
         return self.judge(claim, user)
 
 
@@ -221,7 +223,7 @@ def test_failed_lookups_are_unchecked_not_false():
 
 def test_extraction_failure_fails_the_job():
     class Broken(ScriptedModel):
-        def complete_json(self, system, user):
+        def complete_json(self, system, user, *, max_tokens=None):
             return {"unexpected": True}
 
     with pytest.raises(LLMError):

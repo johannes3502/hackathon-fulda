@@ -21,6 +21,7 @@ import {
   ANSWER_LABELS,
   generateQuestions,
   KIND_LABELS,
+  questionErrorMessage,
   questionFeedback,
   reviewAnswer,
   withFollowUp,
@@ -36,21 +37,21 @@ import { time } from "@/lib/utils";
 
 type Evidence = components["schemas"]["Evidence"];
 function Source({ evidence }: { evidence: Evidence }) {
+  const href =
+    evidence.url && /^https?:\/\//i.test(evidence.url) ? evidence.url : null;
   return (
     <blockquote>
       “{evidence.quote}”
       <cite>
-        {evidence.url ? (
-          <a href={evidence.url} target="_blank" rel="noreferrer">
+        {href ? (
+          <a href={href} target="_blank" rel="noreferrer">
             {evidence.label} <ExternalLink size={11} />
           </a>
         ) : (
           evidence.label
         )}
       </cite>
-      <small className="field-hint">
-        {evidenceHint(evidence)}
-      </small>
+      <small className="field-hint">{evidenceHint(evidence)}</small>
     </blockquote>
   );
 }
@@ -75,6 +76,12 @@ export function QuestionSimulator({
   const result = recording.questions;
   const question = result?.questions[index];
   const persona = result?.persona ?? "tutor";
+  const maxTurns = result?.config.max_turns ?? 6;
+  const maxFollowUps = result?.config.max_follow_ups ?? 3;
+  const roundMinutes = Math.max(
+    1,
+    Math.round((result?.config.round_ttl_s ?? 600) / 60),
+  );
   const fullyAnswered =
     !!result &&
     result.questions.length > 0 &&
@@ -228,9 +235,15 @@ export function QuestionSimulator({
               Question {index + 1} of {result.questions.length}
             </span>
             <span className="badge">
-              {Object.keys(recording.answers ?? {}).length} answered
+              {Object.keys(recording.answers ?? {}).length} answered · turn{" "}
+              {Object.keys(recording.answers ?? {}).length}/{maxTurns}
             </span>
           </div>
+          <p className="field-hint">
+            Up to {maxFollowUps} follow-ups and {roundMinutes} minutes per
+            round. When the round expires or the turn limit is reached, start a
+            new round.
+          </p>
           <ol className="fact-claims">
             <QuestionCard
               key={question.id + question.question}
@@ -239,6 +252,9 @@ export function QuestionSimulator({
               recording={recording}
               persona={persona}
               collection={collection}
+              roundId={result.roundId ?? result.round_id}
+              answeredCount={Object.keys(recording.answers ?? {}).length}
+              maxTurns={maxTurns}
               disabled={busy}
               onSelect={() => {
                 const moment = questionFeedback(
@@ -315,6 +331,9 @@ function QuestionCard({
   recording,
   persona,
   collection,
+  roundId,
+  answeredCount,
+  maxTurns,
   disabled,
   onSelect,
   onAnswered,
@@ -324,6 +343,9 @@ function QuestionCard({
   recording: LiveRecording;
   persona: Persona;
   collection: string | null;
+  roundId: string | null | undefined;
+  answeredCount: number;
+  maxTurns: number;
   disabled: boolean;
   onSelect: () => void;
   onAnswered: (answer: string, review: AnswerReview) => void;
@@ -335,10 +357,19 @@ function QuestionCard({
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
   const review = saved?.review;
+  const limitReached = !review && answeredCount >= maxTurns;
 
   async function submit() {
     const answer = draft.trim();
     if (!answer) return;
+    if (!roundId) {
+      setError("This saved round has no server id. Start a new round.");
+      return;
+    }
+    if (limitReached) {
+      setError("The turn limit for this round is reached. Start a new round.");
+      return;
+    }
     const active = new AbortController();
     controller.current?.abort();
     controller.current = active;
@@ -348,7 +379,8 @@ function QuestionCard({
       const reviewed = await reviewAnswer(
         recording.config.endpoint,
         {
-          question,
+          roundId,
+          questionId: question.id,
           answer,
           collectionId: collection,
           persona,
@@ -358,12 +390,7 @@ function QuestionCard({
       );
       if (!active.signal.aborted) onAnswered(answer, reviewed);
     } catch (failure) {
-      if (!active.signal.aborted)
-        setError(
-          failure instanceof Error
-            ? failure.message
-            : "The answer could not be compared.",
-        );
+      if (!active.signal.aborted) setError(questionErrorMessage(failure));
     } finally {
       if (!active.signal.aborted) setBusy(false);
     }
@@ -408,7 +435,7 @@ function QuestionCard({
           size="sm"
           variant={review ? "outline" : "default"}
           onClick={() => void submit()}
-          disabled={busy || disabled || !draft.trim()}
+          disabled={busy || disabled || limitReached || !draft.trim()}
         >
           {busy
             ? "Comparing with sources…"
@@ -416,6 +443,11 @@ function QuestionCard({
               ? "Compare again"
               : "Compare with sources"}
         </Button>
+        {limitReached && (
+          <span className="status-warning small" role="status">
+            Turn limit reached. Start a new round to continue.
+          </span>
+        )}
         {error && (
           <span className="status-warning small" role="status">
             {error}

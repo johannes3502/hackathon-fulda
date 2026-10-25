@@ -5,6 +5,18 @@ Frontend-Anbindung bleibt ein separater Team-Change. Menschlich gelabelte
 Evaluation und Geräte-/Browser-Abnahme stehen aus; Prüfumfang in §13.
 Bezug: `docs/03-architecture.md`, `docs/04-pose-tracking-requirements.md`, `docs/05-frontend-review-ux.md`, `AGENTS.md`.
 
+## Ergänzung 25.10.2026: Runden und Löschung
+
+`POST /takes/{id}/questions` speichert zusätzlich eine Redis-`round_id`.
+Antworten verwenden die zum Take gehörende Runde; abgelaufene Runden liefern
+410, alte Fragen ohne Runden-ID müssen neu erzeugt werden. Reservierte Turns,
+Nachfragen und identische Retries nutzen denselben Ledger wie `/questions`.
+Das OpenAPI-Modell der Take-Faktencheck-Optionen heißt `TakeFactcheckRequest`;
+der HTTP-Pfad bleibt gleich.
+Session-Löschung bestätigt das Entfernen der Metadaten. Temporäre S3-Objekte
+werden nach Commit gelöscht; Fehler bleiben in `blob_deletions` für erneute
+Versuche. Es entsteht weiterhin kein Server-Video-Endpunkt.
+
 ## 1. Scope und Non-Goals
 
 ### 1.1 Scope

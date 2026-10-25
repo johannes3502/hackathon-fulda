@@ -1670,19 +1670,24 @@ Regeln:
 
 ### 10.3 Aufbewahrung
 
-- `retention_until` am Profil; Empfehlung: 12 Monate nach dem letzten Take,
-  danach automatische Löschung (Cron/Scheduler).
+- `retention_until` am Profil: Standard 365 Tage, verlängert durch neue
+  verknüpfte Takes. `retention_origin=default/user` schützt explizite Fristen.
+  Ein einzelner Compose-Beat plant den täglichen Sweep um 03:15 UTC.
 - Eine Verkürzung von `retention_until` ist eine Löschzusage: Die UI muss
   bestätigen, dass Daten nach dem neuen Datum entfernt werden; der Cleanup-Job
   löscht sie, nicht das Frontend.
-- Für die Hackathon-Demo: „bis zur Löschung“ sichtbar kommunizieren; keine
-  automatische Löschung ohne Entscheidung.
+- Die UI zeigt die effektive Frist. `retentionUntil:null` hebt sie vor Ablauf
+  explizit auf und bleibt auch nach Neustarts/Takes erhalten.
 - Löschung ist hart (keine versteckten Kopien): Profil, Token, Ziele,
   `take_quality`/`take_metrics`, `progress_snapshots`/`progress_change_points`
   und `progress_runs` werden entfernt. Zugehörige Sessions/Takes werden per `ON DELETE SET NULL`
   **entkoppelt** und bleiben unter ihrer eigenen Session-Einwilligung bestehen.
   Für die vollständige Löschung von Analysedaten ist `DELETE /sessions/{id}`
-  separat aufzurufen; die UI muss beide Wirkungen unterscheiden.
+  separat aufzurufen; alternativ löscht `DELETE /profiles/{id}?deleteSessions=true`
+  verknüpfte Session-Daten ausdrücklich mit. Die UI trennt beide Wirkungen.
+  Verknüpfte Sessions haben keine automatische Session-Frist, auch nach
+  Entkopplung. Anonyme Sessions nutzen eine eigene 365-Tage-Frist. S3-Keys
+  werden transaktional in `blob_deletions` vorgemerkt und nach Commit gelöscht.
 - `DELETE /profiles/{id}` ist idempotent: bereits gelöscht → `204`, ohne
   versteckte Daten wiederherzustellen.
 - Lokale Videos werden **nicht** vom Server gelöscht; das Frontend muss sie
@@ -1795,7 +1800,7 @@ oder Login. Das ist eine offene Entscheidung, keine stille Annahme.
 - Review-Runde: Gesamtsuite 320 passed, 1 optionaler Skip (lokales Postgres,
   synthetische Daten, keine externen Keys nötig). Pure Statistik-/Metriktests
   laufen auch ohne Postgres. Recompute zusätzlich mit echtem Celery/Redis geprüft.
-- Noch offen: Frontend-Anbindung, Retention-Cron, Rate Limiting, Multi-Device,
+- Noch offen: Frontend-Anbindung, Legacy-S3-Cleanup, Rate Limiting, Multi-Device,
   echte Nutzerdaten-Validierung.
 
 ### Phase 0 — Voraussetzungen
