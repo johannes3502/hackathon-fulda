@@ -1,0 +1,121 @@
+{
+  "model": "gemini-3.8-flash-tts",
+  "voice": "Sulafat",
+  "generatedAt": "2026-10-25T08:57:58.437Z",
+  "blocks": [
+    {
+      "id": "progress-01-intro",
+      "text": "Zwischen zwei Proben: vier-eins-acht macht Fortschritt sichtbar.",
+      "file": "progress-01-intro.wav",
+      "duration": 4.32
+    },
+    {
+      "id": "progress-02-hero",
+      "text": "Zuerst zählt, wie vergleichbar deine Aufnahmen sind.",
+      "file": "progress-02-hero.wav",
+      "duration": 3.52
+    },
+    {
+      "id": "progress-03-overview",
+      "text": "Vier Kennzahlen: Vergleichbarkeit, Zeitraum, Datenlage, Ziele.",
+      "file": "progress-03-overview.wav",
+      "duration": 6.24
+    },
+    {
+      "id": "progress-04-metrics",
+      "text": "Jede Metrik behält ihre eigene Skala.",
+      "file": "progress-04-metrics.wav",
+      "duration": 3.04
+    },
+    {
+      "id": "progress-05-click",
+      "text": "Ein Klick öffnet den Verlauf:",
+      "file": "progress-05-click.wav",
+      "duration": 2.32
+    },
+    {
+      "id": "progress-06-history",
+      "text": "Start. Aktuell. Veränderung.",
+      "file": "progress-06-history.wav",
+      "duration": 4.04
+    },
+    {
+      "id": "progress-07-focus",
+      "text": "Wie viele Aufnahmen vergleichbar sind, steht direkt daneben.",
+      "file": "progress-07-focus.wav",
+      "duration": 3.56
+    },
+    {
+      "id": "progress-08-why",
+      "text": "Warum sichtbar? Startphase, Streuung, Unsicherheit.",
+      "file": "progress-08-why.wav",
+      "duration": 5.0
+    },
+    {
+      "id": "progress-09-changes",
+      "text": "Veränderungen werden eingeordnet, Schritt für Schritt.",
+      "file": "progress-09-changes.wav",
+      "duration": 3.8
+    },
+    {
+      "id": "progress-10-limits",
+      "text": "Die Grenzen der Daten bleiben sichtbar.",
+      "file": "progress-10-limits.wav",
+      "duration": 2.8
+    },
+    {
+      "id": "progress-11-outro",
+      "text": "Eine Probe für die nächste. vier-eins-acht Pitch Practice.",
+      "file": "progress-11-outro.wav",
+      "duration": 6.04
+    },
+    {
+      "id": "review-01-intro",
+      "text": "Nach der Probe zählt der Moment.",
+      "file": "review-01-intro.wav",
+      "duration": 2.2
+    },
+    {
+      "id": "review-02-scores",
+      "text": "Drei Kriterien: Gestik, Flow und Fachwissen. Jedes mit eigener Datenabdeckung.",
+      "file": "review-02-scores.wav",
+      "duration": 6.48
+    },
+    {
+      "id": "review-03-method",
+      "text": "Die Formel daneben: positive gegen kritische Sekunden. Beim Fachwissen zählt das geprüfte Quellenzitat.",
+      "file": "review-03-method.wav",
+      "duration": 6.92
+    },
+    {
+      "id": "review-04-fact-a",
+      "text": "Im Vortrag zwanzig Teilnehmende, im Demo-Konzept zwölf.",
+      "file": "review-04-fact-a.wav",
+      "duration": 4.2
+    },
+    {
+      "id": "review-04-fact-b",
+      "text": "Der Fact-Check zeigt Zitat und Quelle.",
+      "file": "review-04-fact-b.wav",
+      "duration": 3.64
+    },
+    {
+      "id": "review-05-jump",
+      "text": "Ein Klick springt zur Stelle im lokalen Video. Die Aufnahme bleibt bei dir.",
+      "file": "review-05-jump.wav",
+      "duration": 4.92
+    },
+    {
+      "id": "review-06-graph",
+      "text": "Der Verlauf verbindet Ereignisse. Zwischenwerte sind interpoliert.",
+      "file": "review-06-graph.wav",
+      "duration": 4.28
+    },
+    {
+      "id": "review-07-outro",
+      "text": "Aus jedem Moment wird ein nächster Schritt. vier-eins-acht Pitch Practice.",
+      "file": "review-07-outro.wav",
+      "duration": 5.28
+    }
+  ]
+}
