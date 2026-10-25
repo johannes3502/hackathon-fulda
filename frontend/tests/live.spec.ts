@@ -1401,64 +1401,6 @@ test("transcribed take is fact-checked against sources and links back to the vid
 }, info) => {
   const jobId = "12345678-1234-1234-1234-123456789abc";
   const factJob = "87654321-4321-4321-4321-cba987654321";
-  const questionJob = "77654321-4321-4321-4321-cba987654321";
-  const answerJob = "67654321-4321-4321-4321-cba987654321";
-  const question = {
-    id: "q1",
-    kind: "contradiction",
-    question: "Wie viele Studierende sind es laut Quelle?",
-    reason: "Die Zahlen weichen ab.",
-    t_ms: 200,
-    duration_ms: 900,
-    transcript: "Wir haben 9000 Studierende.",
-    claim: "9000 Studierende",
-    evidence: null,
-    query: "Studierende",
-  };
-  await page.route("**/api/questions", (route) =>
-    route.fulfill({ status: 202, json: { job_id: questionJob } }),
-  );
-  await page.route(`**/api/questions/jobs/${questionJob}`, (route) =>
-    route.fulfill({
-      json: {
-        job_id: questionJob,
-        status: "completed",
-        result: {
-          questions: [question],
-          events: [],
-          notices: [],
-          model: "synthetic-model",
-          sources_used: true,
-        },
-      },
-    }),
-  );
-  await page.route("**/api/questions/answers", async (route) => {
-    expect(route.request().postDataJSON().answer).toBe("9500 Studierende.");
-    await route.fulfill({ status: 202, json: { job_id: answerJob } });
-  });
-  await page.route(`**/api/questions/answers/${answerJob}`, (route) =>
-    route.fulfill({
-      json: {
-        job_id: answerJob,
-        status: "completed",
-        result: {
-          verdict: "supports",
-          explanation: "Die korrigierte Zahl steht in der Quelle.",
-          evidence: {
-            kind: "upload",
-            label: "Synthetische Folie 2",
-            quote: "9500 Studierende",
-            passage: "9500 Studierende",
-          },
-          checked: ["upload"],
-          follow_up: null,
-          model: "synthetic-model",
-          notes: [],
-        },
-      },
-    }),
-  );
   const words = [
     { word: "Wir", start_ms: 200, end_ms: 400 },
     { word: "haben", start_ms: 450, end_ms: 700 },
@@ -1603,26 +1545,16 @@ test("transcribed take is fact-checked against sources and links back to the vid
     .getByRole("group", { name: "Review steps" })
     .getByRole("button", { name: "Practice questions" })
     .click();
-  await page
-    .getByRole("button", { name: "Practice by typing", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Start question round" }).click();
   await expect(
-    page.getByText(question.question, { exact: true }),
-  ).toBeVisible();
-  await page
-    .getByLabel("Your answer", { exact: true })
-    .fill("9500 Studierende.");
-  await page
-    .getByRole("button", { name: "Compare with sources", exact: true })
-    .click();
+    page.getByRole("button", { name: "Practice by typing", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Answer method" })).toHaveCount(
+    0,
+  );
   await expect(
-    page.getByText("Your answer matches the source", { exact: true }),
+    page.getByRole("button", { name: "Start voice questions", exact: true }),
   ).toBeVisible();
   await noOverflow(page);
-  await page
-    .locator(".question-practice")
-    .screenshot({ path: info.outputPath("local-question-answer.png") });
 });
 
 test("live captions send PCM only during recording and a disconnect keeps the take usable", async ({
@@ -2010,7 +1942,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
       if (message.type === "conversation_initiation_client_data") {
         override = message.conversation_config_override.agent.prompt.prompt;
         expect(message.conversation_config_override.agent.first_message).toBe(
-          "Ich habe noch ein paar Fragen. Bist du bereit?",
+          "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?",
         );
         socket.send(
           JSON.stringify({
@@ -2026,7 +1958,8 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
           JSON.stringify({
             type: "agent_response",
             agent_response_event: {
-              agent_response: "Ich habe noch ein paar Fragen. Bist du bereit?",
+              agent_response:
+                "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?",
             },
           }),
         );

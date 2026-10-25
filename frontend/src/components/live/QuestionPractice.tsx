@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Conversation } from "@elevenlabs/client";
 import { AudioLines, Mic, MicOff, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { LiveFeedback, LiveRecording } from "@/features/live/contracts";
+import type { LiveRecording } from "@/features/live/contracts";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import {
   agentSession,
@@ -14,19 +14,11 @@ import {
 } from "@/features/questions/agent";
 import { PRESENTATION_MODES } from "@/features/questions/presentation";
 import { collectionId } from "@/features/sources/api";
-import { QuestionSimulator } from "./QuestionSimulator";
 import { PerformanceEvaluation } from "./PerformanceEvaluation";
 
-export function QuestionPractice({
-  recording,
-  onSelect,
-}: {
-  recording: LiveRecording;
-  onSelect: (item: LiveFeedback) => void;
-}) {
+export function QuestionPractice({ recording }: { recording: LiveRecording }) {
   const { update } = useLiveSessions();
   const [settings, setSettings] = useState<AgentSettings | null>(null);
-  const [method, setMethod] = useState<"voice" | "text">("voice");
   const [phase, setPhase] = useState<
     "idle" | "preparing" | "connecting" | "listening" | "speaking"
   >("idle");
@@ -75,7 +67,9 @@ export function QuestionPractice({
 
   useEffect(() => {
     document
-      .getElementById(finished ? "performance-evaluation-title" : "question-practice-title")
+      .getElementById(
+        finished ? "performance-evaluation-title" : "question-practice-title",
+      )
       ?.focus();
   }, [finished]);
 
@@ -115,10 +109,12 @@ export function QuestionPractice({
         signedUrl,
         connectionType: "websocket",
         textOnly: false,
+        stripAudioTags: true,
         overrides: {
           agent: {
             prompt: { prompt: context.prompt },
-            firstMessage: "Ich habe noch ein paar Fragen. Bist du bereit?",
+            firstMessage:
+              "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?",
           },
         },
         onConversationCreated: (created) => {
@@ -156,7 +152,7 @@ export function QuestionPractice({
         onError: () => {
           if (!pending.signal.aborted) {
             setError(
-              "Voice practice lost its connection. Check the agent settings or try typing instead.",
+              "Voice practice lost its connection. Check the agent settings and retry.",
             );
             void stop();
           }
@@ -238,9 +234,7 @@ export function QuestionPractice({
           <h2 id="question-practice-title" tabIndex={-1}>
             Meet your {mode.listener.toLowerCase()}.
           </h2>
-          <p>
-            {mode.focus} One question at a time.
-          </p>
+          <p>{mode.focus} One question at a time.</p>
         </div>
         <span className="badge">{mode.label}</span>
       </div>
@@ -263,130 +257,99 @@ export function QuestionPractice({
       ) : (
         <>
           <div
-            className="review-view-switch compact"
-            role="group"
-            aria-label="Answer method"
+            className={`question-voice-stage ${connected ? "connected" : ""}`}
           >
-            <button
-              aria-pressed={method === "voice"}
-              disabled={active}
-              onClick={() => setMethod("voice")}
-            >
-              Speak with the agent
-            </button>
-            <button
-              aria-pressed={method === "text"}
-              disabled={active}
-              onClick={() => setMethod("text")}
-            >
-              Practice by typing
-            </button>
-          </div>
-          {method === "text" ? (
-            <QuestionSimulator recording={recording} onSelect={onSelect} />
-          ) : (
-            <>
-              <div
-                className={`question-voice-stage ${connected ? "connected" : ""}`}
-              >
-                <AudioLines size={36} aria-hidden="true" />
-                <p className="question-voice-status" role="status">
-                  {phase === "preparing"
-                    ? "Reading your presentation and material…"
-                    : phase === "connecting"
-                      ? "Connecting your microphone…"
-                      : phase === "speaking"
-                        ? `Your ${mode.listener.toLowerCase()} is speaking`
-                        : phase === "listening"
-                          ? muted
-                            ? "Microphone muted"
-                            : "Listening to your answer"
-                          : "A conversation about your ideas"}
-                </p>
-                <h3>
-                  {lastAgent?.text ??
-                    "Explain your thinking. Defend your choices."}
-                </h3>
-                {lastUser && (
-                  <p className="question-last-answer">
-                    <strong>You:</strong> {lastUser.text}
-                  </p>
-                )}
-                {active ? (
-                  <div className="question-actions">
-                    <Button
-                      variant="outline"
-                      onClick={() => void stop(connected)}
-                    >
-                      <Square size={16} />{" "}
-                      {connected ? "End conversation" : "Cancel"}
-                    </Button>
-                    {connected && (
-                      <Button
-                        variant="ghost"
-                        aria-pressed={muted}
-                        onClick={() => {
-                          session.current?.setMicMuted(!muted);
-                          setMuted(!muted);
-                        }}
-                      >
-                        {muted ? <MicOff size={17} /> : <Mic size={17} />}
-                        {muted ? "Unmute microphone" : "Mute microphone"}
-                      </Button>
-                    )}
-                  </div>
-                ) : (
+            <AudioLines size={36} aria-hidden="true" />
+            <p className="question-voice-status" role="status">
+              {phase === "preparing"
+                ? "Reading your presentation and material…"
+                : phase === "connecting"
+                  ? "Connecting your microphone…"
+                  : phase === "speaking"
+                    ? `Your ${mode.listener.toLowerCase()} is speaking`
+                    : phase === "listening"
+                      ? muted
+                        ? "Microphone muted"
+                        : "Listening to your answer"
+                      : "A conversation about your ideas"}
+            </p>
+            <h3>
+              {lastAgent?.text ?? "Explain your thinking. Defend your choices."}
+            </h3>
+            {lastUser && (
+              <p className="question-last-answer">
+                <strong>You:</strong> {lastUser.text}
+              </p>
+            )}
+            {active ? (
+              <div className="question-actions">
+                <Button variant="outline" onClick={() => void stop(connected)}>
+                  <Square size={16} />{" "}
+                  {connected ? "End conversation" : "Cancel"}
+                </Button>
+                {connected && (
                   <Button
-                    disabled={!settings?.available}
-                    onClick={() => void start()}
+                    variant="ghost"
+                    aria-pressed={muted}
+                    onClick={() => {
+                      session.current?.setMicMuted(!muted);
+                      setMuted(!muted);
+                    }}
                   >
-                    <Mic size={17} />{" "}
-                    {messages.length
-                      ? "Start a new conversation"
-                      : "Start voice questions"}
+                    {muted ? <MicOff size={17} /> : <Mic size={17} />}
+                    {muted ? "Unmute microphone" : "Mute microphone"}
                   </Button>
                 )}
               </div>
-              {settings && !settings.available && (
-                <p className="status-warning" role="status">
-                  {settings.reason}{" "}
-                  <button
-                    className="text-button"
-                    onClick={() => setRevision((n) => n + 1)}
-                  >
-                    Retry connection
-                  </button>
-                </p>
-              )}
-              <p className="field-hint">
-                Starting shares your transcript, matching material and live
-                microphone audio with ElevenLabs. When materials are insufficient,
-                the agent sends focused search queries to Tavily to check public
-                web sources. Spoken feedback is an AI
-                suggestion; use source checks to verify factual claims. You can
-                end the conversation at any time.
-              </p>
-              {notices.map((notice) => (
-                <p className="field-hint" key={notice}>
-                  {notice}
-                </p>
-              ))}
-              {messages.length > 0 && (
-                <details className="review-details">
-                  <summary>Conversation transcript</summary>
-                  <ol className="conversation-transcript">
-                    {messages.map((item, index) => (
-                      <li key={index}>
-                        <strong>
-                          {item.role === "user" ? "You" : mode.listener}
-                        </strong>
-                        <p>{item.text}</p>
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-              )}
-            </>
+            ) : (
+              <Button
+                disabled={!settings?.available}
+                onClick={() => void start()}
+              >
+                <Mic size={17} />{" "}
+                {messages.length
+                  ? "Start a new conversation"
+                  : "Start voice questions"}
+              </Button>
+            )}
+          </div>
+          {settings && !settings.available && (
+            <p className="status-warning" role="status">
+              {settings.reason}{" "}
+              <button
+                className="text-button"
+                onClick={() => setRevision((n) => n + 1)}
+              >
+                Retry connection
+              </button>
+            </p>
+          )}
+          <p className="field-hint">
+            Starting shares your transcript, matching material and live
+            microphone audio with ElevenLabs. When materials are insufficient,
+            the agent sends focused search queries to Tavily to check public web
+            sources. Spoken feedback is an AI suggestion; use source checks to
+            verify factual claims. You can end the conversation at any time.
+          </p>
+          {notices.map((notice) => (
+            <p className="field-hint" key={notice}>
+              {notice}
+            </p>
+          ))}
+          {messages.length > 0 && (
+            <details className="review-details">
+              <summary>Conversation transcript</summary>
+              <ol className="conversation-transcript">
+                {messages.map((item, index) => (
+                  <li key={index}>
+                    <strong>
+                      {item.role === "user" ? "You" : mode.listener}
+                    </strong>
+                    <p>{item.text}</p>
+                  </li>
+                ))}
+              </ol>
+            </details>
           )}
         </>
       )}

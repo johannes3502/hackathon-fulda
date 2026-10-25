@@ -352,6 +352,11 @@ Latenzzusage aus den synthetischen Protokolltests ableiten.
 Web-Review: zwei Hauptansichten, **Review moments** mit zeitgenauen Anmerkungen
 und begrenzter Wiedergabe im lokalen Vollvideo, **Practice questions** mit einer
 Frage pro Schritt. Transkript, Quellencheck und Exporte sind aufklappbare Details.
+Auf Nutzerwunsch ist die Web-Fragerunde nur noch ein ElevenLabs-Sprachdialog;
+„Practice by typing“ ist entfernt. Die bestehende Fragen-/Antwort-API bleibt
+kompatibel. Schnelleres Sprechen beim konfigurierten Eleven v4 Turbo über
+`[rushed]` im Prompt und First-message-Override, ohne numerische Tempozusage;
+Audio-Tags werden aus dem sichtbaren Gespräch entfernt.
 Vor der Aufnahme stehen Material-Upload und drei Präsentationstypen bereit:
 `startup`, `thesis`, `school`. `nonprofit` bleibt nur für bestehende Aufnahmen
 kompatibel und wird nicht mehr zur Auswahl angeboten. `sourceCollectionId` und

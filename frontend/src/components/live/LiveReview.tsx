@@ -331,7 +331,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
             </details>
           </>
         ) : (
-          <QuestionPractice recording={recording} onSelect={jump} />
+          <QuestionPractice recording={recording} />
         )}
         <p className="review-retention field-hint">
           Saved sessions are available on this browser and device. Download your

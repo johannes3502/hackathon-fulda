@@ -114,7 +114,8 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   use the live feedback colors: red for adjustments, green for positive feedback,
   neutral for observations. The violet selection outline remains separate.
   Transcript, source checks, metrics and exports live in disclosures.
-  Questions show one exchange at a time, with voice or typed answers. The
+  Questions show one exchange at a time through voice only. Typed practice is
+  removed from the web flow; unavailable voice services offer a retry. The
   presentation mode and material collection are fixed when a take starts.
   ElevenLabs only starts on an explicit click after its data-sharing notice;
   leaving the question view disconnects the agent. Missing configuration,

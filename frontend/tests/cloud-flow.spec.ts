@@ -44,7 +44,7 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
       if (message.type === "conversation_initiation_client_data") {
         openingOverridden =
           message.conversation_config_override?.agent?.first_message ===
-          "Ich habe noch ein paar Fragen. Bist du bereit?";
+          "[rushed] Ich habe noch ein paar Fragen. Bist du bereit?";
         const prompt =
           message.conversation_config_override?.agent?.prompt?.prompt;
         promptSent =
@@ -58,7 +58,10 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
       const message = JSON.parse(String(payload));
       if (message.type === "audio") audioChunks++;
       if (message.type === "agent_response" && !opening)
-        opening = message.agent_response_event?.agent_response ?? "";
+        opening = (message.agent_response_event?.agent_response ?? "").replace(
+          /^\[rushed\]\s*/,
+          "",
+        );
       if (message.type === "agent_response" && recognizedAnswer)
         repliedToAnswer = true;
       if (message.type === "user_transcript")
@@ -174,27 +177,9 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
       .getByRole("group", { name: "Review steps" })
       .getByRole("button", { name: "Practice questions" })
       .click();
-    await page
-      .getByRole("button", { name: "Practice by typing", exact: true })
-      .click();
-    await page.getByRole("button", { name: "Start question round" }).click();
-    await expect(page.getByLabel("Your answer", { exact: true })).toBeVisible({
-      timeout: 90_000,
-    });
-    await page
-      .getByLabel("Your answer", { exact: true })
-      .fill(
-        "Wir nennen den Dateinamen und die Seitenzahl unserer Quellen und üben den Vortrag mit drei Rückfragen.",
-      );
-    await page
-      .getByRole("button", { name: "Compare with sources", exact: true })
-      .click();
-    await expect(page.locator(".answer-review")).toBeVisible({
-      timeout: 90_000,
-    });
-    await page
-      .getByRole("button", { name: "Speak with the agent", exact: true })
-      .click();
+    await expect(
+      page.getByRole("button", { name: "Practice by typing", exact: true }),
+    ).toHaveCount(0);
     await page
       .getByRole("button", { name: "Start voice questions", exact: true })
       .click();
@@ -207,9 +192,9 @@ test("synthetic recording reaches Whisper, Gemini and an authenticated ElevenLab
     expect(promptSent).toBe(true);
     expect(openingOverridden).toBe(true);
     expect(kickoffSent).toBe(false);
-    await expect.poll(() => opening).toBe(
-      "Ich habe noch ein paar Fragen. Bist du bereit?",
-    );
+    await expect
+      .poll(() => opening)
+      .toBe("Ich habe noch ein paar Fragen. Bist du bereit?");
     expect(outputFormat).toBe("pcm_48000");
     await page.evaluate(() =>
       (
