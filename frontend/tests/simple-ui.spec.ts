@@ -35,7 +35,7 @@ test("home shows an empty recording overview without demo statistics and keeps n
   const drawer = page.getByRole("navigation", { name: "App-Navigation" });
   await expect(drawer).toBeVisible();
   await expect(
-    drawer.getByRole("link", { name: /Start & Aufnahmen/i }),
+    drawer.getByRole("link", { name: /^Home/ }),
   ).toHaveAttribute("aria-current", "page");
   await drawer.getByRole("link", { name: /Live-Studio/i }).click();
   await expect(page).toHaveURL(/\/live$/);

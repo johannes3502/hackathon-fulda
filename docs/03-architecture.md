@@ -512,7 +512,7 @@ flowchart TD
     LA --> RA
     RA --> FGRAPH
 
-    SRC -->|"collection_id aus localStorage"| UPLOAD["POST /sources<br/>POST /sources/search"]
+    SRC -->|"collection_id aus localStorage"| UPLOAD["GET/POST /sources<br/>DELETE /sources/id"]
 
     subgraph Transport["VideoTransport: LiveStudio fest auf backend<br/>(Modus-Schalter entfernt)"]
         ANA["AnalysisTransport<br/>Backend-Upload + Polling, jede Web-Aufnahme"]

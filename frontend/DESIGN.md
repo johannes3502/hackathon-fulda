@@ -117,9 +117,8 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   ElevenLabs only starts on an explicit click after its data-sharing notice;
   leaving the question view disconnects the agent. Missing configuration,
   unavailable services and missing transcripts have visible recovery paths.
-- **Sources:** place the document library and source search beside one another on
-  desktop and stack them on phones. Show supported formats, upload state, errors,
-  and when search becomes available. Continue to recording is the main action.
+- **Sources:** show a full-width document library with supported formats, upload
+  state and errors. Continue to recording is the main action.
 - **Sample:** retain explicit synthetic-data labels for the walkthrough and
   example annotations. Review scores use the disclosed rubric on the synthetic
   example evidence; the qualitative event graph uses only the

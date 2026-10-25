@@ -7,6 +7,30 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
+test("Home returns to the overview from the header or navigation drawer", async ({
+  page,
+}, info) => {
+  await page.goto("/sources");
+  const navigation =
+    info.project.name === "mobile"
+      ? page.getByRole("navigation", { name: "App-Navigation" })
+      : page.getByRole("navigation", { name: "Main navigation" });
+  if (info.project.name === "mobile") {
+    await page.getByRole("button", { name: "Menü", exact: true }).click();
+  }
+  const home = navigation.getByRole("link", { name: /^Home/ });
+  await expect(home).toHaveAttribute("href", "/");
+  await home.click();
+  await expect(page).toHaveURL(/\/$/);
+  if (info.project.name === "mobile") {
+    await page.getByRole("button", { name: "Menü", exact: true }).click();
+  }
+  await expect(navigation.getByRole("link", { name: /^Home/ })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+});
+
 test("presentation introduction leads into preparation and recording", async ({
   page,
 }, info) => {

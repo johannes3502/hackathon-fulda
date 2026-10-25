@@ -5,11 +5,11 @@ import { BrandLogo } from "./BrandLogo";
 import { usePathname } from "next/navigation";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
-  BarChart3,
   CircleHelp,
   Eye,
   FileText,
   FlaskConical,
+  House,
   LineChart,
   Menu,
   Play,
@@ -55,9 +55,9 @@ export function DrawerTriggerButton() {
 export const NAV_ITEMS = [
   {
     href: "/",
-    label: "Start & Aufnahmen",
+    label: "Home",
     description: "Aufgenommene Takes, Dauer und Hinweise im Arbeitsbereich",
-    icon: BarChart3,
+    icon: House,
   },
   {
     href: "/live",
@@ -143,6 +143,9 @@ export function AppShell({
           </Link>
         </div>
         <nav aria-label="Main navigation" className="app-nav">
+          <Link href="/" aria-current={pathname === "/" ? "page" : undefined}>
+            Home
+          </Link>
           <Link
             href="/live"
             aria-current={pathname.startsWith("/live") ? "page" : undefined}
