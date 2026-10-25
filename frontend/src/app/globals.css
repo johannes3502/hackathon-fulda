@@ -62,6 +62,19 @@
   --warning: #e9bd70;
   --error: #ffabb4;
 }
+/* Native option popups otherwise keep system colours (white list in dark mode). */
+select {
+  color-scheme: inherit;
+}
+select option,
+select optgroup {
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+select option:checked {
+  background-color: var(--primary-fill);
+  color: #ffffff;
+}
 @media (prefers-contrast: more) {
   :root {
     --muted: var(--foreground);
