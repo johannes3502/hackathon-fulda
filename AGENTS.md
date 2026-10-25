@@ -422,6 +422,13 @@ kompatibel. Keine Vorgabe für schnelleres Sprechen und kein `[rushed]`-Tag.
 Der Sprachagent fragt vor allem nach Gründen, Entscheidungen und Erklärungen,
 nicht nach Quellen, Dateien oder Seiten; Quellen nutzt er selbst zur Faktenprüfung.
 Audio-Tags werden aus dem sichtbaren Gespräch entfernt.
+`Protect agent speech` ist optional (Standard aus, bisheriges Verhalten), unter
+`/admin` → Voice questions und direkt in der Fragerunde schaltbar; pro Browser
+gespeichert und auch in einer offenen Runde sofort wirksam. Bei aktivem Schutz
+schaltet das Browser-SDK während `speaking` den Mikrofoneingang stumm, bei `listening` wieder frei; manuelles
+Mute hat Vorrang. Der Schutz ist abschaltbar, um dazwischenzureden. Während der
+eigenen Antwort bleiben Umgebungsstimmen möglich; kein Sprecherfilter oder
+Lautstärke-Schwellwert.
 Vor der Aufnahme stehen Material-Upload und drei Präsentationstypen bereit:
 `startup`, `thesis`, `school`. `nonprofit` bleibt nur für bestehende Aufnahmen
 kompatibel und wird nicht mehr zur Auswahl angeboten. `sourceCollectionId` und

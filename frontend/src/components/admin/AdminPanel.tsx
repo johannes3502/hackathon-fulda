@@ -14,7 +14,12 @@ import { Input } from "@/components/ui/input";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 import { FeatureOptions } from "./FeatureOptions";
 import { PoseFeedbackOptions, PoseLabOptions } from "./PoseFeedbackOptions";
-import { AdminSection } from "./parts";
+import { AdminSection, SettingRow, Switch } from "./parts";
+import {
+  storeVoiceProtection,
+  subscribeVoiceProtection,
+  voiceProtectionSnapshot,
+} from "@/features/questions/voice-settings";
 import {
   DEFAULT_LIVE_HINT_SETTINGS,
   LIVE_HINT_FIELDS,
@@ -42,6 +47,7 @@ const serverSnapshot = () => JSON.stringify(DEFAULT_LIVE_HINT_SETTINGS);
 const SECTIONS = [
   { id: "analysis-features", label: "Analysis features", icon: Cpu },
   { id: "speech-hints", label: "Speech hints", icon: Mic },
+  { id: "voice-questions", label: "Voice questions", icon: Mic },
   { id: "pose-feedback", label: "Pose feedback", icon: PersonStanding },
   { id: "hint-timing", label: "Hint timing", icon: Timer },
   { id: "pose-lab", label: "Pose lab tests", icon: FlaskConical },
@@ -55,6 +61,11 @@ const seconds = (raw: string) => {
 };
 
 export function AdminPanel() {
+  const protectAgentSpeech = useSyncExternalStore(
+    subscribeVoiceProtection,
+    voiceProtectionSnapshot,
+    () => false,
+  );
   const saved = JSON.parse(
     useSyncExternalStore(subscribe, snapshot, serverSnapshot),
   ) as LiveHintSettings;
@@ -145,6 +156,26 @@ export function AdminPanel() {
           </nav>
           <div className="admin-content">
             <FeatureOptions flags={featureFlags} change={setFeatureFlags} />
+            <AdminSection
+              id="voice-questions"
+              icon={Mic}
+              title="Voice questions"
+              badge="Saved instantly"
+              description="Microphone behavior during the ElevenLabs question round. Changes apply immediately, including in an open round."
+            >
+              <SettingRow
+                label="Protect agent speech"
+                htmlFor="protect-agent-speech"
+                description="Automatically mute your microphone while the agent speaks, then resume listening. Off by default so you can interrupt as before. Manual mute stays on; background voices can still be heard during your answer."
+              >
+                <Switch
+                  id="protect-agent-speech"
+                  describedBy="protect-agent-speech-description"
+                  checked={protectAgentSpeech}
+                  onChange={storeVoiceProtection}
+                />
+              </SettingRow>
+            </AdminSection>
             <PoseFeedbackOptions />
             <AdminSection
               id="hint-timing"

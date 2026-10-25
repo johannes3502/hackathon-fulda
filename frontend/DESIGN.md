@@ -79,6 +79,8 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   Escape, contained keyboard focus and scroll locking. The camera and skeleton
   keep the same contain projection in both views; overlays stay out of the video.
 - **Review:** two primary views, Review moments and Practice questions.
+  After questions, the final evaluation offers “Practice again” as the primary
+  action into `/live`, alongside “Back to questions”; the completed take remains saved.
   The heading's primary action opens Practice questions. Record again is a
   quiet back link with a left arrow above the heading.
   Three `ReviewScores` cards (Gestik, Fachwissen, Flow) above playback show 0–100 prototype ratings on the

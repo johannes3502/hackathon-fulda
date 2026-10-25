@@ -16,6 +16,23 @@ geschlossen. Abbruch während Vorbereitung/Verbindungsaufbau beendet auch spät
 erzeugte SDK-Verbindungen. Das sind Browser-Grenzen, keine Zusage über harte
 Limits im Anbieterkonto. `Start a new round` setzt die lokale Runde zurück.
 
+Geräuschschutz in der ElevenLabs-Runde (25.10.2026): **Protect agent speech**
+ist optional und standardmäßig aus, damit Unterbrechungen wie bisher funktionieren.
+Unter **Admin → Voice questions** lässt er sich einschalten; derselbe Schalter
+steht auch direkt in der Fragerunde. Die Wahl bleibt pro Browser gespeichert und
+wird auch zwischen offenen Tabs synchronisiert. Bei aktivem Schutz schaltet der
+SDK-Sprechstatus `speaking` den Mikrofoneingang sofort stumm; `listening` gibt
+ihn für die Antwort frei. Das ersetzt das manuelle
+Stummschalten während jeder Agent-Frage. Manuelles Mute hat Vorrang und bleibt
+auch nach dem Agent-Beitrag erhalten. Der Schalter ist vor und während der Runde
+bedienbar; ausgeschaltet erlaubt er wieder Unterbrechungen, auch in einer
+bereits laufenden Runde. Am ElevenLabs-Agenten wird nichts persistent geändert.
+Das verwendete Browser-SDK fordert bereits Echo- und Rauschunterdrückung an.
+Dies ist kein Sprach-/Sprecherfilter: Umgebungsstimmen während der eigenen
+Antwort können weiterhin übertragen werden. Kein willkürlicher dB-Schwellwert,
+der leise Antworten abschneidet; Mikrofon/Speaker in der Demo-Umgebung prüfen.
+SDK-Vertrag: [JavaScript SDK, setMicMuted](https://elevenlabs.io/docs/eleven-agents/libraries/java-script#setmicmuted).
+
 Die kompatible Fragen-API gibt `round_id` zurück. Antworten senden `round_id`
 und `question_id` statt einer frei vorgegebenen Frage. Redis speichert Fragen,
 reservierte Turns und fertige Reviews in einem Wert mit fester TTL (Standard

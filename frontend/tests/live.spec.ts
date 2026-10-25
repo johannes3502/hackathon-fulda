@@ -1852,7 +1852,20 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   let kickoffs = 0;
   let endFromAgent = () => {};
   let sendUserAnswer = () => {};
+  let playAgentAudio: (seconds: number) => void = () => {};
+  const microphonePackets: boolean[] = [];
+  let audioEventId = 0;
   await page.routeWebSocket("wss://api.elevenlabs.io/**", (socket) => {
+    playAgentAudio = (seconds) =>
+      socket.send(
+        JSON.stringify({
+          type: "audio",
+          audio_event: {
+            audio_base_64: Buffer.alloc(16000 * 2 * seconds).toString("base64"),
+            event_id: ++audioEventId,
+          },
+        }),
+      );
     endFromAgent = () => socket.close({ code: 1000 });
     sendUserAnswer = () =>
       socket.send(
@@ -1867,6 +1880,13 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     socket.onMessage((raw) => {
       if (typeof raw !== "string") return;
       const message = JSON.parse(raw);
+      if (message.user_audio_chunk) {
+        microphonePackets.push(
+          Buffer.from(message.user_audio_chunk, "base64").some(
+            (byte) => byte !== 0,
+          ),
+        );
+      }
       if (message.type === "conversation_initiation_client_data") {
         override = message.conversation_config_override.agent.prompt.prompt;
         expect(message.conversation_config_override.agent.first_message).toBe(
@@ -1896,8 +1916,20 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
       if (message.type === "user_message") kickoffs++;
     });
   });
+  await page.goto("/admin");
+  const savedProtection = page.getByRole("checkbox", {
+    name: "Protect agent speech",
+  });
+  await expect(savedProtection).not.toBeChecked();
+  await savedProtection.check();
+  await page.reload();
+  await expect(savedProtection).toBeChecked();
   await page.goto("/sources");
+  await expect(page.locator('input[type="file"]')).toBeEnabled();
   await page.getByLabel("What are you preparing for?").selectOption("thesis");
+  await expect(page.locator("#presentation-mode-focus")).toContainText(
+    "University professor",
+  );
   await page.locator('input[type="file"]').setInputFiles({
     name: "thesis.txt",
     mimeType: "text/plain",
@@ -1937,12 +1969,65 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     }),
   ).toBeVisible();
   expect(kickoffs).toBe(0);
+  const protection = page.getByRole("checkbox", {
+    name: "Protect agent speech",
+  });
+  await expect(protection).toBeChecked();
+  async function expectMicrophoneAudio(nonzero: boolean) {
+    const before = microphonePackets.length;
+    await expect
+      .poll(() => microphonePackets.length)
+      .toBeGreaterThan(before + 2);
+    await expect
+      .poll(() => microphonePackets.slice(-2))
+      .toEqual([nonzero, nonzero]);
+  }
+  // Use the actual SDK and AudioWorklet: agent playback sends only silent
+  // microphone PCM, despite the synthetic microphone's continuous tone.
+  await expectMicrophoneAudio(true);
+  playAgentAudio(3);
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "microphone automatically muted" }),
+  ).toBeVisible();
+  await expectMicrophoneAudio(false);
+  await expect(
+    page.getByRole("status").filter({ hasText: "Listening to your answer" }),
+  ).toBeVisible();
+  await expectMicrophoneAudio(true);
+
+  playAgentAudio(10);
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "microphone automatically muted" }),
+  ).toBeVisible();
+  await protection.uncheck();
+  await expectMicrophoneAudio(true);
+  // Changing the saved setting in Admin must reach an already open round.
+  const adminTab = await page.context().newPage();
+  await adminTab.goto("/admin");
+  await adminTab
+    .getByRole("checkbox", { name: "Protect agent speech" })
+    .check();
+  await expect(protection).toBeChecked();
+  await expectMicrophoneAudio(false);
+  await adminTab.close();
   await page
     .getByRole("button", { name: "Mute microphone", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Unmute microphone", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Microphone muted" }),
+  ).toBeVisible();
+  await expectMicrophoneAudio(false);
+  await page
+    .getByRole("button", { name: "Unmute microphone", exact: true })
+    .click();
+  await expectMicrophoneAudio(true);
   await noOverflow(page);
   await page.screenshot({
     path: info.outputPath("professor-question.png"),
@@ -1966,6 +2051,13 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   await expect(stats).toBeVisible();
   await expect(stats).toBeFocused();
   await expect(page.locator(".performance-score")).toHaveText("100/100");
+  const practiceAgain = page.getByRole("link", {
+    name: "Practice again",
+    exact: true,
+  });
+  await expect(practiceAgain).toBeVisible();
+  await expect(practiceAgain).toHaveAttribute("href", "/live");
+  await expect(practiceAgain).toHaveClass(/button-primary/);
   await page.screenshot({
     path: info.outputPath("final-overall-score.png"),
     fullPage: true,
@@ -1996,9 +2088,23 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   await expect(stats).toBeVisible();
   await expect(stats).toBeFocused();
   await expect.poll(() => closed.size).toBe(2);
+  const savedReviewUrl = page.url();
+  await practiceAgain.click();
+  await expect(page).toHaveURL(/\/live$/);
+  await expect(
+    page.getByRole("button", { name: "Enable camera", exact: true }),
+  ).toBeVisible();
+  // Starting another practice must retain the completed take and its questions.
+  await page.goto(savedReviewUrl);
+  await expect(page.getByLabel("Recorded presentation video")).toBeVisible();
   await page
-    .getByRole("button", { name: "Back to questions", exact: true })
+    .getByRole("group", { name: "Review steps" })
+    .getByRole("button", { name: "Practice questions" })
     .click();
+  await page.getByText("Conversation transcript", { exact: true }).click();
+  await expect(page.locator(".conversation-transcript")).toContainText(
+    "Ich habe noch ein paar Fragen. Bist du bereit?",
+  );
   await page
     .getByRole("button", { name: "Start a new conversation", exact: true })
     .click();
