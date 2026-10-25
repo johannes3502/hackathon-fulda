@@ -172,7 +172,7 @@ export function ProgressDashboard({ demo = false }: { demo?: boolean }) {
         setSelectedMetricId((current) =>
           current && next.series.some((item) => item.metricId === current)
             ? current
-            : (next.series[0]?.metricId ?? null),
+            : next.series[0]?.metricId ?? null,
         );
       })
       .catch((caught: unknown) => {
@@ -239,7 +239,7 @@ export function ProgressDashboard({ demo = false }: { demo?: boolean }) {
       setSelectedTakeId(
         takeId && target.points.some((point) => point.takeId === takeId)
           ? takeId
-          : (target.latest?.takeId ?? null),
+          : target.latest?.takeId ?? null,
       );
     },
     [series],
@@ -395,10 +395,7 @@ export function ProgressDashboard({ demo = false }: { demo?: boolean }) {
       <AppShell experience="live">
         <div className="progress418" lang="de">
           <ProfileError
-            error={{
-              status: 503,
-              message: "Keine Fortschrittsdaten erhalten.",
-            }}
+            error={{ status: 503, message: "Keine Fortschrittsdaten erhalten." }}
             onRetry={retry}
             onReset={resetProfile}
             demo={demo}
@@ -433,7 +430,11 @@ export function ProgressDashboard({ demo = false }: { demo?: boolean }) {
         ) : (
           <>
             <Overview response={response} />
-            <Highlights response={response} onFocus={focusMetric} demo={demo} />
+            <Highlights
+              response={response}
+              onFocus={focusMetric}
+              demo={demo}
+            />
 
             <section
               className="progress-metrics"
@@ -452,8 +453,7 @@ export function ProgressDashboard({ demo = false }: { demo?: boolean }) {
                     <i className="progress-dot is-eligible" /> vergleichbar
                   </span>
                   <span>
-                    <i className="progress-dot is-excluded" /> nicht
-                    vergleichbar
+                    <i className="progress-dot is-excluded" /> nicht vergleichbar
                   </span>
                   <span>
                     <i className="progress-dot is-gap">×</i> nicht berechenbar
@@ -590,8 +590,7 @@ function ProgressHeader({
               onChange={(event) =>
                 onQuery({
                   ...query,
-                  presentationMode: event.target.value as
-                    PresentationMode | "all",
+                  presentationMode: event.target.value as PresentationMode | "all",
                 })
               }
             >
@@ -680,11 +679,7 @@ function ProgressHeader({
           <p className="progress-inline-warning" role="status">
             <RefreshCw size={15} aria-hidden="true" /> Aktualisierung
             fehlgeschlagen. Angezeigt wird der zuletzt geladene Stand.
-            <button
-              type="button"
-              className="progress-link"
-              onClick={() => window.location.reload()}
-            >
+            <button type="button" className="progress-link" onClick={() => window.location.reload()}>
               Neu laden
             </button>
           </p>
@@ -733,11 +728,7 @@ function ProfileMenu({
       <dl>
         <div>
           <dt>Profil-ID</dt>
-          <dd>
-            {profile
-              ? formatShortId(profile.profileId)
-              : formatShortId(response.profile.profileId)}
-          </dd>
+          <dd>{profile ? formatShortId(profile.profileId) : formatShortId(response.profile.profileId)}</dd>
         </div>
         <div>
           <dt>Angelegt</dt>
@@ -776,11 +767,7 @@ function ProfileMenu({
               onClick={() => void remove()}
             >
               {busy ? (
-                <Loader2
-                  size={14}
-                  className="progress-spin"
-                  aria-hidden="true"
-                />
+                <Loader2 size={14} className="progress-spin" aria-hidden="true" />
               ) : (
                 <Trash2 size={15} aria-hidden="true" />
               )}
@@ -844,9 +831,9 @@ function ConsentScreen({
         </span>
         <h1>Fortschritt über mehrere Präsentationen sehen.</h1>
         <p>
-          Aktiviere ein optionales, pseudonymes Profil. Dann kannst du Messwerte
-          einzelner Aufnahmen vergleichen, Veränderungen ab einer bestimmten
-          Aufnahme erkennen und Lücken nachvollziehen.
+          Aktiviere ein optionales, pseudonymes Profil. Dann kannst du
+          Messwerte einzelner Aufnahmen vergleichen, Veränderungen ab einer
+          bestimmten Aufnahme erkennen und Lücken nachvollziehen.
         </p>
         <ul className="progress-consent-list">
           <li>
@@ -867,8 +854,8 @@ function ConsentScreen({
             <CheckCircle2 size={18} aria-hidden="true" />
             <span>
               <strong>Löschbar und exportierbar.</strong> Du kannst die
-              gespeicherten Messwerte jederzeit als CSV/JSON exportieren oder
-              löschen.
+              gespeicherten Messwerte während des Profilzugriffs als CSV/JSON
+              exportieren oder löschen.
             </span>
           </li>
           <li>
@@ -894,10 +881,7 @@ function ConsentScreen({
         </p>
       </section>
 
-      <aside
-        className="progress-consent-card"
-        aria-labelledby="consent-heading"
-      >
+      <aside className="progress-consent-card" aria-labelledby="consent-heading">
         <h2 id="consent-heading">Profil aktivieren</h2>
         <p>
           Die Einwilligung gilt nur für den Langzeit-Fortschritt und ist
@@ -925,7 +909,7 @@ function ConsentScreen({
               Ich willige ein, abgeleitete Messwerte und Qualitätsmerkmale
               meiner Aufnahmen für den Fortschritt zu speichern. Nach 12 Monaten
               wird der Zugriff gesperrt. Automatische Löschung ist noch nicht
-              umgesetzt; ich kann das Profil jederzeit selbst löschen.
+              umgesetzt.
             </span>
           </label>
           <dl className="progress-consent-facts">
@@ -966,8 +950,9 @@ function ConsentScreen({
             {busy ? "Profil wird angelegt …" : "Fortschritt aktivieren"}
           </button>
           <p className="progress-fineprint">
-            Ohne Einwilligung wird nichts langfristig gespeichert. Ist der Token
-            verloren, ist das Profil ohne Recovery nicht mehr erreichbar.
+            Ohne Einwilligung wird nichts langfristig gespeichert. Ist der
+            Token verloren, ist das Profil ohne Recovery nicht mehr
+            erreichbar.
           </p>
         </form>
       </aside>
@@ -977,18 +962,14 @@ function ConsentScreen({
 
 function DemoBanner() {
   return (
-    <aside
-      className="progress-demo-banner"
-      role="status"
-      aria-label="Demo-Hinweis"
-    >
+    <aside className="progress-demo-banner" role="status" aria-label="Demo-Hinweis">
       <FlaskConical size={18} aria-hidden="true" />
       <div>
         <strong>Synthetische Demo-Daten</strong>
         <p>
           24 erfundene Aufnahmen, keine echte Aufnahme, keine ASR- oder
-          Genauigkeitsvalidierung. Die Demo zeigt Zustände und Interaktionen der
-          Progress-UI, nicht deine Leistung.
+          Genauigkeitsvalidierung. Die Demo zeigt Zustände und Interaktionen
+          der Progress-UI, nicht deine Leistung.
         </p>
       </div>
       <Link href="/progress" className="progress-link">
@@ -1001,9 +982,7 @@ function DemoBanner() {
 function Overview({ response }: { response: ProgressResponse }) {
   const excludedTakes = new Set(
     response.series.flatMap((item) =>
-      item.points
-        .filter((point) => !point.eligible)
-        .map((point) => point.takeId),
+      item.points.filter((point) => !point.eligible).map((point) => point.takeId),
     ),
   ).size;
   const goals = response.series.filter((item) => item.goal).length;
@@ -1045,8 +1024,9 @@ function Overview({ response }: { response: ProgressResponse }) {
         <dt>Datenlage</dt>
         <dd>{qualityLabel}</dd>
         <small>
-          {excludedTakes} {excludedTakes === 1 ? "Aufnahme" : "Aufnahmen"} für
-          mindestens eine Metrik nicht vergleichbar
+          {excludedTakes}{" "}
+          {excludedTakes === 1 ? "Aufnahme" : "Aufnahmen"} für mindestens eine
+          Metrik nicht vergleichbar
         </small>
       </div>
       <div>
@@ -1097,10 +1077,7 @@ function Highlights({
     );
   if (!items.length) {
     return (
-      <section
-        className="progress-highlights"
-        aria-labelledby="highlights-heading"
-      >
+      <section className="progress-highlights" aria-labelledby="highlights-heading">
         <div className="progress-section-heading">
           <div>
             <h2 id="highlights-heading">Was sich verändert hat</h2>
@@ -1113,18 +1090,13 @@ function Highlights({
         <p className="progress-empty-line">
           Noch keine belastbare Veränderung beobachtet. Einzelne Ausreißer
           werden nicht als Trend gewertet.
-          {demo
-            ? ""
-            : " Mit mehr vergleichbaren Aufnahmen wird die Aussage stabiler."}
+          {demo ? "" : " Mit mehr vergleichbaren Aufnahmen wird die Aussage stabiler."}
         </p>
       </section>
     );
   }
   return (
-    <section
-      className="progress-highlights"
-      aria-labelledby="highlights-heading"
-    >
+    <section className="progress-highlights" aria-labelledby="highlights-heading">
       <div className="progress-section-heading">
         <div>
           <h2 id="highlights-heading">Was sich verändert hat</h2>
@@ -1139,9 +1111,7 @@ function Highlights({
       </div>
       <ul className="progress-highlight-list">
         {items.slice(0, 3).map((item) => (
-          <li
-            key={`${item.highlight.kind}-${item.series?.metricId}-${item.highlight.sequence ?? "x"}`}
-          >
+          <li key={`${item.highlight.kind}-${item.series?.metricId}-${item.highlight.sequence ?? "x"}`}>
             <span
               className={`progress-highlight-icon is-${item.highlight.kind}`}
               aria-hidden="true"
@@ -1184,9 +1154,7 @@ function Highlights({
           <summary>Alle {items.length} Beobachtungen</summary>
           <ul>
             {items.slice(3).map((item) => (
-              <li
-                key={`more-${item.series?.metricId}-${item.highlight.sequence ?? "x"}`}
-              >
+              <li key={`more-${item.series?.metricId}-${item.highlight.sequence ?? "x"}`}>
                 <span>{item.sentence}</span>
                 <button
                   type="button"
@@ -1239,9 +1207,7 @@ function MetricCard({
         <span className="progress-card-value">
           {formatValue(latest?.value ?? null, series.unit)}
           <small>
-            {latest
-              ? `Aufnahme #${series.points.find((point) => point.takeId === latest.takeId)?.sequence ?? "?"}`
-              : "kein vergleichbarer Wert"}
+            {latest ? `Aufnahme #${series.points.find((point) => point.takeId === latest.takeId)?.sequence ?? "?"}` : "kein vergleichbarer Wert"}
           </small>
         </span>
         <span className="progress-card-spark">
@@ -1334,21 +1300,14 @@ function SeriesDetail({
   const hasExcluded = visiblePoints.some((point) => !point.eligible);
   const hasGaps = visiblePoints.some((point) => point.value == null);
   return (
-    <section
-      className="progress-detail"
-      aria-labelledby="progress-detail-heading"
-    >
+    <section className="progress-detail" aria-labelledby="progress-detail-heading">
       <div className="progress-detail-head">
         <div>
           <span className="progress-eyebrow">
             <LineChart size={15} aria-hidden="true" /> Fokus
           </span>
           <h2 id="progress-detail-heading">{series.label.de}</h2>
-          <p>
-            {series.heuristic
-              ? `${series.label.de} ist eine Heuristik; keine validierte Messung.`
-              : ""}
-          </p>
+          <p>{series.heuristic ? `${series.label.de} ist eine Heuristik; keine validierte Messung.` : ""}</p>
         </div>
         <div className="progress-detail-badges">
           <span className={`progress-badge is-${series.trend.status}`}>
@@ -1359,8 +1318,7 @@ function SeriesDetail({
           </span>
           {series.goal ? (
             <span className={`progress-badge is-goal-${series.goalStatus}`}>
-              <Target size={14} aria-hidden="true" />{" "}
-              {GOAL_STATUS_COPY[series.goalStatus]}
+              <Target size={14} aria-hidden="true" /> {GOAL_STATUS_COPY[series.goalStatus]}
             </span>
           ) : (
             <span className="progress-badge is-neutral">Kein Ziel gesetzt</span>
@@ -1370,15 +1328,14 @@ function SeriesDetail({
 
       {series.quality.versionBreak && (
         <p className="progress-inline-warning" role="status">
-          <TriangleAlert size={16} aria-hidden="true" /> Die Reihe überschreitet
-          eine Regelversion. Punkte jenseits des Bruchs werden nicht mit den
-          älteren verbunden.
+          <TriangleAlert size={16} aria-hidden="true" /> Die Reihe
+          überschreitet eine Regelversion. Punkte jenseits des Bruchs werden
+          nicht mit den älteren verbunden.
         </p>
       )}
       {series.trend.status === "insufficient" && (
         <p className="progress-inline-info" role="status">
-          <CircleHelp size={16} aria-hidden="true" />{" "}
-          {metricStatusSentence(series)}
+          <CircleHelp size={16} aria-hidden="true" /> {metricStatusSentence(series)}
         </p>
       )}
 
@@ -1397,9 +1354,7 @@ function SeriesDetail({
           <dt>Aktuell</dt>
           <dd>
             {formatValue(latest?.value ?? null, series.unit)}
-            <small>
-              {latest ? formatDate(latest.recordedAt) : "kein Wert"}
-            </small>
+            <small>{latest ? formatDate(latest.recordedAt) : "kein Wert"}</small>
           </dd>
         </div>
         <div>
@@ -1524,12 +1479,7 @@ function PresentationStrip({
       </div>
       <ol className="progress-strip" aria-label="Aufnahmen in dieser Metrik">
         {points.map((point) => {
-          const status =
-            point.value == null
-              ? "gap"
-              : point.eligible
-                ? "eligible"
-                : "excluded";
+          const status = point.value == null ? "gap" : point.eligible ? "eligible" : "excluded";
           const selected = point.takeId === selectedTakeId;
           return (
             <li key={point.takeId}>
@@ -1541,10 +1491,7 @@ function PresentationStrip({
                 aria-label={`Aufnahme ${point.sequence}, ${formatDate(point.recordedAt)}, ${point.value == null ? "nicht berechenbar" : formatValue(point.value, series.unit)}, ${point.eligible ? "vergleichbar" : "nicht vergleichbar"}`}
               >
                 <span className="progress-strip-number">#{point.sequence}</span>
-                <span
-                  className={`progress-dot is-${status}`}
-                  aria-hidden="true"
-                >
+                <span className={`progress-dot is-${status}`} aria-hidden="true">
                   {status === "gap" ? "×" : ""}
                 </span>
               </button>
@@ -1575,9 +1522,7 @@ function PointDetail({
       </section>
     );
   }
-  const change = series.changePoints.find(
-    (item) => item.takeId === point.takeId,
-  );
+  const change = series.changePoints.find((item) => item.takeId === point.takeId);
   const reasons = point.exclusionReasons;
   return (
     <section className="progress-point-detail" aria-live="polite">
@@ -1600,7 +1545,9 @@ function PointDetail({
       </div>
       <p className="progress-point-value">
         {formatValue(point.value, series.unit)}
-        {point.recordedAtSource === "server" && <small>Serverzeit</small>}
+        {point.recordedAtSource === "server" && (
+          <small>Serverzeit</small>
+        )}
       </p>
       <dl className="progress-point-facts">
         <div>
@@ -1659,15 +1606,11 @@ function PointDetail({
           type="button"
           className="progress-link"
           onClick={() => {
-            const index = series.points.findIndex(
-              (item) => item.takeId === point.takeId,
-            );
-            const previous = [...series.points]
-              .reverse()
-              .find((item, reverseIndex) => {
-                const position = series.points.length - 1 - reverseIndex;
-                return position < index;
-              });
+            const index = series.points.findIndex((item) => item.takeId === point.takeId);
+            const previous = [...series.points].reverse().find((item, reverseIndex) => {
+              const position = series.points.length - 1 - reverseIndex;
+              return position < index;
+            });
             if (previous) onSelect(previous.takeId);
           }}
           disabled={series.points[0]?.takeId === point.takeId}
@@ -1678,9 +1621,7 @@ function PointDetail({
           type="button"
           className="progress-link"
           onClick={() => {
-            const index = series.points.findIndex(
-              (item) => item.takeId === point.takeId,
-            );
+            const index = series.points.findIndex((item) => item.takeId === point.takeId);
             const next = series.points[index + 1];
             if (next) onSelect(next.takeId);
           }}
@@ -1715,11 +1656,8 @@ function GoalEditor({
   }) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
-  const [direction, setDirection] = useState<
-    "increase" | "decrease" | "target_band"
-  >(
-    series.goal?.direction ??
-      (series.suggestedDirection === "decrease" ? "decrease" : "increase"),
+  const [direction, setDirection] = useState<"increase" | "decrease" | "target_band">(
+    series.goal?.direction ?? (series.suggestedDirection === "decrease" ? "decrease" : "increase"),
   );
   const [target, setTarget] = useState(
     series.goal?.targetValue != null ? String(series.goal.targetValue) : "",
@@ -1758,8 +1696,7 @@ function GoalEditor({
       <div className="progress-goal-body">
         {series.goal ? (
           <p>
-            Aktuelles Ziel:{" "}
-            <strong>{goalTargetLabel(series.goal, series.unit)}</strong>
+            Aktuelles Ziel: <strong>{goalTargetLabel(series.goal, series.unit)}</strong>
             {series.goal.direction === "decrease"
               ? " (soll sinken)"
               : series.goal.direction === "increase"
@@ -1776,8 +1713,8 @@ function GoalEditor({
         )}
         {series.suggestedDirection === "neutral" && (
           <p className="progress-fineprint">
-            Für diese Metrik gibt es keinen universell guten Wert. Ein Ziel legt
-            nur deine eigene Richtung fest.
+            Für diese Metrik gibt es keinen universell guten Wert. Ein Ziel
+            legt nur deine eigene Richtung fest.
           </p>
         )}
         {demo ? (
@@ -1850,11 +1787,7 @@ function GoalEditor({
                 disabled={busy}
               >
                 {busy && (
-                  <Loader2
-                    size={14}
-                    className="progress-spin"
-                    aria-hidden="true"
-                  />
+                  <Loader2 size={14} className="progress-spin" aria-hidden="true" />
                 )}
                 Ziel speichern
               </button>
@@ -1964,8 +1897,8 @@ function QualityTable({ series }: { series: MetricSeries }) {
   return (
     <details className="progress-quality-table">
       <summary>
-        <Database size={16} aria-hidden="true" /> Alle{" "}
-        {series.quality.totalPoints} Aufnahmen als Tabelle
+        <Database size={16} aria-hidden="true" /> Alle {series.quality.totalPoints}{" "}
+        Aufnahmen als Tabelle
       </summary>
       <div className="progress-table-wrap">
         <table>
@@ -1986,18 +1919,11 @@ function QualityTable({ series }: { series: MetricSeries }) {
           </thead>
           <tbody>
             {series.points.map((point) => (
-              <tr
-                key={point.takeId}
-                className={point.eligible ? "" : "is-excluded"}
-              >
+              <tr key={point.takeId} className={point.eligible ? "" : "is-excluded"}>
                 <td data-label="Aufnahme">#{point.sequence}</td>
                 <td data-label="Datum">{formatDate(point.recordedAt)}</td>
-                <td data-label="Typ">
-                  {modeLabel(point.context.presentationMode)}
-                </td>
-                <td data-label="Wert">
-                  {formatValue(point.value, series.unit)}
-                </td>
+                <td data-label="Typ">{modeLabel(point.context.presentationMode)}</td>
+                <td data-label="Wert">{formatValue(point.value, series.unit)}</td>
                 <td data-label="Status">
                   <span
                     className={`progress-table-status ${
@@ -2015,9 +1941,7 @@ function QualityTable({ series }: { series: MetricSeries }) {
                     : "–"}
                 </td>
                 <td data-label="Zeitquelle">
-                  {point.recordedAtSource === "server"
-                    ? "Serverzeit"
-                    : "Client-Zeit"}
+                  {point.recordedAtSource === "server" ? "Serverzeit" : "Client-Zeit"}
                 </td>
               </tr>
             ))}
@@ -2058,9 +1982,7 @@ function ChangeList({
         <ol className="progress-change-list">
           {changes.map(({ series, change }) => (
             <li key={`${series.metricId}-${change.id}`}>
-              <span className="progress-change-sequence">
-                #{change.sequence}
-              </span>
+              <span className="progress-change-sequence">#{change.sequence}</span>
               <span className="progress-change-copy">
                 <strong>{changeSentence(change, series)}</strong>
                 <small>
@@ -2103,9 +2025,7 @@ function DataQuality({
 }) {
   const excluded = new Set(
     response.series.flatMap((series) =>
-      series.points
-        .filter((point) => !point.eligible)
-        .map((point) => point.takeId),
+      series.points.filter((point) => !point.eligible).map((point) => point.takeId),
     ),
   );
   return (
@@ -2132,8 +2052,8 @@ function DataQuality({
               geschätzt, wenn der Oberkörper nicht sichtbar war.
             </li>
             <li>
-              <strong>Zu wenig Sprache oder Wörter:</strong> Tempo, Füllwörter
-              und Inhalt brauchen ausreichend Material.
+              <strong>Zu wenig Sprache oder Wörter:</strong> Tempo,
+              Füllwörter und Inhalt brauchen ausreichend Material.
             </li>
             <li>
               <strong>Zu kurze Aufnahme:</strong> Unter der Metrik-Mindestdauer
@@ -2235,8 +2155,7 @@ function ProfileError({
   onReset: () => void;
   demo: boolean;
 }) {
-  const unavailable =
-    error.status === 401 || error.status === 404 || error.status === 410;
+  const unavailable = error.status === 401 || error.status === 404 || error.status === 410;
   const title =
     error.status === 401
       ? "Dieses Profil ist nicht mehr erreichbar."
@@ -2257,24 +2176,16 @@ function ProfileError({
           : error.status === 404
             ? "Die Daten sind auf dem Server nicht mehr vorhanden. Lege bei Bedarf ein neues Profil an."
             : error.status === 410
-              ? "Der Profilzugriff ist abgelaufen. Die Daten werden nicht mehr ausgeliefert, aber noch nicht automatisch gelöscht. Automatische Löschung steht noch aus."
+              ? "Der Profilzugriff ist abgelaufen. Die Daten werden nicht mehr ausgeliefert, aber noch nicht automatisch gelöscht."
               : error.message}
       </p>
       <div className="progress-empty-actions">
         {!unavailable && (
-          <button
-            type="button"
-            className="button button-primary"
-            onClick={onRetry}
-          >
+          <button type="button" className="button button-primary" onClick={onRetry}>
             <RefreshCw size={16} aria-hidden="true" /> Erneut versuchen
           </button>
         )}
-        <button
-          type="button"
-          className="button button-outline"
-          onClick={onReset}
-        >
+        <button type="button" className="button button-outline" onClick={onReset}>
           <Trash2 size={16} aria-hidden="true" /> Profil zurücksetzen
         </button>
         {!demo && (
@@ -2308,17 +2219,17 @@ function formatDuration(ms: number) {
 function unitLabel(unit: MetricUnit) {
   switch (unit) {
     case "ratio":
-      return "Prozent (0,12 = 12 %)";
+      return "Prozent (0,12 = 12 %)"
     case "per100w":
-      return "pro 100 Wörter";
+      return "pro 100 Wörter"
     case "perMin":
-      return "pro Minute";
+      return "pro Minute"
     case "WPM":
-      return "WPM";
+      return "WPM"
     case "st":
-      return "Halbtönen";
+      return "Halbtönen"
     case "deg":
-      return "Grad";
+      return "Grad"
     default:
       return unit;
   }

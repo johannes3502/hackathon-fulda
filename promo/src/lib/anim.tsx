@@ -146,9 +146,15 @@ export const GlowField: React.FC<{ intensity?: number }> = ({
   });
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.bg }}>
-      <div style={orb("-18%", "-28%", 1300, "rgba(109,40,217,0.32)", 90, 60)} />
-      <div style={orb("68%", "52%", 1500, "rgba(30,58,138,0.30)", -110, -70)} />
-      <div style={orb("30%", "80%", 1000, "rgba(56,3,191,0.20)", 60, -50)} />
+      <div
+        style={orb("-18%", "-28%", 1300, "rgba(109,40,217,0.32)", 90, 60)}
+      />
+      <div
+        style={orb("68%", "52%", 1500, "rgba(30,58,138,0.30)", -110, -70)}
+      />
+      <div
+        style={orb("30%", "80%", 1000, "rgba(56,3,191,0.20)", 60, -50)}
+      />
       {/* Feines Dither direkt über den Glows, unter dem Content:
           bricht letzte Banding-Stufen, ohne Text/Mocks zu betreffen. */}
       <div
@@ -225,26 +231,10 @@ export const Chip: React.FC<{
 }> = ({ children, tone = "neutral", delay = 0, style }) => {
   const entry = useEntry(delay, 22);
   const palette = {
-    neutral: {
-      bg: "rgba(255,255,255,0.07)",
-      fg: COLORS.sub,
-      bd: COLORS.chipBorder,
-    },
-    good: {
-      bg: "rgba(52,211,153,0.12)",
-      fg: COLORS.good,
-      bd: "rgba(52,211,153,0.35)",
-    },
-    warn: {
-      bg: "rgba(248,113,113,0.13)",
-      fg: COLORS.warn,
-      bd: "rgba(248,113,113,0.4)",
-    },
-    accent: {
-      bg: "rgba(139,92,246,0.15)",
-      fg: COLORS.accentSoft,
-      bd: "rgba(139,92,246,0.42)",
-    },
+    neutral: { bg: "rgba(255,255,255,0.07)", fg: COLORS.sub, bd: COLORS.chipBorder },
+    good: { bg: "rgba(52,211,153,0.12)", fg: COLORS.good, bd: "rgba(52,211,153,0.35)" },
+    warn: { bg: "rgba(248,113,113,0.13)", fg: COLORS.warn, bd: "rgba(248,113,113,0.4)" },
+    accent: { bg: "rgba(139,92,246,0.15)", fg: COLORS.accentSoft, bd: "rgba(139,92,246,0.42)" },
   }[tone];
   return (
     <span
@@ -273,11 +263,11 @@ export const Chip: React.FC<{
   );
 };
 
-export const Dot: React.FC<{
-  color: string;
-  size?: number;
-  pulse?: boolean;
-}> = ({ color, size = 12, pulse = false }) => {
+export const Dot: React.FC<{ color: string; size?: number; pulse?: boolean }> = ({
+  color,
+  size = 12,
+  pulse = false,
+}) => {
   const frame = useCurrentFrame();
   const s = pulse ? 1 + 0.25 * Math.sin(frame / 7) : 1;
   return (
