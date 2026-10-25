@@ -2,11 +2,12 @@
 
 Stand: 25.10.2026. Zwei eigenständig lesbare A4-PDFs für Abgabe und Jury:
 
-- **418-Pitch-Practice-Features-Jury.pdf** (2 Seiten): die fünf Kernfeatures,
-  Lernkreislauf, Timestamp-Review, transparente Prototyp-Scores und Jury-Einstieg.
+- **418-Pitch-Practice-Features-Jury.pdf** (2 Seiten): die fünf Funktionen,
+  Bedienung, Review mit Zeitmarken und Berechnung der Prototyp-Scores.
 - **418-Pitch-Practice-Architektur.pdf** (3 Seiten): Systemdiagramm, Analysepfade,
   gemeinsame Zeitachse, Speicherung, Cloud-Grenzen und Integrationsstand.
 
+Weißer Hintergrund, Tabellen und Linien; Violett dient als Akzent.
 Die Diagramme sind Vektorgrafiken; die Schriften sind eingebettet. Das
 Review-Beispiel ist ausdrücklich schematisch und synthetisch. Die Dokumente
 beschreiben den Implementierungsstand, keine Abnahme oder Qualitätsvalidierung.

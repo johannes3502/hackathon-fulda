@@ -22,17 +22,12 @@ pdfmetrics.registerFontFamily("Open", normal="Open", bold="Bold", italic="Open",
 W, H = A4
 M = 42
 CW = W - 2 * M
-INK = "1B1428"
-MUTED = "655E72"
+INK = "202024"
+MUTED = "55555D"
 PURPLE = "3803BF"
-PALE = "F2EDFC"
-LINE = "DDD5EA"
-DARK = "1D1037"
+PALE = "F5F5F7"
+LINE = "D6D6DC"
 WHITE = "FFFFFF"
-GREEN = "137663"
-GREEN_BG = "E8F4EF"
-RED = "B04747"
-RED_BG = "FBEFEE"
 
 
 def col(hex_value):
@@ -48,7 +43,7 @@ class Document:
         self.c.setSubject("Jury und Abgabe | Prototypstand 25.10.2026")
         self.label, self.total, self.page = label, total, 0
 
-    def box(self, x, top, width, height, fill=PALE, radius=12, stroke=None):
+    def box(self, x, top, width, height, fill=PALE, radius=0, stroke=None):
         self.c.setFillColor(col(fill))
         self.c.setStrokeColor(col(stroke or fill))
         self.c.setLineWidth(.7)
@@ -87,27 +82,26 @@ class Document:
         if self.page:
             self.c.showPage()
         self.page += 1
-        self.box(0, 0, W, H, "FCFBFE", 0)
-        self.text("418", M, 27, 23, 56, PURPLE, "Light")
-        self.text("PITCH PRACTICE", M+57, 35, 9, 160, INK, "Bold")
-        self.text(section.upper(), W-220, 36, 8.3, 180, MUTED)
+        self.text("418", M, 28, 21, 56, PURPLE, "Bold")
+        self.text("Pitch Practice", M+50, 34, 10, 160, INK)
+        self.text(section, W-220, 36, 8.3, 180, MUTED)
         self.line(M, 69, W-M, 69)
         self.line(M, 793, W-M, 793)
-        self.text("HACKATHON FULDA 2026  /  FUTURE EDUCATION", M, 805, 7.5, 360, MUTED)
-        self.text(f"{self.page:02d} / {self.total:02d}", W-80, 803, 8.5, 45, PURPLE, "Bold")
+        self.text("Hackathon Fulda · 25. Oktober 2026", M, 805, 8, 360, MUTED)
+        self.text(f"{self.page} / {self.total}", W-76, 805, 8, 40, MUTED)
 
     def title(self, kicker, headline, intro):
-        self.text(kicker.upper(), M, 89, 8.7, CW, PURPLE, "Bold")
-        self.text(headline, M, 109, 31, CW, INK, "Bold", leading=35)
-        self.text(intro, M, 191, 10.5, CW, MUTED, max_h=33)
+        self.text(kicker, M, 91, 9, CW, PURPLE)
+        self.text(headline, M, 113, 24, CW, INK, "Bold", leading=29, max_h=59)
+        self.text(intro, M, 155, 10.5, CW, MUTED, max_h=46)
 
     def tag(self, label, x, top, width, fill=PALE, color=PURPLE):
-        self.box(x, top, width, 22, fill, 7)
-        self.text(label, x+9, top+4, 8.4, width-18, color, "Bold", max_h=14)
+        self.text(label, x, top, 10, width, INK, "Bold", max_h=15)
+        self.line(x, top+22, x+width, top+22)
 
     def node(self, x, top, width, height, title, body, fill=WHITE):
-        self.box(x, top, width, height, fill, 9, LINE if fill == WHITE else None)
-        self.text(title, x+13, top+11, 10.2, width-26, PURPLE, "Bold", max_h=30)
+        self.box(x, top, width, height, fill, 0, LINE)
+        self.text(title, x+13, top+11, 10.2, width-26, INK, "Bold", max_h=30)
         self.text(body, x+13, top+32, 9, width-26, MUTED, max_h=height-37)
 
     def save(self):
@@ -118,194 +112,187 @@ class Document:
 
 
 def features():
-    d = Document("418-Pitch-Practice-Features-Jury.pdf", "Features und Jury-Guide", 2)
-    d.page_start("01 / Produkt & Mehrwert")
-    d.title("Der Präsentationstrainer", "Gute Vorträge<br/>werden geübt.",
-            "418 Pitch Practice verbindet Auftritt, Sprache und Quellenwissen mit konkreten Stellen im eigenen Vortrag. Für Pitch, Thesis und Schule.")
+    d = Document("418-Pitch-Practice-Features-Jury.pdf", "Funktionen und Bedienung", 2)
+    d.page_start("Funktionen")
+    d.title("Produktübersicht", "Funktionen des Prototyps",
+            "418 Pitch Practice ist eine Web-App zum Üben von Präsentationen. Sie erfasst Haltung und Sprache, vergleicht Aussagen mit Quellen und stellt anschließend Rückfragen. Die Jury nutzt den vorbereiteten Laptop ohne Login.")
 
-    d.box(M, 244, CW, 78, DARK)
-    d.text("EIN LERNKREISLAUF", M+17, 255, 8, CW-34, "BCA6F0", "Bold")
-    steps = [("01", "Vorbereiten"), ("02", "Aufnehmen"), ("03", "Review"), ("04", "Fragen üben")]
-    for i, (n, title) in enumerate(steps):
-        x = M+17+i*122
-        d.text(n, x, 278, 9, 22, "BCA6F0", "Bold")
-        d.text(title, x+22, 277, 10.2, 104, WHITE, "Bold")
+    d.text("Ablauf", M, 220, 10, CW, INK, "Bold")
+    for i, title in enumerate(["Material hochladen", "Vortrag aufnehmen", "Review ansehen", "Fragen beantworten"]):
+        x = M+i*130
+        d.text(title, x, 244, 9.2, 123, MUTED)
         if i < 3:
-            d.arrow(x+105, 286, x+116, 286, "BCA6F0")
+            d.arrow(x+115, 251, x+126, 251, MUTED)
+    d.line(M, 277, W-M, 277)
+    d.text("Funktion", M, 289, 8.8, 175, MUTED)
+    d.text("Was die App erfasst und zurückmeldet", M+203, 289, 8.8, CW-203, MUTED)
 
     rows = [
-        ("01", "Auftritt sichtbar machen", "Kamera-Landmarks liefern Hinweise zu Gestik, Haltung und Kopforientierung. Kalibrierte Regeln erzeugen dezentes Live-Feedback."),
-        ("02", "Aussagen an Quellen prüfen", "Transkript mit Wort-Zeitmarken; Abgleich mit hochgeladenem Material. Quellenzitate machen die Urteile nachprüfbar."),
-        ("03", "Sprechfluss reflektieren", "Tempo, Pausen, Füllwörter, Lautstärke und Tonhöhenvariation. Hinweise teils live, die vollständige Auswertung nach der Aufnahme."),
-        ("04", "Genau zur Stelle zurückspringen", "Ein Klick auf einen Review-Moment führt zum passenden Punkt im lokalen Video. Beobachtung, Erklärung und Übung stehen zusammen."),
-        ("05", "Rückfragen im Gespräch üben", "Der konfigurierte ElevenLabs-Sprachdialog fragt anhand von Vortrag und Material nach. Der Präsentationstyp prägt die Gesprächsrolle."),
+        ("1", "Haltung und Gestik", "Die Kamera erfasst Körper- und Handpunkte. Daraus erkennen Regeln zum Beispiel zusammengeführte Hände, verschränkte Arme oder seitliche Neigung. Hinweise erscheinen während der Aufnahme und später mit Zeitmarke im Review."),
+        ("2", "Transkript und Quellencheck", "Gesprochene Wörter erhalten Zeitmarken. Aussagen werden mit hochgeladenen PDF-, Folien- oder Textquellen verglichen. Das Ergebnis zeigt ein Quellenzitat und ein Urteil: gestützt, widersprochen oder in den Quellen nicht gefunden."),
+        ("3", "Sprechmerkmale", "Die App erfasst Tempo, Pausen, Füllwörter, Lautstärke und Tonhöhenvariation. Ein Teil der Hinweise erscheint live. Wortbasiertes Tempo und Füllwörter werden nach dem Stoppen aus dem Transkript ausgewertet."),
+        ("4", "Review mit Zeitmarken", "Ein Klick auf einen Hinweis springt an die zugehörige Stelle im eigenen Video. Zu den Beobachtungen stehen Erklärungen und Übungsvorschläge. Aufnahme, Analyse und Gespräch bleiben in diesem Browser gespeichert."),
+        ("5", "Frage-Simulator", "Ein ElevenLabs-Sprachdialog fragt zu Vortrag und Material nach. Je nach Präsentationstyp übernimmt er die Rolle von Investor, Hochschullehrkraft oder Lehrkraft. Der Dialog benötigt einen konfigurierten Anbieterzugang."),
     ]
     for i, (n, title, body) in enumerate(rows):
-        y = 348+i*78
-        d.circle(M+18, y+18, 18, PALE)
-        d.text(n, M+7, y+10, 11, 26, PURPLE, "Bold")
-        d.text(title, M+51, y, 12, CW-51, INK, "Bold")
-        d.text(body, M+51, y+23, 10, CW-51, MUTED, max_h=43)
+        y = 318+i*81
+        d.text(n, M, y, 10, 20, PURPLE)
+        d.text(title, M+27, y, 11, 160, INK, "Bold", max_h=33)
+        d.text(body, M+203, y, 9.6, CW-203, INK, max_h=69)
         if i < 4:
-            d.line(M+51, y+68, W-M, y+68)
-    d.text("PROTOTYP  /  25.10.2026  /  Demo am vorbereiteten Laptop auf localhost, ohne Login.", M, 754, 8.5, CW, MUTED)
+            d.line(M, y+71, W-M, y+71)
+    d.text("Die Kamera schätzt Kopforientierung, keinen Blickkontakt. Hinweise beruhen auf Prototyp-Heuristiken; es gibt keine Emotions- oder Persönlichkeitsbewertung.", M, 741, 9, CW, MUTED, max_h=27)
+    d.text("Basis: AGENTS.md; docs/01-product.md; docs/07-review-and-agent.md. Stand 25.10.2026.", M, 778, 7.5, CW, MUTED)
 
-    d.page_start("02 / Erleben & Einordnen")
-    d.title("Feedback wird überprüfbar", "Vom Hinweis<br/>zum nächsten Versuch.",
-            "Nicht nur ein Endwert: Im Review lässt sich die Beobachtung im Kontext ansehen und in einen konkreten Übungsschritt übersetzen.")
+    d.page_start("Bedienung und Scores")
+    d.title("Jury-Demo", "Aufnahme und Auswertung",
+            "Für einen eigenen Durchlauf reichen eine kurze Präsentation und synthetisches Quellenmaterial. Kamera und Mikrofon sind erforderlich; der Quellencheck und die Fragerunde benötigen die eingerichteten Cloud-Dienste.")
 
-    d.box(M, 240, CW, 170, DARK)
-    d.text("REVIEW-MOMENTE", M+17, 254, 8.3, 290, "BCA6F0", "Bold")
-    d.text("Schematische Darstellung / synthetisches Beispiel", M+17, 271, 8.1, CW-34, "C5B9D9")
-    x0, x1 = M+25, W-M-25
-    d.line(x0, 309, x1, 309, "6B5B84", 2)
-    for f, t in [(0, "00:00"), (.33, "00:20"), (.66, "00:40"), (1, "01:00")]:
-        x = x0+(x1-x0)*f
-        d.line(x, 304, x, 314, "BCA6F0")
-        d.text(t, x-13, 323, 8.2, 38, "C5B9D9")
-    d.circle(x0+154, 309, 6, "BCA6F0")
-    d.line(x0+154, 296, x0+154, 319, "BCA6F0", .8)
-    d.box(M+17, 350, CW-34, 45, "34214E", 9)
-    d.text("00:20  /  Hände zusammen", M+29, 357, 9.5, CW-58, WHITE, "Bold")
-    d.text("Stelle ansehen: Unterstützt die Geste deine Aussage? Bewusst erneut üben.", M+29, 376, 8.9, CW-58, "E3DAEF", max_h=14)
-
-    labels = [("Gestik", "Zeitanteile bewerteter\nGesten-Evidenz"), ("Fachwissen", "Entscheidbare Urteile\nmit geprüftem Zitat"), ("Flow", "Zeitanteile bewerteter\nSprech-Evidenz")]
-    for i, (title, body) in enumerate(labels):
-        x = M+i*(CW+12)/3
-        width = (CW-24)/3
-        d.box(x, 429, width, 81, PALE)
-        d.text(title, x+13, 440, 12, width-26, PURPLE, "Bold")
-        d.text(body.replace("\n", "<br/>"), x+13, 465, 9.1, width-26, MUTED, max_h=30)
-
-    d.text("Drei transparente Prototyp-Scores, 0 bis 100", M, 528, 12, CW, INK, "Bold")
-    d.text("Zeitbasiert: 100 × positive / (positive + kritische) Zeitanteile. Überlappungen derselben Art zählen einmal. Fachwissen bevorzugt: 100 × gestützt / (gestützt + widersprochen), nur mit geprüftem Quellenzitat.", M, 552, 10, CW, MUTED, max_h=44)
-    d.text("Ohne Evidenz bleibt der Score offen. Formel und Abdeckung sind sichtbar; neutrale und unbekannte Zeit wird ausgeschlossen. Fehlende Warnungen sind kein Lob. Die Werte sind keine validierten Noten.", M, 604, 9.5, CW, MUTED, max_h=42)
-
-    d.line(M, 661, W-M, 661)
+    d.text("Eine kurze Probeaufnahme", M, 218, 12, CW, INK, "Bold")
     for i, (title, body) in enumerate([
-        ("1 / Schnell einsteigen", "Auf dem Demo-Laptop: /gestures zeigt 22 Sekunden synthetische Bewegungen."),
-        ("2 / Selbst ausprobieren", "Quellen vorbereiten, Kamera und Mikro erlauben, kurz präsentieren und Review öffnen."),
-        ("3 / Weiter üben", "Zeitmarke prüfen und danach Practice questions starten; Anbieterzugang erforderlich."),
+        ("Material vorbereiten", "Unter Your sources den Präsentationstyp wählen und Dateien hochladen. Sobald das Material Ready ist, mit Continue to recording ins Studio wechseln."),
+        ("Aufnehmen", "Kamera und Mikrofon erlauben, die Kalibrierung abwarten und kurz präsentieren. Finish & review beendet die Aufnahme und öffnet die Auswertung."),
+        ("Review und Fragen", "Einen Hinweis anklicken und die Stelle ansehen. Practice questions startet den Sprachdialog zur aufgenommenen Präsentation."),
     ]):
-        x=M+i*(CW+15)/3
-        width=(CW-30)/3
-        d.text(title, x, 676, 9.3, width, PURPLE, "Bold")
-        d.text(body, x, 698, 8.7, width, MUTED, max_h=52)
-    d.text("Grenzen: Kopforientierung ist kein Blickkontakt; keine Emotions- oder Persönlichkeitsbewertung. Nur synthetische Demo-Inhalte an Cloud-KI. Basis: AGENTS.md, docs/01-product.md, docs/07-review-and-agent.md; Score-Code: review-scores.ts. Stand 25.10.2026.", M, 755, 7.8, CW, MUTED, leading=10.4, max_h=33)
+        y=247+i*52
+        d.text(str(i+1), M, y, 10, 20, PURPLE)
+        d.text(title, M+27, y, 10.3, 150, INK, "Bold")
+        d.text(body, M+185, y, 9.3, CW-185, INK, max_h=42)
+
+    d.text("Zeitmarken im Review", M, 419, 12, CW, INK, "Bold")
+    d.text("Schematisches Beispiel, keine echte Messung", M+230, 423, 8.2, CW-230, MUTED)
+    x0,x1=M+15,W-M-15
+    d.line(x0, 463, x1, 463, LINE, 1.4)
+    for f,t in [(0,"00:00"),(1/3,"00:20"),(2/3,"00:40"),(1,"01:00")]:
+        x=x0+(x1-x0)*f
+        d.line(x, 458, x, 468, MUTED, .7)
+        d.text(t,x-13,476,8.5,38,MUTED)
+    d.circle(x0+(x1-x0)/3,463,4,PURPLE)
+    d.text("00:20 · Hände zusammen", M, 504, 10, 190, INK, "Bold")
+    d.text("Der Marker öffnet die Stelle im lokalen Video. Dort lässt sich prüfen, ob die Geste zur Aussage passt.", M+203, 504, 9.4, CW-203, INK, max_h=29)
+
+    d.text("Scores im Review", M, 555, 12, CW, INK, "Bold")
+    d.text("Gestik und Flow", M, 582, 10, 160, INK, "Bold")
+    d.text("100 × positive / (positive + kritische) Zeitanteile. Überlappungen derselben Art werden nur einmal gezählt.", M+185, 582, 9.4, CW-185, INK, max_h=29)
+    d.line(M, 621, W-M, 621)
+    d.text("Fachwissen", M, 633, 10, 160, INK, "Bold")
+    d.text("Bevorzugt: 100 × gestützte / (gestützte + widersprochene) Aussagen. Es zählen nur Urteile mit geprüftem Quellenzitat.", M+185, 633, 9.4, CW-185, INK, max_h=42)
+    d.text("Alle drei Werte liegen zwischen 0 und 100. Ohne bewertbare Daten bleibt der jeweilige Score offen. Formel und Datenabdeckung sind sichtbar. Neutrale Beobachtungen und unbekannte Zeit werden ausgeschlossen; die Werte sind keine validierten Noten.", M, 690, 9.4, CW, MUTED, max_h=42)
+    d.text("Ohne eigene Aufnahme: /gestures zeigt einen 22-sekündigen synthetischen Ablauf. /review-preview ist als Beispiel markiert. Für Cloud-Aufrufe werden ausschließlich synthetische Demo-Inhalte verwendet.", M, 745, 8.8, CW, MUTED, max_h=26)
     d.save()
 
 
 def architecture():
     d = Document("418-Pitch-Practice-Architektur.pdf", "Architektur und Datenfluss", 3)
-    d.page_start("01 / Systemüberblick")
-    d.title("Architektur des Prototyps", "Lokal beobachten.<br/>Gezielt analysieren.",
-            "Der Browser erfasst die Präsentation. Python-Jobs analysieren Sprache und Quellen. Zeitmarken führen die Ergebnisse wieder im Review zusammen.")
+    d.page_start("Systemübersicht")
+    d.title("Technische Dokumentation", "Systemübersicht",
+            "Next.js im Browser, FastAPI und Celery im lokalen Docker-Compose-Stack. Pose-Regeln laufen im Browser; Sprach- und Quellenanalysen im Backend. Das Wiedergabevideo wird lokal im Browser gespeichert.")
 
-    d.box(M, 237, CW, 108, PALE)
-    d.text("BROWSER  /  NEXT.JS + TYPESCRIPT", M+14, 249, 9, CW-28, PURPLE, "Bold")
+    d.box(M, 222, CW, 108, PALE, stroke=LINE)
+    d.text("Browser · Next.js / TypeScript", M+14, 234, 10.5, CW-28, INK, "Bold")
     bw=(CW-48)/3
-    for i, (title, body) in enumerate([
-        ("Kamera", "MediaPipe + lokale Regeln<br/>Pose und Hände"),
+    for i,(title,body) in enumerate([
+        ("Kamera", "MediaPipe + lokale Regeln<br/>Körper- und Handpunkte"),
         ("Mikrofon", "AudioWorklet / PCM<br/>Live-Sprechfeedback"),
-        ("Aufnahme & Review", "MediaRecorder + IndexedDB<br/>Lokales Wiedergabevideo"),
+        ("Aufnahme / Review", "MediaRecorder + IndexedDB<br/>Wiedergabe, Analyse, Gespräch"),
     ]):
         x=M+12+i*(bw+12)
-        d.text(title, x, 277, 10, bw, INK, "Bold")
-        d.text(body, x, 299, 8.5, bw, MUTED, max_h=30)
-    d.arrow(W/2, 345, W/2, 387)
-    d.text("HTTP /api + WebSocket / Audio-Upload nach Stop", M, 357, 8.5, 238, MUTED)
+        d.text(title,x,263,9.7,bw,INK,"Bold")
+        d.text(body,x,286,8.5,bw,MUTED,max_h=30)
+    d.arrow(W/2,330,W/2,374)
+    d.text("HTTP /api und WebSocket; Upload nach Stop", M, 344, 8.5, 235, MUTED)
 
-    d.box(M, 388, CW, 52, DARK)
-    d.text("FASTAPI  /  PYTHON 3.12", M+15, 398, 10.5, CW-30, WHITE, "Bold")
-    d.text("Endpunkte, Validierung, Job-Status, Signed URL für den Sprachdialog", M+15, 419, 8.7, CW-30, "C5B9D9")
-    d.arrow(M+64, 440, M+64, 467)
-
-    widths=[129, 200, 150]
-    xs=[M, M+141, M+353]
-    for x,w,title,body in zip(xs,widths,["Redis", "Celery Worker", "Celery Beat"],["Broker + Jobstatus", "ASR, Sprache, Quellen, RAG", "Retention-Scheduler"]):
-        d.node(x, 469, w, 65, title, body)
-    d.arrow(M+129, 501, M+141, 501)
-    # Beat publishes to the queue, rather than directly invoking a worker.
-    d.line(M+428, 469, M+428, 453, PURPLE, dashed=True)
-    d.line(M+428, 453, M+64, 453, PURPLE, dashed=True)
-    d.text("Zeitplan zur Queue", M+286, 439, 7.4, 120, MUTED)
-    # Explicit branches avoid an arrow ending in the gap between the stores.
-    d.line(M+241, 534, M+241, 552, PURPLE)
-    d.line(M+128, 552, M+384, 552, PURPLE)
-    d.arrow(M+128, 552, M+128, 570)
-    d.arrow(M+384, 552, M+384, 570)
-
+    d.box(M,375,CW,53,PALE,stroke=LINE)
+    d.text("FastAPI · Python 3.12",M+14,385,10.5,CW-28,INK,"Bold")
+    d.text("Validierung, Job-Status, Quellen- und Analyse-Endpunkte, Signed URL für ElevenLabs",M+14,407,8.7,CW-28,MUTED)
+    d.arrow(M+64,428,M+64,469)
+    widths=[129,200,150]
+    xs=[M,M+141,M+353]
+    for x,w,title,body in zip(xs,widths,["Redis","Celery Worker","Celery Beat"],["Broker + Jobstatus","ASR, Sprache, Quellen, RAG","Retention-Scheduler"]):
+        d.node(x,470,w,65,title,body)
+    d.arrow(M+129,502,M+141,502)
+    d.line(M+428,470,M+428,451,MUTED,dashed=True)
+    d.line(M+428,451,M+64,451,MUTED,dashed=True)
+    d.text("Zeitgesteuerte Jobs",M+289,436,7.8,120,MUTED)
+    d.line(M+241,535,M+241,556,MUTED)
+    d.line(M+128,556,M+384,556,MUTED)
+    d.arrow(M+128,556,M+128,576,MUTED)
+    d.arrow(M+384,556,M+384,576,MUTED)
     dw=(CW-12)/2
-    d.node(M, 572, dw, 82, "PostgreSQL + pgvector", "Quellen-Chunks + Embeddings;<br/>persistente Review-/Progress-API")
-    d.node(M+dw+12, 572, dw, 82, "SeaweedFS / S3", "Quellen und temporäre Analyse-Uploads;<br/>kein Wiedergabevideo-Dienst")
+    d.node(M,578,dw,80,"PostgreSQL + pgvector","Quellen-Chunks + Embeddings;<br/>persistente Review-/Progress-API")
+    d.node(M+dw+12,578,dw,80,"SeaweedFS / S3","Quellen und temporäre Analyse-Uploads;<br/>keine Video-Wiedergabe aus dem Backend")
 
-    d.box(M, 677, CW, 65, PALE)
-    d.text("CLOUD-VERBINDUNGEN", M+14, 688, 8.3, CW-28, PURPLE, "Bold")
-    d.text("Gemini: Quellenurteile. ElevenLabs: konfigurierter Sprachdialog, direkt aus dem Browser per Signed WebSocket. Deepgram EU: optionales Live-Transkript. Websuche: optional.", M+14, 707, 9.1, CW-28, MUTED, max_h=29)
-    d.text("Betrieb lokal mit Docker Compose. Diagramm vereinfacht. Web-Review aktuell lokal; die persistente Take-/Progress-API ist ein separater Backend-Pfad. Quelle: compose.yaml, docs/03-architecture.md und transport.ts. Stand: 25.10.2026.", M, 758, 7.9, CW, MUTED, leading=10.5, max_h=32)
+    d.text("Externe Dienste",M,685,11,CW,INK,"Bold")
+    d.text("Gemini erstellt Quellenurteile. Der ElevenLabs-Dialog verbindet sich aus dem Browser per Signed WebSocket. Deepgram EU liefert optional Live-Transkripte; Websuche ist ebenfalls optional.",M,709,9.5,CW,INK,max_h=42)
+    d.text("Vereinfachtes Diagramm. Die Web-App nutzt derzeit die Audio-Job-API und lokalen Review. Die persistente Session-/Take-API ist separat implementiert. Basis: compose.yaml, docs/03-architecture.md, transport.ts.",M,762,7.9,CW,MUTED,leading=10.5,max_h=29)
 
-    d.page_start("02 / Analyse & Zeitachse")
-    d.title("Von Eingaben zu Evidenz", "Zwei Pipelines.<br/>Eine Zeitachse.",
-            "Signale, Wörter und Quellenurteile behalten ihren Ursprung. Der Review verbindet sie mit dem Aufnahmevideo, statt separate Clips zu erzeugen.")
+    d.page_start("Analyseabläufe")
+    d.title("Verarbeitung", "Analyseabläufe",
+            "Material und Aufnahme werden getrennt verarbeitet. Der Quellenvergleich nutzt die Aussagen aus dem Transkript. Zeitmarken verbinden die Ergebnisse mit dem lokalen Aufnahmevideo.")
     gap=19
     bw=(CW-gap)/2
-    d.tag("A / MATERIAL & QUELLEN", M, 239, bw)
-    d.tag("B / AUFNAHME & SPRACHE", M+bw+gap, 239, bw)
+    d.tag("Quellen und Aussagen",M,226,bw)
+    d.tag("Aufnahme und Sprache",M+bw+gap,226,bw)
     left=[
-        ("1 / Material einlesen", "PDF, PPTX, DOCX, TXT, MD;<br/>Chunks mit Quelle und Seite/Folie."),
-        ("2 / Lokal suchen", "Jina-Embeddings über FastEmbed/ONNX;<br/>Hybrid-Suche: pgvector + Volltext."),
-        ("3 / Aussagen prüfen", "Gemini extrahiert Aussagen; Retrieval<br/>liefert passende Quellenauszüge."),
-        ("4 / Belege kontrollieren", "Code prüft Zitat und Zahlen. Gestützt,<br/>widersprochen oder nicht gefunden."),
+        ("1 / Material einlesen","PDF, PPTX, DOCX, TXT, MD;<br/>Chunks mit Quelle und Seite/Folie."),
+        ("2 / Passagen suchen","Lokale Jina-Embeddings, FastEmbed/ONNX.<br/>Hybrid-Suche: pgvector + Volltext."),
+        ("3 / Quellenvergleich","Aussagen aus dem Transkript + Retrieval.<br/>Gemini urteilt mit Quellenauszügen."),
+        ("4 / Urteil prüfen","Code prüft Zitat und Zahlen. Gestützt,<br/>widersprochen oder nicht gefunden."),
     ]
     right=[
-        ("1 / Live erfassen", "Pose-Regeln im Browser; PCM zum Server.<br/>Live-Pausen zusätzlich im Browser."),
-        ("2 / Nach Stop analysieren", "Temporärer Upload; FFmpeg, RMS,<br/>YIN-Pitch und Silero-Sprachaktivität."),
-        ("3 / Wörter transkribieren", "Lokales faster-whisper mit Zeitmarken.<br/>Finale Deepgram-Wörter wiederverwendbar."),
-        ("4 / Sprechmerkmale ableiten", "Wort-Tempo, Pausen und Füllwörter;<br/>Zusammenführung mit Signal-Events."),
+        ("1 / Während der Aufnahme","Pose-Regeln im Browser; PCM zum Server.<br/>Live-Pausen zusätzlich im Browser."),
+        ("2 / Nach dem Stoppen","Temporärer Upload; FFmpeg, RMS,<br/>YIN-Pitch und Silero-Sprachaktivität."),
+        ("3 / Transkription","Lokales faster-whisper mit Wort-Zeitmarken.<br/>Finale Deepgram-Wörter wiederverwendbar."),
+        ("4 / Wortbasierte Merkmale","Tempo, Pausen und Füllwörter;<br/>Zusammenführung mit Signal-Events."),
     ]
-    for x, nodes in [(M,left),(M+bw+gap,right)]:
+    for x,nodes in [(M,left),(M+bw+gap,right)]:
         for i,(title,body) in enumerate(nodes):
-            y=277+i*77
-            d.node(x, y, bw, 63, title, body)
+            y=268+i*77
+            d.node(x,y,bw,63,title,body)
             if i<3:
-                d.arrow(x+bw/2, y+63, x+bw/2, y+77)
-    d.line(M+bw/2, 571, M+bw/2, 587, PURPLE)
-    d.line(M+bw+gap+bw/2, 571, M+bw+gap+bw/2, 587, PURPLE)
-    d.line(M+bw/2, 587, M+bw+gap+bw/2, 587, PURPLE)
-    d.arrow(W/2, 587, W/2, 605)
+                d.arrow(x+bw/2,y+63,x+bw/2,y+77,MUTED)
+    d.arrow(M+bw+gap,453,M+bw,453,MUTED,dashed=True)
+    d.line(M+bw/2,562,M+bw/2,580,MUTED)
+    d.line(M+bw+gap+bw/2,562,M+bw+gap+bw/2,580,MUTED)
+    d.line(M+bw/2,580,M+bw+gap+bw/2,580,MUTED)
+    d.arrow(W/2,580,W/2,600,MUTED)
 
-    d.box(M, 606, CW, 101, DARK)
-    d.text("GEMEINSAMER EVENT-VERTRAG", M+16, 620, 9.1, CW-32, "BCA6F0", "Bold")
-    d.text("t_ms = relativ zum Aufnahmestart  /  peak_ms = Sprungziel", M+16, 644, 11, CW-32, WHITE, "Bold")
-    d.text("Typ, Dauer, Quelle, Schweregrad und Payload halten Evidenz fest. MediaRecorder.onstart verankert die Browserzeit; das Review springt über video.currentTime.", M+16, 671, 9.2, CW-32, "D9CEE8", max_h=29)
-    d.text("Beispiel zur Einordnung: Eine nicht gefundene Aussage ist nicht automatisch falsch. Ein geprüftes Zitat belegt die Fundstelle, aber garantiert keine korrekte Modellinterpretation. Live-Captions sind separat von der vollständigen Analyse.", M, 728, 9.3, CW, MUTED, max_h=43)
+    d.line(M,602,W-M,602)
+    d.text("Gemeinsame Zeitachse",M,617,12,CW,INK,"Bold")
+    d.text("t_ms",M,646,10,80,PURPLE,"Bold")
+    d.text("Zeit relativ zum Aufnahmestart",M+100,646,10,CW-100,INK)
+    d.text("peak_ms",M,671,10,80,PURPLE,"Bold")
+    d.text("Sprungziel im Aufnahmevideo",M+100,671,10,CW-100,INK)
+    d.text("Events enthalten außerdem Typ, Dauer, Quelle, Schweregrad und Messdaten. MediaRecorder.onstart verankert die Browserzeit. Im Review erfolgt der Sprung über video.currentTime; es werden keine Server-Clips erstellt.",M,707,9.5,CW,INK,max_h=42)
+    d.text("Ein geprüftes Zitat belegt die Fundstelle, garantiert aber kein korrektes Modellurteil. Nicht gefunden bedeutet nicht falsch. Basis: docs/03-architecture.md; backend/app/events.py; backend/app/review/models.py.",M,763,7.9,CW,MUTED,leading=10.5,max_h=29)
 
-    d.page_start("03 / Entscheidungen & Grenzen")
-    d.title("Technik mit klarer Verantwortung", "Was bleibt wo?<br/>Was ist schon verbunden?", "Bewusst getrennte Speicher und austauschbare Anbieter halten den Demo-Pfad verständlich. Bestehende Erweiterungen werden nicht als fertiger End-to-End-Pfad verkauft.")
-
-    half=(CW-15)/2
-    d.node(M, 240, half, 113, "Im Web angebunden", "Aufnahme → /speech/analyze → Job-Polling;<br/>Quellen und Fact-Check; lokaler Review;<br/>konfigurierter ElevenLabs-Dialog.<br/>Video, Analyse und Gespräch in IndexedDB.", PALE)
-    d.node(M+half+15, 240, half, 113, "Backend-Erweiterung vorhanden", "Sessions/Takes/Reviews in Postgres;<br/>Progress-Profile und Metriken.<br/>Live-Takes sind noch nicht an diesen<br/>Persistenz-/Progress-Pfad angebunden.", PALE)
-
-    d.text("Vier Architekturentscheidungen", M, 377, 13, CW, INK, "Bold")
-    decisions=[
-        ("Lokal rechnen", "MediaPipe im Browser und Whisper/Embeddings lokal. Cloud wird für Quellenurteile bzw. den konfigurierten Sprachdialog eingesetzt."),
-        ("Arbeit entkoppeln", "Lange Analysen laufen in Celery. Die API liefert eine Job-ID; der Browser fragt den Status ab. Redis transportiert keine Medien."),
-        ("Belege prüfen", "Schemas, Zitat- und Zahlenprüfungen begrenzen Modellantworten. Das ist kein vollständiger Schutz vor Prompt Injection oder Fehlurteilen."),
-        ("Ausfälle erklären", "Kamera-/Sprachreview nutzt feste Texte aus gemessenen Events. Fehlende Quellenurteile oder Fragen werden bei Modellfehlern nicht erfunden."),
+    d.page_start("Speicherung und Betrieb")
+    d.title("Daten und Integrationsstand", "Speicherung und Betrieb",
+            "Video und Review bleiben im lokalen Browser-Arbeitsbereich. Der Server speichert Quellen und Analyseergebnisse. Die zusätzliche Session-/Take- und Progress-API ist noch nicht mit neuen Web-Aufnahmen verbunden.")
+    d.text("Daten",M,220,10,160,INK,"Bold")
+    d.text("Speicher und Lebensdauer",M+175,220,10,CW-175,INK,"Bold")
+    d.line(M,243,W-M,243)
+    rows=[
+        ("Video, Pose-Log, Review","IndexedDB im Browser, einschließlich Transkript und Gespräch. Nach Reload wieder verfügbar; lokales Löschen im Review."),
+        ("Analyse-Upload","Vollständige Aufnahme temporär in SeaweedFS. Nach der Verarbeitung wird das Original gelöscht, auch bei Analysefehlern."),
+        ("Quellen","Originaldateien in SeaweedFS, Chunks und Embeddings in Postgres. Automatischer Quellen-Cleanup ist noch offen."),
+        ("Persistente Takes / Progress","Separate API mit Daten in Postgres. Session-Löschung und Profil-Löschung sind getrennt; Profil-Löschung entkoppelt Takes."),
     ]
-    for i,(title,body) in enumerate(decisions):
-        y=407+i*49
-        d.text(title, M, y, 10, 123, PURPLE, "Bold")
-        d.text(body, M+132, y, 9.15, CW-132, MUTED, max_h=40)
-        if i<3:
-            d.line(M, y+43, W-M, y+43)
+    for i,(title,body) in enumerate(rows):
+        y=257+i*50
+        d.text(title,M,y,9.6,160,INK,"Bold",max_h=29)
+        d.text(body,M+175,y,9.2,CW-175,INK,max_h=40)
+        d.line(M,y+43,W-M,y+43)
 
-    d.box(M, 616, CW, 90, DARK)
-    d.text("DATEN & DATENSCHUTZ", M+15, 628, 8.5, CW-30, "BCA6F0", "Bold")
-    d.text("Die Wiedergabekopie liegt lokal. Für die Analyse wird die vollständige Aufnahme temporär hochgeladen und danach gelöscht, auch bei Analysefehlern. Quellen und Legacy-Ergebnisse haben noch offene Cleanup-Aufgaben. Lokales Löschen entfernt keine separaten Backend-Daten.", M+15, 648, 9.1, CW-30, WHITE, max_h=43)
-    d.text("Nur synthetische Demo-Inhalte an Cloud-KI; Einwilligung vor Aufnahme. Gemini ohne EU-Region-Pinning. ElevenLabs-Sprachreaktionen sind nicht zitateverifiziert. Deepgram ist Opt-in. Keine Genauigkeits- oder Lernwirksamkeitszusage.", M, 720, 8.8, CW, MUTED, max_h=39)
-    d.text('Technische Basis: AGENTS.md; compose.yaml; docs/03-architecture.md; docs/07-review-and-agent.md; docs/14-open-todos.md; docs/15-grounding-hardening.md. Repository: <link href="https://github.com/johannes3502/hackathon-fulda" color="#3803BF">github.com/johannes3502/hackathon-fulda</link>. Stand 25.10.2026.', M, 765, 7.6, CW, MUTED, leading=10, max_h=25)
+    d.text("Anbindung und Fehlerbehandlung",M,474,12,CW,INK,"Bold")
+    d.text("Die Web-App lädt über /speech/analyze hoch und fragt den Job-Status ab. Lange Arbeiten laufen in Celery; Redis enthält IDs und Status, keine Medien. Kamera- und Sprachhinweise können ohne LLM aus den erhobenen Events erklärt werden. Ein fehlendes Quellenurteil bleibt offen.",M,499,9.5,CW,INK,max_h=56)
+
+    d.text("Modelle und externe Dienste",M,573,12,CW,INK,"Bold")
+    d.text("MediaPipe, Whisper und Embeddings laufen lokal. Gemini erhält für den Quellencheck Transkript und Quellenauszüge; es gibt kein EU-Region-Pinning. ElevenLabs verarbeitet den Sprachdialog, dessen Reaktionen nicht zitateverifiziert sind. Deepgram EU ist für Live-Transkripte optional und standardmäßig aus.",M,598,9.5,CW,INK,max_h=56)
+
+    d.text("Grenzen des Prototyps",M,672,12,CW,INK,"Bold")
+    d.text("Demo-Inhalte für Cloud-Aufrufe sind synthetisch. Zitat-, Zahlen- und Schema-Prüfungen reduzieren Modellfehler, bieten aber keinen vollständigen Prompt-Injection-Schutz. Die Qualität auf echten Geräten und die Lernwirksamkeit sind nicht validiert. Lokales Löschen entfernt keine separaten Backend-Daten; Legacy-Ergebnis-Cleanup bleibt offen.",M,697,9.2,CW,MUTED,max_h=54)
+    d.text('Basis: AGENTS.md; docs/03-architecture.md; docs/07-review-and-agent.md; docs/14-open-todos.md; docs/15-grounding-hardening.md. <link href="https://github.com/johannes3502/hackathon-fulda" color="#3803BF">Repository: johannes3502/hackathon-fulda</link>. Stand 25.10.2026.',M,765,7.7,CW,MUTED,leading=10.3,max_h=25)
     d.save()
 
 
