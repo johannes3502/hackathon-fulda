@@ -1,0 +1,74 @@
+body:has(.stage-live) .app-header,
+body:has(.stage-live) .practice-journey,
+body:has(.stage-live) .app-footer {
+  display: none;
+}
+
+@media (min-width: 761px) {
+  body:has(.review-workspace.stage-live) .app-header,
+  body:has(.review-workspace.stage-live) .practice-journey,
+  body:has(.review-workspace.stage-live) .app-footer {
+    display: none;
+  }
+}
+
+body:has(.stage-live) main {
+  padding-top: 0;
+}
+
+.stage-live {
+  padding-top: 24px;
+}
+
+.stage-live .live-options,
+.stage-live .recent-recordings,
+.stage-live .workspace-back {
+  display: none;
+}
+
+.stage-live-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.stage-live-bar > div {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stage-live-bar strong {
+  color: var(--primary);
+  letter-spacing: 0.02em;
+}
+
+.stage-live-bar span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.stage-live-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stage-live-actions a {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .stage-live-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

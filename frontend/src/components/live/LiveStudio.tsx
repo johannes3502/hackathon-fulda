@@ -60,6 +60,7 @@ import { backendLabel, fallbackLabel } from "@/features/pose/backend";
 import { PresentationSetup } from "./PresentationSetup";
 import { collectionId } from "@/features/sources/api";
 import "./record-accessibility.css";
+import "./stage-live.css";
 
 const cameraCopy = {
   idle: "Enable your camera to check your framing. Then start recording when you’re ready.",
@@ -72,7 +73,15 @@ const cameraCopy = {
     "No camera is available. Use HTTPS or localhost and connect a camera.",
   failed: "The camera could not start. Close other camera apps and try again.",
 };
-export function LiveStudio() {
+export function LiveStudio({
+  stage = false,
+  initialLocal = false,
+  stageAnalysis,
+}: {
+  stage?: boolean;
+  initialLocal?: boolean;
+  stageAnalysis?: "live" | "local";
+}) {
   const router = useRouter();
   const { stageRef, toggleRef, fullscreen, toggle } = useStageFullscreen();
   const {
@@ -85,18 +94,25 @@ export function LiveStudio() {
   } = useLiveSessions();
   const {
     status: cameraStatus,
+    audioAvailable,
     videoRef,
     enable,
     stop: stopCamera,
     getStream,
   } = useCameraPreview();
+  const [localFallback, setLocalFallback] = useState(
+    initialLocal || (stage && stageAnalysis === "local"),
+  );
+  const [captured, setCaptured] = useState<string | null>(null);
   const pose = usePoseCapture(
     videoRef,
     cameraStatus === "active",
     featureFlags,
   );
-  const [title, setTitle] = useState("My pitch rehearsal");
-  const [targetMs, setTargetMs] = useState(180000);
+  const [title, setTitle] = useState(
+    stage ? "Jury-Demo · 418" : "My pitch rehearsal",
+  );
+  const [targetMs, setTargetMs] = useState(stage ? 60000 : 180000);
   const serverSpeech = useRef<LiveCaptions | null>(null);
   // Browser microphone measurements for the pause rules only: a pause shows
   // once it lasts 2 s, without waiting for speech and the server window. The
@@ -156,6 +172,15 @@ export function LiveStudio() {
     [],
   );
   useEffect(() => {
+    if (!progress) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [progress]);
+  useEffect(() => {
     const controller = new AbortController();
     let destination: string;
     try {
@@ -203,16 +228,17 @@ export function LiveStudio() {
     const generation = ++startGeneration.current;
     const config: LiveConfig = {
       presentationMode,
-      sourceCollectionId: collectionId(),
+      sourceCollectionId: stage ? undefined : collectionId(),
       title: title.trim(),
       targetMs,
-      mode: "backend",
+      mode: localFallback ? "local" : "backend",
       endpoint: destination,
-      transcribe,
+      transcribe: !localFallback && transcribe,
       featureFlags: { ...featureFlags, liveSpeechFeedback: true },
+      ...(stage ? { stage: true, analysisTimeoutMs: 90_000 } : {}),
     };
     const liveTranscript =
-      transcribe && liveCaptions
+      !localFallback && transcribe && liveCaptions
         ? new LiveCaptions(
             (text, status) => setCaption({ text, status }),
             undefined,
@@ -238,6 +264,7 @@ export function LiveStudio() {
       )
         return; // Cancelled during connection setup.
     }
+    setCaptured(null);
     const recorder = new LiveRecorder(
       stream,
       config,
@@ -291,14 +318,16 @@ export function LiveStudio() {
               })),
           ].sort((a, b) => a.startMs - b.startMs),
         });
-        router.push(`/live/${recording.id}/review`);
+        router.push(
+          `/live/${recording.id}/review${stage ? "?stage=1" : ""}`,
+        );
       },
       (timestamp) => {
         pose.beginRecording(timestamp, recorder.id);
         serverEvents.current = [];
         setServerFeedback([]);
         setServerCue(null);
-        if (featureFlags.speechFeedback) {
+        if (!localFallback && featureFlags.speechFeedback) {
           const shown = new Map<string, number>();
           serverSpeech.current = new LiveCaptions(
             (_, status) => {
@@ -373,10 +402,15 @@ export function LiveStudio() {
         }
         liveTranscript?.beginRecording();
       },
+      (captured) => {
+        save(captured);
+        setCaptured(captured.id);
+      },
     );
     owner.current = recorder;
     try {
       await recorder.start();
+      busy.current = false;
     } catch (e) {
       if (owner.current !== recorder) return;
       recorder.dispose();
@@ -402,6 +436,7 @@ export function LiveStudio() {
     busy.current = false;
     stopCamera();
     setProgress(null);
+    setCaptured(null);
   };
   const evaluation =
     cameraStatus === "active" && pose.state?.phase === "running"
@@ -452,13 +487,40 @@ export function LiveStudio() {
   );
   const FeedbackIcon = appearance.Icon;
   const largeView = cameraStatus === "active" || !!progress;
+  const startLabel = stage ? "Demo starten" : "Start recording";
+  const finishLabel = stage ? "Demo beenden & Review" : "Finish & review";
   return (
     <AppShell experience="live">
       <div
-        className={`workspace live-workspace${largeView ? " live-workspace-large" : ""}`}
+        className={`workspace live-workspace${largeView ? " live-workspace-large" : ""}${stage ? " stage-live" : ""}`}
         data-feedback={appearance.tone}
+        data-stage={stage ? "true" : undefined}
       >
-        {!largeView && (
+        {stage && (
+          <div className="stage-live-bar">
+            <div>
+              <strong>418 · Pitch Mode</strong>
+              <span>
+                {localFallback
+                  ? "Lokaler Sofortpfad · keine Analyse-Uploads"
+                  : "Live-Pfad · Backend-Analyse"}
+              </span>
+            </div>
+            <div className="stage-live-actions">
+              {!progress && (
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setLocalFallback(!localFallback)}
+                >
+                  {localFallback ? "Backend-Modus" : "Lokaler Modus"}
+                </button>
+              )}
+              <Link href="/stage">Stage</Link>
+            </div>
+          </div>
+        )}
+        {!largeView && !stage && (
           <div className="workspace-back">
             <Link href="/sources">
               <ArrowLeft size={16} aria-hidden /> Back to sources
@@ -480,10 +542,26 @@ export function LiveStudio() {
             {error}
           </p>
         )}
+        {stage &&
+          cameraStatus === "active" &&
+          audioAvailable === false &&
+          !localFallback && (
+            <p className="status-warning" role="status">
+              Das Mikrofon ist nicht verfügbar. Die Kamera und Pose-Erkennung
+              laufen weiter.{" "}
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setLocalFallback(true)}
+              >
+                Lokale Videoaufnahme starten
+              </button>
+            </p>
+          )}
         <div id="live-studio" className="studio-grid live-studio-grid">
           <div className="studio-main">
             <div className="live-control-bar" aria-hidden={fullscreen}>
-              {!progress && cameraStatus === "active" && (
+              {!progress && cameraStatus === "active" && !stage && (
                 <Button asChild variant="outline">
                   <Link href="/sources">
                     <ArrowLeft size={16} aria-hidden /> Back to sources
@@ -498,7 +576,7 @@ export function LiveStudio() {
                 cameraStatus === "active" && (
                   <>
                     <Button onClick={() => void start()}>
-                      <Radio size={17} /> Start recording
+                          <Radio size={17} /> {startLabel}
                     </Button>
                     <Button variant="ghost" onClick={stopCamera}>
                       <CameraOff size={17} /> Turn camera off
@@ -516,14 +594,27 @@ export function LiveStudio() {
                 >
                   <Square size={14} fill="currentColor" />
                   {progress.phase === "finishing"
-                    ? "Preparing video & feedback…"
-                    : "Finish & review"}
+                    ? "Analyse läuft…"
+                    : finishLabel}
+                </Button>
+              )}
+              {stage && captured && progress?.phase === "finishing" && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    owner.current?.dispose();
+                    router.push(`/live/${captured}/review?stage=1`);
+                  }}
+                >
+                  Review jetzt öffnen
                 </Button>
               )}
               <div className="live-view-toolbar">
-                <a className="text-button" href="#live-options">
-                  Options
-                </a>
+                {!stage && (
+                  <a className="text-button" href="#live-options">
+                    Options
+                  </a>
+                )}
                 {progress && (
                   <strong className="live-view-time">
                     {time(progress?.elapsedMs ?? 0)}
@@ -741,7 +832,7 @@ export function LiveStudio() {
                         </Button>
                       ) : !progress ? (
                         <Button onClick={() => void start()}>
-                          <Radio size={17} /> Start recording
+                      <Radio size={17} /> {startLabel}
                         </Button>
                       ) : progress.phase === "connecting" ? (
                         <Button variant="outline" onClick={cancel}>
@@ -754,10 +845,25 @@ export function LiveStudio() {
                         >
                           <Square size={14} fill="currentColor" />
                           {progress.phase === "finishing"
-                            ? "Preparing video & feedback…"
-                            : "Finish & review"}
+                            ? "Analyse läuft…"
+                            : finishLabel}
                         </Button>
                       )}
+                      {stage &&
+                        captured &&
+                        progress?.phase === "finishing" && (
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              owner.current?.dispose();
+                              router.push(
+                                `/live/${captured}/review?stage=1`,
+                              );
+                            }}
+                          >
+                            Review jetzt öffnen
+                          </Button>
+                        )}
                     </div>
                   </div>
                 ) : (
