@@ -4,6 +4,9 @@ export type PresentationMode = NonNullable<
   components["schemas"]["QuestionRequest"]["presentation_mode"]
 >;
 
+export const PRESENTATION_MODE_OPTIONS = ["startup", "thesis", "school"] as const;
+
+// Keep retired mode details so saved recordings still open with their original context.
 export const PRESENTATION_MODES: Record<
   PresentationMode,
   { label: string; listener: string; focus: string }
@@ -38,7 +41,7 @@ export function presentationModeSnapshot(): PresentationMode {
   if (current) return current;
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && Object.hasOwn(PRESENTATION_MODES, saved))
+    if (PRESENTATION_MODE_OPTIONS.some((mode) => mode === saved))
       return (current = saved as PresentationMode);
   } catch {}
   return (current = "startup");

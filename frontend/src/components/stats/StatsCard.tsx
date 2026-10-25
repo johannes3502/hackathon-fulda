@@ -96,8 +96,10 @@ export function StatsDashboard() {
         </dl>
 
         <section
+          id="past-recordings"
           className="stats418-recordings"
           aria-labelledby="recordings-heading"
+          tabIndex={-1}
         >
           <h2 id="recordings-heading">Deine Takes</h2>
           <SessionStorageNotice />

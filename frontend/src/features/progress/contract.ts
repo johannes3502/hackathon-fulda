@@ -286,7 +286,6 @@ export const PRESENTATION_MODES: PresentationMode[] = [
   "startup",
   "thesis",
   "school",
-  "nonprofit",
 ];
 
 export const PRESENTATION_MODE_LABEL: Record<PresentationMode, string> = {

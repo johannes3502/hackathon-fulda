@@ -369,11 +369,12 @@ sequenceDiagram
 
 Der Web-Review hat zwei Ansichten: **Review moments** (begrenzte Wiedergabe-
 Fenster im lokalen Video, zeitgenaue Anmerkungen) und **Practice questions**.
-Auf `/sources` wird `presentationMode` (startup/thesis/school/nonprofit) neben
+Auf `/sources` wird `presentationMode` (startup/thesis/school) neben
 dem Upload gewählt und im Browser gespeichert. Vor der Aufnahme werden Modus
 und `sourceCollectionId` im Take eingefroren. In beiden Fragepfaden steuert
-derselbe Modus Rolle und fachliche Schwerpunkte: Investor, Hochschullehrkraft,
-Schullehrkraft oder potenzielle Unterstützung; ohne Scores oder Noten. Nach der
+derselbe Modus Rolle und fachliche Schwerpunkte: Investor, Hochschullehrkraft
+oder Schullehrkraft; ohne Scores oder Noten. `nonprofit` bleibt für alte
+Aufnahmen kompatibel, ist aber nicht mehr auswählbar. Nach der
 vollständig beantworteten getippten Runde zeigt der Client zusätzlich eine
 Auswertung mit transparentem Heuristik-Score aus gemessenen Events; siehe
 `docs/07-review-and-agent.md`.
@@ -497,7 +498,7 @@ flowchart TD
 
     LIVE --> LREV["/live/sessionId/review<br/>LiveReview: Review moments + Practice questions<br/>Video, Stärken und nächste Übungsschritte<br/>Feste Erklärungen aus Messdaten ohne LLM<br/>Transkript, Quellencheck und Exporte als Details"]
     LREV -->|"POST /factcheck,<br/>GET /sources?collection_id"| FCAPI["Fact-Check-Job<br/>sourceCollectionId des aufgenommenen Takes"]
-    LREV -->|"POST /questions/agent + /agent/session<br/>oder /questions + /answers"| QAPI["ElevenLabs-Dialog oder getippte Fragen<br/>Startup, Thesis, Schule, Nonprofit<br/>eine Frage pro Schritt"]
+    LREV -->|"POST /questions/agent + /agent/session<br/>oder /questions + /answers"| QAPI["ElevenLabs-Dialog oder getippte Fragen<br/>Startup, Thesis, Schule<br/>Nonprofit nur für bestehende Takes<br/>eine Frage pro Schritt"]
     QAPI -->|"Sprachdialog beenden oder<br/>getippte Runde beantworten"| FINALSTATS["PerformanceEvaluation: Your take at a glance<br/>bestehende Messdaten, Heuristik und Grenzen"]
     LREV -. "bestehender Direktlink" .-> MOM["/live/sessionId/moments<br/>FeedbackReplay: Filter,<br/>Clip-Sprung + Loop"]
     LREV --> LA["/live/sessionId/analysis<br/>ReviewAnalysis: Video + Event-Zeitachse<br/>keine erfundenen Scores"]

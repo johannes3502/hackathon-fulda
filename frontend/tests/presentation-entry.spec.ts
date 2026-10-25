@@ -7,6 +7,37 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
+test("hero links to past recordings even before the first take", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  const intro = page.getByRole("region", {
+    name: "Deine Idee verdient einen starken Auftritt.",
+  });
+  const link = intro.getByRole("link", {
+    name: "Vergangene Aufnahmen",
+    exact: true,
+  });
+  await expect(link).toHaveAttribute("href", "#past-recordings");
+  await expect(link).toBeVisible();
+  await intro.screenshot({ path: info.outputPath("hero-past-recordings.png") });
+  await link.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/#past-recordings$/);
+  const recordings = page.getByRole("region", {
+    name: "Deine Takes",
+    exact: true,
+  });
+  await expect(recordings).toBeFocused();
+  await expect(recordings.getByRole("heading")).toBeInViewport();
+  await expect(
+    recordings.getByText(
+      "Hier erscheinen deine aufgenommenen Präsentationen.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+});
+
 test("Home returns to the overview from the simplified header", async ({
   page,
 }) => {

@@ -1,7 +1,8 @@
 # Review und ElevenLabs-Fragerunde
 
 Nutzerentscheidung, 24.10.2026: zwei Review-Schritte, Fragen passend zu
-Startup-Pitch, Thesis-Verteidigung, Schulvortrag oder Nonprofit-Einladung.
+Startup-Pitch, Thesis-Verteidigung oder Schulvortrag. Nonprofit wird nicht mehr
+zur Auswahl angeboten; bestehende Aufnahmen bleiben kompatibel.
 Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
 
 ## Ablauf
@@ -127,8 +128,7 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
   Sprachagent und getippte Fragerunde verwenden dieselben Modus-Vorgaben:
   Startup = Investor (Nachfrage, Geschäftsmodell, Annahmen und konkreter Ask),
   Thesis = Hochschullehrkraft (Methoden, Belege, Grenzen und Transfer),
-  Schule = Lehrkraft (Verständnis, Erklärungen und Beispiele),
-  Nonprofit = potenzielle Unterstützung (Mission, Wirkung, Machbarkeit und Mitmachen).
+  Schule = Lehrkraft (Verständnis, Erklärungen und Beispiele).
   Alle Fragen bleiben am abgeschlossenen Vortrag oder Material verankert;
   ohne zusätzliche Begrüßung, Vorstellung oder Rückblick.
   Ist eine Antwort geprüft korrekt und beantwortet die

@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { PRESENTATION_MODES } from "../src/features/questions/presentation";
+import {
+  PRESENTATION_MODES,
+  PRESENTATION_MODE_OPTIONS,
+} from "../src/features/questions/presentation";
 
-for (const [mode, details] of Object.entries(PRESENTATION_MODES)) {
+for (const mode of PRESENTATION_MODE_OPTIONS) {
+  const details = PRESENTATION_MODES[mode];
   test(`${mode} questioning is set alongside uploads and retained in the studio`, async ({
     page,
   }, info) => {
@@ -13,6 +17,11 @@ for (const [mode, details] of Object.entries(PRESENTATION_MODES)) {
       name: "What are you preparing for?",
     });
     await expect(select).toBeVisible();
+    await expect(select.locator("option")).toHaveText([
+      "Startup pitch",
+      "Thesis defense",
+      "School presentation",
+    ]);
     await expect(page.locator('input[type="file"]')).toBeEnabled();
     await select.selectOption(mode);
     await expect(page.locator("#presentation-mode-focus")).toContainText(
@@ -20,7 +29,7 @@ for (const [mode, details] of Object.entries(PRESENTATION_MODES)) {
     );
     await page.reload();
     await expect(select).toHaveValue(mode);
-    if (mode === "nonprofit")
+    if (mode === "school")
       await page.screenshot({
         path: info.outputPath("question-mode-with-uploads.png"),
         fullPage: true,
@@ -42,3 +51,18 @@ for (const [mode, details] of Object.entries(PRESENTATION_MODES)) {
     ).toBe(true);
   });
 }
+
+test("a retired saved mode resets to startup during preparation", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("pitchcoach.presentationMode", "nonprofit"),
+  );
+  await page.route("**/sources?collection_id=*", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.goto("/sources");
+  await expect(
+    page.getByRole("combobox", { name: "What are you preparing for?" }),
+  ).toHaveValue("startup");
+});

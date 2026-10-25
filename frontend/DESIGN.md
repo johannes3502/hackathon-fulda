@@ -31,7 +31,8 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   separators and secondary text.
 - `/` and `/stats-preview` begin with a presentation introduction: primary action
   “Neue Präsentation” opens `/sources` to add presentation material; the secondary
-  action also prepares sources. Three steps explain preparation, recording and
+  action also prepares sources. “Vergangene Aufnahmen” jumps to the saved takes
+  on the same page, including their empty state. Three steps explain preparation, recording and
   review. A recent take links back into its review; completed takes persist locally
   in IndexedDB.
   Below, `StatsDashboard` shows counts, durations and observations from actual

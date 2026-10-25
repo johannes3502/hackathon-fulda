@@ -352,8 +352,9 @@ Latenzzusage aus den synthetischen Protokolltests ableiten.
 Web-Review: zwei Hauptansichten, **Review moments** mit zeitgenauen Anmerkungen
 und begrenzter Wiedergabe im lokalen Vollvideo, **Practice questions** mit einer
 Frage pro Schritt. Transkript, Quellencheck und Exporte sind aufklappbare Details.
-Vor der Aufnahme stehen Material-Upload und vier Präsentationstypen bereit:
-`startup`, `thesis`, `school`, `nonprofit`. `sourceCollectionId` und
+Vor der Aufnahme stehen Material-Upload und drei Präsentationstypen bereit:
+`startup`, `thesis`, `school`. `nonprofit` bleibt nur für bestehende Aufnahmen
+kompatibel und wird nicht mehr zur Auswahl angeboten. `sourceCollectionId` und
 `presentationMode` werden im Take festgehalten und an beide Fragepfade übergeben.
 ElevenLabs ist auf Nutzerwunsch als optionaler Sprachdialog integriert; Nutzer
 konfiguriert `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` selbst. Kontext als

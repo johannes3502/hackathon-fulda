@@ -256,7 +256,8 @@ das lokale Vollvideo; serverseitige Clip-Dateien sind gemäß aktuellem Backend-
 aufklappbar.
 
 Vor dem Take: Auf `/sources` neben dem Datei-Upload den Präsentationstyp wählen:
-Startup-Pitch, Bachelor-Verteidigung, Schulvortrag oder Nonprofit-Einladung.
+Startup-Pitch, Bachelor-Verteidigung oder Schulvortrag. Nonprofit ist nicht mehr
+auswählbar; bestehende Aufnahmen bleiben kompatibel.
 Die Auswahl bleibt über Navigation und Reload erhalten und wird beim
 Aufnahmestart im Take festgehalten. In Sprachdialog und getippter Fragerunde
 verändert derselbe Typ Rolle und Frageschwerpunkte, ohne Noten oder Scores. Der

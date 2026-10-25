@@ -1,6 +1,7 @@
 import { NativeSelect } from "@/components/ui/input";
 import {
   PRESENTATION_MODES,
+  PRESENTATION_MODE_OPTIONS,
   type PresentationMode,
 } from "@/features/questions/presentation";
 
@@ -20,9 +21,9 @@ export function PresentationModeSelect({
         onChange={(event) => onMode(event.target.value as PresentationMode)}
         aria-describedby="presentation-mode-focus"
       >
-        {Object.entries(PRESENTATION_MODES).map(([key, item]) => (
+        {PRESENTATION_MODE_OPTIONS.map((key) => (
           <option key={key} value={key}>
-            {item.label}
+            {PRESENTATION_MODES[key].label}
           </option>
         ))}
       </NativeSelect>

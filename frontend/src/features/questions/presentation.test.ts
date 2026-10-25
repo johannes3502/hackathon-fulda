@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-it.each(["startup", "thesis", "school", "nonprofit"] as const)(
+it.each(["startup", "thesis", "school"] as const)(
   "shares and restores the %s mode selected during preparation",
   async (mode) => {
     const presentation = await load();
@@ -31,13 +31,29 @@ it.each(["startup", "thesis", "school", "nonprofit"] as const)(
   },
 );
 
-it.each(["invalid", "toString", "__proto__"])(
+it.each(["invalid", "toString", "__proto__", "nonprofit"])(
   "ignores an invalid stored mode: %s",
   async (value) => {
     storage.set("pitchcoach.presentationMode", value);
     expect((await load()).presentationModeSnapshot()).toBe("startup");
   },
 );
+
+it("retains retired mode details for saved recordings without offering it for new takes", async () => {
+  const presentation = await load();
+  const progress = await import("../progress/contract");
+  expect(presentation.PRESENTATION_MODE_OPTIONS).toEqual([
+    "startup",
+    "thesis",
+    "school",
+  ]);
+  expect(progress.PRESENTATION_MODES).toEqual(
+    presentation.PRESENTATION_MODE_OPTIONS,
+  );
+  expect(presentation.PRESENTATION_MODES.nonprofit.listener).toBe(
+    "Potential supporter",
+  );
+});
 
 it("keeps the selection usable when browser storage is blocked", async () => {
   vi.stubGlobal("localStorage", {
