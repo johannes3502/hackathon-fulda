@@ -31,15 +31,16 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   separators and secondary text.
 - `/` and `/stats-preview` begin with a presentation introduction: primary action
   “Neue Präsentation” opens `/sources` to add presentation material; the secondary
-  action also prepares sources. “Vergangene Aufnahmen” jumps to the saved takes
-  on the same page, including their empty state. Three steps explain preparation, recording and
+  action also prepares sources. Three steps explain preparation, recording and
   review. A recent take links back into its review; completed takes persist locally
   in IndexedDB.
   Below, `StatsDashboard` shows counts, durations and observations from actual
   recordings in the current workspace, with an empty state before the first take.
   No synthetic percentages, monthly histories or performance scores appear.
-  `AppShell` provides the logo, Home and Admin links, appearance and help controls
-  outside the record screen. Active links use `aria-current`. A shared
+  `AppShell` provides the logo, Home, Vergangene Aufnahmen and Admin links,
+  appearance and help controls outside the record screen. Active links use
+  `aria-current`. “Vergangene Aufnahmen” opens `/#past-recordings`, including
+  the empty state. A shared
   Prepare / Record / Review strip connects sources, studio and reviews; its Review
   link uses the current or latest take, or explicitly offers an example when no
   take exists. The record screen hides this strip during both camera setup and
@@ -125,8 +126,6 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   example annotations. Review scores use the disclosed rubric on the synthetic
   example evidence; the qualitative event graph uses only the
   supplied example annotations.
-- **Loading:** small wordmark and announced status, with a reduced-motion-safe
-  indicator. Loading must not download a font or initialize WebGL.
 
 Camera permission is requested only on an explicit click. Consent, destination,
 retention information, unavailable services, and retry paths must remain readable.

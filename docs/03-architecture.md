@@ -461,15 +461,14 @@ kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
 
 ```mermaid
 flowchart TD
-    HEADER["AppShell: Logo, Home und Admin außerhalb des Record-Screens<br/>Darstellung und Hilfe; kein Menü-Drawer"]
+    HEADER["AppShell: Logo, Home, Vergangene Aufnahmen und Admin außerhalb des Record-Screens<br/>Darstellung und Hilfe; kein Menü-Drawer"]
     THEME["Root-Layout: gespeicherte Darstellung vor First Paint<br/>localStorage, CSS-Tokens, OS-Fallback"] -.-> HEADER
     HEADER --> SP
+    HEADER -->|"Vergangene Aufnahmen: /#past-recordings"| TAKES["Deine Takes: lokal gespeicherte Aufnahmen oder Leerzustand"]
     HEADER --> ADMIN
     JOURNEY["Gemeinsamer Ablauf: Prepare / Record / Review<br/>aktuelle oder letzte Aufnahme, sonst markiertes Beispiel"] --> SRC
     JOURNEY --> LIVE
     JOURNEY --> LREV
-    LOADING["app/loading.tsx<br/>418 LoadingScreen<br/>PNG-Logo, CSS-Animation, Reduced-Motion"]
-    LP["/loading-preview<br/>Dauerhafte Animationsvorschau"] --> LOADING
     SP["/ und /stats-preview<br/>Einleitung + Neue Präsentation / Quellen vorbereiten<br/>darunter Aufnahmeübersicht im Browser-Arbeitsbereich"] --> SC["StatsDashboard<br/>Anzahl, Dauer, Hinweise und Transkripte<br/>aus aufgenommenen Takes, sonst Leerzustand"]
     SP -->|"Neue Präsentation"| SRC
     SP -->|"Quellen vorbereiten"| SRC
@@ -477,7 +476,6 @@ flowchart TD
     RP["/review-preview<br/>Synthetisches Video + Beispiel-Momente<br/>ausdrücklich markierte Beispiel-Scores"]
     SC -->|"Letzte Aufnahme"| LREV
     SC --> LIVE
-    LOADING -. "Suspense-Fallback beim Laden" .-> LIVE
     LIVE["/live - LiveStudio<br/>Vor Kamera-Aktivierung: gleiche Seitenbreite wie Upload, ohne Header und Schrittleiste<br/>Back to sources vor Aufnahmestart<br/>Ab Kamera-Aktivierung: Vollbild mit Pose-Overlay<br/>Back-Link in der Toolbar bis Aufnahmestart<br/>Immer Live + Backend-Analyse,<br/>Options: Vortragstyp, Material und Transkript,<br/>kalibrierte Hinweise mit Rot-/Grün-Tönung,<br/>Kamera aktivieren -> Aufnahme starten"]
     STORE["Root-Layout: LiveSessionProvider + IndexedDB<br/>Video, Analyse und Fragen je Aufnahme<br/>Wiederherstellung nach Reload"] -.-> LIVE
     STORE --> EVIDENCE["recordingReviewData + recordingFeedback<br/>Video, Dauer und Events der gewählten Aufnahme<br/>Quellen-Marker aus aktuellem Fact-Check<br/>Fragen zählen nicht als Präsentationsevidenz"]

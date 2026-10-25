@@ -7,20 +7,26 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("hero links to past recordings even before the first take", async ({
+test("header links to past recordings from Home and another page", async ({
   page,
 }, info) => {
   await page.goto("/");
   const intro = page.getByRole("region", {
     name: "Deine Idee verdient einen starken Auftritt.",
   });
-  const link = intro.getByRole("link", {
+  await expect(
+    intro.getByRole("link", { name: "Vergangene Aufnahmen", exact: true }),
+  ).toHaveCount(0);
+  const header = page.getByRole("banner");
+  const link = header.getByRole("link", {
     name: "Vergangene Aufnahmen",
     exact: true,
   });
-  await expect(link).toHaveAttribute("href", "#past-recordings");
+  await expect(link).toHaveAttribute("href", "/#past-recordings");
   await expect(link).toBeVisible();
-  await intro.screenshot({ path: info.outputPath("hero-past-recordings.png") });
+  await header.screenshot({
+    path: info.outputPath("header-past-recordings.png"),
+  });
   await link.focus();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/#past-recordings$/);
@@ -36,6 +42,10 @@ test("hero links to past recordings even before the first take", async ({
       { exact: true },
     ),
   ).toBeVisible();
+  await page.goto("/sources");
+  await link.click();
+  await expect(page).toHaveURL(/\/#past-recordings$/);
+  await expect(recordings.getByRole("heading")).toBeInViewport();
 });
 
 test("Home returns to the overview from the simplified header", async ({
@@ -206,7 +216,7 @@ test("saved appearance overrides the system across routes and reloads", async ({
   await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
 });
 
-test("header only shows the logo, Home, Admin and utility controls", async ({
+test("header shows the logo, Home, past recordings, Admin and utility controls", async ({
   page,
 }, info) => {
   await page.goto("/sources");
@@ -219,7 +229,11 @@ test("header only shows the logo, Home, Admin and utility controls", async ({
   const navigation = header.getByRole("navigation", {
     name: "Main navigation",
   });
-  await expect(navigation.getByRole("link")).toHaveText(["Home", "Admin"]);
+  await expect(navigation.getByRole("link")).toHaveText([
+    "Home",
+    "Vergangene Aufnahmen",
+    "Admin",
+  ]);
   const admin = navigation.getByRole("link", { name: "Admin", exact: true });
   await admin.focus();
   await page.keyboard.press("Enter");

@@ -42,6 +42,8 @@ export function AppShell({
           <Link href="/" aria-current={pathname === "/" ? "page" : undefined}>
             Home
           </Link>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Native hash navigation moves keyboard focus to the recordings section. */}
+          <a href="/#past-recordings">Vergangene Aufnahmen</a>
           <Link
             href="/admin"
             aria-current={pathname === "/admin" ? "page" : undefined}

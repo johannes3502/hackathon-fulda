@@ -1,14 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ArrowRight,
-  FileText,
-  History,
-  MessageSquare,
-  Play,
-  Video,
-} from "lucide-react";
+import { ArrowRight, FileText, MessageSquare, Play, Video } from "lucide-react";
 import { useLiveSessions } from "@/features/live/LiveSessionProvider";
 
 export function PresentationIntro() {
@@ -41,9 +34,6 @@ export function PresentationIntro() {
           <Link href="/sources" className="button button-outline">
             <FileText size={17} /> Quellen vorbereiten
           </Link>
-          <a href="#past-recordings" className="button button-outline">
-            <History size={17} aria-hidden="true" /> Vergangene Aufnahmen
-          </a>
         </div>
         <div className="presentation-intro-footnote">
           <span>In deinem Tempo. Ohne Login.</span>
