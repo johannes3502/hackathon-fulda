@@ -199,3 +199,31 @@ Tests mit synthetischen Bildern belegen Start und Datenfluss, keine Genauigkeit.
   getrenntes System und wird auf der Stage nicht angezeigt.
 - **Was die Demo nicht verspricht:** keine Genauigkeits-, Latenz- oder
   Lernwirksamkeitsgarantie; keine Noten oder Personenbewertung.
+
+## Geprüfter Cleanup-Stand (25.10.2026)
+
+- 319 Frontend-Unit-Tests, Lint, Typecheck und OpenAPI-Abgleich bestanden.
+- 473 Backend-Tests mit lokaler Modellinstallation und isolierter
+  PostgreSQL-Testdatenbank bestanden; ein Cloud-Test bewusst übersprungen.
+  `pip check` meldet keine widersprüchlichen Abhängigkeiten.
+- 138 reguläre Browserfälle bestanden (Desktop und schmaler Chromium-Viewport);
+  zwei kostenpflichtige Cloud-Fälle blieben aus. Aufnahme, Reload, lokale
+  Löschung, Analysefehler und Stage-Fallback wurden mit synthetischen Medien geprüft.
+  Nach Integration der parallel eingegangenen Teamänderungen bestanden weitere
+  20 gezielte Browserprüfungen am finalen Image, einschließlich Mikrofon-Schutz,
+  „Practice again“, Admin-Einstellungen und Stage-Wiederherstellung.
+- Docker- und lokaler Production-Build, lokales `next start`, zehn
+  Compose-Prüfungen und 18 Route-/Asset-Probes bestanden. API, Worker und Beat
+  verwenden dasselbe Image; die Testdatenbank wurde anschließend entfernt.
+- Echte lokale Smokes: PostgreSQL/S3/Redis/Celery, Quellen-Upload mit
+  Embeddings/Retrieval/Löschung, Silero, Whisper mit synthetischer deutscher
+  Sprache, Template-Review samt Upload-/Session-Löschung. Live-Signalfeedback
+  wurde zusätzlich durch den Next.js-WebSocket-Proxy geprüft.
+- Alle zwölf Mermaid-Diagramme wurden gerendert; die lokalen Markdown-Links
+  wurden auf vorhandene Ziele geprüft.
+
+Die aktuell gestartete Konfiguration hat keine Gemini-/ElevenLabs-Zugangsdaten;
+Anbieter-Funktionen sind dort ausdrücklich nicht verfügbar. Die lokale Stage
+mit vorbereiteter Frage funktioniert. Das ist keine Abnahme echter Kamera- und
+Mikrofonbedingungen, kein Safari-Nachweis und keine Genauigkeitsvalidierung.
+Die verbleibenden Integrationsgrenzen stehen in [den TODOs](14-open-todos.md).

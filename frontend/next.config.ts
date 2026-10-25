@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Docker ships the traced runtime; local builds still support `npm start`.
+  output: process.env.BUILD_STANDALONE === "1" ? "standalone" : undefined,
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   experimental: {
     // The /api rewrite buffers bodies (default 10 MB). Recordings up to 5 min

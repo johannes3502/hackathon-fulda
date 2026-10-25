@@ -234,7 +234,7 @@ sequenceDiagram
     BE-->>FE: Bereit, oder Abbruch vor Aufnahme mit Retry-Hinweis
     FE->>FE: FeatureFlags im Take festhalten (Lite/Heavy, VIDEO/IMAGE)
     FE->>FE: Pose-Worker GPU-first/CPU-Fallback, Fingertracking separat bis 5 Hz
-    Note over FE,BE: Normales Studio mit Mikrofon, Live-Feedback und vollständigem Upload; Stage lokal ohne Upload
+    Note over FE,BE: Normales Studio mit Mikrofon, Live-Feedback und vollständigem Upload, Stage lokal ohne Upload
 
     FE->>FE: MediaPipe Pose lokal (Web Worker)
     FE->>BE: WS /speech/feedback: start, PCM nach ready
@@ -468,7 +468,7 @@ sequenceDiagram
         FE->>E: Mikrofon-Audio, erst danach erste Frage zum Vortrag
         loop Eine Frage nach der anderen
             E->>FE: Frage / Reaktion, Audio + Text
-            Note over FE: Protect agent speech optional, Standard aus;<br/>Admin / Fragerunde, pro Browser gespeichert.<br/>Wenn an: SDK speaking → Mikrofon stumm,<br/>listening → für Antwort freigeben;<br/>manuelles Mute hat Vorrang
+            Note over FE: Protect agent speech optional, Standard aus,<br/>Admin / Fragerunde, pro Browser gespeichert.<br/>Wenn an: SDK speaking → Mikrofon stumm,<br/>listening → für Antwort freigeben,<br/>manuelles Mute hat Vorrang
             U->>FE: Gesprochene Antwort
             FE->>E: Mikrofon-Audio
             opt Upload-Auszüge fehlen oder klären Sachfrage nicht

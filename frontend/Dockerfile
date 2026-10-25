@@ -22,7 +22,7 @@ ARG NEXT_PUBLIC_STAGE_MODE=1
 ENV NEXT_PUBLIC_STAGE_MODE=$NEXT_PUBLIC_STAGE_MODE
 ARG NEXT_PUBLIC_STAGE_ANALYSIS=local
 ENV NEXT_PUBLIC_STAGE_ANALYSIS=$NEXT_PUBLIC_STAGE_ANALYSIS
-RUN npm run build --workspace frontend
+RUN BUILD_STANDALONE=1 npm run build --workspace frontend
 
 # Ship only Next.js's traced runtime and public assets. Build tools and source
 # stay in the builder stage; the same image runs independently of the checkout.

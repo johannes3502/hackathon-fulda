@@ -429,13 +429,13 @@ schaltet das Browser-SDK während `speaking` den Mikrofoneingang stumm, bei `lis
 Mute hat Vorrang. Der Schutz ist abschaltbar, um dazwischenzureden. Während der
 eigenen Antwort bleiben Umgebungsstimmen möglich; kein Sprecherfilter oder
 Lautstärke-Schwellwert.
-Vor der Aufnahme stehen Material-Upload und drei Präsentationstypen bereit:
-`startup`, `thesis`, `school`. `nonprofit` bleibt nur für bestehende Aufnahmen
-kompatibel und wird nicht mehr zur Auswahl angeboten. `sourceCollectionId` und
+Vor der Aufnahme stehen Material-Upload und die Bildungsmodi `school` und
+`thesis` bereit. `startup` und `nonprofit` bleiben nur für bestehende Aufnahmen
+kompatibel und werden nicht mehr zur Auswahl angeboten. `sourceCollectionId` und
 `presentationMode` werden im Take festgehalten und an beide Fragepfade übergeben.
 ElevenLabs ist auf Nutzerwunsch als optionaler Sprachdialog integriert; Nutzer
 konfiguriert `ELEVENLABS_API_KEY` und `ELEVENLABS_AGENT_ID` selbst. Kontext als
-Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Sprachreaktionen sind nicht zitateverifiziert; die Auswertung nach der getippten Runde ist ein Client-Heuristik-Score aus gemessenen Events (siehe Abschnitt 6, Frage-Simulator).
+Celery-Job, Signed URL serverseitig, SDK im Browser. Getippte Fragen nutzen das konfigurierte Gemini-Modell (Cloud). Sprachreaktionen sind nicht zitateverifiziert; die Auswertung nach der Web-Sprachrunde ist ein Client-Heuristik-Score aus bereits gemessenen Events (siehe Abschnitt 6, Frage-Simulator).
 Bei unzureichenden Upload-Auszügen nutzt der ElevenLabs-Agent das Webhook-Tool
 `search_web` (Tavily, Secret im ElevenLabs-Konto) für gezielte öffentliche
 Sachfragen. Webquellen werden benannt; Suchfehler/fehlende Belege bleiben offen.

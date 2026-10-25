@@ -1121,3 +1121,23 @@ Einrichtung und Speichergrenzen: `docs/07-review-and-agent.md`.
   schmaler Chromium-Viewport) bestanden. Damit 130 verschiedene Fälle geprüft;
   zwei optionale Cloud-Fälle blieben aus. Das ist keine echte Safari-,
   Mikrofon- oder Anbieter-Abnahme.
+
+## Jury-Cleanup (25.10.2026)
+
+- Nutzerauftrag: ungenutzten Code entfernen, einfache Abläufe vereinfachen und
+  den Code für die Jury nachvollziehbar machen. Vor Löschungen wurden Imports,
+  Routen, Aufrufer und Dokumentverweise geprüft.
+- SeaweedFS bleibt: Quellen-Ingest, Audiojobs und weitere Hintergrundjobs
+  verwenden den Speicher tatsächlich. Die lokale Wiedergabe in IndexedDB
+  ersetzt diese Backend-Aufgaben nicht.
+- Drei unverbundene Panels, deren alte HTTP-/TTS-Helfer, der wirkungslose
+  Pose-Lob-Timer, zugehörige Styles und zwei überholte Umsetzungspläne entfernt.
+  Gespeicherte Takes und die weiterhin implementierten Backend-APIs bleiben
+  kompatibel. Forschungsnotizen bleiben als historische Entscheidungsbelege.
+- Gemeinsame Job-Speicherung aus dem Sprachmodul nach `app/job_storage.py`
+  verschoben. Frontend als Standalone-Runtime, API/Worker/Beat aus demselben
+  gebauten Image ohne Source-Mounts; lokale Entwicklung bleibt möglich.
+  Wiederholte Healthchecks sind klein, breitere Abnahme läuft als Smoke-Test.
+- Zeitgleich eingegangene Teamänderungen für „Practice again“ und optionalen
+  Mikrofon-Schutz integriert. Validierung und Grenzen:
+  [Jury-Runbook](05-jury-demo.md#geprüfter-cleanup-stand-25102026).
