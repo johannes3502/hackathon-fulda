@@ -204,7 +204,7 @@ Geräte-Abnahme: `docs/05-jury-demo.md`.
 ## 7. Infrastruktur
 
 - Jedes Team hat Zugang zu einem **LAN-Anschluss**; zusätzlich **WLAN**.
-- **WLAN:** SSID `Hackathon`, Passwort `Hackathon2026`.
+- **WLAN-Zugangsdaten:** bei der Organisation vor Ort erfragen; nicht im öffentlichen Repository ablegen.
 - **Mitbringen/planen:** Mehrfachsteckdosen, USB-C/HDMI-Adapter, Ladekabel,
   Powerbank, optional Hotspot als Backup.
 - **Externe APIs:** nicht untersagt; vor Ort prüfen, ob Internetzugriff auf
