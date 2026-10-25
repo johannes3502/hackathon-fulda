@@ -105,13 +105,13 @@ export function AppShell({
             ) : (
               <>
                 <ol className="help-list">
-                  <li>Set your pitch context and audience.</li>
+                  <li>Set your presentation topic and learning context.</li>
                   <li>
-                    Watch a sample pitch unfold, with optional local camera
-                    preview.
+                    Watch a sample presentation unfold, with optional local
+                    camera preview.
                   </li>
                   <li>
-                    Choose sample answers to explore the judge’s follow-ups.
+                    Choose sample answers to explore the examiner’s follow-ups.
                   </li>
                   <li>Inspect the evidence and retry one answer.</li>
                 </ol>
@@ -122,7 +122,7 @@ export function AppShell({
                 </p>
                 <p>
                   Setup and demo reports are stored in this tab’s session
-                  storage. Use synthetic pitch content.
+                  storage. Use synthetic presentation content.
                 </p>
               </>
             )}
@@ -135,7 +135,7 @@ export function AppShell({
       </main>
       <footer className="app-footer">
         <span>
-          <ShieldCheck size={14} /> A rehearsal, not a verdict.
+          <ShieldCheck size={14} /> Practice for learning. No grades.
         </span>
         <span>Built for Hackathon Fulda 2026</span>
       </footer>

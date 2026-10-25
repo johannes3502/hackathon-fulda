@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { StatsDashboard } from "@/components/stats/StatsCard";
 
 export const metadata: Metadata = {
-  title: "418 – Präsentationstraining",
+  title: "418 – Referate und Präsentationen üben",
   description:
-    "Nimm deine Präsentation auf und prüfe konkrete Momente mit Zeitmarken. Ein Prototyp für Präsentationscoaching.",
+    "Übe Referate und Abschlusspräsentationen mit Feedback zu Sprache, Gestik und Fachwissen. Prüfe Aussagen an Lernmaterialien und bereite dich auf Rückfragen vor.",
 };
 
 export default function Page() {

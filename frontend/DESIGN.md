@@ -2,9 +2,9 @@
 
 ## Design direction
 
-The presenter rehearses at a laptop in a bright hackathon hall, or checks a take
-on a phone. The interface should be quiet, readable, and consistent while the
-presentation remains the focus. Apply Apple's hierarchy, legibility, familiar
+Learners rehearse classroom presentations and thesis defenses at a laptop,
+or revisit a practice recording on a phone. The interface should be quiet,
+readable, and consistent while the presentation remains the focus. Apply Apple's hierarchy, legibility, familiar
 controls, and progressive disclosure to the web; this is not a native Apple UI.
 
 ## Shared system
@@ -30,9 +30,12 @@ controls, and progressive disclosure to the web; this is not a native Apple UI.
   visible. Reduced motion disables animation; increased contrast strengthens
   separators and secondary text.
 - `/` and `/stats-preview` begin with a presentation introduction: primary action
-  “Neue Präsentation” opens `/sources` to add presentation material; the secondary
-  action also prepares sources. Three steps explain preparation, recording and
-  review. A recent take links back into its review; completed takes persist locally
+  “Referat üben” opens `/sources`; “Lernmaterial hinzufügen” offers the same
+  preparation entry. The headline “Verstehen. Erklären. Sicher präsentieren.”
+  and three steps focus on learning materials, explaining a topic and answering
+  subject questions. New sessions offer classroom presentation (default) and
+  thesis defense. The shared logo is a typographic 418 mark in the brand violet.
+  A recent take links back into its review; completed takes persist locally
   in IndexedDB.
   Below, `StatsDashboard` shows counts, durations and observations from actual
   recordings in the current workspace, with an empty state before the first take.

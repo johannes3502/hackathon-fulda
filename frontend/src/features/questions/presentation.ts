@@ -4,7 +4,7 @@ export type PresentationMode = NonNullable<
   components["schemas"]["QuestionRequest"]["presentation_mode"]
 >;
 
-export const PRESENTATION_MODE_OPTIONS = ["startup", "thesis", "school"] as const;
+export const PRESENTATION_MODE_OPTIONS = ["school", "thesis"] as const;
 
 // Keep retired mode details so saved recordings still open with their original context.
 export const PRESENTATION_MODES: Record<
@@ -22,7 +22,7 @@ export const PRESENTATION_MODES: Record<
     focus: "Research choices, methods, evidence and limitations.",
   },
   school: {
-    label: "School presentation",
+    label: "Classroom presentation",
     listener: "Teacher",
     focus: "Clear explanations, understanding and examples.",
   },
@@ -44,7 +44,7 @@ export function presentationModeSnapshot(): PresentationMode {
     if (PRESENTATION_MODE_OPTIONS.some((mode) => mode === saved))
       return (current = saved as PresentationMode);
   } catch {}
-  return (current = "startup");
+  return (current = "school");
 }
 
 export function subscribePresentationMode(listener: () => void) {

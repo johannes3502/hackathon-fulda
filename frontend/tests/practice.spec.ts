@@ -70,7 +70,9 @@ test("complete no-permission rehearsal, evidence, retry and restored report", as
   });
   await page.getByRole("button", { name: "Next event", exact: true }).click();
   await page.getByRole("button", { name: "Next event", exact: true }).click();
-  await page.getByRole("button", { name: "End pitch", exact: true }).click();
+  await page
+    .getByRole("button", { name: "End presentation", exact: true })
+    .click();
   await expect(
     page
       .locator(".judge-question")
@@ -96,7 +98,7 @@ test("complete no-permission rehearsal, evidence, retry and restored report", as
   await page.getByRole("button", { name: "Finish Q&A and review" }).click();
   await expect(page).toHaveURL(/\/review$/);
   await expect(
-    page.getByText("This pitch ended early.", { exact: false }),
+    page.getByText("This presentation ended early.", { exact: false }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "View evidence", exact: false })
@@ -159,13 +161,17 @@ test("custom context, simulation mode, interruption, failure and active refresh 
   await page
     .getByRole("button", { name: "Start practice", exact: true })
     .click();
-  await expect(page.getByLabel("Pitch title")).toBeFocused();
-  await page.getByLabel("Pitch title").fill("A reusable learning toolkit");
+  await expect(page.getByLabel("Presentation title")).toBeFocused();
   await page
-    .getByLabel("What’s the big idea?")
+    .getByLabel("Presentation title")
+    .fill("A reusable learning toolkit");
+  await page
+    .getByLabel("What will you explain?")
     .fill("A synthetic proposal to help students share learning materials.");
   await page.getByText("Practice options", { exact: true }).click();
-  await page.getByLabel("Who’s listening?").selectOption("investor");
+  await expect(
+    page.getByText("Sample audience: University examiner"),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Simulation Feedback at the end" })
     .click();

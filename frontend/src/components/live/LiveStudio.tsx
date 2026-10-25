@@ -96,7 +96,7 @@ export function LiveStudio() {
     cameraStatus === "active",
     featureFlags,
   );
-  const [title, setTitle] = useState("My pitch rehearsal");
+  const [title, setTitle] = useState("My presentation practice");
   const [targetMs, setTargetMs] = useState(180000);
   const serverSpeech = useRef<LiveCaptions | null>(null);
   // Browser microphone measurements for the pause rules only: a pause shows

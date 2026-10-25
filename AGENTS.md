@@ -4,7 +4,7 @@ Einstiegspunkt für Menschen und Agents. Hackathon-Regeln, Deadlines und Bewertu
 
 ## 1. Projekt
 
-**418 Pitch Practice** — Live-Präsentationstrainer (8. Hackathon Fulda, 24.–25.10.2026, Thema Future Education): analysiert Auftritt und Sprache, macht Feedback timestamp-genau zurückspulbar und fragt danach gezielt nach. Web-App für Laptop; die Jury-Demo läuft lokal und ohne Login. Smartphone und öffentliche URL sind nicht Teil des aktuellen Demo-Pfads.
+**418** — Live-Präsentationstrainer für Schule und Studium (8. Hackathon Fulda, 24.–25.10.2026, Thema Future Education): analysiert Auftritt und Sprache, macht Feedback timestamp-genau zurückspulbar und fragt danach gezielt nach. Web-App für Laptop; die Jury-Demo läuft lokal und ohne Login. Smartphone und öffentliche URL sind nicht Teil des aktuellen Demo-Pfads.
 
 | # | Feature | Inhalt |
 |---|---|---|

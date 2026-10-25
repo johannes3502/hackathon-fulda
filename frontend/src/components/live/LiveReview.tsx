@@ -49,7 +49,7 @@ export function LiveReview({ sessionId }: { sessionId: string }) {
   const visible = all || !practice.length ? moments : practice;
   const appearance = cueAppearance(selected, "ready");
   const mode =
-    PRESENTATION_MODES[recording.config.presentationMode ?? "startup"];
+    PRESENTATION_MODES[recording.config.presentationMode ?? "school"];
   const jump = (item: LiveFeedback) => {
     setSelected({ ...item });
     setView("moments");

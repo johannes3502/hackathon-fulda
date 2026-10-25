@@ -1,4 +1,4 @@
-# Produkt — Live-Präsentationstrainer
+# Produkt — Präsentationstraining für Schule und Studium
 
 **Status:** Thema fix (24.10.2026). Offene TODOs: [14-open-todos.md](14-open-todos.md).
 **Grundlage:** Erste Feature-Beschreibungen des Teams. Es gibt noch kein
@@ -38,9 +38,12 @@ Grundgerüst ist festgelegt (Abschnitt 3, Technik).
 Diese Reihenfolge ist eine direkte Ableitung der fünf Features, keine zusätzliche
 Produktentscheidung.
 
-UI-Einstieg (24.10.2026, Nutzerauftrag): Die Startseite leitet mit „Neue
-Präsentation“ ins vorhandene Live-Studio und bietet Quellen-Vorbereitung als
-zweiten Weg. Darunter stehen Anzahl, Dauer und Hinweise der tatsächlich in diesem
+Bildungsfokus (25.10.2026, Nutzerauftrag): Referate, fachliches Erklären und
+Abschlusspräsentationen stehen im Mittelpunkt. Die Startseite leitet mit
+„Referat üben“ in die Quellen-Vorbereitung und bietet „Lernmaterial hinzufügen“
+als zweiten Einstieg. Landingpage, Studio, Review und synthetische Demo nutzen
+Lernkontext statt Pitch-/Investment-Sprache. Darunter stehen Anzahl, Dauer und
+Hinweise der tatsächlich in diesem
 Browser-Arbeitsbereich aufgenommenen Takes; vor der ersten Aufnahme ein Leerzustand. Der
 gemeinsame Ablauf Vorbereiten → Aufnehmen → Review verbindet die Ansichten;
 ohne eigene Aufnahme ist das Review-Ziel ausdrücklich ein Beispiel. Die
@@ -256,8 +259,11 @@ das lokale Vollvideo; serverseitige Clip-Dateien sind gemäß aktuellem Backend-
 aufklappbar.
 
 Vor dem Take: Auf `/sources` neben dem Datei-Upload den Präsentationstyp wählen:
-Startup-Pitch, Bachelor-Verteidigung oder Schulvortrag. Nonprofit ist nicht mehr
-auswählbar; bestehende Aufnahmen bleiben kompatibel.
+Schulvortrag (Standard) oder Bachelor-Verteidigung. Startup und Nonprofit sind
+für neue Aufnahmen nicht mehr auswählbar; eine gespeicherte Auswahl dieser Typen
+fällt bei der Vorbereitung auf Schulvortrag zurück. Bestehende Aufnahmen behalten
+ihren gespeicherten Typ und bleiben mit dem Backend kompatibel. Ohne gespeicherten
+Typ nutzt das Web auch im Review und im Frage-Agenten Schulvortrag.
 Die Auswahl bleibt über Navigation und Reload erhalten und wird beim
 Aufnahmestart im Take festgehalten. In Sprachdialog und getippter Fragerunde
 verändert derselbe Typ Rolle und Frageschwerpunkte, ohne Noten oder Scores. Der

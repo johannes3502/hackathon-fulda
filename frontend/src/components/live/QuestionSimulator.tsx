@@ -156,7 +156,7 @@ export function QuestionSimulator({
           collectionId: collection,
           claims,
           persona: "tutor",
-          presentationMode: recording.config.presentationMode ?? "startup",
+          presentationMode: recording.config.presentationMode ?? "school",
         },
         active.signal,
       );
@@ -384,7 +384,7 @@ function QuestionCard({
           answer,
           collectionId: collection,
           persona,
-          presentationMode: recording.config.presentationMode ?? "startup",
+          presentationMode: recording.config.presentationMode ?? "school",
         },
         active.signal,
       );
@@ -464,7 +464,7 @@ function QuestionCard({
               <strong>
                 {
                   PRESENTATION_MODES[
-                    recording.config.presentationMode ?? "startup"
+                    recording.config.presentationMode ?? "school"
                   ].listener
                 }
                 :

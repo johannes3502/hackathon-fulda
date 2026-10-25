@@ -8,9 +8,9 @@ import "./live.css";
 import "./sources.css";
 import "./experience.css";
 export const metadata: Metadata = {
-  title: "418 — Presentation practice",
+  title: "418 — Learning through presentation",
   description:
-    "Record your presentation, review specific moments, and practice follow-up questions. A presentation coaching prototype.",
+    "Practice classroom presentations and thesis defenses. Review your explanations, check claims against learning materials, and prepare for subject questions.",
 };
 export default function RootLayout({
   children,

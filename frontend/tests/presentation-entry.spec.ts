@@ -12,7 +12,7 @@ test("header links to past recordings from Home and another page", async ({
 }, info) => {
   await page.goto("/");
   const intro = page.getByRole("region", {
-    name: "Deine Idee verdient einen starken Auftritt.",
+    name: /Verstehen\. Erklären\.\s*Sicher präsentieren\./,
   });
   await expect(
     intro.getByRole("link", { name: "Vergangene Aufnahmen", exact: true }),
@@ -31,14 +31,14 @@ test("header links to past recordings from Home and another page", async ({
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/#past-recordings$/);
   const recordings = page.getByRole("region", {
-    name: "Deine Takes",
+    name: "Deine Übungsaufnahmen",
     exact: true,
   });
   await expect(recordings).toBeFocused();
   await expect(recordings.getByRole("heading")).toBeInViewport();
   await expect(
     recordings.getByText(
-      "Hier erscheinen deine aufgenommenen Präsentationen.",
+      "Hier erscheinen deine aufgenommenen Referate und Abschlusspräsentationen.",
       { exact: true },
     ),
   ).toBeVisible();
@@ -85,11 +85,11 @@ test("presentation introduction leads into preparation and recording", async ({
   });
   await page.goto("/");
   const intro = page.getByRole("region", {
-    name: "Deine Idee verdient einen starken Auftritt.",
+    name: /Verstehen\. Erklären\.\s*Sicher präsentieren\./,
   });
   await expect(intro).toBeVisible();
   await expect(
-    intro.getByRole("link", { name: "Neue Präsentation" }),
+    intro.getByRole("link", { name: "Referat üben" }),
   ).toHaveAttribute("href", "/sources");
   await expect(page.locator("h1")).toHaveCount(1);
   await expect(
@@ -101,7 +101,7 @@ test("presentation introduction leads into preparation and recording", async ({
     path: info.outputPath("home-light.png"),
     fullPage: true,
   });
-  await intro.getByRole("link", { name: "Neue Präsentation" }).click();
+  await intro.getByRole("link", { name: "Referat üben" }).click();
   await expect(page).toHaveURL(/\/sources$/);
   await expect(
     page.getByRole("heading", { name: "Your sources", exact: true }),

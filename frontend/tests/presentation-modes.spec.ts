@@ -18,9 +18,8 @@ for (const mode of PRESENTATION_MODE_OPTIONS) {
     });
     await expect(select).toBeVisible();
     await expect(select.locator("option")).toHaveText([
-      "Startup pitch",
+      "Classroom presentation",
       "Thesis defense",
-      "School presentation",
     ]);
     await expect(page.locator('input[type="file"]')).toBeEnabled();
     await select.selectOption(mode);
@@ -52,11 +51,11 @@ for (const mode of PRESENTATION_MODE_OPTIONS) {
   });
 }
 
-test("a retired saved mode resets to startup during preparation", async ({
+test("a retired saved mode resets to classroom practice during preparation", async ({
   page,
 }) => {
   await page.addInitScript(() =>
-    localStorage.setItem("pitchcoach.presentationMode", "nonprofit"),
+    localStorage.setItem("pitchcoach.presentationMode", "startup"),
   );
   await page.route("**/sources?collection_id=*", (route) =>
     route.fulfill({ json: [] }),
@@ -64,5 +63,5 @@ test("a retired saved mode resets to startup during preparation", async ({
   await page.goto("/sources");
   await expect(
     page.getByRole("combobox", { name: "What are you preparing for?" }),
-  ).toHaveValue("startup");
+  ).toHaveValue("school");
 });

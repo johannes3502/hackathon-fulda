@@ -135,7 +135,7 @@ export function ReviewWorkspace() {
         </div>
         {report.completion === "partial" && (
           <div className="status-warning">
-            This pitch ended early. Feedback includes only sample events
+            This presentation ended early. Feedback includes only sample events
             delivered before you stopped.
           </div>
         )}
@@ -201,7 +201,7 @@ export function ReviewWorkspace() {
                 <h2>Give the sample a little more time.</h2>
                 <p>
                   No finalized evidence was captured. Restart and let the
-                  opening finish before ending your pitch.
+                  opening finish before ending your presentation.
                 </p>
               </div>
             </div>

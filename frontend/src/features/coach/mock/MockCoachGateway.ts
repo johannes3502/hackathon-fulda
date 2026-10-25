@@ -205,7 +205,7 @@ export class MockCoachGateway implements CoachGateway, DemoGateway {
         category: "content",
         title: "Give your claim a foundation",
         observation:
-          "The sample pitch claims a 50% improvement without naming a measure or a baseline.",
+          "The sample presentation claims a 50% improvement without naming a measure or a baseline.",
         nextAction:
           "Separate the hypothesis from the result. Say what you will measure and what remains untested.",
         priority: 1,
@@ -236,7 +236,7 @@ export class MockCoachGateway implements CoachGateway, DemoGateway {
         category: "delivery",
         title: "Let the central idea land",
         observation:
-          "The sample pace rises to 182 words per minute around the explanation of the solution.",
+          "The sample pace rises to 182 words per minute around the explanation of the learning activity.",
         nextAction:
           "Pause after ‘the teacher decides’ before moving to your evidence.",
         priority: 3,

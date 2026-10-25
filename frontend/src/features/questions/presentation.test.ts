@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-it.each(["startup", "thesis", "school"] as const)(
+it.each(["school", "thesis"] as const)(
   "shares and restores the %s mode selected during preparation",
   async (mode) => {
     const presentation = await load();
@@ -26,33 +26,34 @@ it.each(["startup", "thesis", "school"] as const)(
     expect(listener).toHaveBeenCalledOnce();
     expect((await load()).presentationModeSnapshot()).toBe(mode);
     unsubscribe();
-    presentation.storePresentationMode("startup");
+    presentation.storePresentationMode("school");
     expect(listener).toHaveBeenCalledOnce();
   },
 );
 
-it.each(["invalid", "toString", "__proto__", "nonprofit"])(
+it.each(["invalid", "toString", "__proto__", "nonprofit", "startup"])(
   "ignores an invalid stored mode: %s",
   async (value) => {
     storage.set("pitchcoach.presentationMode", value);
-    expect((await load()).presentationModeSnapshot()).toBe("startup");
+    expect((await load()).presentationModeSnapshot()).toBe("school");
   },
 );
 
 it("retains retired mode details for saved recordings without offering it for new takes", async () => {
   const presentation = await load();
   const progress = await import("../progress/contract");
-  expect(presentation.PRESENTATION_MODE_OPTIONS).toEqual([
-    "startup",
-    "thesis",
-    "school",
-  ]);
+  expect(presentation.PRESENTATION_MODE_OPTIONS).toEqual(["school", "thesis"]);
   expect(progress.PRESENTATION_MODES).toEqual(
     presentation.PRESENTATION_MODE_OPTIONS,
   );
   expect(presentation.PRESENTATION_MODES.nonprofit.listener).toBe(
     "Potential supporter",
   );
+  expect(presentation.PRESENTATION_MODES.startup.listener).toBe("Investor");
+});
+
+it("starts new sessions with classroom questions", async () => {
+  expect((await load()).presentationModeSnapshot()).toBe("school");
 });
 
 it("keeps the selection usable when browser storage is blocked", async () => {
@@ -65,7 +66,7 @@ it("keeps the selection usable when browser storage is blocked", async () => {
     },
   });
   const presentation = await load();
-  expect(presentation.presentationModeSnapshot()).toBe("startup");
+  expect(presentation.presentationModeSnapshot()).toBe("school");
   presentation.storePresentationMode("school");
   expect(presentation.presentationModeSnapshot()).toBe("school");
 });

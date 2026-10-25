@@ -38,7 +38,7 @@ export function TranscriptPanel({ full = false }: { full?: boolean }) {
           <span className="timestamp">{time(segment.startMs)}</span>
           <span>
             <small>
-              {segment.speaker === "judge" ? "Judge" : "Sample presenter"}
+              {segment.speaker === "judge" ? "Examiner" : "Sample presenter"}
               {!segment.isFinal && " · partial"}
             </small>
             {segment.text}

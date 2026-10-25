@@ -84,7 +84,7 @@ export function VideoPlayback({
           controls
           playsInline
           preload="metadata"
-          aria-label="Recorded pitch video"
+          aria-label="Recorded presentation video"
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           onLoadedMetadata={() => {
@@ -200,7 +200,7 @@ export function VideoPlayback({
           <Button asChild variant="ghost" size="sm">
             <a
               href={recording.videoUrl}
-              download={`pitch-${recording.id}.${recording.mimeType.includes("mp4") ? "mp4" : "webm"}`}
+              download={`presentation-${recording.id}.${recording.mimeType.includes("mp4") ? "mp4" : "webm"}`}
             >
               <Download size={14} /> Download video
             </a>

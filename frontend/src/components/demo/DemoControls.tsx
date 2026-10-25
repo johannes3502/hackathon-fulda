@@ -17,7 +17,7 @@ export function DemoControls() {
       </summary>
       <div className="demo-controls-content">
         <p>
-          <FlaskConical size={15} /> Deterministic sample · Viva hackathon pitch
+          <FlaskConical size={15} /> Deterministic sample · Learning by explaining · seminar presentation
         </p>
         <div className="demo-actions">
           <Button

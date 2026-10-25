@@ -282,11 +282,7 @@ export interface ProgressLimitation {
   message: string;
 }
 
-export const PRESENTATION_MODES: PresentationMode[] = [
-  "startup",
-  "thesis",
-  "school",
-];
+export const PRESENTATION_MODES: PresentationMode[] = ["school", "thesis"];
 
 export const PRESENTATION_MODE_LABEL: Record<PresentationMode, string> = {
   startup: "Startup-Pitch",

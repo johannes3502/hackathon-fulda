@@ -33,7 +33,7 @@ const phaseLabels = {
   preflight: "Ready when you are",
   countdown: "Get ready",
   presenting: "Session running",
-  judge_thinking: "Judge is thinking",
+  judge_thinking: "Examiner is thinking",
   judge_question: "Your question",
   answering: "Your answer",
   report_pending: "Preparing review",
@@ -92,7 +92,7 @@ export function PracticeStudio() {
               <span>·</span>{" "}
               {state.retryTarget
                 ? "30-second answer retry"
-                : `${duration / 60000}-minute pitch`}
+                : `${duration / 60000}-minute presentation`}
             </p>
           </div>
           <div className="session-time">
@@ -104,7 +104,7 @@ export function PracticeStudio() {
               )}
             </strong>
             <span>
-              {state.retryTarget ? "answer target" : "pitch remaining"}
+              {state.retryTarget ? "answer target" : "presentation remaining"}
             </span>
           </div>
         </div>
@@ -316,7 +316,7 @@ export function PracticeStudio() {
                         disabled={blocked || state.phase !== "presenting"}
                         onClick={() => void send({ type: "finish_pitch" })}
                       >
-                        <Square size={13} fill="currentColor" /> End pitch
+                        <Square size={13} fill="currentColor" /> End presentation
                       </Button>
                     </div>
                   </div>
@@ -353,13 +353,13 @@ function SessionNotice() {
   return (
     <details className="context-disclosure">
       <summary>
-        Pitch context <span className="muted">{state.config.title}</span>
+        Presentation context <span className="muted">{state.config.title}</span>
       </summary>
       <p>{state.config.context}</p>
       <p className="small muted">
         Focus: {state.config.criteria.join(" · ") || "General rehearsal"}.
-        Analysis follows the prepared Viva scenario, including for custom
-        pitches.
+        Analysis follows the prepared learning scenario, including for custom
+        presentations.
       </p>
     </details>
   );
