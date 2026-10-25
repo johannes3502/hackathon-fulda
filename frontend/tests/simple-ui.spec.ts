@@ -15,7 +15,7 @@ test("home shows an empty recording overview without demo statistics and keeps n
     page.getByRole("link", { name: "Referat üben" }),
   ).toHaveAttribute("href", "/sources");
   await expect(
-    page.getByRole("img", { name: "418 Learning practice" }),
+    page.getByRole("img", { name: "418 Pitch Practice" }),
   ).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/pitch|investor/i);
   expect(

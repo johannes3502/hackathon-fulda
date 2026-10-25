@@ -11,12 +11,14 @@ export const metadata: Metadata = {
   title: "418 — Learning through presentation",
   description:
     "Practice classroom presentations and thesis defenses. Review your explanations, check claims against learning materials, and prepare for subject questions.",
+  // Browser auto-translation rewrites the server HTML before hydration.
+  other: { google: "notranslate" },
 };
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" translate="no" suppressHydrationWarning>
       <body>
         {/* Sets the saved appearance before hydration to avoid a theme flash. */}
         <Script id="appearance" strategy="beforeInteractive">
