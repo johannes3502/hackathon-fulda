@@ -41,6 +41,8 @@ x-backend: &backend
     EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
     EMBEDDING_MODEL_PATH: /app/models/embedding
     SOURCE_MAX_BYTES: ${SOURCE_MAX_BYTES:-26214400}
+    # Heuristic only: vector-only hits below this cosine are marked weak.
+    SOURCE_WEAK_SIMILARITY: ${SOURCE_WEAK_SIMILARITY:-0.30}
     LLM_BASE_URL: ${LLM_BASE_URL-https://generativelanguage.googleapis.com/v1beta/openai}
     LLM_MODEL: ${LLM_MODEL-gemini-3.1-flash-lite}
     LLM_API_KEY: ${LLM_API_KEY:-}

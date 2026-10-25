@@ -30,14 +30,16 @@ from app.events import Event, merge_timeline
 from app.factcheck.llm import ChatModel, LLMError, structured_json
 from app.factcheck.drafts import AnswerJudgment, QuestionDrafts
 from app.factcheck.models import ClaimResult, Evidence
-from app.factcheck.pipeline import Passage, upload_passages, verified_evidence
+from app.factcheck.pipeline import Passage, numeric_gate, upload_passages, verified_evidence
 from app.factcheck.transcript import Sentence, clock, sentences
+from app.factcheck.web import WebPassage
 from app.questions.models import (
     AnswerRequest, AnswerReview, Persona, Question, QuestionKind, QuestionRequest, QuestionResult,
     VoiceAnswerRequest,
 )
 from app.sources import retrieval
 from app.sources.models import SourceHit
+from app.sources.numbers import numbers_in
 from app.questions.styles import PRESENTATION_STYLES, PresentationMode
 from app.transcription.pipeline import extract_audio
 from app.transcription.transcriber import Transcriber
@@ -149,14 +151,30 @@ def _text(item: dict, name: str, limit: int) -> str:
     return value.strip()[:limit] if isinstance(value, str) else ""
 
 
+def _allowed_numbers(finding: ClaimResult | None, evidence: Evidence | None, transcript: str | None) -> set[str]:
+    """Numbers the model may use in a question: only those in its cited grounding."""
+    allowed: set[str] = set()
+    if finding is not None:
+        allowed |= numbers_in(finding.claim)
+        allowed |= numbers_in(finding.transcript or "")
+        if finding.evidence:
+            allowed |= numbers_in(finding.evidence.quote)
+    if evidence is not None:
+        allowed |= numbers_in(evidence.quote)
+    if transcript:
+        allowed |= numbers_in(transcript)
+    return allowed
+
+
 def parse_questions(answer: dict, items: list[Sentence], claims: list[ClaimResult], passages: list[Passage],
-                    limit: int, min_quote_chars: int) -> list[Question]:
+                    limit: int, min_quote_chars: int) -> tuple[list[Question], int]:
     raw = answer.get("questions")
     if not isinstance(raw, list):
         raise LLMError("Model answer has no questions list")
     by_number = {s.number: s for s in items}
     questions: list[Question] = []
     seen: set[str] = set()
+    dropped_numbers = 0
     for item in raw:
         if not isinstance(item, dict):
             continue
@@ -191,6 +209,9 @@ def parse_questions(answer: dict, items: list[Sentence], claims: list[ClaimResul
             t_ms, duration_ms, transcript = None, 0, None
         if kind == "clarification" and transcript is None:
             continue  # Neither a source nor a spoken passage behind it.
+        if numbers_in(text) - _allowed_numbers(finding if claim is not None else None, evidence, transcript):
+            dropped_numbers += 1
+            continue  # Figures the cited finding/passage does not carry.
         seen.add(text.casefold())
         questions.append(Question(
             id="", kind=kind, question=text, reason=_text(item, "reason", 300), t_ms=t_ms,
@@ -201,7 +222,49 @@ def parse_questions(answer: dict, items: list[Sentence], claims: list[ClaimResul
     questions = questions[:limit]
     for index, question in enumerate(questions, 1):
         question.id = f"q{index}"
-    return questions
+    return questions, dropped_numbers
+
+
+def _transcript_windows(items: list[Sentence], limit: int, max_chars: int = 700) -> list[str]:
+    """Evenly spread transcript windows so gap retrieval sees the whole talk."""
+    windows: list[str] = []
+    current: list[str] = []
+    size = 0
+    for item in items:
+        if current and size + len(item.text) + 1 > max_chars:
+            windows.append(" ".join(current))
+            current, size = [], 0
+        current.append(item.text)
+        size += len(item.text) + 1
+    if current:
+        windows.append(" ".join(current))
+    if len(windows) > limit:
+        if limit <= 1:
+            windows = [max(windows, key=len)]
+        else:
+            picks = [round(index * (len(windows) - 1) / (limit - 1)) for index in range(limit)]
+            windows = [windows[index] for index in sorted(set(picks))]
+    return [window[:500] for window in windows]
+
+
+def source_queries(items: list[Sentence], claims: list[ClaimResult], limit: int) -> list[str]:
+    """Focused claim queries plus transcript windows, never the whole transcript."""
+    queries: list[str] = []
+    seen: set[str] = set()
+    claim_limit = max(1, limit - 1) if items else limit
+    for claim in claims:
+        value = claim.claim.strip()[:500]
+        if value and value.casefold() not in seen:
+            queries.append(value)
+            seen.add(value.casefold())
+        if len(queries) >= claim_limit:
+            break
+    if len(queries) < limit:
+        for window in _transcript_windows(items, limit - len(queries)):
+            if window.casefold() not in seen:
+                queries.append(window)
+                seen.add(window.casefold())
+    return queries[:limit]
 
 
 def generate_questions(request: QuestionRequest, llm: ChatModel,
@@ -227,8 +290,9 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
     has_sources = request.collection_id is not None and ready_sources(request.collection_id) > 0
     if has_sources and retrieve is not None and config.source_passages:
         try:
-            query = " ".join(s.text for s in items)[:2000]
-            passages = upload_passages(retrieve(request.collection_id, query, config.source_passages))
+            queries = source_queries(items, request.claims, config.source_queries)
+            results = [retrieve(request.collection_id, query, config.source_passages) for query in queries]
+            passages = upload_passages(retrieval.fuse(results, config.source_passages))
         except (psycopg.Error, ValueError) as error:
             log.warning("Question source lookup failed (%s)", type(error).__name__)
             notices.append("Quellen konnten nicht abgerufen werden; keine Fragen zu fehlenden Inhalten.")
@@ -242,11 +306,13 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
         f"Faktencheck-Befunde (Nummer, Zeit, Urteil, Behauptung):\n{_numbered_findings(request.claims)}\n\n"
         f"Quellenauszüge:\n{context}", QuestionDrafts,
     )
-    questions = parse_questions(answer, items, request.claims, passages, config.max_questions,
-                                config.min_quote_chars)
+    questions, dropped_numbers = parse_questions(answer, items, request.claims, passages, config.max_questions,
+                                                  config.min_quote_chars)
     events = [Event(t_ms=q.t_ms, duration_ms=q.duration_ms, type="question", severity=SEVERITY[q.kind],
                     source="agent", payload=q.model_dump(mode="json", exclude={"t_ms", "duration_ms"}))
               for q in questions if q.t_ms is not None]
+    if dropped_numbers:
+        notices.append(f"{dropped_numbers} Frage(n) mit Zahlen ohne Beleg im zitierten Befund verworfen.")
     if not questions:
         notices.append("Das Modell hat keine belastbaren Rückfragen vorgeschlagen.")
     return QuestionResult(questions=questions, events=merge_timeline(events), persona=request.persona,
@@ -255,7 +321,17 @@ def generate_questions(request: QuestionRequest, llm: ChatModel,
 
 
 def evidence_passage(evidence: Evidence) -> Passage:
-    return Passage(evidence.kind, evidence.label, evidence.passage)
+    hit = None
+    web = None
+    if evidence.kind == "upload" and evidence.source_id and evidence.filename and evidence.location:
+        hit = SourceHit(
+            chunk_id=0, source_id=evidence.source_id, filename=evidence.filename,
+            location=evidence.location, text=evidence.passage, similarity=evidence.similarity,
+            matched_by=evidence.matched_by, retrieval_score=evidence.retrieval_score, weak=evidence.weak,
+        )
+    elif evidence.kind == "web" and evidence.url:
+        web = WebPassage(title=evidence.label, url=evidence.url, text=evidence.passage)
+    return Passage(evidence.kind, evidence.label, evidence.passage, hit=hit, web=web)
 
 
 def review_answer(request: AnswerRequest, llm: ChatModel,
@@ -304,6 +380,12 @@ def review_answer(request: AnswerRequest, llm: ChatModel,
         if evidence is None:
             verdict, explanation, reply = "unchecked", "", fallback
             notes.append("Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen.")
+        else:
+            note = numeric_gate(request.answer, evidence.quote, verdict)
+            if note:
+                verdict, explanation, reply = "unchecked", "", fallback
+                evidence = None
+                notes.append(note)
     follow_text = _text(answer, "follow_up", 500) if verdict != "unchecked" else ""
     follow_up = Question(
         id=f"{question.id}.f", kind="follow_up", question=follow_text,

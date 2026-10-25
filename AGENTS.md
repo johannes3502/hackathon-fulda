@@ -208,6 +208,10 @@ pro Aussage zuerst Retrieval in den hochgeladenen Quellen, danach optional
 Websuche (Wikipedia/Tavily); Zitate werden per `quote_in_text` geprüft,
 Ergebnisse sind `fact`-Events. LLM standardmäßig Gemini (Cloud), konfigurierbar
 über `LLM_BASE_URL`/`LLM_MODEL`; kein lokales Ollama mehr im Projekt.
+DOCX wird über `iter_inner_content()` in Dokumentreihenfolge gelesen; Tabellen erhalten einen eigenen Ort `table`.
+Kurze Exact-Zitate werden auf Satzkontext erweitert; ein deterministisches `numeric_gate` verwirft `supports`-Urteile, deren Zahlen nicht im verifizierten Zitat stehen; ein verworfenes Upload-Urteil wird `unchecked`, der optionale Web-Pfad kann danach ein eigenes Urteil liefern.
+Lücken-Fragen nutzen bis zu vier fokussierte `source_queries` mit RRF-Fusion; `retrieval_score`, `similarity`, `matched_by` und `weak` sind unkalibrierte Signale, keine Konfidenz.
+Details und Grenzen stehen in `docs/15-grounding-hardening.md`.
 Der Frage-Simulator ist umgesetzt (`backend/app/questions/`, `POST /questions`,
 `POST /questions/answers`, Panel in `/live/[id]/review`): Fragen aus
 Fact-Check-Funden (Widerspruch, nicht belegt), Lücken gegenüber den Quellen und

@@ -51,12 +51,23 @@ const LABELS: Record<Location["kind"], [string, string]> = {
   page: ["Page", "Pages"],
   slide: ["Slide", "Slides"],
   paragraph: ["Paragraph", "Paragraphs"],
+  table: ["Table", "Tables"],
   line: ["Line", "Lines"],
 };
 
 export function locationLabel({ kind, start, end }: Location) {
   const [singular, plural] = LABELS[kind];
   return start === end ? `${singular} ${start}` : `${plural} ${start}–${end}`;
+}
+
+export function retrievalHint(
+  hit: Pick<SourceHit, "similarity" | "matched_by" | "weak">,
+) {
+  const parts = [];
+  if (hit.similarity !== null && hit.similarity !== undefined)
+    parts.push(`similarity ${hit.similarity.toFixed(2)} (signal)`);
+  if (hit.weak) parts.push("weak match, check passage");
+  return parts.join(" · ");
 }
 
 export type SourceRequest = <T>(

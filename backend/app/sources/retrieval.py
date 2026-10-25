@@ -5,6 +5,7 @@ candidates; both rankings are combined with reciprocal rank fusion (RRF).
 Keywords catch exact numbers and names that embeddings tend to blur.
 """
 
+import os
 from uuid import UUID
 
 from app.sources import db
@@ -14,6 +15,14 @@ from app.sources.quotes import normalize as normalize_quote
 
 CANDIDATES = 20
 RRF_K = 60  # Common constant from the original RRF paper; not tuned here.
+
+
+def weak_similarity() -> float:
+    """Cosine below which a vector-only hit is marked weak; heuristic, not calibrated."""
+    try:
+        return float(os.getenv("SOURCE_WEAK_SIMILARITY", "0.30"))
+    except ValueError:
+        return 0.30
 
 _SEARCH = """
 WITH vec AS (
@@ -30,11 +39,12 @@ WITH vec AS (
     ORDER BY ts_rank_cd(tsv, query) DESC, id LIMIT %(candidates)s
 )
 SELECT c.id, c.source_id, s.filename, c.location_kind, c.location_start, c.location_end, c.text,
-       vec.similarity, vec.rank IS NOT NULL AS by_vector, kw.rank IS NOT NULL AS by_keyword
+       vec.similarity, vec.rank IS NOT NULL AS by_vector, kw.rank IS NOT NULL AS by_keyword,
+       coalesce(1.0 / (%(rrf)s + vec.rank), 0) + coalesce(1.0 / (%(rrf)s + kw.rank), 0) AS score
 FROM vec FULL JOIN kw ON vec.id = kw.id
 JOIN source_chunks c ON c.id = coalesce(vec.id, kw.id)
 JOIN sources s ON s.id = c.source_id AND s.status = 'ready'
-ORDER BY coalesce(1.0 / (%(rrf)s + vec.rank), 0) + coalesce(1.0 / (%(rrf)s + kw.rank), 0) DESC, c.id
+ORDER BY score DESC, c.id
 LIMIT %(k)s
 """
 
@@ -55,17 +65,57 @@ def search(collection_id: UUID, query: str, k: int = 5, embedder: Embedder | Non
     }
     with db.connect() as connection:
         rows = connection.execute(_SEARCH, params).fetchall()
-    return [SourceHit(
-        chunk_id=row["id"], source_id=row["source_id"], filename=row["filename"],
-        location=Location(kind=row["location_kind"], start=row["location_start"], end=row["location_end"]),
-        text=row["text"],
-        similarity=round(float(row["similarity"]), 4) if row["similarity"] is not None else None,
-        matched_by=[name for name, hit in (("vector", row["by_vector"]), ("keyword", row["by_keyword"])) if hit],
-    ) for row in rows]
+    threshold = weak_similarity()
+    results = []
+    for row in rows:
+        similarity = round(float(row["similarity"]), 4) if row["similarity"] is not None else None
+        matched_by = [name for name, hit in (("vector", row["by_vector"]), ("keyword", row["by_keyword"])) if hit]
+        results.append(SourceHit(
+            chunk_id=row["id"], source_id=row["source_id"], filename=row["filename"],
+            location=Location(kind=row["location_kind"], start=row["location_start"], end=row["location_end"]),
+            text=row["text"], similarity=similarity, matched_by=matched_by,
+            retrieval_score=round(float(row["score"]), 6),
+            weak=similarity is not None and similarity < threshold and "keyword" not in matched_by,
+        ))
+    return results
+
+
+def fuse(results: list[list[SourceHit]], k: int = 5, rrf_k: int = RRF_K) -> list[SourceHit]:
+    """Fuse several ranked result lists with reciprocal rank fusion."""
+    scores: dict[int, float] = {}
+    hits: dict[int, SourceHit] = {}
+    for result in results:
+        for rank, hit in enumerate(result, 1):
+            scores[hit.chunk_id] = scores.get(hit.chunk_id, 0.0) + 1.0 / (rrf_k + rank)
+            previous = hits.get(hit.chunk_id)
+            if previous is None:
+                hits[hit.chunk_id] = hit
+                continue
+            similarities = [value for value in (previous.similarity, hit.similarity) if value is not None]
+            hits[hit.chunk_id] = previous.model_copy(update={
+                "matched_by": list(dict.fromkeys(previous.matched_by + hit.matched_by)),
+                "similarity": max(similarities) if similarities else None,
+                "weak": previous.weak and hit.weak,
+            })
+    ordered = sorted(hits, key=lambda chunk_id: (-scores[chunk_id], chunk_id))[:k]
+    return [hits[chunk_id].model_copy(update={"retrieval_score": round(scores[chunk_id], 6)})
+            for chunk_id in ordered]
+
+
+def search_many(collection_id: UUID, queries: list[str], k: int = 5,
+                embedder: Embedder | None | object = CONFIGURED) -> list[SourceHit]:
+    """Run focused queries and fuse their rankings; duplicates are skipped."""
+    unique = list(dict.fromkeys(query.strip() for query in queries if query.strip()))
+    if not unique:
+        return []
+    if embedder is CONFIGURED:
+        embedder = configured_embedder()
+    return fuse([search(collection_id, query, k, embedder) for query in unique], k)
 
 
 LABELS = {"page": ("Seite", "Seiten"), "slide": ("Folie", "Folien"),
-          "paragraph": ("Absatz", "Absätze"), "line": ("Zeile", "Zeilen")}
+          "paragraph": ("Absatz", "Absätze"), "table": ("Tabelle", "Tabellen"),
+          "line": ("Zeile", "Zeilen")}
 
 
 def location_label(location: Location) -> str:

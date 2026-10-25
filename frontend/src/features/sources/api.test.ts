@@ -4,6 +4,7 @@ import {
   collectionId,
   deleteSource,
   locationLabel,
+  retrievalHint,
   searchSources,
   uploadSource,
 } from "./api";
@@ -38,10 +39,23 @@ it("rejects unsupported, empty and oversized files before upload", () => {
   expect(checkFile(big)).toMatch(/25 MB/);
 });
 
-it("labels page, slide and merged paragraph locations", () => {
+it("labels page, slide, table and merged paragraph locations", () => {
   expect(locationLabel({ kind: "slide", start: 2, end: 2 })).toBe("Slide 2");
   expect(locationLabel({ kind: "paragraph", start: 1, end: 4 })).toBe(
     "Paragraphs 1–4",
+  );
+  expect(locationLabel({ kind: "table", start: 1, end: 1 })).toBe("Table 1");
+});
+
+it("shows retrieval similarity and weak matches without claiming a probability", () => {
+  expect(retrievalHint({ similarity: 0.42, matched_by: ["vector"], weak: false })).toBe(
+    "similarity 0.42 (signal)",
+  );
+  expect(retrievalHint({ similarity: 0.2, matched_by: ["vector"], weak: true })).toBe(
+    "similarity 0.20 (signal) · weak match, check passage",
+  );
+  expect(retrievalHint({ similarity: null, matched_by: ["keyword"], weak: false })).toBe(
+    "",
   );
 });
 

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.factcheck import router as factcheck_router
 from app.factcheck.llm import LLMError, OpenAICompatibleChat, configured_llm, parse_json_object
 from app.factcheck.models import FactCheckRequest
-from app.factcheck.pipeline import EXTRACT_PROMPT, run_fact_check
+from app.factcheck.pipeline import EXTRACT_PROMPT, numeric_gate, run_fact_check
 from app.factcheck.transcript import sentences
 from app.factcheck.web import WebPassage, WikipediaSearcher, best_passages
 from app.main import app
@@ -180,6 +180,19 @@ def test_without_sources_only_web_and_without_web_nothing():
     assert all(c.checked == [] and c.verdict == "not_found" for c in offline.claims)
     assert offline.web_provider is None and any("nicht geprüft" in n for n in offline.notices)
     assert len(searcher.queries) == 3
+
+
+def test_numeric_gate_requires_the_claim_figures_in_the_quote():
+    assert numeric_gate("Der Umsatz stieg auf 4,2 Mio. Euro.", "Der Umsatz stieg auf 4.200.000 Euro.", "supports") is None
+    assert numeric_gate("Der Preis beträgt 299 €.", "Der Preis beträgt 149 €.", "supports")
+    assert numeric_gate("Der Preis beträgt 299 €.", "Der Preis beträgt 149 € statt 299 €.", "contradicts") is None
+    assert numeric_gate("Die Hochschule hat 9000 Studierende.",
+                        "9000 Studierende in acht Fachbereichen.", "contradicts") is None
+    assert numeric_gate("50 % in Hessen.", "50 % in Bayern.", "contradicts") is None
+    assert numeric_gate("Der Mond besteht aus Käse.", "Der Mond besteht aus Gestein.", "contradicts") is None
+    assert numeric_gate("Der Preis beträgt 299 €.", "Der Preis beträgt 299 €.", "contradicts")
+    assert numeric_gate("Der Umsatz stieg auf 4,2Mio. Euro.",
+                        "Der Umsatz stieg auf 4.200.000 Euro.", "supports") is None
 
 
 def test_failed_lookups_are_unchecked_not_false():

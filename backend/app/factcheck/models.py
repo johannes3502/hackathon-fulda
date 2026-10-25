@@ -44,6 +44,14 @@ class Evidence(BaseModel):
     location: Location | None = None
     url: str | None = None
     quote_verified: Literal["exact", "fuzzy"] | None = None
+    retrieval_score: float | None = Field(
+        default=None, description="Fused reciprocal-rank score; unitless, not a probability")
+    similarity: float | None = Field(
+        default=None, description="Cosine similarity of the best vector match; null for keyword-only")
+    matched_by: list[Literal["vector", "keyword"]] = Field(default_factory=list)
+    weak: bool = Field(
+        default=False, description="Heuristic: vector-only match below the configured similarity threshold")
+
 
 
 class ClaimResult(BaseModel):

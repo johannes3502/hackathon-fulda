@@ -14,7 +14,8 @@ from app.sources import db, ingest, retrieval
 from app.sources import router as sources_router
 from app.sources.chunking import chunk_segments
 from app.sources.extract import ExtractionError, Segment, extract
-from app.sources.models import Location
+from app.sources.models import Location, SourceHit
+from app.sources.quotes import verified_quote
 
 
 def minimal_pdf(pages: list[str]) -> bytes:
@@ -85,6 +86,59 @@ def test_extract_docx_and_text(tmp_path):
     assert extract(text, ".md") == [Segment("line", 1, "# Titel\nZeile zwei"), Segment("line", 5, "Absatz ab Zeile fünf")]
 
 
+def test_extract_docx_keeps_tables_in_document_order(tmp_path):
+    from docx import Document
+
+    document = Document()
+    document.add_paragraph("Vor der Tabelle.")
+    table = document.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = "Kennzahl"
+    table.cell(0, 1).text = "Wert"
+    table.cell(1, 0).text = "Haushalte pro Woche"
+    table.cell(1, 1).text = "1.200"
+    document.add_paragraph("Nach der Tabelle.")
+    path = tmp_path / "tabelle.docx"
+    document.save(path)
+
+    assert extract(path, ".docx") == [
+        Segment("paragraph", 1, "Vor der Tabelle."),
+        Segment("table", 1, "Kennzahl | Wert\nHaushalte pro Woche | 1.200"),
+        Segment("paragraph", 2, "Nach der Tabelle."),
+    ]
+
+
+def test_chunking_does_not_merge_paragraphs_across_a_table():
+    chunks = chunk_segments([
+        Segment("paragraph", 1, "Kurz."),
+        Segment("table", 1, "Kennzahl | Wert"),
+        Segment("paragraph", 2, "Auch kurz."),
+    ], max_chars=300)
+    assert [(chunk.kind, chunk.start, chunk.end) for chunk in chunks] == [
+        ("paragraph", 1, 1), ("table", 1, 1), ("paragraph", 2, 2)]
+
+
+def test_short_exact_quotes_are_expanded_to_sentence_context():
+    passage = "Der Preis beträgt 149 € statt 299 €. Die Aktion endet am Freitag."
+    assert verified_quote("149 €", passage, 12) == ("Der Preis beträgt 149 € statt 299 €.", "exact")
+    assert verified_quote("149", "Preis: 149 Euro.", 12) == ("Preis: 149 Euro.", "exact")
+    assert verified_quote("149", "Preis: 1490 Euro.", 12) is None  # Not a substring of a longer number.
+    assert verified_quote("5", "Wir haben 5 Standorte.", 12) is None
+    assert verified_quote("%", "Wir haben 5 % Wachstum.", 12) is None
+    assert verified_quote("2 Wochen", passage, 12) is None
+
+
+def test_multi_query_fusion_prefers_passages_found_by_several_queries():
+    def hit(chunk_id: int, text: str, similarity: float) -> SourceHit:
+        return SourceHit(chunk_id=chunk_id, source_id=uuid4(), filename="folien.pdf",
+                         location=Location(kind="page", start=1, end=1), text=text,
+                         similarity=similarity, matched_by=["vector"])
+
+    first, shared, last = hit(1, "A", 0.8), hit(2, "B", 0.4), hit(3, "C", 0.7)
+    fused = retrieval.fuse([[first, shared], [shared, last]], k=2)
+    assert [item.chunk_id for item in fused] == [2, 1]
+    assert fused[0].retrieval_score > fused[1].retrieval_score
+
+
 def test_extract_rejects_broken_files(tmp_path):
     path = tmp_path / "kaputt.pdf"
     path.write_bytes(b"not a pdf")
@@ -119,6 +173,7 @@ def test_quote_verification_and_labels():
     assert not retrieval.quote_in_text(" … ", chunk)
     assert retrieval.location_label(Location(kind="slide", start=2, end=2)) == "Folie 2"
     assert retrieval.location_label(Location(kind="paragraph", start=1, end=4)) == "Absätze 1–4"
+    assert retrieval.location_label(Location(kind="table", start=1, end=1)) == "Tabelle 1"
 
 
 def test_upload_validation_and_accept(monkeypatch):

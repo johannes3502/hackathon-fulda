@@ -20,6 +20,7 @@ const result: FactCheckResult = {
         quote: "rund 9.500 Studierende",
         passage: "Die Hochschule hat rund 9.500 Studierende.",
         quote_verified: "exact",
+        weak: false,
         filename: "folien.pdf",
         location: { kind: "page", start: 2, end: 2 },
       },

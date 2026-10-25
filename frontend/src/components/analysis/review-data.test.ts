@@ -52,6 +52,7 @@ describe("review timeline", () => {
         quote: "Source quote",
         passage: "Source quote",
         url: "javascript:alert(1)",
+        weak: false,
       },
     };
     const moment = feedbackToMoment(
@@ -107,6 +108,7 @@ describe("review timeline", () => {
         quote: "Ten participants.",
         passage: "Ten participants.",
         quote_verified: "exact",
+        weak: false,
       },
     };
     const take = recordedTake({

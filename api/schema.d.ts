@@ -1327,6 +1327,8 @@ export interface components {
              */
             label: string;
             location?: components["schemas"]["Location"] | null;
+            /** Matched By */
+            matched_by?: ("vector" | "keyword")[];
             /** Passage */
             passage: string;
             /**
@@ -1336,10 +1338,26 @@ export interface components {
             quote: string;
             /** Quote Verified */
             quote_verified?: ("exact" | "fuzzy") | null;
+            /**
+             * Retrieval Score
+             * @description Fused reciprocal-rank score; unitless, not a probability
+             */
+            retrieval_score?: number | null;
+            /**
+             * Similarity
+             * @description Cosine similarity of the best vector match; null for keyword-only
+             */
+            similarity?: number | null;
             /** Source Id */
             source_id?: string | null;
             /** Url */
             url?: string | null;
+            /**
+             * Weak
+             * @description Heuristic: vector-only match below the configured similarity threshold
+             * @default false
+             */
+            weak: boolean;
         };
         /**
          * FactCheckConfig
@@ -1625,7 +1643,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "page" | "slide" | "paragraph" | "line";
+            kind: "page" | "slide" | "paragraph" | "table" | "line";
             /** Start */
             start: number;
         };
@@ -2366,6 +2384,12 @@ export interface components {
              */
             source_passages: number;
             /**
+             * Source Queries
+             * @description Focused retrieval queries fused for gap questions; the whole transcript is never one query
+             * @default 4
+             */
+            source_queries: number;
+            /**
              * Top K
              * @description Upload passages per answer review
              * @default 5
@@ -2774,6 +2798,11 @@ export interface components {
             /** Matched By */
             matched_by: ("vector" | "keyword")[];
             /**
+             * Retrieval Score
+             * @description Fused reciprocal-rank score; unitless, not a probability
+             */
+            retrieval_score?: number | null;
+            /**
              * Similarity
              * @description Cosine similarity to the query embedding; null if matched by keywords only
              */
@@ -2785,6 +2814,12 @@ export interface components {
             source_id: string;
             /** Text */
             text: string;
+            /**
+             * Weak
+             * @description Heuristic: vector-only match below SOURCE_WEAK_SIMILARITY; not a truth judgment
+             * @default false
+             */
+            weak: boolean;
         };
         /** Strength */
         Strength: {

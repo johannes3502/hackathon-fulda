@@ -28,7 +28,8 @@ from app.factcheck.transcript import Sentence, clock, sentences, windows
 from app.factcheck.web import WebPassage, WebSearcher
 from app.sources import retrieval
 from app.sources.models import SourceHit
-from app.sources.quotes import quote_match
+from app.sources.numbers import numbers_in
+from app.sources.quotes import normalize, verified_quote
 
 log = logging.getLogger(__name__)
 
@@ -117,8 +118,6 @@ def web_passages(found: list[WebPassage], provider: str) -> list[Passage]:
 def verified_evidence(quote: object, preferred: object, passages: list[Passage], min_chars: int) -> Evidence | None:
     """Evidence only if the model's quote is verbatim in a passage; the named passage is tried first."""
     quote = quote if isinstance(quote, str) else ""
-    if len(retrieval.normalize(quote).strip(" \"'.…")) < min_chars:
-        return None
     # A declared location is binding; never move a quote to another source/page.
     if isinstance(preferred, int) and not isinstance(preferred, bool):
         if not 1 <= preferred <= len(passages):
@@ -127,15 +126,46 @@ def verified_evidence(quote: object, preferred: object, passages: list[Passage],
     else:
         order = list(range(len(passages)))
     for index in order:
-        match = "exact" if retrieval.quote_in_text(quote, passages[index].text) else quote_match(quote, passages[index].text)
-        if match:
+        found = verified_quote(quote, passages[index].text, min_chars)
+        if found:
+            verified, match = found
             passage = passages[index]
             hit, web = passage.hit, passage.web
             return Evidence(
-                kind=passage.kind, label=passage.label, quote=quote.strip(), passage=passage.text,
+                kind=passage.kind, label=passage.label, quote=verified, passage=passage.text,
                 filename=hit.filename if hit else None, source_id=hit.source_id if hit else None,
                 location=hit.location if hit else None, url=web.url if web else None, quote_verified=match,
+                retrieval_score=hit.retrieval_score if hit else None, similarity=hit.similarity if hit else None,
+                matched_by=hit.matched_by if hit else [], weak=hit.weak if hit else False,
             )
+    return None
+
+
+def numeric_gate(claim: str, quote: str, verdict: str) -> str | None:
+    """Reject verdicts whose verified quote does not carry the claimed figures.
+
+    A real quote can still under-warrant a numeric claim. This deterministic
+    check is deliberately narrower than entailment: it only compares digits
+    and scale words. Units and number words are not checked.
+    """
+    claimed = numbers_in(claim)
+    if not claimed:
+        return None
+    quoted = numbers_in(quote)
+    if verdict == "supports":
+        if claimed - quoted:
+            return "Zitat enthält nicht alle Zahlen der Behauptung; Urteil verworfen."
+        return None
+    if verdict == "contradicts":
+        # Do not veto contradictions on matching figures: the quote may
+        # contradict on an entity, unit or place (50 % in Hessen vs Bayern).
+        # Only an exact restatement of the claim cannot be its contradiction.
+        def bare(text: str) -> str:
+            return normalize(text).strip(" .!?;:\"'")
+
+        if bare(claim) == bare(quote):
+            return "Zitat ist identisch mit der Behauptung; Widerspruch verworfen."
+        return None
     return None
 
 
@@ -151,6 +181,9 @@ def judge(llm: ChatModel, claim: Claim, passages: list[Passage], config: FactChe
         return "not_found", explanation.strip(), None, []
     evidence = verified_evidence(answer.get("quote"), answer.get("passage"), passages, config.min_quote_chars)
     if evidence is not None:
+        note = numeric_gate(claim.text, evidence.quote, verdict)
+        if note:
+            return "unchecked", "", None, [note]
         return verdict, explanation.strip(), evidence, []
     return "unchecked", "", None, ["Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen."]
 

@@ -22,6 +22,7 @@ import {
   isPending,
   listSources,
   locationLabel,
+  retrievalHint,
   searchSources,
   uploadSource,
   type Source,
@@ -305,22 +306,26 @@ export function SourceLibrary() {
             )}
             {hits && hits.length > 0 && (
               <ol className="source-hits">
-                {hits.map((hit) => (
-                  <li key={hit.chunk_id}>
-                    <div className="source-hit-meta">
-                      <strong>{hit.filename}</strong>
-                      <span>{locationLabel(hit.location)}</span>
-                      <span className="badge">
-                        {hit.matched_by
-                          .map((by) =>
-                            by === "vector" ? "meaning" : "keyword",
-                          )
-                          .join(" + ")}
-                      </span>
-                    </div>
-                    <p>{hit.text}</p>
-                  </li>
-                ))}
+                {hits.map((hit) => {
+                  const hint = retrievalHint(hit);
+                  return (
+                    <li key={hit.chunk_id}>
+                      <div className="source-hit-meta">
+                        <strong>{hit.filename}</strong>
+                        <span>{locationLabel(hit.location)}</span>
+                        <span className="badge">
+                          {hit.matched_by
+                            .map((by) =>
+                              by === "vector" ? "meaning" : "keyword",
+                            )
+                            .join(" + ")}
+                        </span>
+                        {hint && <span className="field-hint">{hint}</span>}
+                      </div>
+                      <p>{hit.text}</p>
+                    </li>
+                  );
+                })}
               </ol>
             )}
           </section>

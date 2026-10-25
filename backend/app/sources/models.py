@@ -44,6 +44,10 @@ class SourceHit(BaseModel):
     similarity: float | None = Field(
         default=None, description="Cosine similarity to the query embedding; null if matched by keywords only")
     matched_by: list[Literal["vector", "keyword"]]
+    retrieval_score: float | None = Field(
+        default=None, description="Fused reciprocal-rank score; unitless, not a probability")
+    weak: bool = Field(
+        default=False, description="Heuristic: vector-only match below SOURCE_WEAK_SIMILARITY; not a truth judgment")
 
 
 class SearchRequest(BaseModel):

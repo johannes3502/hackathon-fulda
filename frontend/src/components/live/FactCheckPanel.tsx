@@ -183,7 +183,7 @@ export function FactCheckPanel({
           {web
             ? ` and short search queries to ${providerName(settings.web_provider)}`
             : ""}
-          . Only quotes found verbatim in a source count as evidence.
+          . Only quotes found in a source count as evidence; fuzzy matches are marked.
         </p>
       )}
       <Button onClick={() => void check()} disabled={!canRun}>
@@ -251,6 +251,22 @@ export function FactCheckPanel({
                         claim.evidence.label
                       )}
                     </cite>
+                    <small className="field-hint">
+                      {claim.evidence.kind === "web"
+                        ? "Quote taken from the cited web source."
+                        : claim.evidence.quote_verified === "exact"
+                          ? "Quote verified verbatim."
+                          : claim.evidence.quote_verified === "fuzzy"
+                            ? "Quote matched approximately."
+                            : "Quote verified in the upload."}
+                      {claim.evidence.similarity !== null &&
+                      claim.evidence.similarity !== undefined
+                        ? ` Source similarity ${claim.evidence.similarity.toFixed(2)} (signal, not calibrated).`
+                        : ""}
+                      {claim.evidence.weak
+                        ? " Weak retrieval match: check the passage."
+                        : ""}
+                    </small>
                   </blockquote>
                 )}
                 {claim.explanation && <p>{claim.explanation}</p>}

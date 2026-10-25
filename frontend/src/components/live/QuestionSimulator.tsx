@@ -47,6 +47,19 @@ function Source({ evidence }: { evidence: Evidence }) {
           evidence.label
         )}
       </cite>
+      <small className="field-hint">
+        {evidence.kind === "web"
+          ? "Quote taken from the cited web source."
+          : evidence.quote_verified === "exact"
+            ? "Quote verified verbatim."
+            : evidence.quote_verified === "fuzzy"
+              ? "Quote matched approximately."
+              : "Quote verified in the upload."}
+        {evidence.similarity !== null && evidence.similarity !== undefined
+          ? ` Source similarity ${evidence.similarity.toFixed(2)} (signal, not calibrated).`
+          : ""}
+        {evidence.weak ? " Weak retrieval match: check the passage." : ""}
+      </small>
     </blockquote>
   );
 }

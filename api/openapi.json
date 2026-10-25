@@ -1330,6 +1330,17 @@
               }
             ]
           },
+          "matched_by": {
+            "items": {
+              "enum": [
+                "vector",
+                "keyword"
+              ],
+              "type": "string"
+            },
+            "title": "Matched By",
+            "type": "array"
+          },
           "passage": {
             "title": "Passage",
             "type": "string"
@@ -1354,6 +1365,30 @@
             ],
             "title": "Quote Verified"
           },
+          "retrieval_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fused reciprocal-rank score; unitless, not a probability",
+            "title": "Retrieval Score"
+          },
+          "similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cosine similarity of the best vector match; null for keyword-only",
+            "title": "Similarity"
+          },
           "source_id": {
             "anyOf": [
               {
@@ -1376,6 +1411,12 @@
               }
             ],
             "title": "Url"
+          },
+          "weak": {
+            "default": false,
+            "description": "Heuristic: vector-only match below the configured similarity threshold",
+            "title": "Weak",
+            "type": "boolean"
           }
         },
         "required": [
@@ -2237,6 +2278,7 @@
               "page",
               "slide",
               "paragraph",
+              "table",
               "line"
             ],
             "title": "Kind",
@@ -4277,6 +4319,14 @@
             "title": "Source Passages",
             "type": "integer"
           },
+          "source_queries": {
+            "default": 4,
+            "description": "Focused retrieval queries fused for gap questions; the whole transcript is never one query",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Source Queries",
+            "type": "integer"
+          },
           "top_k": {
             "default": 5,
             "description": "Upload passages per answer review",
@@ -5304,6 +5354,18 @@
             "title": "Matched By",
             "type": "array"
           },
+          "retrieval_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fused reciprocal-rank score; unitless, not a probability",
+            "title": "Retrieval Score"
+          },
           "similarity": {
             "anyOf": [
               {
@@ -5324,6 +5386,12 @@
           "text": {
             "title": "Text",
             "type": "string"
+          },
+          "weak": {
+            "default": false,
+            "description": "Heuristic: vector-only match below SOURCE_WEAK_SIMILARITY; not a truth judgment",
+            "title": "Weak",
+            "type": "boolean"
           }
         },
         "required": [

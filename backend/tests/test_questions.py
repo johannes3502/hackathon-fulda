@@ -9,14 +9,18 @@ from fastapi.testclient import TestClient
 
 from app.factcheck.llm import LLMError
 from app.factcheck.models import ClaimResult, Evidence
+from app.factcheck.transcript import sentences
 from app.main import app
 from app.questions import pipeline, router as questions_router
 from app.questions.models import AnswerRequest, Question, QuestionRequest
-from app.questions.pipeline import generate_questions, review_answer
+from app.questions.pipeline import generate_questions, review_answer, source_queries
+from app.sources.models import Location
+from app.transcription.models import Word
 from tests.test_factcheck import SLIDE, TRANSCRIPT, hit
 
 SOURCE = Evidence(kind="upload", label="folien.pptx, Folie 3", quote="rund 9.000 Studierende",
-                  passage=SLIDE, filename="folien.pptx")
+                  passage=SLIDE, filename="folien.pptx", source_id=uuid4(),
+                  location=Location(kind="slide", start=3, end=3))
 CLAIMS = [
     ClaimResult(claim="Die Hochschule hat 9000 Studierende.", transcript="Unsere Hochschule hat 9000 Studierende.",
                 t_ms=5000, duration_ms=1450, verdict="supports", explanation="", evidence=SOURCE, checked=["upload"]),
@@ -89,10 +93,55 @@ def test_questions_are_grounded_ordered_and_timed_by_code():
         (0, "question", "agent", "info"), (5000, "question", "agent", "info"),
         (9000, "question", "agent", "hint"), (13000, "question", "agent", "warning")]
     assert "t_ms" not in result.events[0].payload
-    assert result.sources_used and len(queries) == 1 and queries[0][1] == 6
+    assert result.sources_used and len(queries) == 4
+    assert {k for _, k in queries} == {6}
+    assert queries[0][0] == "Die Hochschule hat 9000 Studierende."
+    assert queries[-1][0].startswith("Hallo zusammen")
     system, user = model.prompts[0]
     assert "Höchstens 5 Fragen" in system
     assert "[2] (00:13) widerspricht: Der Mond besteht aus Käse." in user and "[1] folien.pptx, Folie 3:" in user
+
+
+def test_source_queries_prioritise_findings_and_sample_long_talks():
+    items = sentences(TRANSCRIPT)
+    assert source_queries(items, CLAIMS, 4)[:3] == [claim.claim for claim in CLAIMS]
+    long_words = [Word(word=f"Satz{index}.", start_ms=index * 1000, end_ms=index * 1000 + 900)
+                  for index in range(400)]
+    queries = source_queries(sentences(long_words), [], 4)
+    assert len(queries) == 4 and len(set(queries)) == 4
+    assert all(len(query) <= 500 for query in queries)
+    assert queries[0] != " ".join(word.word for word in long_words)
+
+
+def test_questions_with_unbacked_numbers_are_dropped():
+    model = Model({"questions": [
+        {"kind": "unsupported", "question": "Wie passen 120 Betriebe und 30 % Wachstum zusammen?",
+         "reason": "Nicht belegt.", "finding": 3, "sentences": [2]},
+        {"kind": "clarification", "question": "Was bedeutet 9000 Studierende?", "reason": "Unklar.", "sentences": [2]},
+        {"kind": "clarification", "question": "Was bedeutet 30 %?", "reason": "Unklar.", "sentences": [1]},
+        {"kind": "clarification", "question": "Was ist unklar?", "reason": "Unklar."},
+    ]})
+    result = generate_questions(request(), model, ready_sources=lambda c: 0)
+    assert [question.question for question in result.questions] == ["Was bedeutet 9000 Studierende?"]
+    assert any("2 Frage(n) mit Zahlen" in notice for notice in result.notices)
+
+
+def test_answer_review_rejects_numbers_not_in_the_verified_quote():
+    model = Model({"verdict": "supports", "passage": 1, "quote": "rund 9.000 Studierende",
+                   "explanation": "Passt."})
+    review = review_answer(AnswerRequest(question=question(evidence=SOURCE), answer="Es sind 1200 Studierende."), model)
+    assert review.verdict == "unchecked" and review.evidence is None
+    assert any("Zahlen" in note for note in review.notes)
+
+
+def test_answer_review_keeps_source_metadata():
+    model = Model({"verdict": "supports", "passage": 1, "quote": "rund 9.000 Studierende",
+                   "explanation": "Passt."})
+    review = review_answer(AnswerRequest(question=question(evidence=SOURCE),
+                                         answer="Es sind 9000 Studierende."), model)
+    assert review.verdict == "supports" and review.evidence is not None
+    assert review.evidence.filename == "folien.pptx"
+    assert review.evidence.location == Location(kind="slide", start=3, end=3)
 
 
 def test_without_sources_or_findings_and_broken_answers():
@@ -246,7 +295,6 @@ class Transcriber:
 
 def test_voice_answer_is_transcribed_then_reviewed(monkeypatch, tmp_path):
     from app.questions.models import VoiceAnswerRequest
-    from app.transcription.models import Word
 
     monkeypatch.setattr(pipeline, "extract_audio", lambda recording, target: target)
     voice = VoiceAnswerRequest(question=question(), persona="tutor")
