@@ -132,9 +132,13 @@ def update_profile(profile_id, request: ProfilePatch, token, key):
         return 200, body
 
 
-def delete_profile(profile_id, token, key):
-    request_hash = db.digest({"profileId": str(profile_id), "delete": True})
+def delete_profile(profile_id, token, key, *, delete_sessions=False):
+    from app.retention import outbox
+
+    request_hash = db.digest({"profileId": str(profile_id), "delete": True,
+                              "deleteSessions": bool(delete_sessions)})
     scope = f"profiles:{profile_id}:delete"
+    result = None
     with db.mutation(scope, key, request_hash) as (connection, previous):
         if previous:
             return 204, None
@@ -142,9 +146,11 @@ def delete_profile(profile_id, token, key):
         if row is None:
             return 204, None
         db.authenticate(connection, profile_id, token, allow_expired=True, lock=True)
-        db.delete_profile(connection, profile_id)
+        result = db.delete_profile(connection, profile_id, delete_sessions=delete_sessions)
         db.remember(connection, scope, key, request_hash, None, 204, None)
-        return 204, None
+    if result and result["blobsQueued"]:
+        outbox.flush_quietly()
+    return 204, None
 
 
 def rotate_token(profile_id, token, key):

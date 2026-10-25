@@ -8,6 +8,9 @@ export type FeatureFlags = PoseOptions & {
   fillerFeedback: boolean;
   volumeFeedback: boolean;
   pitchFeedback: boolean;
+  // Idle studio statuses shown while no hint is active.
+  framingCue: boolean;
+  readyCue: boolean;
 };
 
 // These flags select feedback markers; the studio always uses backend analysis.
@@ -20,6 +23,8 @@ export const DEFAULT_FEATURE_FLAGS: Readonly<FeatureFlags> = Object.freeze({
   fillerFeedback: true,
   volumeFeedback: true,
   pitchFeedback: true,
+  framingCue: true,
+  readyCue: true,
 });
 
 export const SPEECH_FEEDBACK_FLAGS = [
@@ -60,6 +65,8 @@ const ALLOWED: {
   fillerFeedback: [true, false],
   volumeFeedback: [true, false],
   pitchFeedback: [true, false],
+  framingCue: [true, false],
+  readyCue: [true, false],
 };
 let current: Readonly<FeatureFlags> | null = null;
 const listeners = new Set<() => void>();

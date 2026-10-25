@@ -8,6 +8,81 @@ import type { Persona, Question } from "./api";
 /** The talk is transcribed in German, so questions and replies are German. */
 export const SPEECH_LANG = "de-DE";
 
+/** Browser voice rounds are capped independently of the backend round ledger. */
+export const VOICE_ROUND_LIMIT_S = 600;
+export const MAX_VOICE_USER_TURNS = 12;
+export const MAX_FOLLOW_UPS_PER_MAIN = 2;
+
+export function remainingSeconds(
+  startedAt: number | null,
+  now = Date.now(),
+  limitSeconds = VOICE_ROUND_LIMIT_S,
+): number {
+  if (startedAt === null) return limitSeconds;
+  return Math.max(0, limitSeconds - Math.floor((now - startedAt) / 1000));
+}
+
+export function formatCountdown(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safe / 60);
+  return `${String(minutes).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+/** Root question of a follow-up id such as `q1.f1` or `q1.f1.f2`. */
+export function followUpParent(id: string): string {
+  const marker = id.indexOf(".f");
+  return marker < 0 ? id : id.slice(0, marker);
+}
+
+export function followUpsForMain(
+  questions: Question[],
+  mainId: string,
+): number {
+  const root = followUpParent(mainId);
+  return questions.filter(
+    (question) =>
+      question.kind === "follow_up" && followUpParent(question.id) === root,
+  ).length;
+}
+
+export function canAddFollowUp(questions: Question[], mainId: string): boolean {
+  return followUpsForMain(questions, mainId) < MAX_FOLLOW_UPS_PER_MAIN;
+}
+
+/** Shared by both voice components so the timer and turn cap stop a session. */
+export function voiceSessionExpired(
+  startedAt: number | null,
+  userTurns: number,
+  now = Date.now(),
+): boolean {
+  return (
+    remainingSeconds(startedAt, now) === 0 || userTurns >= MAX_VOICE_USER_TURNS
+  );
+}
+
+export function canStartVoiceRound(
+  limitReached: boolean,
+  available: boolean,
+): boolean {
+  return available && !limitReached;
+}
+
+/** End a provider session exactly once; safe for a missing session. */
+type VoiceSession = { endSession: () => Promise<void> };
+const endingSessions = new WeakMap<VoiceSession, Promise<void>>();
+
+export function endSessionIfActive(
+  session: VoiceSession | null,
+): Promise<void> {
+  if (!session) return Promise.resolve();
+  let ending = endingSessions.get(session);
+  if (!ending) {
+    ending = Promise.resolve().then(() => session.endSession());
+    endingSessions.set(session, ending);
+  }
+  return ending;
+}
+
 /** Pitch and rate only make the two roles audibly distinct; nothing is inferred from them. */
 const VOICE: Record<Persona, { pitch: number; rate: number }> = {
   student: { pitch: 1.2, rate: 1.05 },

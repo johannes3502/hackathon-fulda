@@ -9,7 +9,8 @@ the container, restart only the frontend with `docker compose restart frontend`
 (`docker --context colima compose restart frontend` when using Colima). The
 file watcher can miss new files across the host mount. This cleared the stale
 `lab-events` and review-component errors without changing source files or data.
-The frontend healthcheck also compiles `/live` and `/live/healthcheck/review`,
+The frontend healthcheck also compiles `/demo`, `/gestures`, `/sources`,
+`/progress`, `/admin`, `/review-preview`, `/live` and `/live/healthcheck/review`,
 so a working homepage cannot conceal a broken studio or review. The review probe
 opens the missing-recording state; it does not create a take or access a recording.
 
@@ -49,7 +50,7 @@ opens the missing-recording state; it does not create a take or access a recordi
   ready before recording starts. Calibration
   waits for about three seconds of voiced speech; startup silence and unpitched
   room noise do not count. The voice reference then adjusts slowly while you speak
-  and stays fixed during pauses. A new recording calibrates afresh. Transcription is on by default, with Deepgram EU streaming enabled (requires a server-side API key).
+  and stays fixed during pauses. A new recording calibrates afresh. Transcription is on by default; Deepgram EU streaming is opt-in (requires a server-side API key).
   Completed stream words are reused in review; otherwise local Whisper runs
   after stopping. Turn transcription off for signal analysis only. The batch
   fallback uses `local_only=true` to prevent an unintended hosted ASR provider.
@@ -59,8 +60,10 @@ opens the missing-recording state; it does not create a take or access a recordi
   Filler words and word-based pace require the transcript after stopping.
 - **Source review and questions:** upload sources under `/sources`, then in a
   recorded take choose **Check facts**. Gemini selects claims and
-  compares retrieved passages. **Start question round** asks follow-up questions;
-  enter a text answer to compare it with the sources. Quotes are verified against retrieved text.
+  compares retrieved passages. **Practice questions** uses the optional ElevenLabs
+  voice conversation. The browser ends it after ten minutes from Start or twelve
+  user messages; provider-enforced limits still depend on agent configuration.
+  Typed answers remain available through the API, using a server-issued round.
   [Setup, evaluation and limits](../docs/06-local-coaching.md).
 - **Rewatch feedback sections:** seek to a marker, loop the surrounding section,
   or play the full take. Backend review also accepts word-timestamp JSON from

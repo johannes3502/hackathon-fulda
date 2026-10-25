@@ -19,7 +19,7 @@ from app.jobs import QueueUnavailable, enqueue_task
 from app.progress import service as progress_service
 from app.review import db, media, service
 from app.review.errors import ReviewError
-from app.review.models import (TakeJobAccepted, ErrorResponse, EventBatch, EventsAccepted, EvaluationResponse, FactcheckRequest,
+from app.review.models import (TakeJobAccepted, ErrorResponse, EventBatch, EventsAccepted, EvaluationResponse, TakeFactcheckRequest,
     JobResponse, QuestionsRequest, QuestionsResponse, ReviewRequest, ReviewResponse, ReviewReused, SessionCreate, SessionDetail,
     SessionResponse, TakeAnswerRequest, TakeCreate, TakeResponse, TimelineResponse)
 from app.speech.config import AudioConfig
@@ -205,8 +205,8 @@ def job(job_id: UUID):
 
 
 @router.post("/takes/{take_id}/factcheck", status_code=202, response_model=TakeJobAccepted)
-async def factcheck(take_id: UUID, idempotency_key: Key, request: FactcheckRequest | None = None):
-    options = request or FactcheckRequest()
+async def factcheck(take_id: UUID, idempotency_key: Key, request: TakeFactcheckRequest | None = None):
+    options = request or TakeFactcheckRequest()
     def preflight():
         require_llm(take_id)
         if options.use_web:

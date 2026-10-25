@@ -5,6 +5,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 60000,
+  expect: { timeout: 15000 },
   use: { baseURL: `http://localhost:${port}`, trace: "retain-on-failure" },
   projects: [
     {
@@ -24,7 +25,11 @@ export default defineConfig({
   ],
   webServer: {
     command: `npm run dev -- --hostname 127.0.0.1 --port ${port}`,
-    env: { NEXT_DIST_DIR: ".next-playwright" },
+    env: {
+      NEXT_DIST_DIR: ".next-playwright",
+      // Use the Next.js proxy so the E2E origin does not depend on backend CORS.
+      NEXT_PUBLIC_API_URL: "/api",
+    },
     url: `http://localhost:${port}`,
     reuseExistingServer: false,
     timeout: 120000,

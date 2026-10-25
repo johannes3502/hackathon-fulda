@@ -94,9 +94,11 @@ def patch_profile(profile_id: UUID, request: ProfilePatch, idempotency_key: Key,
 
 
 @router.delete("/profiles/{profile_id}", status_code=204)
-def delete_profile(profile_id: UUID, idempotency_key: Key, token: Token = None):
+def delete_profile(profile_id: UUID, idempotency_key: Key, token: Token = None,
+                   delete_sessions: bool = Query(default=False, alias="deleteSessions")):
     return mutation_response(service.delete_profile(
-        profile_id, require_token(token), checked_key(idempotency_key)))
+        profile_id, require_token(token), checked_key(idempotency_key),
+        delete_sessions=delete_sessions))
 
 
 @router.post("/profiles/{profile_id}/rotate-token", response_model=ProfileTokenRotateResponse)

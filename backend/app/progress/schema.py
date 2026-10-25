@@ -1,8 +1,8 @@
 """Additive schema for optional long-term progress profiles.
 
 The review module owns the base session/take tables. This schema is applied
-after them and never changes existing rows except for filling server-time
-fallbacks on the new take columns.
+after them. Migration backfills add server-time take fallbacks and the default
+retention policy while preserving explicit deadlines and unset session expiry.
 """
 
 PROGRESS_SCHEMA = """
@@ -240,4 +240,71 @@ CREATE TABLE IF NOT EXISTS progress_runs (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS progress_runs_one_active_idx
     ON progress_runs(profile_id) WHERE status IN ('queued', 'running');
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_schema = current_schema() AND table_name = 'speaker_profiles'
+                     AND column_name = 'retention_origin') THEN
+        ALTER TABLE speaker_profiles
+            ADD COLUMN retention_origin text NOT NULL DEFAULT 'default';
+        UPDATE speaker_profiles SET retention_origin = 'user'
+         WHERE consent->>'retentionUntil' IS NOT NULL;
+    END IF;
+END $$;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conname = 'speaker_profiles_retention_origin_check'
+           AND conrelid = 'speaker_profiles'::regclass
+    ) THEN
+        ALTER TABLE speaker_profiles
+            ADD CONSTRAINT speaker_profiles_retention_origin_check
+            CHECK (retention_origin IN ('default', 'user'));
+    END IF;
+END $$;
+
+-- Existing profiles without an explicit end date get the documented default.
+UPDATE speaker_profiles
+   SET retention_until = created_at + interval '365 days'
+ WHERE retention_until IS NULL AND retention_origin = 'default';
+CREATE INDEX IF NOT EXISTS speaker_profiles_retention_idx
+    ON speaker_profiles(retention_until) WHERE retention_until IS NOT NULL;
+
+-- Backfill only when adding the column. A NULL deadline is deliberate and
+-- must survive reconnects, restarts and profile unlinking.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_schema = current_schema() AND table_name = 'sessions'
+                     AND column_name = 'retention_until') THEN
+        ALTER TABLE sessions ADD COLUMN retention_until timestamptz;
+        UPDATE sessions SET retention_until = created_at + interval '365 days'
+         WHERE profile_id IS NULL;
+    END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS sessions_retention_idx
+    ON sessions(retention_until) WHERE retention_until IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS retention_runs (
+    id uuid PRIMARY KEY,
+    started_at timestamptz NOT NULL,
+    finished_at timestamptz,
+    status text NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'skipped')),
+    counts jsonb NOT NULL DEFAULT '{}',
+    error_code text
+);
+CREATE INDEX IF NOT EXISTS retention_runs_started_idx
+    ON retention_runs(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS blob_deletions (
+    object_key text PRIMARY KEY,
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    next_attempt_at timestamptz NOT NULL DEFAULT now(),
+    last_error_code text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS blob_deletions_due_idx
+    ON blob_deletions(next_attempt_at, created_at);
 """

@@ -3,8 +3,8 @@
 1. The model extracts checkable claims and names the sentences they come from.
 2. Per claim, hybrid retrieval returns the top passages of the uploads (RAG).
 3. The model judges only from those passages and quotes one verbatim.
-4. Code checks that the quote really is in the passage (`quote_in_text`);
-   otherwise the judgment is discarded.
+4. Code verifies a passage-local source quote and numeric coverage;
+   otherwise the judgment is discarded. Neither check proves entailment.
 5. Claims the uploads do not settle go through the same steps with web
    passages, if a web provider is configured and the request allows it.
 """
@@ -20,15 +20,17 @@ import psycopg
 
 from app.events import Event, merge_timeline
 from app.factcheck.llm import ChatModel, LLMError, structured_json
-from app.factcheck.drafts import ExtractedClaims, Judgment
+from app.factcheck.drafts import ExtractedClaim, ExtractedClaims, Judgment
 from app.factcheck.models import (
     ClaimResult, Evidence, EvidenceKind, FactCheckConfig, FactCheckRequest, FactCheckResult,
 )
 from app.factcheck.transcript import Sentence, clock, sentences, windows
 from app.factcheck.web import WebPassage, WebSearcher
+from app.prompt_safety import safe_http_url, untrusted_block
 from app.sources import retrieval
 from app.sources.models import SourceHit
-from app.sources.quotes import quote_match
+from app.sources.numbers import numbers_in
+from app.sources.quotes import normalize, verified_quote
 
 log = logging.getLogger(__name__)
 
@@ -81,24 +83,27 @@ def extract_claims(llm: ChatModel, items: list[Sentence], limit: int) -> list[Cl
         if len(claims) >= limit:
             break
         transcript = "\n".join(f"[{s.number}] ({clock(s.start_ms)}) {s.text}" for s in batch)
-        answer = structured_json(llm, EXTRACT_PROMPT.replace("{limit}", str(limit - len(claims))),
-                                   f"Transkript (Satznummer, Zeit, Satz):\n{transcript}", ExtractedClaims)
+        answer = structured_json(
+            llm, EXTRACT_PROMPT.replace("{limit}", str(limit - len(claims))),
+            "Transkript (Satznummer, Zeit, Satz):\n" + untrusted_block("transcript", transcript),
+            ExtractedClaims,
+        )
         raw = answer.get("claims")
         if not isinstance(raw, list):
             raise LLMError("Model answer has no claims list")
         for item in raw:
-            if not isinstance(item, dict) or not isinstance(item.get("claim"), str):
+            try:
+                draft = ExtractedClaim.model_validate(item)
+            except ValueError:
                 continue
-            text = item["claim"].strip()[:500]
-            numbers = item.get("sentences")
-            refs = sorted({by_number[n] for n in numbers if isinstance(n, int) and n in by_number},
-                          key=lambda s: s.number) if isinstance(numbers, list) else []
+            text = draft.claim.strip()[:500]
+            refs = sorted({by_number[n] for n in draft.sentences if n in by_number}, key=lambda s: s.number)
             # Claims without a valid sentence reference cannot be placed on the timeline.
             if not text or not refs or text.casefold() in seen:
                 continue
             seen.add(text.casefold())
-            query = item.get("query") if isinstance(item.get("query"), str) and item["query"].strip() else text
-            claims.append(Claim(text, query.strip()[:300], tuple(refs)))
+            query = draft.query.strip() or text
+            claims.append(Claim(text, query[:300], tuple(refs)))
             if len(claims) >= limit:
                 break
     return claims
@@ -115,10 +120,8 @@ def web_passages(found: list[WebPassage], provider: str) -> list[Passage]:
 
 
 def verified_evidence(quote: object, preferred: object, passages: list[Passage], min_chars: int) -> Evidence | None:
-    """Evidence only if the model's quote is verbatim in a passage; the named passage is tried first."""
+    """Verify a quote within its declared passage, retaining source wording."""
     quote = quote if isinstance(quote, str) else ""
-    if len(retrieval.normalize(quote).strip(" \"'.…")) < min_chars:
-        return None
     # A declared location is binding; never move a quote to another source/page.
     if isinstance(preferred, int) and not isinstance(preferred, bool):
         if not 1 <= preferred <= len(passages):
@@ -127,31 +130,62 @@ def verified_evidence(quote: object, preferred: object, passages: list[Passage],
     else:
         order = list(range(len(passages)))
     for index in order:
-        match = "exact" if retrieval.quote_in_text(quote, passages[index].text) else quote_match(quote, passages[index].text)
-        if match:
+        found = verified_quote(quote, passages[index].text, min_chars)
+        if found:
+            verified, match = found
             passage = passages[index]
             hit, web = passage.hit, passage.web
             return Evidence(
-                kind=passage.kind, label=passage.label, quote=quote.strip(), passage=passage.text,
+                kind=passage.kind, label=passage.label, quote=verified, passage=passage.text,
                 filename=hit.filename if hit else None, source_id=hit.source_id if hit else None,
-                location=hit.location if hit else None, url=web.url if web else None, quote_verified=match,
+                location=hit.location if hit else None, url=web.url if web and safe_http_url(web.url) else None, quote_verified=match,
+                retrieval_score=hit.retrieval_score if hit else None, similarity=hit.similarity if hit else None,
+                matched_by=hit.matched_by if hit else [], weak=hit.weak if hit else False,
             )
+    return None
+
+
+def numeric_gate(claim: str, quote: str, verdict: str) -> str | None:
+    """Reject verdicts whose verified quote does not carry the claimed figures.
+
+    A real quote can still under-warrant a numeric claim. This deterministic
+    check is deliberately narrower than entailment: it only compares digits
+    and scale words. Units and number words are not checked.
+    """
+    if verdict == "contradicts" and normalize(claim).strip(" .!?;:\"'") == normalize(quote).strip(" .!?;:\"'"):
+        return "Zitat ist identisch mit der Behauptung; Widerspruch verworfen."
+    claimed = numbers_in(claim)
+    if not claimed:
+        return None
+    quoted = numbers_in(quote)
+    if verdict == "supports":
+        if claimed - quoted:
+            return "Zitat enthält nicht alle Zahlen der Behauptung; Urteil verworfen."
+        return None
+    # Matching figures do not veto contradictions on entity, unit or place.
     return None
 
 
 def judge(llm: ChatModel, claim: Claim, passages: list[Passage], config: FactCheckConfig) -> tuple[str, str, Evidence | None, list[str]]:
     """Return verdict, explanation, verified evidence and notes."""
     context = "\n\n".join(f"[{i}] {p.label}:\n{p.text}" for i, p in enumerate(passages, 1))
-    answer = structured_json(llm, JUDGE_PROMPT, f"Behauptung: {claim.text}\n\nAuszüge:\n{context}", Judgment)
-    verdict = answer.get("verdict")
-    explanation = answer.get("explanation") if isinstance(answer.get("explanation"), str) else ""
-    if verdict not in ("supports", "contradicts", "not_found"):
-        return "unchecked", "", None, ["Modellantwort ohne gültiges Urteil verworfen."]
-    if verdict == "not_found":
-        return "not_found", explanation.strip(), None, []
-    evidence = verified_evidence(answer.get("quote"), answer.get("passage"), passages, config.min_quote_chars)
+    user = "\n\n".join([
+        "Behauptung (untrusted):\n" + untrusted_block("claim", claim.text),
+        "Auszüge (untrusted):\n" + untrusted_block("passages", context),
+    ])
+    answer = structured_json(llm, JUDGE_PROMPT, user, Judgment)
+    try:
+        judgment = Judgment.model_validate(answer)
+    except ValueError:
+        return "unchecked", "", None, ["Modellantwort entsprach nicht dem Schema."]
+    if judgment.verdict == "not_found":
+        return "not_found", judgment.explanation.strip(), None, []
+    evidence = verified_evidence(judgment.quote, judgment.passage, passages, config.min_quote_chars)
     if evidence is not None:
-        return verdict, explanation.strip(), evidence, []
+        note = numeric_gate(claim.text, evidence.quote, judgment.verdict)
+        if note:
+            return "unchecked", "", None, [note]
+        return judgment.verdict, judgment.explanation.strip(), evidence, []
     return "unchecked", "", None, ["Zitat des Modells steht nicht wörtlich im Auszug; Urteil verworfen."]
 
 
@@ -200,8 +234,8 @@ def run_fact_check(request: FactCheckRequest, llm: ChatModel, searcher: WebSearc
         ready_sources = lambda collection: sum(s.status == "ready" for s in db.list_sources(collection))  # noqa: E731
     has_sources = request.collection_id is not None and ready_sources(request.collection_id) > 0
     searcher = searcher if request.use_web else None
-    notices = [f"Urteile stammen vom Sprachmodell {llm.model}. Code prüft nur, dass das Zitat wörtlich in der "
-               "Quelle steht, nicht die Bewertung selbst.",
+    notices = [f"Urteile stammen vom Sprachmodell {llm.model}. Code prüft Zitatfundort und Zahlenabdeckung, "
+               "nicht die inhaltliche Bewertung. Annähernde Zitate sind markiert; kurze Zitate können Kontext enthalten.",
                "„Nicht gefunden“ heißt: in den geprüften Quellen nicht belegt, nicht „falsch“."]
     if not has_sources:
         notices.append("Keine fertig verarbeiteten Quellen hochgeladen; Aussagen nur im Web gesucht."

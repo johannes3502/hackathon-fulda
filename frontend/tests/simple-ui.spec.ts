@@ -189,6 +189,9 @@ test("recording consent stays visible while diagnostics and server details are o
   await expect(page.locator(".recording-consent")).toContainText(
     "By starting, you agree to send your video and microphone audio",
   );
+  await expect(page.locator(".recording-consent strong")).toHaveText(
+    "this local server",
+  );
   await expect(page.locator(".recording-consent")).toBeVisible();
   // Deepgram streaming is opt-in; by default only local Whisper transcribes.
   await expect(page.locator(".recording-consent")).toContainText(
@@ -416,4 +419,24 @@ test("enlarged text reflows without hiding navigation or primary controls", asyn
       await expect(camera).toBeInViewport();
     }
   }
+});
+
+test("sample demo does not log hydration errors", async ({ page }) => {
+  const errors: string[] = [];
+  const hydration = /hydrat|did not match|server rendered/i;
+  page.on("console", (message) => {
+    if (message.type() === "error" && hydration.test(message.text()))
+      errors.push(message.text());
+  });
+  page.on("pageerror", (error) => {
+    if (hydration.test(error.message)) errors.push(error.message);
+  });
+  await page.goto("/demo");
+  await page.getByRole("button", { name: "Try sample demo" }).click();
+  await page.waitForURL(/\/practice\/[^/]+$/);
+  await expect(
+    page.getByText("Ready when you are", { exact: true }).first(),
+  ).toBeVisible();
+  await page.waitForTimeout(1000);
+  expect(errors).toEqual([]);
 });

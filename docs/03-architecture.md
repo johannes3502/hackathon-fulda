@@ -33,7 +33,7 @@ flowchart TB
         RV["Review-Router (additiv)<br/>/sessions, /takes, /jobs<br/>Idempotency-Key, camelCase<br/>verknüpft: X-Profile-Token"]
         PR["Progress-Router (additiv)<br/>/profiles, /progress, /goals<br/>X-Profile-Token, Idempotency-Key"]
         CEL["Celery App + Jobs"]
-        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job,<br/>recompute_progress, worker_probe (Smoke)"]
+        TASKS["Celery Tasks<br/>analyze_speech, ingest_source,<br/>fact_check, generate_questions,<br/>review_answer, review_voice_answer,<br/>prepare_agent, run_take_job,<br/>recompute_progress, retention_sweep,<br/>worker_probe (Smoke)"]
     end
 
     subgraph Pipelines["Analyse-Pipelines (Worker)"]
@@ -49,7 +49,7 @@ flowchart TB
 
     subgraph Infra["Infrastruktur (Docker Compose)"]
         PG[("PostgreSQL 18<br/>+ pgvector<br/>Sessions, Progress-Profile,<br/>Metriken, Chunks")]
-        RD[("Redis 8<br/>Broker DB0 / Results DB1")]
+        RD[("Redis 8<br/>Broker DB0 / Results DB1<br/>Fragerunden mit fester TTL")]
         S3[("SeaweedFS<br/>S3-kompatibel<br/>Port 8333")]
     end
 
@@ -90,6 +90,12 @@ flowchart TB
     RV -- "Session/Take/Event/Review/Job" --> PG
     RV -- "nur temporärer Analyse-Upload" --> S3
     RV -- "enqueue: nur Job-ID" --> CEL
+    BEAT["Celery Beat: 03:15 UTC"] -->|"retention_sweep"| CEL
+    TASKS --> RETENTION["Retention: begrenzte Batches,<br/>Profil nur entkoppeln,<br/>Blob-Outbox nach Commit leeren"]
+    RETENTION -->|"retention_runs, blob_deletions"| PG
+    RETENTION -->|"S3 Delete; Fehler mit Backoff"| S3
+    QR -->|"kanonische Frage, reservierte Turns,<br/>Review-Cache, TTL ohne Verlängerung"| RD
+    QUEST -->|"kurzer Runden-Lock; kein Modellaufruf im Lock"| RD
     PR -- "Profil, Qualität, Metriken, Ziele" --> PG
     PR -- "deterministische Projektion" --> PROG
     PR -- "Recompute: nur Run-ID, 202 + Status-URL" --> CEL
@@ -145,9 +151,10 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph Host["docker compose (localhost only)"]
-        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000<br/>Health: Homepage, Studio, Review, Backend"]
+        FE["frontend<br/>Next.js :3000<br/>Rewrite /api -> backend:8000<br/>Health: alle Demo-Routen + Backend"]
         BE["backend<br/>einziger Builder des gemeinsamen Images<br/>uvicorn :8000, --reload"]
         WK["worker<br/>verwendet Backend-Image, kein Pull<br/>Celery, Concurrency 2"]
+        BT["beat: ein Scheduler<br/>gemeinsames Backend-Image<br/>03:15 UTC -> retention_sweep"]
         PG[("postgres<br/>pgvector :5432<br/>Volume: postgres_data")]
         RD[("redis :6379<br/>AOF, noeviction<br/>Volume: redis_data")]
         ST[("storage<br/>SeaweedFS :8333<br/>Volume: media_data")]
@@ -158,6 +165,8 @@ flowchart LR
     BE -->|"postgres healthy"| PG
     BE -->|"storage healthy"| ST
     BE -->|"redis healthy"| RD
+    BT -->|"backend healthy"| BE
+    BT -->|"redis healthy; periodischer Auftrag"| RD
     WK -->|"backend healthy vor Start"| BE
     WK -. "Runtime-Verbindungen über x-backend-Umgebung,<br/>keine eigenen Health-Gates" .-> PG
     WK -.-> ST
@@ -305,19 +314,19 @@ flowchart TB
     UP["Upload /sources<br/>PDF, PPTX, DOCX, TXT, MD<br/>max 25 MB, kein OCR"] --> API["Sources-Router"]
     API --> S3A[("S3: sources/id/original")]
     API --> Q["Celery: ingest_source<br/>(idempotent, Redis-Lock)"]
-    Q --> EX["extract.py<br/>PDF je Seite - PPTX je Folie<br/>DOCX je Absatz - TXT/MD je Block"]
+    Q --> EX["extract.py<br/>PDF je Seite - PPTX je Folie<br/>DOCX je Absatz/Tabelle (iter_inner_content, LocationKind table)<br/>TXT/MD je Block"]
     EX --> CH["chunking.py<br/>~1200 Zeichen, Satzgrenzen,<br/>~200 Overlap"]
     CH --> EM["embeddings.py<br/>jina-embeddings-v2-base-de<br/>768 dim, lokal ONNX"]
     EM --> PGDB[("Postgres + pgvector<br/>sources, source_chunks<br/>+ tsvector (deutsch, GIN)")]
 
     SEARCH["POST /sources/search"] --> RET["retrieval.py<br/>Hybrid: pgvector-Kosinus<br/>+ Volltextsuche<br/>Reciprocal Rank Fusion"]
     PGDB --> RET
-    RET --> HITS["Top-k SourceHits<br/>mit Zitat-Ort: page/slide/<br/>paragraph/line"]
+    RET --> HITS["Top-k SourceHits<br/>Ort: page/slide/paragraph/table/line<br/>retrieval_score, similarity, matched_by, weak<br/>(Signale, nicht kalibriert)"]
     FCQ["Fact-Check je Aussage<br/>(app/factcheck/pipeline.py)"] -- "Suchanfrage" --> RET
-    HITS --> JUDGE["LLM-Urteil mit Zitat<br/>exakt oder konservativ fuzzy; Fundort bindend<br/>Zahlen/Negation bleiben gleich<br/>ungültiges Zitat: unchecked"]
+    HITS --> JUDGE["LLM-Urteil mit Zitat<br/>Originalspan, exakt oder konservativ fuzzy; Fundort bindend<br/>keine Teilzahlen oder geänderte Negation/Kontraste<br/>kurze Exact-Zitate auf Satzkontext erweitert<br/>numeric_gate: Supports braucht Behauptungszahlen<br/>identischer Widerspruch: unchecked<br/>Web-Pfad kann separat urteilen"]
     JUDGE -. "keine geprüfte Evidenz<br/>(nicht belegt oder unchecked)" .-> WEBQ["Websuche als Zweitquelle<br/>(Wikipedia / Tavily)"]
     JUDGE --> EVT["fact-Events auf der Timeline"]
-    HITS --> QA["Frage-Simulator<br/>(app/questions/pipeline.py)<br/>Lücken-Fragen + Antwort-Abgleich"]
+    HITS --> QA["Frage-Simulator<br/>(app/questions/pipeline.py)<br/>queries aus questions/retrieval.py + fuse per RRF<br/>Default 4, konfigurierbar 1–8 Queries<br/>Zahlen-Gates für Fragen, Gründe, Feedback, Nachfragen"]
     EVT --> QA
     QA --> QEVT["question-Events (source: agent)"]
 ```
@@ -361,6 +370,12 @@ sequenceDiagram
     FE->>FE: fact-Momente in der Timeline, Klick spielt die Stelle ab
 ```
 
+`FactCheckPanel` und der kompatible API-Fragen-Client nutzen denselben
+`evidenceHint` für `quote_verified`, `similarity` und `weak`. Er benennt auch
+ungeprüfte Alt-Zitate und möglichen Kontext bei Kurz-Zitaten. Diese Angaben sind
+keine Konfidenz- oder Wahrscheinlichkeitsanzeige; `retrieval_score` bleibt ein
+Ordnungssignal. Der Web-Fragepfad bleibt der ElevenLabs-Sprachdialog.
+
 ## 5b. Datenfluss: Frage-Simulator und Voice-Agent
 
 Der Web-Review hat zwei Ansichten: **Review moments** (begrenzte Wiedergabe-
@@ -398,7 +413,8 @@ sequenceDiagram
         FE->>BE: POST /questions/agent (Wörter, Collection, Modus, Funde)
         BE->>S3: agent-context-jobs/id/request.json
         BE-->>FE: 202 Job-ID
-        W->>PG: Hybrid-Suche in der Collection des Takes
+        W->>PG: Fokussierte Hybrid-Queries in der Collection des Takes (Default 4)
+        W->>W: RRF-Fusion, höchstens 8 Auszüge, auch Vortragsende berücksichtigen
         W->>S3: status.json mit begrenztem Kontext, request.json löschen
         FE->>BE: GET /questions/agent/jobs/id (Polling)
         FE->>BE: POST /questions/agent/session
@@ -409,7 +425,7 @@ sequenceDiagram
         E-->>FE: Verbindung bestätigt
         E->>FE: Ich habe noch ein paar Fragen. Bist du bereit? (Audio + Text)
         U->>FE: Bereitschaft bestätigen
-        FE->>E: Mikrofon-Audio; erst danach erste Frage zum Vortrag
+        FE->>E: Mikrofon-Audio, erst danach erste Frage zum Vortrag
         loop Eine Frage nach der anderen
             E->>FE: Frage / Reaktion, Audio + Text
             U->>FE: Gesprochene Antwort
@@ -417,15 +433,16 @@ sequenceDiagram
             opt Upload-Auszüge fehlen oder klären Sachfrage nicht
                 E->>T: search_web: gezielte öffentliche Sachfrage
                 T-->>E: Bis zu drei Treffer mit Titel, URL und Auszug
-                Note over E: Webquelle nennen; bei Fehler/fehlendem Beleg Urteil offenlassen
+                Note over E: Webquelle nennen, bei Fehler/fehlendem Beleg Urteil offenlassen
             end
             Note over E: Prompt: höchstens zwei Nachfragen, danach nächste Hauptfrage
         end
-        alt End conversation oder reguläres Agent-Ende
+        Note over FE: Browser: 600 s ab Start oder 12 Nutzerbeiträge,<br/>auch Vorbereitung abbrechen, späte SDK-Verbindung schließen
+        alt End conversation, Browserlimit oder reguläres Agent-Ende
             U->>FE: Gespräch beenden
             FE->>E: Verbindung schließen, Mikrofon freigeben
-            FE->>FE: PerformanceEvaluation anzeigen; Fokus auf Statistik-Überschrift
-            Note over FE: Vorhandene Messdaten;<br/>keine neuen Urteile über gesprochene Antworten
+            FE->>FE: PerformanceEvaluation anzeigen, Fokus auf Statistik-Überschrift
+            Note over FE: Vorhandene Messdaten,<br/>keine neuen Urteile über gesprochene Antworten
         else Ansicht verlassen / Verbindung abbrechen
             FE->>E: Verbindung schließen, keine Auswertung öffnen
         end
@@ -438,6 +455,34 @@ bis zu acht passende Auszüge, nicht die gesamte Bibliothek. Ohne konfigurierte
 Zugangsdaten bleibt die Sprachfunktion sichtbar als nicht verfügbar. Der
 bestehende `/questions/answers/voice`-Endpunkt mit ASR bleibt für API-Clients
 kompatibel; der neue Web-Review verwendet den direkten ElevenLabs-Dialog.
+
+Der kompatible API-Pfad hat einen eigenen, serverseitig begrenzten Ablauf:
+
+```mermaid
+sequenceDiagram
+    participant C as API-Client / Take-Worker
+    participant Q as Questions-Pipeline
+    participant R as Redis-Runde
+    participant L as LLM / ASR
+    C->>Q: Fragen erzeugen
+    Q->>L: Nonce-begrenzte Eingaben und JSON-Schema
+    L-->>Q: Fragenentwürfe
+    Q->>Q: Referenzen, Zitate und Zahlen prüfen
+    Q->>R: Fragen + feste TTL speichern
+    Q-->>C: round_id + Fragen
+    C->>Q: round_id, question_id, Antwort
+    Q->>R: Kurzer Lock: Turn reservieren / Cache lesen
+    alt Identische fertige Antwort
+        R-->>C: Gespeicherter Review ohne Provider-Aufruf
+    else Neuer Turn innerhalb Budget und TTL
+        Q->>L: Antwort auswerten, außerhalb des Locks
+        Q->>Q: Schema-, Zitat- und Zahlenprüfung
+        Q->>R: Kurzer Lock: Review + begrenzte Nachfrage atomar speichern
+        Q-->>C: Review
+    else Abgelaufen / unbekannt / Limit
+        Q-->>C: 410 / 404 / 429 ohne Provider-Aufruf
+    end
+```
 
 ## 6. Frontend-Navigation (Web)
 
@@ -529,6 +574,7 @@ erDiagram
         text locale
         jsonb consent "long-term-progress"
         timestamptz retention_until
+        text retention_origin "default/user"
     }
     PROFILE_TOKENS {
         uuid id PK
@@ -545,6 +591,7 @@ erDiagram
         text status
         jsonb consent
         jsonb capture "inkl. deviceKey"
+        timestamptz retention_until "NULL bei verknüpften Sessions"
         timestamptz created_at
         timestamptz deleted_at
     }
@@ -686,6 +733,21 @@ erDiagram
         timestamptz expires_at
     }
 
+    RETENTION_RUNS {
+        uuid id PK
+        timestamptz started_at
+        timestamptz finished_at
+        text status
+        jsonb counts
+        text error_code
+    }
+    BLOB_DELETIONS {
+        text object_key PK
+        int attempts
+        timestamptz next_attempt_at
+        text last_error_code
+        timestamptz created_at
+    }
     SOURCES {
         uuid id PK
         uuid collection_id
@@ -706,7 +768,7 @@ erDiagram
         uuid source_id FK
         uuid collection_id
         int ordinal
-        string location_kind "page, slide, paragraph, line"
+        string location_kind "page, slide, paragraph, table, line"
         int location_start
         int location_end
         text text
@@ -724,6 +786,8 @@ Die Embedding-Spalte ist bewusst dimensionsfrei, damit das Modell
 ausgetauscht werden kann; Abfragen vergleichen nur Vektoren desselben
 `embedding_model`.
 
+`source_chunks.location_kind` ist `text NOT NULL` ohne CHECK-Constraint; der neue Wert `table` braucht deshalb keine Migration. Bestehende DOCX-Chunks behalten ihre alte Numerierung und sollten für konsistente Orte neu ingestiert werden.
+
 Zusätzlich (außerhalb Postgres):
 
 | Speicher | Inhalt |
@@ -734,7 +798,7 @@ Zusätzlich (außerhalb Postgres):
 | SeaweedFS `factcheck-jobs/{job_id}/` | Status und Fact-Check-Ergebnis; `request.json` (Transkript) wird nach Abschluss gelöscht |
 | SeaweedFS `question-jobs/{job_id}/`, `answer-jobs/{job_id}/` | Status mit Fragen bzw. Antwort-Abgleich (bei Sprache mit Transkript der Antwort); `request.json` (Transkript, Antworttext) und `recording` (gesprochene Antwort) werden nach Abschluss gelöscht |
 | SeaweedFS `agent-context-jobs/{job_id}/` | Vorbereiteter Prompt mit gekürztem Transkript und Quellenauszügen; Request wird gelöscht, Ergebnis bleibt wie andere Jobs gespeichert, noch kein TTL-Cleanup |
-| Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks |
+| Redis DB0 / DB1 | Celery-Broker / Result-Backend, Locks; `question-round:{id}` enthält kanonische Fragen, reservierte Turns und fertige Reviews bis zur festen TTL (Standard 600 s). Das kann Transkript-/Quellenauszüge enthalten. |
 | Browser `sessionStorage` | Practice-Session-State (`pitch-coach:v1:<id>`) |
 | Browser `localStorage` | Quellen-Collection-ID (`pitchcoach.sourceCollection`), optional Profil-ID/Token (`pp_…`) und zufälliger `deviceKey`; Token ist XSS-exponiert |
 | Browser IndexedDB `presentation-recordings`, Store `recordings` | Abgeschlossene Live-Takes inklusive Video-/Pose-Log-Blobs, Config mit FeatureFlags/presentationMode/sourceCollectionId, ElevenLabs-Gespräch, Wörter, Pose-Events, Fact-Check, Fragen und Antworten; pro Take gespeichert, nach Reload wiederhergestellt. Objekt-URLs nur im Arbeitsspeicher. Löschen im Review entfernt den lokalen Take, keine Backend-Daten/Quellen. |
@@ -802,11 +866,11 @@ flowchart LR
         F1["GET /factcheck/settings"]
         F2["POST /factcheck"]
         F3["GET /factcheck/jobs/{job_id}"]
-        Q1["POST /questions"]
+        Q1["POST /questions<br/>liefert round_id"]
         Q2["GET /questions/jobs/{job_id}"]
-        Q3["POST /questions/answers"]
+        Q3["POST /questions/answers<br/>round_id + question_id"]
         Q4["GET /questions/answers/{job_id}"]
-        Q5["POST /questions/answers/voice"]
+        Q5["POST /questions/answers/voice<br/>round_id + question_id"]
         Q6["GET /questions/agent/settings"]
         Q7["POST /questions/agent (202)"]
         Q8["GET /questions/agent/jobs/{job_id}"]
@@ -839,7 +903,14 @@ Explizites Recompute läuft über Celery und `progress_runs`; normale Reads
 extrahieren nur geänderte Takes und schreiben das tatsächlich angefragte Fenster.
 Die Profil-Löschung entkoppelt
 Sessions/Takes (`ON DELETE SET NULL`) und entfernt nur die abgeleiteten
-Progress-Daten; die Session-Löschung bleibt separat.
+Progress-Daten. Verknüpfte Sessions haben keine automatische Session-Frist,
+auch nach Entkopplung. Anonyme Sessions haben eine unabhängige Standardfrist
+von 365 Tagen. `DELETE /profiles/{id}?deleteSessions=true` ist ein expliziter
+zusätzlicher Löschauftrag für verknüpfte Session-Daten; lokale Videos bleiben
+separat. Der tägliche Sweep löscht Profile, abgelaufene anonyme Sessions,
+alte Take-Jobs und Idempotenzdaten in begrenzten Batches. S3-Löschungen stehen
+vor dem Metadaten-Commit in `blob_deletions`; Fehler bleiben wiederholbar.
+Quellen und Legacy-S3-Ergebnispräfixe werden nicht automatisch gescannt.
 
 ## Deep Research (24.10.2026)
 

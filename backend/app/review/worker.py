@@ -64,7 +64,7 @@ def model_job(job, take):
     from app.factcheck.models import ClaimResult, FactCheckRequest
     from app.factcheck.pipeline import run_fact_check
     from app.factcheck.web import configured_web_searcher
-    from app.questions.models import AnswerRequest, Question, QuestionRequest
+    from app.questions.models import AnswerRequest, QuestionRequest
     from app.questions.pipeline import generate_questions, review_answer
     from app.transcription.models import Word
 
@@ -79,14 +79,14 @@ def model_job(job, take):
     if job["kind"] == "questions_generate":
         claims = [ClaimResult.model_validate(claim) for claim in (analysis.get("factcheck") or {}).get("claims", [])]
         result = generate_questions(QuestionRequest(words=words, claims=claims, collection_id=session["collection_id"],
-                                                    persona=options.get("persona", "tutor")), llm)
+                                                    persona=options.get("persona", "tutor"),
+                                                    presentation_mode=session["presentation_mode"] or "thesis"), llm)
         return "questions", result.model_dump(mode="json"), pipeline_events(result.events, take, prefix="question:")
-    raw = next((question for question in (analysis.get("questions") or {}).get("questions", [])
-                if question["id"] == options["questionId"]), None)
-    if raw is None:
-        raise ReviewError(404, "E_QUESTION_NOT_FOUND", "Frage gehört nicht zu diesem Take.")
-    result = review_answer(AnswerRequest(question=Question.model_validate(raw), answer=options["answer"],
-        collection_id=session["collection_id"], persona=options.get("persona", "tutor")), llm)
+    round_id = (analysis.get("questions") or {}).get("round_id")
+    if round_id is None:
+        raise ReviewError(409, "E_ROUND_REQUIRED", "Alte Fragerunde bitte neu erzeugen.")
+    result = review_answer(AnswerRequest(round_id=round_id, question_id=options["questionId"],
+                                        answer=options["answer"]), llm)
     return "answer", result.model_dump(mode="json"), []
 
 

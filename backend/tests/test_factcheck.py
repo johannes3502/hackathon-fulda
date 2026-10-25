@@ -1,6 +1,7 @@
 """Fact-check pipeline with scripted model answers. Synthetic data only."""
 
 import json
+import re
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
@@ -11,7 +12,7 @@ from fastapi.testclient import TestClient
 from app.factcheck import router as factcheck_router
 from app.factcheck.llm import LLMError, OpenAICompatibleChat, configured_llm, parse_json_object
 from app.factcheck.models import FactCheckRequest
-from app.factcheck.pipeline import EXTRACT_PROMPT, run_fact_check
+from app.factcheck.pipeline import EXTRACT_PROMPT, numeric_gate, run_fact_check
 from app.factcheck.transcript import sentences
 from app.factcheck.web import WebPassage, WikipediaSearcher, best_passages
 from app.main import app
@@ -54,11 +55,12 @@ class ScriptedModel:
         ]
         self.prompts = []
 
-    def complete_json(self, system, user):
+    def complete_json(self, system, user, *, max_tokens=None):
         self.prompts.append((system, user))
         if system.startswith(EXTRACT_PROMPT[:40]):
             return {"claims": self.claims}
-        claim = user.split("\n", 1)[0].removeprefix("Behauptung: ")
+        block = re.search(r"<untrusted-claim-[0-9a-f]{32}>\n(.*?)\n</untrusted-claim-", user, re.S)
+        claim = block.group(1) if block else ""
         return self.judge(claim, user)
 
 
@@ -182,6 +184,30 @@ def test_without_sources_only_web_and_without_web_nothing():
     assert len(searcher.queries) == 3
 
 
+def test_numeric_gate_requires_the_claim_figures_in_the_quote():
+    assert numeric_gate("Der Umsatz stieg auf 4,2 Mio. Euro.", "Der Umsatz stieg auf 4.200.000 Euro.", "supports") is None
+    assert numeric_gate("Der Preis beträgt 299 €.", "Der Preis beträgt 149 €.", "supports")
+    assert numeric_gate("Der Preis beträgt 299 €.", "Der Preis beträgt 149 € statt 299 €.", "contradicts") is None
+    assert numeric_gate("Die Hochschule hat 9000 Studierende.",
+                        "9000 Studierende in acht Fachbereichen.", "contradicts") is None
+    assert numeric_gate("50 % in Hessen.", "50 % in Bayern.", "contradicts") is None
+    assert numeric_gate("Der Mond besteht aus Käse.", "Der Mond besteht aus Gestein.", "contradicts") is None
+    assert numeric_gate("Der Preis beträgt 299 €.", "Der Preis beträgt 299 €.", "contradicts")
+    assert numeric_gate("Die App ist kostenlos.", "Die App ist kostenlos.", "contradicts")
+    assert numeric_gate("Der Umsatz stieg auf 4,2Mio. Euro.",
+                        "Der Umsatz stieg auf 4.200.000 Euro.", "supports") is None
+
+
+def test_fact_check_cannot_support_a_price_from_a_longer_number():
+    model = ScriptedModel(lambda claim, context: {
+        "verdict": "supports", "passage": 1, "quote": "Der Preis beträgt 149", "explanation": "Passt.",
+    }, claims=[{"sentences": [1], "claim": "Der Preis beträgt 149 Euro.", "query": "Preis"}])
+    result = run_fact_check(FactCheckRequest(words=words("Der Preis beträgt 149 Euro."),
+                                           collection_id=uuid4(), use_web=False), model, None,
+                            retrieve=lambda c, q, k: [hit("Der Preis beträgt 1490 Euro.")], ready_sources=lambda c: 1)
+    assert result.claims[0].verdict == "unchecked" and result.claims[0].evidence is None
+
+
 def test_failed_lookups_are_unchecked_not_false():
     def judge(claim, context):
         raise LLMError("timeout")
@@ -197,7 +223,7 @@ def test_failed_lookups_are_unchecked_not_false():
 
 def test_extraction_failure_fails_the_job():
     class Broken(ScriptedModel):
-        def complete_json(self, system, user):
+        def complete_json(self, system, user, *, max_tokens=None):
             return {"unexpected": True}
 
     with pytest.raises(LLMError):

@@ -114,9 +114,20 @@ def reserve_job(take_id, kind, options, key, fingerprint=None, preflight=None):
         if kind in {"factcheck", "questions_generate"} and not take["analysis"].get("words"):
             raise ReviewError(409, "E_TRANSCRIPT_NOT_READY", "Für diesen Take liegt kein Transkript vor.")
         if kind == "answer_review":
-            questions = (take["analysis"].get("questions") or {}).get("questions", [])
-            if not any(question["id"] == options["questionId"] for question in questions):
-                raise ReviewError(404, "E_QUESTION_NOT_FOUND", "Frage gehört nicht zu diesem Take.")
+            from app.questions import rounds
+            from redis.exceptions import RedisError
+            result = take["analysis"].get("questions") or {}
+            round_id = result.get("round_id")
+            if round_id is None:
+                if not any(question["id"] == options["questionId"] for question in result.get("questions", [])):
+                    raise ReviewError(404, "E_QUESTION_NOT_FOUND", "Frage gehört nicht zu diesem Take.")
+                raise ReviewError(409, "E_ROUND_REQUIRED", "Alte Fragerunde bitte neu erzeugen.")
+            try:
+                rounds.validate_answer(round_id, options["questionId"])
+            except rounds.RoundError as error:
+                raise ReviewError(error.status_code, error.code, error.message) from error
+            except RedisError as error:
+                raise ReviewError(503, "E_ROUND_UNAVAILABLE", "Fragerunde derzeit nicht erreichbar.") from error
         job_id = db.insert_job(connection, take_id, kind, options)
         if kind == "audio_analyze":
             connection.execute("UPDATE takes SET status='audio_processing' WHERE id=%s", (take_id,))
@@ -164,13 +175,9 @@ def evaluation(take_id):
 
 
 def delete_session(session_id):
-    from app.review import media
+    from app.retention import outbox
     with db.connect() as connection, connection.transaction():
-        row = connection.execute("SELECT id FROM sessions WHERE id=%s FOR UPDATE", (session_id,)).fetchone()
-        if row is None:
-            return
-        jobs = connection.execute("SELECT object_key FROM jobs WHERE take_id IN (SELECT id FROM takes WHERE session_id=%s)"
-                                  " AND object_key IS NOT NULL", (session_id,)).fetchall()
-        for job in jobs:
-            media.delete(job["object_key"])
-        connection.execute("DELETE FROM sessions WHERE id=%s", (session_id,))
+        result = db.delete_session_rows(connection, session_id)
+    if result["deleted"]:
+        outbox.flush_quietly()
+    return result

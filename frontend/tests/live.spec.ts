@@ -700,10 +700,11 @@ test("raw camera recording, stats, filtered video sections, download and refresh
     .toBeGreaterThanOrEqual(2);
   await page.reload();
   await expect(
-    page.getByRole("heading", {
-      name: "This recording isn’t in this workspace.",
-    }),
+    page.getByRole("heading", { name: "Make your next take stronger." }),
   ).toBeVisible();
+  await expect
+    .poll(() => video.evaluate((el: HTMLVideoElement) => el.readyState))
+    .toBeGreaterThanOrEqual(2);
   expect(errors).toEqual([]);
 });
 
@@ -1489,6 +1490,8 @@ test("transcribed take is fact-checked against sources and links back to the vid
                   "Die Hochschule hat rund 9.500 Studierende in acht Fachbereichen.",
                 filename: "folien.pdf",
                 quote_verified: "exact",
+                similarity: 0.2,
+                weak: true,
                 location: { kind: "page", start: 2, end: 2 },
               },
               checked: ["upload"],
@@ -1530,6 +1533,12 @@ test("transcribed take is fact-checked against sources and links back to the vid
   );
   await expect(page.locator(".fact-claim blockquote")).toContainText(
     "“rund 9.500 Studierende in acht Fachbereichen”folien.pdf, Page 2",
+  );
+  await expect(page.locator(".fact-claim blockquote")).toContainText(
+    "Quoted text found in the cited source; short quotes may include surrounding context.",
+  );
+  await expect(page.locator(".fact-claim blockquote")).toContainText(
+    "Retrieval similarity 0.20 (uncalibrated signal). Weak retrieval match: check the passage.",
   );
   expect(request).toMatchObject({ words, use_web: false });
   expect(request!.collection_id).toMatch(/^[0-9a-f-]{36}$/);
@@ -1682,9 +1691,9 @@ test("signal feedback appears during recording without captions and failure pres
   await expect(page.locator(".camera-message")).toContainText(
     "Recording continues",
   );
-  await expect(page.locator(".cue-message")).not.toHaveText(
-    "Your voice is quieter",
-  );
+  await expect(
+    page.getByText("Your voice is quieter", { exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Finish & review" }).click();
   await expect(page).toHaveURL(/\/review$/);
   await expect
@@ -1933,8 +1942,18 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   let override = "";
   let kickoffs = 0;
   let endFromAgent = () => {};
+  let sendUserAnswer = () => {};
   await page.routeWebSocket("wss://api.elevenlabs.io/**", (socket) => {
     endFromAgent = () => socket.close({ code: 1000 });
+    sendUserAnswer = () =>
+      socket.send(
+        JSON.stringify({
+          type: "user_transcript",
+          user_transcription_event: {
+            user_transcript: "Synthetic spoken answer.",
+          },
+        }),
+      );
     socket.onClose(() => closed.add(socket));
     socket.onMessage((raw) => {
       if (typeof raw !== "string") return;
@@ -2096,6 +2115,65 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
     "Ich habe noch ein paar Fragen. Bist du bereit?",
   );
   expect(closed.size).toBe(3);
+
+  // Exercise the actual SDK connection and microphone cleanup at both limits.
+  await page
+    .getByRole("button", { name: "Start a new conversation", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "End conversation", exact: true }),
+  ).toBeVisible();
+  const stoppedBeforeLimit = await page.evaluate(
+    () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+  );
+  for (let turn = 0; turn < 12; turn++) sendUserAnswer();
+  await expect(
+    page.getByRole("button", { name: "Session limit reached", exact: true }),
+  ).toBeDisabled();
+  await expect.poll(() => closed.size).toBe(4);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { stoppedTracks: number }).stoppedTracks,
+      ),
+    )
+    .toBeGreaterThan(stoppedBeforeLimit);
+  await expect(page.locator(".conversation-transcript li")).toHaveCount(13);
+
+  await page
+    .getByRole("button", { name: "Start a new round", exact: true })
+    .click();
+  await page.clock.install();
+  await page
+    .getByRole("button", { name: "Start voice questions", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "End conversation", exact: true }),
+  ).toBeVisible();
+  await page.clock.fastForward(600_000);
+  await expect(
+    page.getByRole("button", { name: "Session limit reached", exact: true }),
+  ).toBeDisabled();
+  await expect.poll(() => closed.size).toBe(5);
+
+  // The same deadline must cancel context preparation, before a socket exists.
+  await page
+    .getByRole("button", { name: "Start a new round", exact: true })
+    .click();
+  await page.route("**/api/questions/agent/jobs/*", (route) =>
+    route.fulfill({ json: { job_id: jobId, status: "running" } }),
+  );
+  await page
+    .getByRole("button", { name: "Start voice questions", exact: true })
+    .click();
+  await expect(
+    page.getByText("Reading your presentation and material…", { exact: true }),
+  ).toBeVisible();
+  await page.clock.fastForward(600_000);
+  await expect(
+    page.getByRole("button", { name: "Session limit reached", exact: true }),
+  ).toBeDisabled();
+  expect(closed.size).toBe(5);
 });
 
 test("past sessions keep video and updated feedback across reload and can be deleted", async ({

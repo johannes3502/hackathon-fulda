@@ -298,6 +298,7 @@
         "type": "object"
       },
       "AnswerRequest": {
+        "additionalProperties": false,
         "properties": {
           "answer": {
             "maxLength": 4000,
@@ -341,11 +342,43 @@
             "type": "string"
           },
           "question": {
-            "$ref": "#/components/schemas/Question"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Question"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deprecated. Ignored when round_id is set; the HTTP API rejects it without a round."
+          },
+          "question_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Id"
+          },
+          "round_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Server-issued question round",
+            "title": "Round Id"
           }
         },
         "required": [
-          "question",
           "answer"
         ],
         "title": "AnswerRequest",
@@ -709,7 +742,7 @@
             "type": "string"
           },
           "request": {
-            "description": "VoiceAnswerRequest JSON: question, collection_id, persona",
+            "description": "VoiceAnswerRequest JSON: round_id, question_id, persona",
             "title": "Request",
             "type": "string"
           }
@@ -1330,12 +1363,23 @@
               }
             ]
           },
+          "matched_by": {
+            "items": {
+              "enum": [
+                "vector",
+                "keyword"
+              ],
+              "type": "string"
+            },
+            "title": "Matched By",
+            "type": "array"
+          },
           "passage": {
             "title": "Passage",
             "type": "string"
           },
           "quote": {
-            "description": "Verbatim passage, verified by string match",
+            "description": "Source wording from the cited passage; short exact anchors may include surrounding context",
             "title": "Quote",
             "type": "string"
           },
@@ -1353,6 +1397,30 @@
               }
             ],
             "title": "Quote Verified"
+          },
+          "retrieval_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fused reciprocal-rank score; unitless, not a probability",
+            "title": "Retrieval Score"
+          },
+          "similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cosine similarity of the best vector match; null for keyword-only",
+            "title": "Similarity"
           },
           "source_id": {
             "anyOf": [
@@ -1376,6 +1444,12 @@
               }
             ],
             "title": "Url"
+          },
+          "weak": {
+            "default": false,
+            "description": "Heuristic: vector-only match below the configured similarity threshold",
+            "title": "Weak",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1399,7 +1473,7 @@
           },
           "min_quote_chars": {
             "default": 12,
-            "description": "Shorter quotes are not accepted as evidence",
+            "description": "Minimum verified quote length after optional short-anchor expansion",
             "minimum": 1.0,
             "title": "Min Quote Chars",
             "type": "integer"
@@ -1616,18 +1690,6 @@
           "web_provider"
         ],
         "title": "FactCheckSettings",
-        "type": "object"
-      },
-      "FactcheckRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "useWeb": {
-            "default": false,
-            "title": "Useweb",
-            "type": "boolean"
-          }
-        },
-        "title": "FactcheckRequest",
         "type": "object"
       },
       "FailedJob": {
@@ -2237,6 +2299,7 @@
               "page",
               "slide",
               "paragraph",
+              "table",
               "line"
             ],
             "title": "Kind",
@@ -4157,10 +4220,13 @@
         "type": "object"
       },
       "Question": {
+        "additionalProperties": false,
+        "description": "A canonical question stored in the round ledger and returned to clients.",
         "properties": {
           "claim": {
             "anyOf": [
               {
+                "maxLength": 2000,
                 "type": "string"
               },
               {
@@ -4187,6 +4253,7 @@
             "description": "Verified source passage behind the question"
           },
           "id": {
+            "maxLength": 64,
             "title": "Id",
             "type": "string"
           },
@@ -4203,15 +4270,19 @@
           },
           "query": {
             "description": "Search query used to compare the answer with the sources",
+            "maxLength": 300,
             "title": "Query",
             "type": "string"
           },
           "question": {
+            "maxLength": 500,
+            "minLength": 1,
             "title": "Question",
             "type": "string"
           },
           "reason": {
             "description": "Why this question is asked, one sentence",
+            "maxLength": 300,
             "title": "Reason",
             "type": "string"
           },
@@ -4230,6 +4301,7 @@
           "transcript": {
             "anyOf": [
               {
+                "maxLength": 4000,
                 "type": "string"
               },
               {
@@ -4252,8 +4324,17 @@
         "type": "object"
       },
       "QuestionConfig": {
+        "additionalProperties": false,
         "description": "Prototype limits, not tuned. Returned with every result.",
         "properties": {
+          "max_follow_ups": {
+            "default": 3,
+            "description": "Maximum follow-up questions per round",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Max Follow Ups",
+            "type": "integer"
+          },
           "max_questions": {
             "default": 3,
             "description": "Maximum initial questions; follow-ups are separate",
@@ -4262,11 +4343,27 @@
             "title": "Max Questions",
             "type": "integer"
           },
+          "max_turns": {
+            "default": 6,
+            "description": "Maximum answered question turns per round",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Max Turns",
+            "type": "integer"
+          },
           "min_quote_chars": {
             "default": 12,
-            "description": "Shorter quotes are not accepted as evidence",
+            "description": "Minimum verified quote length after optional short-anchor expansion",
             "minimum": 1.0,
             "title": "Min Quote Chars",
+            "type": "integer"
+          },
+          "round_ttl_s": {
+            "default": 600,
+            "description": "Server-side round lifetime in seconds",
+            "maximum": 3600.0,
+            "minimum": 60.0,
+            "title": "Round Ttl S",
             "type": "integer"
           },
           "source_passages": {
@@ -4275,6 +4372,14 @@
             "maximum": 12.0,
             "minimum": 0.0,
             "title": "Source Passages",
+            "type": "integer"
+          },
+          "source_queries": {
+            "default": 4,
+            "description": "Maximum focused source queries fused for questions and voice context",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Source Queries",
             "type": "integer"
           },
           "top_k": {
@@ -4335,6 +4440,7 @@
         "type": "object"
       },
       "QuestionRequest": {
+        "additionalProperties": false,
         "properties": {
           "claims": {
             "description": "Fact-check findings of the same transcript",
@@ -4448,6 +4554,19 @@
             },
             "title": "Questions",
             "type": "array"
+          },
+          "round_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Server-issued round for follow-up answers",
+            "title": "Round Id"
           },
           "sources_used": {
             "title": "Sources Used",
@@ -5304,6 +5423,18 @@
             "title": "Matched By",
             "type": "array"
           },
+          "retrieval_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fused reciprocal-rank score; unitless, not a probability",
+            "title": "Retrieval Score"
+          },
           "similarity": {
             "anyOf": [
               {
@@ -5324,6 +5455,12 @@
           "text": {
             "title": "Text",
             "type": "string"
+          },
+          "weak": {
+            "default": false,
+            "description": "Heuristic: vector-only match below SOURCE_WEAK_SIMILARITY; not a truth judgment",
+            "title": "Weak",
+            "type": "boolean"
           }
         },
         "required": [
@@ -5657,6 +5794,18 @@
           "timebase"
         ],
         "title": "TakeCreate",
+        "type": "object"
+      },
+      "TakeFactcheckRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "useWeb": {
+            "default": false,
+            "title": "Useweb",
+            "type": "boolean"
+          }
+        },
+        "title": "TakeFactcheckRequest",
         "type": "object"
       },
       "TakeJobAccepted": {
@@ -6560,6 +6709,16 @@
               "format": "uuid",
               "title": "Profile Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "deleteSessions",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Deletesessions",
+              "type": "boolean"
             }
           },
           {
@@ -8526,7 +8685,7 @@
     },
     "/questions": {
       "post": {
-        "description": "Generate follow-up questions from transcript, fact-check findings and uploads.\n\nSends transcript sentences, findings and upload passages to the configured\nOpenAI-compatible model (same as the fact-check). Questions with a spoken\npassage carry `t_ms` of the recording and appear as `question` events.",
+        "description": "Generate follow-up questions from transcript, fact-check findings and uploads.\n\nSends transcript sentences, findings and upload passages to the configured\nOpenAI-compatible model (same as the fact-check). Questions with a spoken\npassage carry `t_ms` of the recording and appear as `question` events.\nThe result includes a server-issued `round_id`; answers must use it.",
         "operationId": "start_questions_questions_post",
         "requestBody": {
           "content": {
@@ -8694,7 +8853,7 @@
     },
     "/questions/answers": {
       "post": {
-        "description": "Compare a typed answer with the question's evidence and upload passages.\n\nResult is a verdict with a verbatim quote and an optional follow-up\nquestion; no points or grades.",
+        "description": "Compare a typed answer with the canonical question of a server-issued round.\n\n`question_id` and `round_id` are required. A legacy `question` field is\nignored and never becomes evidence. Result is a verdict with a verbatim\nquote and an optional follow-up question; no points or grades.",
         "operationId": "start_answer_review_questions_answers_post",
         "requestBody": {
           "content": {
@@ -10383,7 +10542,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/FactcheckRequest"
+                    "$ref": "#/components/schemas/TakeFactcheckRequest"
                   },
                   {
                     "type": "null"

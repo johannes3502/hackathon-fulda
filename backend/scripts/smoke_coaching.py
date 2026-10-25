@@ -46,7 +46,7 @@ def main():
             assert all(c["evidence"] for c in facts["claims"] if c["verdict"] in {"supports", "contradicts"})
             questions = run("/questions", {"collection_id": collection, "words": words, "claims": facts["claims"]}, "question-jobs")
             question = next(q for q in questions["questions"] if q["kind"] == "contradiction")
-            review = run("/questions/answers", {"collection_id": collection, "question": question,
+            review = run("/questions/answers", {"round_id": questions["round_id"], "question_id": question["id"],
                          "answer": "Ich korrigiere die Uhrzeit: Das Lernlabor öffnet um neun Uhr."}, "answer-jobs")
             assert review["verdict"] == "supports" and review["evidence"]
         finally:

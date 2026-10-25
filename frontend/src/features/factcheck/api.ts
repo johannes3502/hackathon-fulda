@@ -7,6 +7,28 @@ export type FactCheckResult = components["schemas"]["FactCheckResult"];
 export type ClaimResult = components["schemas"]["ClaimResult"];
 export type Verdict = ClaimResult["verdict"];
 
+/** Matching method and retrieval signals, without implying factual certainty. */
+export function evidenceHint(
+  evidence: components["schemas"]["Evidence"],
+): string {
+  const parts = [
+    evidence.quote_verified === "exact"
+      ? "Quoted text found in the cited source; short quotes may include surrounding context."
+      : evidence.quote_verified === "fuzzy"
+        ? "Approximate match; displayed wording comes from the cited source."
+        : "This source quote has not been verified.",
+  ];
+  if (
+    typeof evidence.similarity === "number" &&
+    Number.isFinite(evidence.similarity)
+  )
+    parts.push(
+      `Retrieval similarity ${evidence.similarity.toFixed(2)} (uncalibrated signal).`,
+    );
+  if (evidence.weak) parts.push("Weak retrieval match: check the passage.");
+  return parts.join(" ");
+}
+
 export const VERDICT_LABELS: Record<Verdict, string> = {
   supports: "Supported by source",
   contradicts: "Source says otherwise",

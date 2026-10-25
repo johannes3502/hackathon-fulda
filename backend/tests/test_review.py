@@ -262,7 +262,7 @@ def test_provider_outage_falls_back_once_and_preserves_explanations():
     class Unavailable:
         model = "synthetic-outage"
         calls = 0
-        def complete_json(self, system, user):
+        def complete_json(self, system, user, *, max_tokens=None):
             self.calls += 1
             raise LLMError("private provider response")
     model = Unavailable()
@@ -357,7 +357,7 @@ def test_llm_fallback_and_nonce_delimited_cards():
     class InjectedModel:
         model = "synthetic-injection-fixture"
         calls = []
-        def complete_json(self, system, user):
+        def complete_json(self, system, user, *, max_tokens=None):
             assert "IGNORE" not in system
             assert "<data-" in user and "</data-" in user
             self.calls.append(user)
@@ -381,7 +381,7 @@ def test_valid_model_wording_cannot_remove_practice_explanation_or_step():
     card = card_for(ReviewEvent.model_validate(pose_event()), "en")
     class MinimalModel:
         model = "synthetic-minimal"
-        def complete_json(self, system, user):
+        def complete_json(self, system, user, *, max_tokens=None):
             return {"claims": [{"evidenceIds": [card["id"]], "template": "observation", "text": card["allowedTexts"][0]}]}
     report, verification = build_review(timeline_fixture(), ReviewRequest(mode="llm", language="en"), MinimalModel())
     assert report.generator.mode == "llm" and verification["fallbackRate"] == 0
@@ -415,6 +415,16 @@ def test_new_contract_has_no_server_playback_fields_and_headers_are_documented()
         assert any(p["name"] == "Idempotency-Key" and p["required"] for p in schema["paths"][path]["post"]["parameters"])
     response = TestClient(app).post("/sessions", json={})
     assert response.status_code == 422 and response.json()["error"]["requestId"]
+
+
+def test_openapi_component_names_are_case_insensitively_unique():
+    schema = app.openapi()
+    names = list(schema["components"]["schemas"])
+    assert len(names) == len({name.lower() for name in names})
+    assert "FactCheckRequest" in names
+    assert "TakeFactcheckRequest" in names
+    body = schema["paths"]["/takes/{take_id}/factcheck"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+    assert {"$ref": "#/components/schemas/TakeFactcheckRequest"} in body["anyOf"]
 
 
 def test_unexpected_errors_are_structured_and_do_not_echo_sensitive_data(monkeypatch):

@@ -1,4 +1,4 @@
-"""Text per page (PDF), slide (PPTX), paragraph (DOCX) or line block (TXT/MD).
+"""Text per page (PDF), slide (PPTX), paragraph/table (DOCX) or line block (TXT/MD).
 
 Every segment keeps its 1-based location so answers can cite "Seite 3" or
 "Folie 2". No OCR: scanned PDFs without a text layer yield no segments.
@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-LocationKind = Literal["page", "slide", "paragraph", "line"]
+LocationKind = Literal["page", "slide", "paragraph", "table", "line"]
 
 SUPPORTED: dict[str, LocationKind] = {
     ".pdf": "page", ".pptx": "slide", ".docx": "paragraph", ".txt": "line", ".md": "line",
@@ -83,12 +83,27 @@ def _pptx(path: Path) -> list[Segment]:
 
 def _docx(path: Path) -> list[Segment]:
     from docx import Document
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
 
     document = Document(path)
-    texts = [paragraph.text for paragraph in document.paragraphs]
-    for table in document.tables:
-        texts.extend(" | ".join(cell.text for cell in row.cells) for row in table.rows)
-    return [Segment("paragraph", number, clean(text)) for number, text in enumerate(texts, 1)]
+    segments: list[Segment] = []
+    paragraph_number = table_number = 0
+    # `iter_inner_content` keeps paragraphs and tables in document order.
+    # Paragraphs inside a table are represented by the table's rows.
+    for block in document.iter_inner_content():
+        if isinstance(block, Paragraph):
+            paragraph_number += 1
+            segments.append(Segment("paragraph", paragraph_number, clean(block.text)))
+        elif isinstance(block, Table):
+            table_number += 1
+            rows = []
+            for row in block.rows:
+                cells = [clean(cell.text).replace("\n", " ").strip() for cell in row.cells]
+                if any(cells):
+                    rows.append(" | ".join(cells))
+            segments.append(Segment("table", table_number, clean("\n".join(rows))))
+    return segments
 
 
 def _decode(data: bytes) -> str:
