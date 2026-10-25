@@ -1,6 +1,7 @@
 """Question simulator with scripted model answers. Synthetic data only."""
 
 import json
+import re
 from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
@@ -10,8 +11,8 @@ from fastapi.testclient import TestClient
 from app.factcheck.llm import LLMError
 from app.factcheck.models import ClaimResult, Evidence
 from app.main import app
-from app.questions import pipeline, router as questions_router
-from app.questions.models import AnswerRequest, Question, QuestionRequest
+from app.questions import pipeline, router as questions_router, rounds
+from app.questions.models import AnswerRequest, Question, QuestionConfig, QuestionRequest
 from app.questions.pipeline import generate_questions, review_answer
 from tests.test_factcheck import SLIDE, TRANSCRIPT, hit
 
@@ -37,7 +38,7 @@ class Model:
         self.answer = answer
         self.prompts = []
 
-    def complete_json(self, system, user):
+    def complete_json(self, system, user, *, max_tokens=None):
         self.prompts.append((system, user))
         return self.answer(system, user) if callable(self.answer) else self.answer
 
@@ -90,9 +91,11 @@ def test_questions_are_grounded_ordered_and_timed_by_code():
         (9000, "question", "agent", "hint"), (13000, "question", "agent", "warning")]
     assert "t_ms" not in result.events[0].payload
     assert result.sources_used and len(queries) == 1 and queries[0][1] == 6
+    assert result.round_id and rounds.get_round(result.round_id).questions[0].id == "q1"
     system, user = model.prompts[0]
     assert "Höchstens 5 Fragen" in system
     assert "[2] (00:13) widerspricht: Der Mond besteht aus Käse." in user and "[1] folien.pptx, Folie 3:" in user
+    assert "<untrusted-transcript-" in user and "<untrusted-source-passages-" in user
 
 
 def test_without_sources_or_findings_and_broken_answers():
@@ -127,6 +130,7 @@ def test_answer_review_uses_question_evidence_and_verifies_quotes():
     assert review.follow_up.id == "q1.f" and review.follow_up.kind == "follow_up"
     assert review.follow_up.t_ms == 13000 and review.follow_up.evidence == question().evidence
     assert "[1] Wikipedia: Mond:" in model.prompts[0][1] and "[2] folien.pptx, Folie 3:" in model.prompts[0][1]
+    assert "<untrusted-answer-" in model.prompts[0][1] and "Aus Gestein." in model.prompts[0][1]
 
     invented = review_answer(AnswerRequest(question=question(), answer="Aus Käse."),
                              Model({"verdict": "contradicts", "passage": 1, "quote": "besteht ganz aus Käse und Milch"}))
@@ -145,12 +149,15 @@ def test_answer_review_without_passages_or_model_is_unchecked():
 
 def test_api_requires_model_and_accepts_jobs(monkeypatch):
     client = TestClient(app)
+    state = rounds.create_round([question()], QuestionConfig(), collection_id=None,
+                                persona="tutor", presentation_mode="thesis")
     monkeypatch.delenv("LLM_BASE_URL", raising=False)
     monkeypatch.setenv("LLM_MODEL", "requires-explicit-base-url")
     body = {"words": [w.model_dump() for w in TRANSCRIPT]}
     assert client.post("/questions", json=body).status_code == 503
     assert client.post("/questions", json={"words": []}).status_code == 422
-    answer = {"question": question().model_dump(mode="json"), "answer": "Aus Gestein."}
+    answer = {"round_id": str(state.round_id), "question_id": "q1", "answer": "Aus Gestein."}
+    legacy = {"question": question().model_dump(mode="json"), "answer": "Aus Gestein."}
     assert client.post("/questions/answers", json=answer).status_code == 503
     assert client.post("/questions/answers", json={**answer, "answer": ""}).status_code == 422
 
@@ -167,6 +174,8 @@ def test_api_requires_model_and_accepts_jobs(monkeypatch):
     response = client.post("/questions/answers", json=answer)
     assert response.json()["status_url"] == f"/questions/answers/{response.json()['job_id']}"
     assert enqueue.await_args.args[0] is questions_router.review_answer
+    # A client-supplied question is not an answer credential anymore.
+    assert client.post("/questions/answers", json=legacy).status_code == 422
 
     monkeypatch.setattr(questions_router.storage, "read_json", lambda job, name, prefix: None)
     assert client.get(f"/questions/jobs/{uuid4()}").status_code == 404
@@ -217,8 +226,10 @@ def test_persona_changes_the_role_not_the_grounding():
     assert result.persona == "student" and any("Studierender" in n for n in result.notices)
     assert student.prompts[0][0].startswith(pipeline.PERSONAS["student"])
     assert tutor.prompts[0][0].startswith(pipeline.PERSONAS["tutor"])
-    # Same transcript, findings and passages reach the model in both roles.
-    assert student.prompts[0][1] == tutor.prompts[0][1]
+    # Same transcript, findings and passages reach the model in both roles;
+    # only the per-call nonce of the data delimiters differs.
+    normalize = lambda text: re.sub(r"</?untrusted-[^>]+>", "", text)  # noqa: E731
+    assert normalize(student.prompts[0][1]) == normalize(tutor.prompts[0][1])
 
 
 def test_spoken_reply_is_kept_only_with_a_verified_quote():
@@ -255,7 +266,7 @@ def test_voice_answer_is_transcribed_then_reviewed(monkeypatch, tmp_path):
     words = [Word(word="Aus", start_ms=0, end_ms=200), Word(word="Gestein.", start_ms=200, end_ms=700)]
     review = pipeline.review_voice_answer(voice, tmp_path / "a.webm", Transcriber(words), model, retrieve=None)
     assert review.answer == "Aus Gestein." and review.verdict == "supports"
-    assert "Antwort: Aus Gestein." in model.prompts[0][1]
+    assert "Aus Gestein." in model.prompts[0][1] and "<untrusted-answer-" in model.prompts[0][1]
 
     silent = pipeline.review_voice_answer(voice, tmp_path / "a.webm", Transcriber([]), model, retrieve=None)
     assert silent.verdict == "unchecked" and silent.reply == pipeline.UNHEARD_REPLY["tutor"]
@@ -264,16 +275,21 @@ def test_voice_answer_is_transcribed_then_reviewed(monkeypatch, tmp_path):
 
 def test_voice_api_needs_asr_and_stores_the_audio(monkeypatch):
     client = TestClient(app)
+    state = rounds.create_round([question()], QuestionConfig(), collection_id=None,
+                                persona="student", presentation_mode="thesis")
     monkeypatch.setenv("LLM_BASE_URL", "https://llm.example/v1")
     monkeypatch.setenv("LLM_MODEL", "demo-model")
     monkeypatch.setenv("ASR_PROVIDER", "deepgram")
     monkeypatch.delenv("DEEPGRAM_API_KEY", raising=False)
     files = {"recording": ("answer.webm", b"synthetic", "audio/webm")}
-    form = {"request": json.dumps({"question": question().model_dump(mode="json"), "persona": "student"})}
+    form = {"request": json.dumps({"round_id": str(state.round_id), "question_id": "q1", "persona": "student"})}
     assert client.post("/questions/answers/voice", files=files, data=form).status_code == 503
     monkeypatch.setenv("DEEPGRAM_API_KEY", "test-key")
     assert client.post("/questions/answers/voice", files=files,
                        data={"request": '{"persona": "student"}'}).status_code == 422
+    assert client.post("/questions/answers/voice", files=files,
+                       data={"request": json.dumps({"question": question().model_dump(mode="json")})}
+                       ).status_code == 422
 
     stored = []
     enqueue = AsyncMock(return_value="task")
@@ -285,6 +301,27 @@ def test_voice_api_needs_asr_and_stores_the_audio(monkeypatch):
     assert response.json()["status_url"] == f"/questions/answers/{response.json()['job_id']}"
     assert enqueue.await_args.args[0] is questions_router.review_voice_answer
     assert stored[0][0].persona == "student" and stored[0][1] == b"synthetic"
+    assert len(stored[0][0].audio_sha256 or "") == 64
+
+
+def test_voice_upload_cap_rejects_before_storing(monkeypatch):
+    client = TestClient(app)
+    state = rounds.create_round([question()], QuestionConfig(), collection_id=None,
+                                persona="tutor", presentation_mode="thesis")
+    monkeypatch.setenv("LLM_BASE_URL", "https://llm.example/v1")
+    monkeypatch.setenv("LLM_MODEL", "demo-model")
+    monkeypatch.setenv("ASR_PROVIDER", "deepgram")
+    monkeypatch.setenv("DEEPGRAM_API_KEY", "test-key")
+    monkeypatch.setattr(questions_router, "MAX_VOICE_UPLOAD_BYTES", 8)
+    store, enqueue = Mock(), AsyncMock(return_value="task")
+    monkeypatch.setattr(questions_router, "_store", store)
+    monkeypatch.setattr(questions_router, "enqueue_task", enqueue)
+    files = {"recording": ("answer.webm", b"123456789", "audio/webm")}
+    form = {"request": json.dumps({"round_id": str(state.round_id), "question_id": "q1"})}
+    response = client.post("/questions/answers/voice", files=files, data=form)
+    assert response.status_code == 413
+    store.assert_not_called()
+    enqueue.assert_not_called()
 
 
 def test_voice_task_deletes_audio_and_request(monkeypatch):

@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -58,7 +59,10 @@ def test_missing_or_processing_sources_are_not_presented_as_ready(monkeypatch):
 @pytest.mark.parametrize("mode", PRESENTATION_STYLES)
 def test_teacher_receives_the_spoken_content_and_waits_for_readiness(mode):
     result = agent.prepare_context(QuestionRequest(words=TRANSCRIPT, presentation_mode=mode))
-    context = json.loads(result.prompt.splitlines()[-1])
+    block = re.search(r"<untrusted-reference-[0-9a-f]{32}>\n(.*)\n</untrusted-reference-[0-9a-f]{32}>",
+                      result.prompt, re.S)
+    assert block is not None
+    context = json.loads(block.group(1))
     assert context["transcript"] == " ".join(word.word for word in TRANSCRIPT)
     assert "Do not greet" in result.prompt
     assert "teacher asking a student" in result.prompt

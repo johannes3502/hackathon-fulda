@@ -164,13 +164,9 @@ def evaluation(take_id):
 
 
 def delete_session(session_id):
-    from app.review import media
+    from app.retention import outbox
     with db.connect() as connection, connection.transaction():
-        row = connection.execute("SELECT id FROM sessions WHERE id=%s FOR UPDATE", (session_id,)).fetchone()
-        if row is None:
-            return
-        jobs = connection.execute("SELECT object_key FROM jobs WHERE take_id IN (SELECT id FROM takes WHERE session_id=%s)"
-                                  " AND object_key IS NOT NULL", (session_id,)).fetchall()
-        for job in jobs:
-            media.delete(job["object_key"])
-        connection.execute("DELETE FROM sessions WHERE id=%s", (session_id,))
+        result = db.delete_session_rows(connection, session_id)
+    if result["deleted"]:
+        outbox.flush_quietly()
+    return result

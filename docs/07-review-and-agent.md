@@ -6,23 +6,57 @@ Der Nutzer trägt die ElevenLabs-Zugangsdaten nach der Implementierung ein.
 
 ## Ablauf
 
+## Review-Evidenzprofil
+
 Ergänzender Nutzerauftrag: Vier 0–100-Prototyp-Scores stehen über dem Video.
-`evidence-share-v1` bewertet positive / (positive + kritische) Zeitanteile,
-mit zeitlicher Vereinigung überlappender Hinweise derselben Art. Für Fachwissen
-hat der Anteil gestützter an entscheidbaren Quellenurteilen mit geprüftem
-Quellenzitat Vorrang. Offene Aussagen, neutrale Beobachtungen und unbekannte
-Zeit werden ausgeschlossen.
-Ohne Evidenz steht „–“. Datenabdeckung und Formel sind direkt im UI sichtbar.
+`evidence-share-v2` bewertet **Körper & Gesten**, **Quellenbezug**,
+**Sprechfluss** und **Aufbau** getrennt. Es gibt keinen Gesamtscore.
+
+- **Zeitkriterien** (Körper & Gesten, Sprechfluss): positive und kritische
+  Intervalle werden je Art vereinigt; Überlappungen zählen hälftig. Die
+  geglättete Schätzung ist `(positive ms + 1000) / (bewertete ms + 2000)`, die
+  Spanne ein Wilson-95-%-Intervall. Unter 5 s bewerteter Zeit oder 10 %
+  Abdeckung steht „–“, unter 30 s oder 30 % „vorläufig“; Endpunkte 0/100 erst ab
+  30 s.
+- **Quellenbezug:** `(gestützte + 1) / (gestützte + widersprochene + 2)`, nur
+  für Aussagen mit `quote_verified = exact|fuzzy`. Ohne entscheidbare Aussage
+  „–“, unter 5 Entscheidungen vorläufig, Endpunkte erst ab 10. `not_found` und
+  `unchecked` bleiben offen und gelten nicht als falsch.
+- **Aufbau:** `structure-rubric-v1` (siehe unten) liefert Einstieg, Abschluss,
+  Abschnitte und Übergänge. Der Score entsteht nur mit mindestens drei
+  verfügbaren Signalen, 50 Wörtern und 45 s; die Spanne kommt aus den
+  Komponenten. Folien, Betonung und Mimik werden nicht geprüft.
+
+Ohne Evidenz steht „–“. Datenabdeckung, Formel und Grenzen sind im UI sichtbar.
 Das Hauptreview und die detaillierte Analyse verwenden denselben
 `recordingReviewData`-Adapter für die gespeicherte Aufnahme (Video, Dauer,
-Kamera-/Sprachhinweise und aktueller Quellencheck). Quellen-Anmerkungen werden
-aus dem aktuellen Check abgeleitet, damit alte Marker nach einem erneuten Check
-keine abweichenden Scores ergeben. `evidenceVerdict` hält Urteile ohne geprüftes
-Zitat auch im Score offen. Die Score-Karten benennen den Titel der Aufnahme;
-der synthetische Pfad `/review-preview` bleibt ausdrücklich ein Beispiel.
-**Struktur** hat im Live-Pfad derzeit keine Evidenzquelle; nur der synthetische
-Demo-Datensatz enthält Struktur-Momente. Der Live-Wert bleibt deshalb „–“
-(TODO: `14-open-todos.md`).
+Kamera-/Sprachhinweise, Wörter und aktueller Quellencheck). Quellen-Anmerkungen
+werden aus dem aktuellen Check abgeleitet, damit alte Marker nach einem erneuten
+Check keine abweichenden Scores ergeben. `evidenceVerdict` hält Urteile ohne
+geprüftes Zitat auch im Score offen. Die Score-Karten benennen den Titel der
+Aufnahme; der synthetische Pfad `/review-preview` bleibt ausdrücklich ein
+Beispiel. Beide Review-Ansichten zeigen dieselben vier Kriterien und dieselbe
+Aufbau-Evidenz; es gibt keinen versteckten fünften Score.
+
+### Aufbau-Rubrik `structure-rubric-v1`
+
+Die Rubrik läuft deterministisch im Browser auf Wörtern und Zeitstempeln:
+Satzende an `.!?…` oder einer Lücke ab 1500 ms, maximal 40 Wörter pro Satz;
+DE/EN-Marker für Einstieg (erste zwei Sätze), Abschluss (letzte zwei Sätze),
+Sequenzen und Abschnittswechsel. Abschnittsgrenzen entstehen aus Jaccard-
+Ähnlichkeit von 3-Satz-Fenstern (absolut ≤ 0,12 und ≥ 0,06 unter dem lokalen
+Mittel; starke Sequenzmarker bis ≤ 0,35), Abschnitte unter 3 Sätzen/12 s werden
+zusammengeführt, maximal 8. Einstieg/Abschluss/Abschnitte sind 0/1, Übergänge
+`min(1, markierte Übergangssätze/2)`. Der Score ist das gerundete Mittel der
+verfügbaren Signale, aber nur bei mindestens 3 Signalen, 50 Wörtern und 45 s.
+Konfidenz `high` ab 150 Wörtern/90 s/8 Sätzen/4 Signalen, `medium` ab 80/60/3,
+sonst `low`; `low` ergibt „vorläufig“.
+
+Marker und Abschnittsgrenzen sind Heuristiken. Ein fehlender Marker belegt
+keinen fehlenden Übergang; gemischte Sprache wird erkannt, aber nicht semantisch
+aufgelöst. Es gibt keine Pk-/Genauigkeitsauswertung. Details und Quellen:
+`docs/15-evidence-safety-retention-research.md`.
+
 Der Graph ist eine durchgehende, ungefüllte Linie mit geraden, zackigen Segmenten. Zwischenwerte
 sind als interpoliert gekennzeichnet, der Wiedergabepunkt folgt dem Video.
 Darunter teilt eine Wiedergabeleiste dieselbe Zeitachse und die Grün-/Rot-/Neutralbereiche
@@ -131,12 +165,14 @@ Quellenurteile und Übungsfragen werden bei einem LLM-Ausfall nicht erfunden.
   lange Erklärung, ausführliches Lob oder weitere Nachfrage zur beantworteten
   Frage; notwendige Quellenangaben bleiben knapp. Mehr Erklärung nur auf Wunsch.
   Bei falschen, unvollständigen oder unbelegten
-  Antworten sind eine, höchstens zwei Nachfragen pro Hauptfrage vorgesehen;
-  danach kurz quellenbelegt korrigieren oder Unsicherheit benennen und zur
-  nächsten Hauptfrage wechseln, auch wenn die Antwort weiter falsch ist.
+  Antworten sind im Voice-Prompt eine, höchstens zwei Nachfragen pro Hauptfrage
+  vorgesehen; danach kurz quellenbelegt korrigieren oder Unsicherheit benennen
+  und zur nächsten Hauptfrage wechseln, auch wenn die Antwort weiter falsch ist.
   Bei „weiß ich nicht“ oder Wunsch zu überspringen wechselt er früher weiter.
-  Diese Grenzen sind Prompt-Vorgaben, keine programmatisch erzwungene
-  Gesprächssteuerung. Die Rollen der getippten Fragerunde bleiben modusabhängig.
+  Der Browser beendet den Voice-Pfad nach 600 s oder 12 Antworten. Diese
+  Grenzen sind Prompt-/Client-Vorgaben, keine programmatisch erzwungene
+  Gesprächssteuerung durch den Anbieter. Die Rollen der getippten Fragerunde
+  bleiben modusabhängig.
 - In der lokalen `.env` setzen:
 
 ```dotenv
@@ -166,43 +202,72 @@ Der Browser lädt den offiziellen `@elevenlabs/client` erst beim Start. Er bekom
 Signed URL; der API-Key bleibt im Backend. Die App legt keine Agenten automatisch
 an und verändert sie nicht. Das Suchtool wird einmalig wie oben im Konto konfiguriert.
 
-## Auswertung nach der Fragerunde (24.10.2026)
+## Frage-Runden: Grenzen und Prompt-Sicherheit
+
+Der getippte Pfad ist serverseitig begrenzt. `POST /questions` erzeugt eine
+Runde und legt die kanonischen Fragen samt Zählern in Redis ab
+(`question-round:<uuid>`, TTL 600 s, konfigurierbar 60–3600 s). Der Client
+sendet beim Antworten nur `round_id` und `question_id`; ein frei erfundener
+Fragetext wird mit 422 abgelehnt. Die Runde erlaubt maximal 5 Startfragen
+(Default 3), 3 Follow-ups und standardmäßig 6 Antwort-Turns
+(Request-Konfiguration bis 12). Pro Antwort sind 4000 Zeichen,
+pro Voice-Upload 25 MB erlaubt. Eine Frage wird nur einmal akzeptiert; ein
+identischer Retry liefert die gecachte Auswertung, ein anderer Text wird
+abgelehnt. Ein `pending`-Claim verhindert doppelte bezahlte Aufrufe und läuft
+nach 180 s ab. Erreicht die Runde ihr Limit oder ist sie abgelaufen, antwortet
+der Server mit 429 bzw. 410.
+
+Transkript, Funde, Quellenauszüge, Fragen und Antworten werden als
+untrusted-Daten mit einem zufälligen Nonce markiert; nach jedem Block folgt die
+Policy erneut. Das erschwert das Einschleusen schließender Tags, ist aber kein
+vollständiger Schutz. Ausgaben werden strikt gegen Pydantic-Schemas und Enums
+geprüft; Quellenzitate müssen wörtlich im Auszug stehen. Web-URLs werden nur als
+absolute `http(s)`-URLs ohne Credentials oder Steuerzeichen akzeptiert.
+
+Prompt-Injection bleibt ein Restrisiko: Ein Modell kann Anweisungen in Daten
+folgen, der Systemprompt kann teilweise offengelegt werden, und die lokale API
+hat keine allgemeine Authentifizierung oder Rate-Limits. Im Voice-Pfad gelten
+600 s und 12 Antworten im Browser; ob ElevenLabs zusätzliche harte Limits
+erzwingt, hängt von der Agentenkonfiguration ab und ist nicht im Code
+garantiert. Details und Quellen: `docs/15-evidence-safety-retention-research.md`.
+
+## Auswertung nach der Fragerunde (24.10.2026, v2 am 25.10.2026)
 
 Sobald jede Frage der getippten Runde beantwortet ist, zeigt der Web-Review
-unterhalb der Fragerunde eine Auswertung („Your take at a glance“) mit
-Score 0–100. Der Sprachdialog öffnet dasselbe Panel nach **End conversation**
-oder einem regulären Gesprächsende durch den Agenten und setzt den Tastaturfokus
-auf die Überschrift. **Back to questions** führt zurück zur Fragerunde;
-Abbrechen beim Verbindungsaufbau und Verbindungsfehler öffnen keine Auswertung.
-Vor dem Wechsel wird die Voice-Verbindung geschlossen und das Mikrofon freigegeben.
-Die Auswertung ist rein clientseitig und deterministisch
+unterhalb der Fragerunde eine Auswertung („Your take at a glance“). Der
+Sprachdialog öffnet dasselbe Panel nach **End conversation** oder einem
+regulären Gesprächsende durch den Agenten und setzt den Tastaturfokus auf die
+Überschrift. **Back to questions** führt zurück zur Fragerunde; Abbrechen beim
+Verbindungsaufbau und Verbindungsfehler öffnen keine Auswertung. Vor dem Wechsel
+wird die Voice-Verbindung geschlossen und das Mikrofon freigegeben. Die
+Auswertung ist rein clientseitig und deterministisch
 (`frontend/src/features/evaluation/performance.ts`, Panel
 `frontend/src/components/live/PerformanceEvaluation.tsx`); kein Backend-Endpunkt,
 kein LLM, Eingaben sind nur Daten, die der Browser ohnehin hat
 (Fact-Check-Urteile, Antwort-Urteile, Wörter, Feedback-Events, Pose-Events).
 
-Formel `evidence-count-heuristic.v1` — **separat** von den vier Review-Scores
-oben. Die Werte sind nicht vergleichbar und werden nicht zu einem Gesamtscore
-verrechnet; „Inhalt“ ist nicht dasselbe wie „Fachwissen“ im Review:
+`practice.evidence.v2` zeigt vier getrennte Zeilen, **keinen Gesamtscore**,
+keine Gewichte und keine Labels wie „Strong“/„Fair“:
 
-- **Inhalt** (Gewicht 0,5): Jede Fact-Check-Aussage und jede beantwortete Frage
-  zählt nach Urteil — `supports` = 1, `contradicts` = 0, `not_found`/
-  `unchecked` = 0,5. Score = 100 · Punkte / Items.
-- **Stimme** (0,25): 100 abzüglich 15 Punkte pro Tempo-/Lautstärke-/Tonhöhen-,
-  Füllwort- und Pausen-Marker pro Minute, Floor 40.
-- **Gestik** (0,25): gleiche Formel über Pose-Marker (Haltung, Gesten,
-  Kopfrichtung). Fehlt eine Kategorie (z. B. keine Pose-Daten), entfällt sie
-  mit Renormalisierung der Gewichte; ohne Daten erscheint kein Score.
-- Labels: ab 85 „Strong“, ab 70 „Solid“, ab 55 „Fair“, darunter „Keep
-  practicing“; Stärken und Übungsvorschläge folgen nur aus Zählern
-  (z. B. „3 von 5 Aussagen quellengestützt“).
+- **Quellenbindung Vortrag:** `(gestützte + 1) / (gestützte + widersprochene +
+  2)` über die Fact-Check-Aussagen, nur mit geprüftem Quellenzitat; Wilson-
+  95-%-Spanne. Ohne entscheidbare Aussage „–“; unter 5 Entscheidungen vorläufig.
+- **Quellenbindung Antworten:** dieselbe Formel über die beantworteten
+  Practice-Fragen. Offene Fragen bleiben als offen sichtbar.
+- **Sprechmerkmale:** Anzahl und Rate pro Minute der Marker für Tempo,
+  Lautstärke, Tonhöhe, Füllwörter und Pausen. Keine Umrechnung in eine
+  Punktzahl; fehlende Marker beweisen keine gute Leistung.
+- **Pose/Gesten:** Anzahl und Rate pro Minute der Haltungs-, Gesten- und
+  Kopforientierungsmarker. Keine Umrechnung in eine Punktzahl.
 
-Grenzen (im Panel aufklappbar benannt): unvalidierte Heuristik aus
-Prototyp-Regeln, kein Vergleich mit anderen Sprechern, „nicht gefunden“ ist
-nicht „falsch“, der Inhalts-Score misst Abdeckung durch die hochgeladenen
-Quellen statt Allgemeinwissen, keine Personen- oder Emotionsbewertung. Der
-Sprachpfad (ElevenLabs-Dialog) erzeugt keine Antwort-Urteile; dort bleibt die
-Inhalts-Kategorie auf den Fact-Check beschränkt.
+Die vier Zeilen messen unterschiedliche Dinge und werden nicht verrechnet. Die
+Quellenzeilen sind Schätzungen mit Unsicherheit; die Sprech-/Pose-Zeilen sind
+Zähler. „Nicht gefunden“ heißt nicht „falsch“, und der Sprachpfad liefert keine
+Antwort-Urteile. Die alte gewichtete 0–100-Heuristik
+(`evidence-count-heuristic.v1`) ist ersetzt. Grenzen: unvalidierte
+Prototyp-Regeln, keine Person-, Emotions- oder Eignungsbewertung, kein
+Vergleich mit anderen Sprechern. Methodik und Quellen:
+`docs/15-evidence-safety-retention-research.md`.
 
 ## Daten und Grenzen
 
@@ -214,8 +279,13 @@ Nach Reload entstehen neue Objekt-URLs aus den gespeicherten Blobs. Studio
 „Recording details and exports“ lässt sich ein Take mit Bestätigung lokal löschen.
 Speicherfehler lassen die aktuelle Aufnahme im Tab verfügbar und zeigen einen
 Download-Hinweis. Der Browser kann Daten bei Speicherdruck verdrängen; Löschen
-der Browserdaten entfernt die Historie. Keine Cloud-Synchronisation, keine
-automatische Löschung der separaten Backend-Ergebnisse oder Quellen. Bereits
+der Browserdaten entfernt die Historie. Keine Cloud-Synchronisation.
+Serverseitige Sessions/Takes/Profile unterliegen der täglichen Retention
+(Standard 12 Monate, `RETENTION_*`); Profil-Ablauf entkoppelt Sessions/Takes,
+`deleteSessions=true` löscht optional auch die Analyse. Quellen-Collections und
+mehrere S3-Präfixe werden nicht vollständig durchsucht; eine
+S3-Lifecycle-Regel ist nur Backstop und nicht verifiziert. Das ist keine
+Rechtsgarantie und keine Zusage, dass jede Kopie gelöscht ist. Bereits
 vor dieser Änderung aus dem Arbeitsspeicher verlorene Takes sind nicht rekonstruierbar.
 
 Websuche geprüft am 25.10.2026: synthetischer Textdialog über denselben privaten
@@ -241,8 +311,8 @@ keine Garantie für jede Antwort und keine Mikrofon-/Audio-Abnahme.
   Transkripte/private Details als Suchanfrage und behandelt Suchtreffer als
   unvertrauenswürdige Daten. Websuche kann zusätzliche Latenz und Kosten verursachen.
 - Der Backend-Job löscht `request.json`. `status.json` enthält weiterhin den
-  vorbereiteten Kontext; wie bei anderen Analyse-Jobs fehlt noch automatisches
-  TTL-Cleanup. Keine Zusage, dass alle Transkriptkopien gelöscht sind.
+  vorbereiteten Kontext; der tägliche Retention-Sweep erfasst dieses S3-Präfix
+  nicht. Keine Zusage, dass alle Transkriptkopien gelöscht sind.
 - Sprachfeedback des Agenten ist ein Modellvorschlag. Es wird nicht durch den
   `quote_in_text`-Check der getippten Antworten validiert. Fehlende Belege heißen
   nicht „falsch“. Keine Punkte, Noten oder Persönlichkeitsbewertung.
@@ -304,6 +374,10 @@ Die Dauer ist ein einzelner synthetischer Testlauf, keine Latenzzusage.
 
 Reale Audioqualität über Mac-Lautsprecher, Geräteverhalten und pädagogische
 Qualität sind durch synthetische Audioübertragung nicht abgenommen.
+
+Aktueller Prüfstand (25.10.2026, synthetisch): Backend 370 bestanden, 2
+übersprungen; Frontend 314 bestanden in 44 Dateien; Lint, Typecheck und Build
+grün. Das belegt weder Modellqualität noch Geräteverhalten.
 
 Offizielle Referenzen: [JavaScript SDK](https://elevenlabs.io/docs/eleven-agents/libraries/java-script),
 [Webhook-Tools](https://elevenlabs.io/docs/eleven-agents/customization/tools/webhook-tools),

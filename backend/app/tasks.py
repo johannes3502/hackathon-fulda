@@ -60,6 +60,27 @@ def recompute_progress(self, run_id: str) -> dict[str, str]:
     return {"run_id": run_id}
 
 
+@celery_app.task(bind=True, acks_late=True, reject_on_worker_lost=True, max_retries=3,
+                 soft_time_limit=240, time_limit=300, expires=3600)
+def retention_sweep(self) -> dict:
+    """Daily server-side cleanup; the Postgres advisory lock prevents overlap."""
+    from app.retention.service import sweep
+
+    try:
+        result = sweep()
+    except SoftTimeLimitExceeded:
+        raise
+    except Exception as error:
+        if self.request.retries >= self.max_retries:
+            logging.getLogger(__name__).warning(
+                "Retention sweep task failed (%s)", type(error).__name__)
+            raise
+        raise self.retry(countdown=300) from error
+    if result.get("status") == "failed" and self.request.retries < self.max_retries:
+        raise self.retry(countdown=300)
+    return result
+
+
 @celery_app.task(bind=True, reject_on_worker_lost=True, max_retries=24)
 def ingest_source(self, source_id: str) -> dict[str, str]:
     """Extract, chunk and embed one uploaded source; status lives in PostgreSQL."""

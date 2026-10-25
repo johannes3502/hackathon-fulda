@@ -74,6 +74,55 @@
   margin-left: 6px;
   letter-spacing: 0;
 }
+.review-score-range {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.review-score-status {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.review-score-status.provisional {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+  color: var(--warning);
+}
+.review-score-status.insufficient {
+  border-style: dashed;
+}
+.review-score-components {
+  display: grid;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 0.8125rem;
+}
+.review-score-components > span {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+}
+.review-score-components > span > span {
+  font-weight: 600;
+}
+.review-score-components small {
+  color: var(--muted);
+  text-align: right;
+}
+.review-score-components .unavailable {
+  color: var(--muted);
+  border-top-style: dashed;
+}
 .review-score-bar {
   display: block;
   width: 100%;

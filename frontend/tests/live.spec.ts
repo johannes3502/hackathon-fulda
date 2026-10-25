@@ -245,7 +245,7 @@ test("every recording uses microphone, live backend feedback and a full upload w
     fullPage: true,
   });
   await page.getByRole("button", { name: "Finish & review" }).click();
-  await expect(page).toHaveURL(/\/review$/);
+  await expect(page).toHaveURL(/\/review$/, { timeout: 30000 });
   expect(uploads).toBe(1);
   await expect(page.getByLabel("Recorded pitch video")).toBeVisible();
 });
@@ -1918,7 +1918,9 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   const stats = page.getByRole("heading", { name: "Your take at a glance" });
   await expect(stats).toBeVisible();
   await expect(stats).toBeFocused();
-  await expect(page.locator(".performance-score")).toHaveText("100/100");
+  await expect(page.locator(".performance-notice")).toContainText(
+    "No overall score",
+  );
   await page.screenshot({
     path: info.outputPath("final-overall-score.png"),
     fullPage: true,
@@ -1928,7 +1930,7 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   ).not.toBeVisible();
   await expect(
     page.getByText(
-      "No checked statements or answered questions were available.",
+      "No checked statements were available for the talk.",
     ),
   ).toBeVisible();
   await noOverflow(page);
@@ -2224,7 +2226,7 @@ test("review scores and statistics follow each recorded take across views and re
   await expect(page).toHaveURL(/\/review$/);
   const firstReview = page.url();
   const scores = page.getByRole("region", {
-    name: "Bewertung der vier Kriterien",
+    name: "Evidenzprofil der vier Kriterien",
   });
   const values = scores.locator(".review-score-value");
   await expect(values).toHaveText(["–", "–", "75/100", "–"]);

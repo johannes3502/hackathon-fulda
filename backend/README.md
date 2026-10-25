@@ -77,7 +77,8 @@ smoke command above to check the running containers.
 | Next.js frontend | Browser UI; `/api/...` forwards to FastAPI inside Compose | `http://localhost:3000` |
 | FastAPI + Uvicorn | API; connection helpers and health endpoints | `http://localhost:8000` |
 | Celery worker | Background jobs in separate Python processes | Internal; no host port |
-| Redis | Celery broker (DB 0) and temporary task results (DB 1) | Internal `redis:6379`; no host port |
+| Celery beat | Single scheduler; daily `retention_sweep` at 03:15 UTC | Internal; no host port |
+| Redis | Celery broker (DB 0), temporary task results (DB 1) and question-round TTL ledger | Internal `redis:6379`; no host port |
 | MediaPipe | Pose/hand tracking in the browser and native app | Client-side; no Python package in the backend image |
 | PostgreSQL + pgvector | Sessions, takes, events, reviews, jobs, word timestamps, source chunks and embeddings | `localhost:5432` |
 | SeaweedFS | Sources and temporary audio-analysis uploads; no review playback media | `http://localhost:8333` |
@@ -140,13 +141,18 @@ Request/response names are camelCase; actual IDs are UUIDs.
 
 The schema is created idempotently on first access under a PostgreSQL advisory
 lock. No extra service or frontend implementation is needed for backend tests.
+Compose mounts `./templates` at `/templates` for the web-search template; the
+backend image does not `COPY` that directory. Runs outside Compose therefore
+need an equivalent mount, and baking it into the image remains open.
 `run_take_job` is a Celery task; queues contain only job UUIDs. Worker writes
 re-check the parent session so deletion cannot recreate derived data.
 Only one long-running job is accepted per take. Queued jobs survive a publish
-failure: retry the same POST/key to publish the same job. There is no periodic
-outbox sweeper; abandoned requests need retry or session deletion. Terminal
-jobs reuse results. Audio cleanup failures are retried and never reported as
-successful completion. A hard worker kill delays cleanup until redelivery.
+failure: retry the same POST/key to publish the same job. A daily
+`retention_sweep` handles stale/terminal jobs and the S3 outbox; a request lost
+before enqueue still needs retry or session deletion. Terminal jobs reuse
+results. Audio cleanup failures are queued in `blob_deletions` and retried;
+successful completion is never reported while an upload remains queued. A hard
+worker kill delays cleanup until redelivery.
 
 The review writer receives a bounded evidence-card pack, chooses at most three
 findings and builds counts/summary in code. `mode: "llm"` uses the configured
@@ -175,8 +181,10 @@ a five-minute metadata-only take with 60 events. Database tests in
 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` point to a test database.
 Use a host-reachable PostgreSQL address outside Compose. These synthetic checks
 do not establish model accuracy, human claim support, browser seeking or device
-acceptance. Automatic session retention, authentication and public-host rate
-limits remain open; the confirmed deployment scope is localhost.
+acceptance. General authentication and public-host rate limits remain open; the
+confirmed deployment scope is localhost. Daily retention covers profiles,
+sessions, review jobs and idempotency, but sources and several S3 prefixes are
+not fully swept.
 
 ## Long-term progress (optional)
 
@@ -201,12 +209,57 @@ as before.
   Restart the worker after updating the task code.
 - Retention is checked on every read/mutation, including idempotent replays.
   Expired profiles return `410`; deletion remains available. Explicit
-  `PATCH {retentionUntil:null}` clears retention before expiry.
+  `PATCH {retentionUntil:null}` clears retention before expiry. Default is 365
+  days; `retention_origin` distinguishes a default (extended by new takes) from
+  a user-set deadline (not extended implicitly). A daily Celery Beat job at
+  03:15 UTC deletes expired rows and flushes the `blob_deletions` S3 outbox.
 - Metrics are heuristics, missing values stay unknown, and the response has no
   overall score. See `docs/12-long-term-progress-data-design.md` and
   `docs/13-long-term-progress-frontend-contract.md`.
 - `DELETE /profiles/{id}` removes progress data but unlinks sessions/takes;
   delete a session separately for its analysis data.
+  `DELETE /profiles/{id}?deleteSessions=true` additionally deletes linked
+  sessions, takes and their server-side analysis. Source collections and older
+  S3 prefixes are outside that sweep.
+
+## Retention and object cleanup
+
+`app/retention/` runs one `retention_sweep` per day at 03:15 UTC via Celery Beat
+(the `beat` Compose service; do not use `worker -B`). It takes a PostgreSQL
+advisory lock, writes a row to `retention_runs`, and processes bounded batches:
+
+- expired profiles: delete profile-owned progress data and unlink sessions/takes
+  (`ON DELETE SET NULL`); sessions are not deleted implicitly;
+- expired sessions: cascade takes, events, reviews and jobs;
+- `queued`/`running` jobs older than 2 h: mark failed and queue their object key;
+- `completed`/`failed` jobs older than 30 days: delete;
+- expired profile/review idempotency rows;
+- due `blob_deletions` rows: delete S3 objects after the database commit, with
+  exponential retry capped at one hour.
+
+Configuration: `RETENTION_PROFILE_DAYS=365`, `RETENTION_SESSION_DAYS=365`,
+`RETENTION_JOB_DAYS=30`, `RETENTION_STALE_JOB_HOURS=2`,
+`RETENTION_BATCH=100`. Source collections and several legacy S3 prefixes are not
+fully swept; S3 lifecycle rules are only a backstop and are not verified here.
+This is not a legal-compliance guarantee. `DELETE /sessions/{id}` commits the
+database delete first and then flushes the outbox; the daily sweep retries
+failures. `DELETE /profiles/{id}?deleteSessions=true` is the explicit full
+server-side delete.
+
+## Prompt safety and question-round limits
+
+Typed answers use a server-issued round in Redis (`round_id` + `question_id`);
+the browser does not send a canonical question. Default TTL is 600 s
+(60–3600 s). Limits are 5 initial questions (default 3), 3 follow-ups and 6 turns
+per round, 4000 characters per answer and 25 MB per voice upload. A question can
+be reviewed once; an identical retry returns the cached review, a different
+answer returns 409. A pending claim expires after 180 s. Untrusted transcript,
+source and answer blocks use per-call nonces; model output is validated strictly
+and source quotes are checked verbatim. Prompt injection cannot be prevented
+completely. The ElevenLabs browser path is limited to 600 s / 12 answers; hard
+provider limits remain agent configuration. See
+`docs/07-review-and-agent.md` and
+`docs/15-evidence-safety-retention-research.md`.
 
 ## Background jobs
 
@@ -329,8 +382,11 @@ recording (WebM/MP4/WAV) → FFmpeg 16 kHz mono → frames (40 ms, every 10 ms)
   worker loss permits redelivery after the lease. A crash after a successful
   provider call but before saving the result can still repeat that call.
 - Originals are deleted after terminal processing (including analysis failure).
-  If storage is unavailable or a process is killed, cleanup can be delayed;
-  queued/stalled jobs and analysis results have no automatic expiry yet.
+  If storage is unavailable or a process is killed, cleanup stays queued in the
+  S3 outbox and is retried by the daily retention sweep. Review jobs have a
+  30-day terminal TTL; analysis results under `speech-jobs/`, `factcheck-jobs/`,
+  `question-jobs/` and `agent-context-jobs/` still lack a complete automatic
+  TTL.
 
 ### Whisper model size per device
 
@@ -515,7 +571,8 @@ recording → FFmpeg 16 kHz WAV → Transcriber → words {word, start_ms, end_m
 - Word-based pause and words-per-minute complement the signal-based values.
 
 All thresholds (`AudioConfig`, `WordConfig`) are unvalidated heuristics and
-are returned in `heuristics` so the UI can label them. No scores.
+are returned in `heuristics` so the UI can label them. No score at this
+speech-feature layer; review evidence profiles are separate.
 
 Tests (synthetic tones, computer-generated speech and word lists only), from `backend/`:
 
@@ -610,7 +667,8 @@ GET /factcheck/settings    configured model, LLM host and web provider (for cons
   sources", never "false") and `unchecked` (model or search failed for this
   claim). Every result is also a `fact` event (`source="factcheck"`) on the
   shared timeline: `contradicts` → `warning`, `not_found` → `hint`, otherwise
-  `info`. No scores.
+  `info`. The fact-check itself assigns no score; review and practice evidence
+  profiles are separate and have no overall score.
 - Evidence is accepted only if the quoted text appears verbatim in the passage
   (whitespace, case and quote style ignored) and has at least
   `min_quote_chars` characters. Upload evidence names file and page/slide;
@@ -671,8 +729,12 @@ GET /questions/answers/{id}
 - Third parties: transcript sentences, findings, upload passages and the typed
   answer go to the LLM host. Stored requests (transcript, answer text) are
   deleted after the job finishes.
-- Limits (`QuestionConfig`): 3 questions, 6 upload passages for gaps, 5 per
-  answer review. Not tuned; question quality depends on the model.
+- Limits (`QuestionConfig`): 5 initial questions (default 3), 3 follow-ups,
+  6 turns, TTL 600 s; answers 4000 characters, voice upload 25 MB. For retrieval,
+  6 upload passages are used for gaps and 5 per answer review. A round is
+  stored canonically in Redis, so an answer request only carries
+  `round_id`/`question_id`. Not tuned; question quality depends on the model.
+  Prompt injection is mitigated, not solved.
 
 Tests: `tests/test_questions.py` (scripted model answers, reference checks,
 API and task redelivery).
@@ -702,14 +764,15 @@ silent audio and deletes it again; its temporary database table disappears
 when the connection closes.
 
 PostgreSQL, S3 and Redis use named Docker volumes. Data deliberately written during
-development survives restart, recreation and `docker compose down`. There is
-no automatic expiry for database records, media or queued jobs. Redis uses
-AOF persistence with a one-second sync interval and no key eviction; abrupt
-host failure can still lose the most recent writes. Task results expire after
-one hour; the smoke check removes its result immediately. This does not define
-media/transcript retention. Before using human recordings, decide
-and document consent, retention, session deletion and cleanup of both files
-and database references in `docs/01-product.md`.
+development survives restart, recreation and `docker compose down`. Profiles,
+sessions, review jobs and idempotency have the daily retention sweep described
+above; sources and several S3 prefixes still rely on manual deletion or an
+unverified lifecycle backstop. Redis uses AOF persistence with a one-second sync
+interval and no key eviction; abrupt host failure can still lose the most recent
+writes. Task results expire after one hour; the smoke check removes its result
+immediately. Before using human recordings, decide and document consent,
+retention, session deletion and cleanup of both files and database references in
+`docs/01-product.md`.
 
 ```sh
 docker compose logs -f backend
@@ -741,6 +804,9 @@ their contents are disposable.
 - This does not verify live tracking, transcription, a model/API fallback,
   browser recording, physical devices or a deployment. Those remain work
   for the vertical slice. Dependency failures do not produce fake feedback.
+- Current synthetic suite (25.10.2026): 370 passed, 2 skipped. Frontend: 315
+  tests in 44 files; lint, typecheck and build green. None of these numbers
+  establish model accuracy or device behavior.
 
 Verified locally on 24.10.2026 with Docker Desktop on ARM64: image build,
 `pip check`, all six service health checks and the extended smoke check passed.

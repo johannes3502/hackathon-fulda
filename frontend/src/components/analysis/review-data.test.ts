@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type { ClaimResult } from "@/features/factcheck/api";
 import type { LiveRecording } from "@/features/live/contracts";
 import { reviewScores } from "@/features/live/review-scores";
+import { germanTalk } from "@/features/structure/fixtures";
 import {
   boundedTime,
   DEMO_REVIEW,
@@ -159,11 +160,16 @@ describe("review timeline", () => {
     });
     const scores = reviewScores(data.moments, data.durationMs, data.claims);
     expect(scores.flow).toMatchObject({
-      value: 75,
+      value: null,
       assessedMs: 4000,
       coverage: 0.4,
+      status: "insufficient",
     });
-    expect(scores.knowledge).toMatchObject({ value: 0, contradicted: 1 });
+    expect(scores.knowledge).toMatchObject({
+      value: 33,
+      contradicted: 1,
+      status: "provisional",
+    });
     expect(scores.gesture.value).toBeNull();
     expect(scores.structure.value).toBeNull();
     // Source checks added or rerun after recording change the current evidence.
@@ -177,10 +183,65 @@ describe("review timeline", () => {
     expect(
       reviewScores(updated.moments, updated.durationMs, updated.claims)
         .knowledge.value,
-    ).toBe(100);
+    ).toBe(67);
     expect(updated.moments[2].assessment).toBe("positive");
     expect(take.feedback[2].startMs).toBe(1000);
     expect(take.factCheck!.claims[0].verdict).toBe("contradicts");
+  });
+  it("adds deterministic structure evidence and structure moments from the transcript", () => {
+    const data = recordingReviewData(
+      recordedTake({
+        durationMs: germanTalk.durationMs,
+        words: germanTalk.words,
+      }),
+    );
+    expect(data.structure).toMatchObject({
+      version: "structure-rubric-v1",
+      language: "de",
+    });
+    expect(data.moments.some((moment) => moment.id === "structure-opening")).toBe(
+      true,
+    );
+    expect(
+      data.moments
+        .filter((moment) => moment.id.startsWith("structure-"))
+        .every(
+          (moment) =>
+            moment.tMs >= 0 &&
+            moment.tMs + moment.durationMs <= data.durationMs,
+        ),
+    ).toBe(true);
+    const scores = reviewScores(
+      data.moments,
+      data.durationMs,
+      data.claims,
+      data.structure,
+    );
+    expect(scores.structure.value).not.toBeNull();
+    expect(scores.structure.source).toBe("structure");
+  });
+  it("does not fabricate a structure analysis for the demo fixture", () => {
+    expect(DEMO_REVIEW.structure).toBeUndefined();
+    expect(
+      DEMO_REVIEW.moments.some((moment) => moment.criterion === "structure"),
+    ).toBe(true);
+  });
+  it("derives demo scores from synthetic evidence and keeps them provisional", () => {
+    const scores = reviewScores(
+      DEMO_REVIEW.moments,
+      DEMO_REVIEW.durationMs,
+      DEMO_REVIEW.claims,
+      DEMO_REVIEW.structure,
+      { structureFromMoments: true },
+    );
+    expect({
+      gesture: scores.gesture.value,
+      knowledge: scores.knowledge.value,
+      flow: scores.flow.value,
+      structure: scores.structure.value,
+    }).toEqual({ gesture: 92, knowledge: 50, flow: 44, structure: 95 });
+    expect(Object.values(scores).every((score) => score.status === "provisional"))
+      .toBe(true);
   });
   it("keeps an unmeasured take empty instead of using the synthetic preview", () => {
     const data = recordingReviewData(

@@ -234,7 +234,12 @@ Abschied), 3–5 s Wartezeit nach der Frage, 10 s Answer-Timeout, ≤15
 Agent-Turns, kein neues Thema nach Minute 8, letzte 90 s Zusammenfassung, zwei
 Timeouts in Folge → früh schließen. Das sind Safety-Rails, keine Pädagogik;
 adaptiver Stop ergänzt sie. `QuestionConfig.max_questions` ist im Code auf 5
-begrenzt.
+begrenzt. **Implementierter Stand (25.10.2026):** Der getippte Pfad hat
+serverseitig 5 Startfragen (Default 3), 3 Follow-ups, 6 Turns und TTL 600 s.
+Der Browser-Voice-Pfad stoppt nach 600 s/12 Antworten; harte
+ElevenLabs-Anbieterlimits sind Agentenkonfiguration und nicht im Code
+garantiert. Die Zahlen oben sind Planungsziele, keine behauptete
+Gesprächssteuerung.
 
 **Ollama entfernt.** Der lokale Ollama-Adapter, `OLLAMA_URL`/`COACH_MODEL`,
 der Host-Gateway-Eintrag und die Ollama-Tests sind aus dem Projekt entfernt.

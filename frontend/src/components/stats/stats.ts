@@ -1,10 +1,10 @@
 import type { LiveRecording } from "@/features/live/contracts";
 
 export const STAT_LABELS = {
-  gesture: "Gestik",
-  knowledge: "Fachwissen",
-  flow: "Flow",
-  structure: "Struktur",
+  gesture: "Körper & Gesten",
+  knowledge: "Quellenbezug",
+  flow: "Sprechfluss",
+  structure: "Aufbau",
 } as const;
 
 /** Counts and durations from captured takes; observations are not quality scores. */

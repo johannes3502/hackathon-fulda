@@ -13,6 +13,14 @@ import {
   type AgentSettings,
 } from "@/features/questions/agent";
 import { PRESENTATION_MODES } from "@/features/questions/presentation";
+import {
+  MAX_VOICE_USER_TURNS,
+  canStartVoiceRound,
+  endSessionIfActive,
+  formatCountdown,
+  remainingSeconds,
+  voiceSessionExpired,
+} from "@/features/questions/voice";
 import { collectionId } from "@/features/sources/api";
 import { QuestionSimulator } from "./QuestionSimulator";
 import { PerformanceEvaluation } from "./PerformanceEvaluation";
@@ -36,6 +44,9 @@ export function QuestionPractice({
   const [notices, setNotices] = useState<string[]>([]);
   const [transcribing, setTranscribing] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(0);
+  const [limitReached, setLimitReached] = useState(false);
   const session = useRef<Conversation | null>(null);
   const controller = useRef<AbortController | null>(null);
   const [collection] = useState(
@@ -48,6 +59,29 @@ export function QuestionPractice({
   const messages = recording.conversation ?? [];
   const lastAgent = messages.findLast((item) => item.role === "agent");
   const lastUser = messages.findLast((item) => item.role === "user");
+  const userTurns = messages.filter((item) => item.role === "user").length;
+
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => {
+      const value = Date.now();
+      setNow(value);
+      if (!connected || limitReached) return;
+      if (!voiceSessionExpired(startedAt, userTurns, value)) return;
+      setLimitReached(true);
+      setError(
+        "The 10-minute / 12-answer voice session is over. The conversation was ended.",
+      );
+      controller.current?.abort();
+      const current = session.current;
+      session.current = null;
+      setPhase("idle");
+      setMuted(false);
+      setStartedAt(null);
+      void endSessionIfActive(current);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [active, connected, limitReached, startedAt, userTurns]);
 
   useEffect(() => {
     const pending = new AbortController();
@@ -67,7 +101,7 @@ export function QuestionPractice({
   useEffect(
     () => () => {
       controller.current?.abort();
-      void session.current?.endSession();
+      void endSessionIfActive(session.current);
       session.current = null;
     },
     [],
@@ -85,8 +119,9 @@ export function QuestionPractice({
     session.current = null;
     setPhase("idle");
     setMuted(false);
+    setStartedAt(null);
     try {
-      await current?.endSession();
+      await endSessionIfActive(current);
       if (showStats) setFinished(true);
     } catch {
       setError("The connection ended unexpectedly. You can start again.");
@@ -95,10 +130,13 @@ export function QuestionPractice({
 
   async function start() {
     if (controller.current && !controller.current.signal.aborted) return;
+    if (limitReached) return;
     const pending = new AbortController();
     controller.current = pending;
     setError("");
     setNotices([]);
+    setStartedAt(Date.now());
+    setNow(Date.now());
     setPhase("preparing");
     try {
       const context = await prepareAgent(recording, collection, pending.signal);
@@ -150,6 +188,7 @@ export function QuestionPractice({
             session.current = null;
             setPhase("idle");
             setMuted(false);
+            setStartedAt(null);
             if (reason === "agent") setFinished(true);
           }
         },
@@ -176,6 +215,7 @@ export function QuestionPractice({
         );
         pending.abort();
         setPhase("idle");
+        setStartedAt(null);
       }
     }
   }
@@ -216,6 +256,15 @@ export function QuestionPractice({
         pending.abort();
       }
     }
+  }
+
+  function resetConversation() {
+    setLimitReached(false);
+    setStartedAt(null);
+    setFinished(false);
+    setError("");
+    setPhase("idle");
+    update(recording.id, (take) => ({ ...take, conversation: [] }));
   }
 
   if (finished)
@@ -341,16 +390,33 @@ export function QuestionPractice({
                   </div>
                 ) : (
                   <Button
-                    disabled={!settings?.available}
+                    disabled={
+                      !canStartVoiceRound(limitReached, !!settings?.available)
+                    }
                     onClick={() => void start()}
                   >
                     <Mic size={17} />{" "}
-                    {messages.length
-                      ? "Start a new conversation"
-                      : "Start voice questions"}
+                    {limitReached
+                      ? "Session limit reached"
+                      : messages.length
+                        ? "Start a new conversation"
+                        : "Start voice questions"}
                   </Button>
                 )}
               </div>
+              {(active || limitReached) && (
+                <p className="field-hint" role="status">
+                  {startedAt !== null
+                    ? formatCountdown(remainingSeconds(startedAt, now))
+                    : "00:00"}{" "}
+                  left · {userTurns}/{MAX_VOICE_USER_TURNS} spoken answers
+                </p>
+              )}
+              {limitReached && (
+                <Button variant="outline" onClick={resetConversation}>
+                  Reset conversation and limits
+                </Button>
+              )}
               {settings && !settings.available && (
                 <p className="status-warning" role="status">
                   {settings.reason}{" "}
@@ -363,10 +429,12 @@ export function QuestionPractice({
                 </p>
               )}
               <p className="field-hint">
-                Starting shares your transcript, matching material and live
-                microphone audio with ElevenLabs. When materials are insufficient,
-                the agent sends focused search queries to Tavily to check public
-                web sources. Spoken feedback is an AI
+                This session stops after 10:00 or {MAX_VOICE_USER_TURNS} spoken
+                answers. Your ElevenLabs agent settings may impose additional
+                limits. Starting shares your transcript, matching material and
+                live microphone audio with ElevenLabs. When materials are
+                insufficient, the agent sends focused search queries to Tavily
+                to check public web sources. Spoken feedback is an AI
                 suggestion; use source checks to verify factual claims. You can
                 end the conversation at any time.
               </p>

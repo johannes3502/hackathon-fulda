@@ -660,7 +660,7 @@ sind nötig (Li & Zhang 2024; Dugan et al. 2022).
 |---|---|
 | Gespräch | 8–10 min Ziel, Hard Stop 10 min (12 min inkl. Abschied) |
 | Hauptfragen | 3–5, Default 4 |
-| Follow-ups | 1 pro Frage; max. 2 nur bei klarem Widerspruch |
+| Follow-ups | Research/Plan: 1 pro Frage; max. 2 nur bei klarem Widerspruch. Implementiert: max. 3 Follow-ups pro Runde, 6 Turns, TTL 600 s. |
 | Wartezeit | 3–5 s nach der Frage; 2–3 s nach der Antwort |
 | Answer-Timeout | 10 s, dann Hinweis oder weiter |
 | Agent-Turns | ≤15 |

@@ -6,7 +6,10 @@ import type { PresentationMode } from "./presentation";
 
 export type Question = components["schemas"]["Question"];
 export type QuestionKind = Question["kind"];
-export type QuestionResult = components["schemas"]["QuestionResult"];
+type RawQuestionResult = components["schemas"]["QuestionResult"];
+export type QuestionResult = RawQuestionResult & {
+  roundId: string | null;
+};
 export type AnswerReview = components["schemas"]["AnswerReview"];
 export type QuestionAnswer = { answer: string; review: AnswerReview };
 export type Persona = QuestionResult["persona"];
@@ -46,13 +49,27 @@ const validQuestion = (q: unknown): q is Question =>
   q.kind in KIND_LABELS &&
   (q.t_ms === null || q.t_ms === undefined || typeof q.t_ms === "number");
 
-function validResult(value: unknown): value is QuestionResult {
+function validResult(value: unknown): value is RawQuestionResult {
   return (
     isObject(value) &&
+    typeof value.round_id === "string" &&
+    value.round_id.length > 0 &&
     Array.isArray(value.questions) &&
     Array.isArray(value.notices) &&
     value.questions.every(validQuestion)
   );
+}
+
+/** Turn backend round refusals into copy a presenter can act on. */
+export function questionErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (/HTTP 410|\bexpired\b/i.test(message))
+    return "This question round has expired. Start a new round.";
+  if (/HTTP 429|\blimit\b/i.test(message))
+    return "This round's turn limit is reached. Start a new round.";
+  if (/HTTP 404|does not belong/i.test(message))
+    return "This question is no longer part of the round. Start a new round.";
+  return message || "The answer could not be compared.";
 }
 
 function validReview(value: unknown): value is AnswerReview {
@@ -77,7 +94,7 @@ export function generateQuestions(
   signal: AbortSignal,
   pollMs = 1500,
 ): Promise<QuestionResult> {
-  return runBackendJob(
+  return runBackendJob<RawQuestionResult>(
     endpoint,
     {
       path: "/questions",
@@ -94,14 +111,15 @@ export function generateQuestions(
     },
     signal,
     pollMs,
-  );
+  ).then((result) => ({ ...result, roundId: result.round_id ?? null }));
 }
 
-/** Compare a typed answer with the question's evidence and the uploaded sources. */
+/** Compare a typed answer with the canonical question of a server-issued round. */
 export function reviewAnswer(
   endpoint: string,
   input: {
-    question: Question;
+    roundId: string;
+    questionId: string;
     answer: string;
     collectionId: string | null;
     persona: Persona;
@@ -116,7 +134,8 @@ export function reviewAnswer(
       path: "/questions/answers",
       statusPath: "/questions/answers",
       body: {
-        question: input.question,
+        round_id: input.roundId,
+        question_id: input.questionId,
         answer: input.answer,
         collection_id: input.collectionId,
         persona: input.persona,
@@ -134,7 +153,8 @@ export function reviewAnswer(
 export function reviewVoiceAnswer(
   endpoint: string,
   input: {
-    question: Question;
+    roundId: string;
+    questionId: string;
     recording: Blob;
     collectionId: string | null;
     persona: Persona;
@@ -152,7 +172,8 @@ export function reviewVoiceAnswer(
   body.append(
     "request",
     JSON.stringify({
-      question: input.question,
+      round_id: input.roundId,
+      question_id: input.questionId,
       collection_id: input.collectionId,
       persona: input.persona,
       presentation_mode: input.presentationMode ?? "thesis",

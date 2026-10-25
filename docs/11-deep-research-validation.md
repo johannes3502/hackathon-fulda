@@ -32,7 +32,10 @@ dem finalen Fact-Check. Drei Annahmen sind aber zu stark:
    „widerspricht“ trennen und darf kein Live-Urteil zeigen.
 3. **Feste Fragezahlen sind keine Pädagogik.** 3–5 Fragen, ein Follow-up und
    10 Minuten sind **Sicherheitsgrenzen** für die Demo, keine empirisch
-   optimale Dosis. Sie müssen mit adaptivem Stop kombiniert werden.
+   optimale Dosis. Sie müssen mit adaptivem Stop kombiniert werden. Im aktuellen
+   Code gelten stattdessen serverseitig 5 Startfragen (Default 3), 3 Follow-ups,
+   6 Turns und TTL 600 s; die folgenden Zahlen bleiben Research-Orientierung,
+   keine Aussage über die implementierte Voice-Steuerung.
 
 ## 1. Entscheidungs-Audit
 
@@ -44,7 +47,7 @@ dem finalen Fact-Check. Drei Annahmen sind aber zu stark:
 | Hybrid-Fact-Check: live Kandidaten, final autoritativ | **moderat–stark** für hybrid, **stark** gegen Live-Urteile | Nutzer übervertrauen einem falschen Urteil | Final nur drei Ausgänge mit Zitat + Quelle; „nicht gefunden“ ≠ „falsch“; keine Live-Urteile |
 | Vorgerenderte TTS für bekannte Fragen/Filler | **schwach–moderat** | Canned-Prosodie, Stale Cache, Voice-Mismatch | Nur feste Texte; gleiche Stimme; Cache-Key aus Text+Voice+Version; First-Audio-Latenz messen |
 | Halbduplex (Mikro stumm während TTS) | **moderat**, dass Barge-in natürlicher wirkt; **schwach** zu Cognitive Load | Nutzer kann nicht unterbrechen; Walkie-Talkie-Gefühl | Sichtbarer Listening/Speaking-State; Stop-Taste; kurze Agent-Turns; Barge-in vor Naturalness-Urteil testen |
-| Harte Grenzen 5 Fragen / 20 min / 2 Follow-ups | **schwach/umstritten** | Schneidet Retrieval-Practice ab; Timeout bestraft Nachdenken | Als Safety-Rails behalten, adaptiven Stop ergänzen, Truncation-Grund loggen |
+| Harte Grenzen 5 Fragen / 20 min / 2 Follow-ups (Research-Empfehlung; Code: 5/3/6/600 s) | **schwach/umstritten** | Schneidet Retrieval-Practice ab; Timeout bestraft Nachdenken | Als Safety-Rails behalten, adaptiven Stop ergänzen, Truncation-Grund loggen |
 | Sofort kurzes Feedback, Details im Review | **umstritten** für Timing, **moderat** für Feedbackqualität | Vorschnelles Urteil bei Teilantworten/ASR-Fehlern | Nur nach Antwortende; „enthalten/fehlt“, kein Score; bei ASR-Unsicherheit nachfragen |
 
 ## 2. Wie Lehrkräfte tatsächlich fragen
@@ -118,14 +121,17 @@ direkt auf Voice-Agent übertragen.
 ## 3. Harte Grenzen für die Demo
 
 Die Zahlen sind konservative Übersetzungen der Evidenz, keine gemessenen
-Optima. Sie verhindern Endlosschleifen und Überforderung.
+Optima. Sie verhindern Endlosschleifen und Überforderung. **Abweichung im
+Code:** Der getippte Pfad nutzt 5 Startfragen (Default 3), 3 Follow-ups,
+6 Turns und TTL 600 s; die Tabelle beschreibt weiterhin die
+Research-Empfehlung, nicht die aktuelle Serverkonfiguration.
 
 | Grenze | Wert | Begründung |
 |---|---|---|
 | Gesprächsziel | 8–10 min | Kurzeformative Einheit; MMI nutzt 10-min-Stationen |
 | Hard Stop | 10 min, absolut 12 min inkl. Verabschiedung | Abbruch ist besser als Endlosschleife |
 | Hauptfragen | 3–5, Default 4 | Kognitive Last, Respondent Burden |
-| Follow-ups | 1 pro Frage; max. 2 nur bei klarem Widerspruch | Working Memory ~4 Chunks; ein ungelöster Punkt |
+| Follow-ups | Research-Empfehlung 1 pro Frage, max. 2 bei klarem Widerspruch; implementiert max. 3 pro Runde | Working Memory ~4 Chunks; ein ungelöster Punkt |
 | Answer-Endpointing | 1,5–2 s Stille | Natürlicher Turn-Wechsel |
 | Pädagogische Wartezeit | 3–5 s nach der Frage | Rowe/Tobin |
 | Answer-Timeout | 10 s, dann Hinweis oder weiter | Kein stilles Warten |
@@ -255,7 +261,10 @@ verwenden. Das ist eine bewusste Abkehr von der früheren Local-only-Zusage.
 3. **Keine Live-Urteile.** Live nur Kandidaten und Retrieval-Prefetch.
 4. **Mehrere akzeptable Antwortpunkte.** Plan-first mit `expected_points[]`,
    nicht mit einer goldenen Antwort. Jede Frage gegen Quelle validieren.
-5. **Adaptiver Stop plus Safety-Caps.** 3–5 Fragen, 1 Follow-up, 10 min.
+5. **Adaptiver Stop plus Safety-Caps.** Research-Empfehlung 3–5 Fragen,
+   1 Follow-up, 10 min; im Code 5 Startfragen (Default 3), 3 Follow-ups,
+   6 Turns, TTL 600 s. Der Voice-Pfad ist im Browser auf 600 s/12 Antworten
+   begrenzt; harte Provider-Limits bleiben Agentenkonfiguration.
 6. **Zweistufiges Feedback.** Kurz im Gespräch, Evidenz im Review.
 7. **Turn-Taking sichtbar machen.** First Audio <700 ms für bekannte Texte,
    <1,5 s für dynamische mit Filler; >4 s ist schlecht. Halbduplex nur mit
