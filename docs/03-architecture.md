@@ -1,7 +1,7 @@
 # Architektur – Pitch Coach (Live-Präsentationstrainer)
 
 > Grafische Darstellung des Projekts als Mermaid-Diagramme.
-> Generiert aus der Codeanalyse: `frontend/`, `backend/`, `mobile/`, `api/`, `compose.yaml`.
+> Generiert aus der Codeanalyse: `frontend/`, `backend/`, `api/`, `compose.yaml`.
 
 ## 1. Systemübersicht
 
@@ -9,13 +9,11 @@
 flowchart TB
     subgraph Clients["Clients"]
         WEB["Web-Frontend<br/>Next.js 16 / React 19 / TS<br/>Port 3000"]
-        MOB["Mobile App<br/>Expo / React Native"]
     end
 
     subgraph ClientAI["KI im Client (lokal, kein Upload)"]
         MP_W["MediaPipe Pose: Lite / Heavy<br/>VIDEO (Standard) / IMAGE<br/>GPU-first, CPU-Fallback; max. 10 Hz"]
-        MP_M["react-native-mediapipe<br/>Pose Landmarker Lite"]
-        MR["MediaRecorder / Vision Camera<br/>Video + Audio"]
+        MR["MediaRecorder<br/>Video + Audio"]
     end
 
     WEB -->|"LiveSessionProvider: abgeschlossene Takes und Review-Updates"| IDB["Browser IndexedDB<br/>Video, Pose-Log, Transkript, Feedback,<br/>Fragen, Antworten, Gespräch"]
@@ -77,10 +75,8 @@ flowchart TB
     LIVE_SIG -- "feedback: position_ms + alle qualifizierenden Events" --> WEB
     WEB --> HINT_FILTER["Client: ein Hinweis gleichzeitig,<br/>15-s-Cooldown pro Typ, 10-s-Frische"]
     MP_W --> RULES["PoseEvaluator: Neutralstellung, Geometrie, Mindestdauer<br/>posture/gesture-Events; lokale Evidenz"]
-    MOB -- "Kamera" --> MP_M
 
     WEB -- "fetch: /speech, /sources,<br/>/transcription, /factcheck,<br/>/questions, /profiles, /health" --> MAIN
-    MOB -- "Upload + Job-Polling" --> MAIN
     WEB -. "Typen" .-> OAS
     OAS -. "Quelle der Wahrheit" .-> MAIN
 
@@ -502,22 +498,10 @@ flowchart TD
     LIVE --> Transport
 ```
 
-## 7. Mobile-App (Expo) Screens
+## 7. Demo-Plattform
 
-```mermaid
-flowchart LR
-    IDX["index - Rehearsals<br/>native iOS-Liste"] --> STU["studio - Aufnahme<br/>Vision Camera 720p/30fps,<br/>1/3/5 Min, Permissions,<br/>Pose-Overlay + Arms-crossed-Cue"]
-    STU <--> OPT["settings - Recording Options<br/>native iOS-Form-Sheet,<br/>Titel, Pose, Backend-URL,<br/>State für die App-Sitzung"]
-    IDX --> SET["setup - Practice Setup<br/>Titel, Kontext, Publikum,<br/>Dauer, Modus, Fokus"]
-    SET --> DEM
-    SET --> STU
-    IDX --> SRC_M["sources - Quellen<br/>Upload, Status-Polling,<br/>Suche, Löschen"]
-    SRC_M -->|"GET/POST/DELETE /sources<br/>POST /sources/search"| BE
-    SRC_M --- CID["Collection-ID pro Server<br/>lokale Datei; gleiche ID wie Web"]
-    IDX --> DEM["demo - Sample Rehearsal<br/>MockCoachGateway,<br/>Fragen, Pause, Retry,<br/>Vergleich + frühere Reports"]
-    STU --> REV["review - Playback<br/>expo-video, Timestamp-Feedback<br/>Klick spult ±2s zurück,<br/>Upload + Wort-Import,<br/>Sharing (Video, Pose-JSONL)"]
-    REV -->|"GET /health/ready,<br/>POST /speech/analyze,<br/>GET /speech/jobs/id,<br/>POST /transcription/analyze-words"| BE(("FastAPI<br/>Backend"))
-```
+Die native Mobile-App wurde auf Nutzerwunsch entfernt. Die Präsentation und
+der Demo-Pfad verwenden ausschließlich die Web-App auf dem Laptop.
 
 ## 8. Datenmodell (Postgres)
 
@@ -839,7 +823,6 @@ flowchart LR
     end
 
     WEBF["Web-Frontend"] --> H2 & S1 & S2 & S3LIVE & S4LIVE & T1 & R1 & R2 & R3 & R4 & R5 & F1 & F2 & F3 & Q1 & Q2 & Q3 & Q4 & Q5 & Q6 & Q7 & Q8 & Q9
-    MOB["Mobile App"] --> H2 & S1 & S2 & T1 & R1 & R2 & R4 & R5
     CLIENT["Neuer Take-Client-Vertrag<br/>Frontend-Integration separat"] -.-> V1 & V2 & V3 & V4 & V5 & V6
     PROGRESS["Progress-Client<br/>X-Profile-Token"] -.-> P1 & P2 & P3
 ```

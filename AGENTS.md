@@ -80,7 +80,7 @@ Text-Fragerunde mit Quellenvergleich ohne Noten.
 
 ## 4. Architektur
 
-**Pflicht bei Architektur-Änderungen:** Die Mermaid-Diagramme in `docs/03-architecture.md` (Systemübersicht, Compose-Deployment, Sprech­analyse-Flow, RAG-Pipeline, Frontend-Routen, Mobile-Screens, Datenmodell, Event-Modell, API-Endpunkte) sind Teil dieser Datei und immer mitzupflegen. Sobald sich Services in `compose.yaml`, Endpunkte/Routen, Pipelines, Datenmodell oder das Event-Schema ändern, die betroffenen Diagramme im selben Change aktualisieren.
+**Pflicht bei Architektur-Änderungen:** Die Mermaid-Diagramme in `docs/03-architecture.md` (Systemübersicht, Compose-Deployment, Sprech­analyse-Flow, RAG-Pipeline, Frontend-Routen, Datenmodell, Event-Modell, API-Endpunkte) sind Teil dieser Datei und immer mitzupflegen. Sobald sich Services in `compose.yaml`, Endpunkte/Routen, Pipelines, Datenmodell oder das Event-Schema ändern, die betroffenen Diagramme im selben Change aktualisieren.
 
 ```
 Browser (Next.js, TS)

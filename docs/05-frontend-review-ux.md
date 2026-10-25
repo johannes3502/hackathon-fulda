@@ -441,7 +441,6 @@ Eigene Zustände mit Grund und nächster Aktion:
 
 - Frage-Simulator mit Fragen aus Transkript, Quellen und Fact-Check.
 - Verlauf über mehrere Aufnahmen (nur mit expliziter Zustimmung, keine Rankings).
-- Mobile-App-Review mit derselben Timeline.
 - Geteilte Review-Links (nur Timestamps, kein Video).
 - Lokale Suche über Transkript und Findings.
 - Experiment-Modus: „Nimm 30 s mit einem Fokus auf.“

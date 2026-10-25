@@ -132,13 +132,6 @@ For local browser tests: `npx playwright install chromium`, then
 The user confirmed three camera gestures. Safari/iOS and microphone transcription
 still need physical-device acceptance; public deployment is outside the local demo scope.
 
-## Native app
-
-The [React Native companion](../mobile/README.md) supports iPhone, iPad and Android,
-including native on-device pose capture. Run `npm run mobile:ios` or
-`npm run mobile:android` from the repository root to build a development client.
-Expo Go cannot load its native pose modules.
-
 ## Backend timestamp alignment
 
 Backend transcript timestamps may differ from the browser clock by up to 250 ms
