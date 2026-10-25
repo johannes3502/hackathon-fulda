@@ -1,4 +1,4 @@
-FROM node:22.23.4-bookworm-slim
+FROM node:22.23.4-bookworm-slim AS builder
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -22,10 +22,16 @@ ARG NEXT_PUBLIC_STAGE_MODE=1
 ENV NEXT_PUBLIC_STAGE_MODE=$NEXT_PUBLIC_STAGE_MODE
 ARG NEXT_PUBLIC_STAGE_ANALYSIS=local
 ENV NEXT_PUBLIC_STAGE_ANALYSIS=$NEXT_PUBLIC_STAGE_ANALYSIS
-RUN npm run build --workspace frontend
+RUN BUILD_STANDALONE=1 npm run build --workspace frontend
 
+# Ship only Next.js's traced runtime and public assets. Build tools and source
+# stay in the builder stage; the same image runs independently of the checkout.
+FROM node:22.23.4-bookworm-slim AS runtime
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
+WORKDIR /app
+COPY --from=builder --chown=node:node /app/frontend/.next/standalone ./
+COPY --from=builder --chown=node:node /app/frontend/.next/static ./frontend/.next/static
+COPY --from=builder --chown=node:node /app/frontend/public ./frontend/public
+USER node
 EXPOSE 3000
-
-# Production mode avoids Turbopack/HMR hydration failures observed in the
-# dev container and is the stable path for the jury demo.
-CMD ["npm", "run", "start", "--workspace", "frontend", "--", "--hostname", "0.0.0.0"]
+CMD ["node", "frontend/server.js"]

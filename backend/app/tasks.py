@@ -11,7 +11,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 
 from app.celery_app import celery_app
 from app.connections import s3_client
-from app.speech import storage
+from app import job_storage as storage
 from app.speech.job_models import AnalysisJob, AnalysisOptions
 from app.speech.pipeline import run_analysis
 

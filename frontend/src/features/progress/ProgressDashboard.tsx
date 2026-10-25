@@ -1631,10 +1631,7 @@ function PointDetail({
           className="progress-link"
           onClick={() => {
             const index = series.points.findIndex((item) => item.takeId === point.takeId);
-            const previous = [...series.points].reverse().find((item, reverseIndex) => {
-              const position = series.points.length - 1 - reverseIndex;
-              return position < index;
-            });
+            const previous = series.points[index - 1];
             if (previous) onSelect(previous.takeId);
           }}
           disabled={series.points[0]?.takeId === point.takeId}

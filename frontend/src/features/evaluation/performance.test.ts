@@ -7,7 +7,7 @@ import type {
   Question,
   QuestionAnswer,
   QuestionResult,
-} from "../questions/api";
+} from "../questions/contracts";
 import { evaluatePerformance } from "./performance";
 
 let sequence = 0;

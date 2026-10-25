@@ -1,5 +1,9 @@
 # Voice-Agent: Stack-Entscheidung
 
+> Research-Stand vom 24.10.2026, kein aktueller Implementierungsvertrag.
+> Der Web-Dialog nutzt heute ElevenLabs; aktueller Aufbau und Grenzen:
+> [Review und Agent](07-review-and-agent.md), [Architektur](03-architecture.md).
+
 Stand: 24.10.2026, Research für den Lehrer-/Tutor-Dialog nach der Präsentation.
 Dieses Dokument ist eine **Entscheidungsvorlage**, keine umgesetzte Architektur.
 Nach der Entscheidung gehört der Beschluss in `docs/02-ai-decision-log.md` und,

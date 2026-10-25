@@ -32,15 +32,13 @@ export const POSE_RULES = Object.freeze({
   headDownEnter: 0.1,
   headDownExit: 0.06,
   cooldownMs: 5000,
-  // Live hint timing; defaults until an admin panel can override them.
+  // Live hint timing; the admin panel can override these defaults per browser.
   // A pose must hold this long before it becomes an event and a hint.
   stabilizeHoldMs: 2000,
   // A shown hint, pose or voice, stays at least this long.
   minDisplayMs: 3000,
   // Blank bubble between two consecutive hints; 0 swaps back-to-back.
   minDisplayGapMs: 2000,
-  // Pose lab praise needs this long without a correction.
-  praiseAfterMs: 10000,
 });
 export const POSE_RULE_IDS = [
   "hand_raised",

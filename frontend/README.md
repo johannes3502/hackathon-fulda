@@ -6,11 +6,11 @@ after changing source or configuration, rebuild it with
 `docker compose up --build -d frontend`. For local development use
 `npm run dev --workspace frontend` and open the printed URL.
 
-The frontend healthcheck requests `/demo`, `/gestures`, `/sources`,
-`/progress`, `/admin`, `/review-preview`, `/live` and
-`/live/healthcheck/review`; `/stage` is checked by its own preflight. The
-review probe opens the missing-recording state; it does not create a take or
-access a recording.
+The image contains Next.js's standalone server, static files and public assets.
+Source, compilers and test tools stay in the build stage. Its healthcheck probes
+`/` and `/api/health/ready`. Run `npm run test:smoke` from the repository root
+for the broader route and asset check, including `/stage`. The missing-recording
+review probe does not create a take or access a recording.
 
 ## Pitch Mode
 
@@ -114,8 +114,9 @@ deploy `public/pose` with the frontend. Model failures leave recording available
 
 ## Backend connection
 
-Compose sets `NEXT_PUBLIC_API_URL=/api`. Next.js forwards requests to
-`API_INTERNAL_URL=http://backend:8000`; the browser uses its current origin.
+The browser defaults to `/api` on its current origin. Compose passes
+`API_INTERNAL_URL=http://backend:8000` at build time for the Next.js rewrite;
+the standalone runtime needs no duplicate API environment settings.
 Upload and polling endpoints are described in the [integration handoff](../docs/04-integration.md).
 
 For optional local frontend development, install Node.js 22.12+ and run from
@@ -137,16 +138,29 @@ Open `/sources` or choose **Add your sources** on setup. Upload PDF, PPTX, DOCX,
 
 ## Checks
 
-With Compose running:
+From the repository root, using Node.js 22.12+:
 
 ```sh
-docker compose exec frontend npm run typecheck
-docker compose exec frontend npm run lint
-docker compose exec frontend npm test
+npm ci
+npm run typecheck
+npm run lint
+npm test
+npm run test:compose
 ```
 
-For local browser tests: `npx playwright install chromium`, then
-`npm run test:e2e`. Production build: `npm run build`.
+For browser tests: `npx playwright install chromium`, then `npm run test:e2e`.
+To test the production container already running on localhost:
+
+```sh
+npm run test:smoke
+PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e
+```
+
+The production image intentionally contains no development/test tools. Build
+locally with `npm run build`, or rebuild the container for the jury. Cloud smoke
+is separately opt-in (`RUN_CLOUD_SMOKE=1`); ordinary browser tests use synthetic
+media and stub provider responses. Use `SMOKE_URL` for a different port and
+`NEXT_PUBLIC_STAGE_MODE=0` with the smoke script when that build hides Stage.
 
 [Design notes](DESIGN.md) · [Implementation decisions](../docs/02-ai-decision-log.md).
 The user confirmed three camera gestures. Safari/iOS and microphone transcription

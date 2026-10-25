@@ -8,7 +8,7 @@ from app.factcheck.llm import configured_llm, llm_available, llm_settings
 from app.factcheck.models import FactCheckJob, FactCheckRequest, FactCheckSettings
 from app.factcheck.web import configured_web_searcher, web_provider
 from app.jobs import QueueUnavailable, enqueue_task
-from app.speech import storage
+from app import job_storage as storage
 from app.speech.job_models import AcceptedJob
 from app.tasks import PREFIX, fact_check
 

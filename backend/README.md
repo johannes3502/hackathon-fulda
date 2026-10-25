@@ -10,9 +10,18 @@ docker compose exec backend python -m scripts.smoke
 
 Keep an existing `.env` instead of overwriting it. API docs:
 <http://localhost:8000/docs>; frontend: <http://localhost:3000>.
-Edit `backend/app/` for automatic API reload;
-restart the worker after task changes with `docker compose restart worker`.
-Changes to dependencies, scripts or the Dockerfile require a rebuild.
+Compose runs the source baked into one shared image for the API, worker and
+scheduler, without hot reload or source mounts. After backend changes, rebuild
+and recreate all three so they run the same revision:
+
+```sh
+docker compose up --build -d --wait backend worker beat
+```
+
+The Docker build context is the repository root; `templates/` is included in
+the image. Local development can still use `uvicorn app.main:app --reload`
+from `backend/` with the configured infrastructure and model paths. Model
+download layers are cached independently of ordinary application edits.
 
 ## Question rounds and retention (reviewed 25 October 2026)
 
@@ -96,13 +105,13 @@ VS Code configuration is in `.vscode/`. Personal `.idea/` state stays ignored.
 
 - **IntelliJ IDEA:** enable the **Docker** plugin, select **Docker Compose**
   in the run selector and click **Run**. It builds images and starts every
-  service in `compose.yaml`: frontend, backend, Celery worker, Redis, PostgreSQL and S3 storage. The
+  service in `compose.yaml`: frontend, backend, Celery worker, Celery Beat, Redis, PostgreSQL and S3 storage. The
   configuration uses the local Docker connection named `Docker`; select your
   local connection in its **Server** field if it has a different name.
   View logs and stop containers in the **Services** tool window.
 - **VS Code:** run **Tasks: Run Build Task** (`Cmd+Shift+B` on macOS,
   `Ctrl+Shift+B` on Windows/Linux). The default **Compose: up** task builds
-  and starts all six containers, then waits for their health checks. **Tasks:
+  and starts all seven containers, then waits for their health checks. **Tasks:
   Run Task** also offers **Compose: stop**, **Compose: frontend logs** and
   **Compose: backend logs**.
 

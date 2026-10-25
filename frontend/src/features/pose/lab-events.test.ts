@@ -20,7 +20,6 @@ const result = (
   display: "",
   values: { left_in_pocket: true },
   failing: [],
-  praise: false,
 });
 
 it("turns a recognized pocket into one live cue and review event", () => {

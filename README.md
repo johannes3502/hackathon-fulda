@@ -40,6 +40,9 @@ docker compose up --build -d --wait
 
 Compose startet sieben Dienste: Frontend, FastAPI-Backend, Celery-Worker,
 Celery Beat, Redis, PostgreSQL mit pgvector und SeaweedFS als S3-Speicher.
+SeaweedFS wird für Quellen, temporäre Analyse-Uploads und Job-Ergebnisse benötigt;
+das Wiedergabevideo bleibt im Browser. Alle Anwendungskomponenten laufen aus
+gebauten Images, ohne Entwicklungsserver oder Source-Mounts.
 Die veröffentlichten Ports sind an `127.0.0.1` gebunden. Abweichende Ports
 lassen sich in `.env` einstellen.
 
@@ -118,6 +121,21 @@ stehen in [docs/14-open-todos.md](docs/14-open-todos.md).
 Für Cloud-Aufrufe nur synthetische Demo-Inhalte verwenden: Gemini und
 ElevenLabs verarbeiten Daten außerhalb des lokalen Stacks.
 
+## Code-Einstieg für die Jury
+
+| Bereich | Einstieg |
+| --- | --- |
+| Aufnahme, lokale Speicherung, Timestamp-Review | `frontend/src/features/live/` und `frontend/src/components/live/` |
+| Pose-Regeln und Kalibrierung | `frontend/src/features/pose/` |
+| API und Hintergrundjobs | `backend/app/main.py`, `tasks.py`, `jobs.py`, `job_storage.py` |
+| Quellen, Fact-Check, Fragen | `backend/app/sources/`, `factcheck/`, `questions/` |
+| Architektur, Dienstaufgaben und Integrationsgrenzen | [Architektur](docs/03-architecture.md) und [Integration](docs/04-integration.md) |
+| Synthetische Vorträge und Abgabeunterlagen | `test-presentations/`, `pitch/`, `output/pdf/` |
+
+`promo/` ist ein separates, optionales Video-Projekt und gehört nicht zur App
+oder zum Compose-Build. Forschungsnotizen bleiben als Entscheidungsbelege
+verfügbar; aktuelle offene Abnahmen stehen zentral in [TODOs](docs/14-open-todos.md).
+
 ## Entwicklung und Dokumentation
 
 [Frontend und Checks](frontend/README.md) · [Backend und Smoke-Tests](backend/README.md) ·
@@ -133,6 +151,16 @@ npm run dev
 
 Das startet nur das Frontend. `/stage` bietet eine lokale Aufnahme ohne
 Analyse-Upload; der normale `/live`-Pfad benötigt das Backend.
-Typecheck, Lint und Tests: `npm run typecheck`, `npm run lint`, `npm test`.
-Das Compose-Frontend verwendet einen Production-Build. Nach Änderungen an
-Quellcode oder Stage-Flags neu bauen: `docker compose up --build -d frontend`.
+Checks im Checkout: `npm run typecheck`, `npm run lint`, `npm test`,
+`npm run test:compose` und `npm run api:check` (Python-Umgebung siehe API-Guide).
+Gegen den laufenden Jury-Stack: `npm run test:smoke`; Browser-Abnahme nach
+`npx playwright install chromium` mit
+`PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e`.
+Die Browser-Tests verwenden synthetische Medien; echte Kamera und Mikrofon
+werden zusätzlich gemäß [Jury-Runbook](docs/05-jury-demo.md) geprüft.
+
+Nach Frontend- oder Stage-Flag-Änderungen:
+`docker compose up --build -d --wait frontend`.
+Nach Backend-Änderungen API, Worker und Beat gemeinsam neu bauen:
+`docker compose up --build -d --wait backend worker beat`.
+Die schlanke Frontend-Runtime enthält keine Compiler oder Testwerkzeuge.

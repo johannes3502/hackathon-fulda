@@ -1,5 +1,9 @@
 # Inkrementelle Analyse, Fact-Check-Lanes und Gemini-Modellwahl
 
+> Research-Stand vom 24.10.2026, kein aktueller Implementierungsvertrag.
+> Der Web-Dialog nutzt heute ElevenLabs; aktueller Aufbau und Grenzen:
+> [Review und Agent](07-review-and-agent.md), [Architektur](03-architecture.md).
+
 Stand: 24.10.2026. Ergänzt `docs/08-question-agent-architecture.md`.
 Research + Zielarchitektur, keine umgesetzte Pipeline.
 

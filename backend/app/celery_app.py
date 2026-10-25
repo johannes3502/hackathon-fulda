@@ -30,7 +30,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_acks_late=True,
     worker_cancel_long_running_tasks_on_connection_loss=True,
-    # Infrastructure defaults, to be tuned when the transcription provider exists.
+    # Bound model jobs so a stalled analysis cannot occupy the worker indefinitely.
     task_soft_time_limit=540,
     task_time_limit=600,
     broker_connection_retry_on_startup=True,

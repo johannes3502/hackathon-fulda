@@ -12,19 +12,7 @@ const { services } = JSON.parse(
   ),
 );
 
-for (const failedPath of [
-  null,
-  "/",
-  "/demo",
-  "/gestures",
-  "/sources",
-  "/progress",
-  "/admin",
-  "/live",
-  "/live/healthcheck/review",
-  "/review-preview",
-  "/api/health/ready",
-]) {
+for (const failedPath of [null, "/", "/api/health/ready"]) {
   test(`frontend healthcheck ${failedPath ? `rejects a failure on ${failedPath}` : "accepts healthy routes"}`, () => {
     const [, command, flag, script] = services.frontend.healthcheck.test;
     assert.equal(command, "node");
@@ -121,8 +109,19 @@ test("an explicitly empty LLM endpoint or model disables both API and worker con
         { encoding: "utf8", env: { ...process.env, [disabled]: "" } },
       ),
     );
-    for (const name of ["backend", "worker"]) {
+    for (const name of ["backend", "worker", "beat"]) {
       assert.equal(configured[name].environment[disabled], "");
     }
   }
+});
+
+test("API and background processes run the built source without development mounts", () => {
+  for (const name of ["backend", "worker", "beat"]) {
+    assert.ok(
+      !services[name].volumes?.length,
+      `${name} must be self-contained`,
+    );
+    assert.ok(!services[name].command?.includes("--reload"));
+  }
+  assert.equal(services.backend.build.dockerfile, "backend/Dockerfile");
 });

@@ -61,9 +61,6 @@ x-backend: &backend
     RETENTION_JOB_DAYS: ${RETENTION_JOB_DAYS:-30}
     RETENTION_STALE_JOB_HOURS: ${RETENTION_STALE_JOB_HOURS:-2}
     RETENTION_BATCH: ${RETENTION_BATCH:-100}
-  volumes:
-    - ./backend/app:/app/app:ro
-    - ./templates:/templates:ro
   depends_on:
     postgres:
       condition: service_healthy
@@ -82,9 +79,6 @@ services:
         NEXT_PUBLIC_STAGE_MODE: ${NEXT_PUBLIC_STAGE_MODE:-1}
         NEXT_PUBLIC_STAGE_ANALYSIS: ${NEXT_PUBLIC_STAGE_ANALYSIS:-local}
     init: true
-    environment:
-      API_INTERNAL_URL: http://backend:8000
-      NEXT_PUBLIC_API_URL: /api
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
     depends_on:
@@ -92,21 +86,22 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "const paths=['/','/demo','/gestures','/sources','/progress','/admin','/live','/live/healthcheck/review','/review-preview','/api/health/ready'];(async()=>{for(const path of paths){const response=await fetch('http://127.0.0.1:3000'+path,{signal:AbortSignal.timeout(10000)});if(!response.ok)process.exit(1)}})().then(()=>process.exit(0)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "Promise.all(['/','/api/health/ready'].map(async path=>{const r=await fetch('http://127.0.0.1:3000'+path,{signal:AbortSignal.timeout(10000)});if(!r.ok)throw new Error(path)})).catch(()=>process.exit(1))"]
       interval: 15s
-      timeout: 150s
+      timeout: 15s
       retries: 10
       start_period: 120s
 
   backend:
     <<: *backend
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
       args:
         WHISPER_MODEL: ${WHISPER_MODEL:-small}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=10).close()"]
       interval: 10s

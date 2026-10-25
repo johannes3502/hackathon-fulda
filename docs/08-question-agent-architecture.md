@@ -1,5 +1,9 @@
 # Fragen-Agent: Architektur, Didaktik und Sprachausgabe
 
+> Research-Stand vom 24.10.2026, kein aktueller Implementierungsvertrag.
+> Der Web-Dialog nutzt heute ElevenLabs; aktueller Aufbau und Grenzen:
+> [Review und Agent](07-review-and-agent.md), [Architektur](03-architecture.md).
+
 Stand: 24.10.2026. Baut auf `docs/07-voice-agent-stack.md` auf.
 Dieses Dokument ist Research + Zielarchitektur, keine umgesetzte Pipeline.
 Nach der Umsetzung gehören die betroffenen Diagramme in

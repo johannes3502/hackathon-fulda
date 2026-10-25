@@ -1853,7 +1853,19 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   const audioChunks: boolean[] = [];
   let endFromAgent = () => {};
   let sendUserAnswer = () => {};
+  let playAgentAudio: (seconds: number) => void = () => {};
+  let audioEventId = 0;
   await page.routeWebSocket("wss://api.elevenlabs.io/**", (socket) => {
+    playAgentAudio = (seconds) =>
+      socket.send(
+        JSON.stringify({
+          type: "audio",
+          audio_event: {
+            audio_base_64: Buffer.alloc(16000 * 2 * seconds).toString("base64"),
+            event_id: ++audioEventId,
+          },
+        }),
+      );
     endFromAgent = () => socket.close({ code: 1000 });
     sendUserAnswer = () =>
       socket.send(
@@ -1869,7 +1881,11 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
       if (typeof raw !== "string") return;
       const message = JSON.parse(raw);
       if (message.user_audio_chunk) {
-        audioChunks.push(Buffer.from(message.user_audio_chunk, "base64").some((byte) => byte !== 0));
+        audioChunks.push(
+          Buffer.from(message.user_audio_chunk, "base64").some(
+            (byte) => byte !== 0,
+          ),
+        );
       }
       if (message.type === "conversation_initiation_client_data") {
         override = message.conversation_config_override.agent.prompt.prompt;
@@ -1900,6 +1916,14 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
       if (message.type === "user_message") kickoffs++;
     });
   });
+  await page.goto("/admin");
+  const savedProtection = page.getByRole("checkbox", {
+    name: "Protect agent speech",
+  });
+  await expect(savedProtection).not.toBeChecked();
+  await savedProtection.check();
+  await page.reload();
+  await expect(savedProtection).toBeChecked();
   await page.goto("/sources");
   await expect(page.locator('input[type="file"]')).toBeEnabled();
   await page.getByLabel("What are you preparing for?").selectOption("thesis");
@@ -2005,6 +2029,40 @@ test("ElevenLabs receives the presentation, asks for readiness and opens final s
   });
   await expectMic(false);
   await touch.detach();
+  const protection = page.getByRole("checkbox", {
+    name: "Protect agent speech",
+  });
+  await expect(protection).toBeChecked();
+  await talk.hover();
+  await page.mouse.down();
+  await expectMic(true);
+  playAgentAudio(3);
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "microphone automatically muted" }),
+  ).toBeVisible();
+  await expect
+    .poll(() => audioChunks.slice(-10).every((chunk) => !chunk))
+    .toBe(true);
+  await expect(
+    page.getByRole("status").filter({ hasText: "Listening to your answer" }),
+  ).toBeVisible();
+  await expectMic(true);
+  await page.mouse.up();
+  await expectMic(false);
+  // Playback and preference changes must never reopen a released microphone.
+  playAgentAudio(1);
+  await protection.uncheck();
+  await expectMic(false);
+  const adminTab = await page.context().newPage();
+  await adminTab.goto("/admin");
+  await adminTab
+    .getByRole("checkbox", { name: "Protect agent speech" })
+    .check();
+  await expect(protection).toBeChecked();
+  await adminTab.close();
+  await expectMic(false);
   await noOverflow(page);
   await page.screenshot({
     path: info.outputPath("professor-question.png"),
