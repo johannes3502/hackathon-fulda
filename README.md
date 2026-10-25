@@ -23,3 +23,7 @@ Details: [Frontend](frontend/README.md) · [Backend](backend/README.md) ·
 
 **Jury:** [22-second gesture example](http://localhost:3000/gestures) ·
 [Demo guide](docs/05-jury-demo.md) · [What we measure and why](docs/04-gesture-evaluation.md).
+
+**Jury-PDFs:** [Features und Jury-Einstieg](output/pdf/418-Pitch-Practice-Features-Jury.pdf)
+(2 Seiten) · [Architektur und Datenfluss](output/pdf/418-Pitch-Practice-Architektur.pdf)
+(3 Seiten). Stand 25.10.2026; [Erzeugung und Grundlagen](output/pdf/README.md).
