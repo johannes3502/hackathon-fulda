@@ -59,7 +59,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     () => false,
   );
   const [microphone] = useState(() => new VoiceMicrophone());
-  const [finished, setFinished] = useState(false);
+  const [finished, setFinished] = useState(recording.conversationFinished === true);
   const [error, setError] = useState("");
   const [notices, setNotices] = useState<string[]>([]);
   const [transcribing, setTranscribing] = useState(false);
@@ -119,6 +119,11 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     microphone.setProtectAgentSpeech(protectAgentSpeech);
   }, [microphone, protectAgentSpeech]);
 
+  const finish = useCallback(() => {
+    setFinished(true);
+    update(recording.id, (take) => ({ ...take, conversationFinished: true }));
+  }, [recording.id, update]);
+
   const endForLimit = useCallback(() => {
     setLimitReached(true);
     setError(
@@ -132,8 +137,9 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     setPhase("idle");
     setMuted(true);
     setStartedAt(null);
+    finish();
     void endSessionIfActive(current).catch(() => {});
-  }, [microphone, releaseTalk]);
+  }, [microphone, releaseTalk, finish]);
 
   useEffect(() => {
     if (!active) return;
@@ -190,9 +196,9 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     setPhase("idle");
     setMuted(true);
     setStartedAt(null);
+    if (showStats) finish();
     try {
       await endSessionIfActive(current);
-      if (showStats && controller.current === pending) setFinished(true);
     } catch {
       if (controller.current === pending)
         setError("The connection ended unexpectedly. You can start again.");
@@ -212,6 +218,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
       ...take,
       conversation: [],
       conversationRole: voiceRole,
+      conversationFinished: false,
     }));
     const began = Date.now();
     turnCount.current = 0;
@@ -367,7 +374,7 @@ export function QuestionPractice({ recording }: { recording: LiveRecording }) {
     setFinished(false);
     setError("");
     setPhase("idle");
-    update(recording.id, (take) => ({ ...take, conversation: [] }));
+    update(recording.id, (take) => ({ ...take, conversation: [], conversationFinished: false }));
   }
 
   if (finished)

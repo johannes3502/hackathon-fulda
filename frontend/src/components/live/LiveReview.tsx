@@ -41,7 +41,7 @@ export function LiveReview({
   sessionId: string;
   stage?: boolean;
 }) {
-  const { recordings, remove } = useLiveSessions();
+  const { recordings, remove, update } = useLiveSessions();
   const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -49,6 +49,7 @@ export function LiveReview({
   const stage = requestedStage || recording?.config.stage === true;
   const [selected, setSelected] = useState<LiveFeedback | null>(null);
   const [view, setView] = useState<"moments" | "questions">("moments");
+  const [questionRound, setQuestionRound] = useState(0);
   const [all, setAll] = useState(true);
   if (!recording) return <MissingRecording />;
   const moments = recordingFeedback(recording);
@@ -59,6 +60,17 @@ export function LiveReview({
   const appearance = cueAppearance(selected, "ready");
   const mode =
     PRESENTATION_MODES[recording.config.presentationMode ?? "school"];
+  const openQuestions = () => {
+    if (view === "questions" && recording.conversationFinished) {
+      update(recording.id, (take) => ({
+        ...take,
+        conversation: [],
+        conversationFinished: false,
+      }));
+      setQuestionRound((round) => round + 1);
+    }
+    setView("questions");
+  };
   const jump = (item: LiveFeedback) => {
     setSelected({ ...item });
     setView("moments");
@@ -102,7 +114,7 @@ export function LiveReview({
             </p>
           </div>
           {!stage && (
-            <Button onClick={() => setView("questions")}>
+            <Button onClick={openQuestions}>
               <MessageSquare size={17} aria-hidden="true" /> Practice questions
               <ArrowRight size={16} aria-hidden="true" />
             </Button>
@@ -128,7 +140,7 @@ export function LiveReview({
             </button>
             <button
               aria-pressed={view === "questions"}
-              onClick={() => setView("questions")}
+              onClick={openQuestions}
             >
               <MessageSquare size={17} /> Practice questions
             </button>
@@ -286,7 +298,7 @@ export function LiveReview({
                   <h2>Now defend your ideas.</h2>
                   <p>Your teacher will ask about what you presented.</p>
                 </div>
-                <Button onClick={() => setView("questions")}>
+                <Button onClick={openQuestions}>
                   Practice questions <ArrowRight size={17} />
                 </Button>
               </div>
@@ -369,7 +381,7 @@ export function LiveReview({
             {stage && <StageQuestion />}
           </>
         ) : (
-          <QuestionPractice recording={recording} />
+          <QuestionPractice key={questionRound} recording={recording} />
         )}
         <p className="review-retention field-hint">
           Saved sessions are available on this browser and device. Download your

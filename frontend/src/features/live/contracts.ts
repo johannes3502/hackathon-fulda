@@ -68,6 +68,7 @@ export type LiveProgress = {
   notice: string | null;
 };
 export type LiveRecording = {
+  conversationFinished?: boolean;
   conversationRole?: VoiceRole | null;
   analysisUploaded?: boolean;
   conversation?: { role: "user" | "agent"; text: string }[];
