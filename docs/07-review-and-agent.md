@@ -74,6 +74,12 @@ aus dem aktuellen Check abgeleitet, damit alte Marker nach einem erneuten Check
 keine abweichenden Scores ergeben. `evidenceVerdict` hält Urteile ohne geprüftes
 Zitat auch im Score offen. Die Score-Karten benennen den Titel der Aufnahme;
 der synthetische Pfad `/review-preview` bleibt ausdrücklich ein Beispiel.
+Direkt unter den Scores steht in beiden Live-Review-Ansichten **Check facts**.
+Der Check startet weiterhin ausdrücklich per Klick; Modell/API-Konfiguration,
+fehlendes Transkript und fehlende Quellen werden dort sichtbar erklärt.
+Nach Abschluss aktualisieren sich Fachwissen und Quellen-Marker aus demselben
+lokal gespeicherten Ergebnis; ein Reload erhält den Score. Ohne entscheidbare,
+zitateverifizierte Aussagen bleibt Fachwissen offen.
 Struktur ist auf Nutzerwunsch aus Kriterien und Berechnung entfernt;
 vorhandene Anmerkungen bleiben ohne eigenes Kriterium erhalten.
 Der Graph ist eine durchgehende, ungefüllte Linie mit geraden, zackigen Segmenten. Zwischenwerte

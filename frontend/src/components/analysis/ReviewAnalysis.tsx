@@ -14,9 +14,12 @@ import { AppShell } from "@/components/shared/AppShell";
 import { STAT_LABELS } from "@/components/stats/stats";
 import { PerformanceGraph } from "./PerformanceGraph";
 import { ReviewScores } from "@/components/live/ReviewScores";
+import { FactCheckPanel } from "@/components/live/FactCheckPanel";
+import type { LiveRecording } from "@/features/live/contracts";
 import { reviewScores } from "@/features/live/review-scores";
 import {
   boundedTime,
+  feedbackToMoment,
   timestamp,
   type Criterion,
   type ReviewData,
@@ -37,10 +40,12 @@ export function ReviewAnalysis({
   data,
   backHref = "/",
   backLabel = "Zur Startseite",
+  recording,
 }: {
   data: ReviewData;
   backHref?: string;
   backLabel?: string;
+  recording?: LiveRecording;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const pendingSeek = useRef<number | null>(null);
@@ -144,12 +149,19 @@ export function ReviewAnalysis({
             recordingTitle={data.demo ? undefined : data.title}
             onSelect={(key) => setCriterion(criterion === key ? null : key)}
           />
-          {!data.demo && scores.knowledge.value === null && (
+          {!recording && !data.demo && scores.knowledge.value === null && (
             <p className="field-hint" role="status">
               Fachwissen benötigt entscheidbare Aussagen mit geprüftem
               Quellenzitat.{" "}
               <Link href={backHref}>Quellencheck in der Aufnahmeübersicht</Link>
             </p>
+          )}
+          {recording && (
+            <FactCheckPanel
+              key={recording.id}
+              recording={recording}
+              onSelect={(item) => select(feedbackToMoment(item))}
+            />
           )}
           <div className="review418-context">
             <span>

@@ -174,6 +174,13 @@ export function LiveReview({
                 </a>
               </p>
             )}
+            <FactCheckPanel
+              key={recording.id}
+              recording={recording}
+              onSelect={jump}
+              autoCheck={!stage}
+              onStatus={setKnowledgeStatus}
+            />
             <div className="review-stage-grid">
               <VideoPlayback
                 recording={{ ...recording, feedback: moments }}
@@ -318,12 +325,6 @@ export function LiveReview({
             <details id="source-checks" className="review-details">
               <summary>Transcript and source checks</summary>
               <RecordedTranscript recording={recording} onSelect={jump} />
-              <FactCheckPanel
-                recording={recording}
-                onSelect={jump}
-                autoCheck={!stage}
-                onStatus={setKnowledgeStatus}
-              />
             </details>
             <details className="review-details">
               <summary>Recording details and exports</summary>
