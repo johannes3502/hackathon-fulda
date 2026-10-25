@@ -244,7 +244,7 @@ Kein Fallback erfindet Sprache, Zitate oder Scores.
   ausgegeben. Browser-Vorlesen wählt ausschließlich eine lokale deutsche Stimme.
 - Automatisierte Regressionen verwenden synthetisches Video, Audio und
   Landmarks. Echter Kamera-/Mikrofon-/Stimmen-Test und Safari bleiben Geräte-Abnahme.
-- Verifiziert nach Integration des aktuellen `main`: 316 Frontend-Tests,
+- Verifiziert nach Integration des aktuellen `main`: 321 Frontend-Tests,
   370 Backend-Tests (54 optionale Integrationsprüfungen übersprungen),
   17 Compose-Prüfungen, Lint, Typecheck und API-Schema-Abgleich. Die
   Browser-Erwartungen verwenden die neue Agent-Begrüßung ohne Tempo-Tag.
@@ -252,6 +252,9 @@ Kein Fallback erfindet Sprache, Zitate oder Scores.
   darunter früher Review mit ausgeblendeten Landmarks, Reload, Mikrofon-Ausfall
   und lokaler Betrieb ohne Analyse-Traffic. Zusätzlich bestehen fünf
   Stage-Szenarien gegen das gebaute Produktionsimage und zwölf HTTP-Prüfungen.
+  Nach Integration des Bildungsfokus bestehen auch die 60 Prüfungen für
+  Vorbereitung, Präsentationstypen, Beispielablauf, UI und Stage. Aufnahme,
+  Wiedergabe, Reload und Sprachdialog wurden nochmals gezielt geprüft.
 - Produktionsimage gebaut, zwölf Architektur-Diagramme gerendert. Lokaler
   Whisper-Smoke-Test mit VAD: deutsche Sprachfixture liefert Wörter,
   Stille liefert keine. Das belegt den technischen Pfad, keine Erkennungsqualität.
