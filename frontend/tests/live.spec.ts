@@ -347,6 +347,7 @@ test("camera setup hides global navigation and full-size recording preserves the
   await syntheticCamera(page);
   await syntheticPose(page);
   await enable(page);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(page.getByRole("banner")).toBeHidden();
   await expect(
     page.getByRole("navigation", { name: "Presentation workflow" }),

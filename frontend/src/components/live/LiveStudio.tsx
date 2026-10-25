@@ -137,7 +137,7 @@ export function LiveStudio() {
   const startGeneration = useRef(0);
   useEffect(() => {
     if (cameraStatus === "active")
-      document.getElementById("live-studio")?.scrollIntoView({ block: "start" });
+      window.scrollTo({ top: 0, behavior: "instant" });
   }, [cameraStatus]);
   useEffect(
     () => () => {
